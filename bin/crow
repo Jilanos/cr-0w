@@ -45,11 +45,11 @@ oneshot() {
 cmd="${1:-hub}"
 shift || true
 case "$cmd" in
-  hub)      exec cdx "$CROW_ACCOUNT" "$CROW_HOME" ;;
+  hub)      exec cdx "$CROW_ACCOUNT" --dir "$CROW_HOME" ;;
   brief)    oneshot "/brief" ;;
   daily)    oneshot "/daily Draft only: save the draft to the state dir as drafts/daily-$(date +%F).md and print it. Do not post anything." ;;
   weekly)   oneshot "/weekly" ;;
-  open)     exec cdx "$CROW_ACCOUNT" "$(project_path "${1:?usage: crow open <project>}")" ;;
+  open)     exec cdx "$CROW_ACCOUNT" --dir "$(project_path "${1:?usage: crow open <project>}")" ;;
   ls)       python3 -c "
 import yaml
 for p in yaml.safe_load(open('$REGISTRY'))['projects']:
