@@ -14,8 +14,9 @@ Read-only except for one activity-log line. Target: **one screen, ≤ 40 lines**
    `assignee = currentUser() AND sprint in openSprints() AND statusCategory != Done ORDER BY priority DESC`
    Ask only for key, summary, status and priority fields.
 4. **Vault tasks**: `rg -n "^\s*- \[ \]" "<vault>/00 Inbox" "<vault>/10 Work" "<vault>/20 Personal"` and keep only tasks with a due date (📅 YYYY-MM-DD or `due:`) on or before today. Also count the files in `00 Inbox`. Don't read notes further.
-5. **Background runs**: `cdx runs --since today --json`. Keep only running or failed ones.
-6. **Mail + calendar**: only if Microsoft 365 tools are available in this session. Today's meetings, and unread mail that needs a reply. If unavailable, print one line saying so and move on.
+5. **Release tracks**: `bin/crow-releases`.
+6. **Background runs**: `cdx runs --since today --json`. Keep only running or failed ones.
+7. **Mail + calendar**: only if Microsoft 365 tools are available in this session. Today's meetings, and unread mail that needs a reply. If unavailable, print one line saying so and move on.
 
 Skip any source that errors and note it in one line at the bottom.
 
@@ -35,8 +36,8 @@ Skip any source that errors and note it in one line at the bottom.
 ## 🧵 Open threads
 - stale (>3 days) or due ones only
 
-## 🏠 Side project
-- one line: last activity + suggested next step for the most recently active personal project
+## 🚀 Release tracks
+- one line per track: name → target, next milestone (or "no roadmap yet"); then one suggested next step for the most recently active personal project
 
 ## ✅ Suggested top 3
 1. …  (follow the priority order in CLAUDE.md)

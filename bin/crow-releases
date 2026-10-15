@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Release tracks: where each registered project stands on its road to a public release.
+
+Reads the `release:` block of each project in the registry and, when a roadmap
+file exists, its milestones (Logics roadmap format: `## <version> - <title>`,
+`(delivered)` suffix when done, `- Exit signal:` line).
+
+Usage: crow-releases [--scope work|personal|all] [--json]
+"""
+import argparse
+import json
+import os
+import re
+import sys
+
+import yaml
+
+CROW_HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+REGISTRY = os.path.join(CROW_HOME, "local", "projects.yaml")
+MILESTONE = re.compile(r"^## (\d+(?:\.\d+)*)\s+-\s+(.+?)\s*$")
+
+
+def parse_roadmap(path):
+    milestones, current = [], None
+    status = None
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if status is None and line.startswith("> Status:"):
+                status = line.split(":", 1)[1].strip()
+            m = MILESTONE.match(line)
+            if m:
+                title = m.group(2)
+                delivered = bool(re.search(r"\((delivered|released|done)\)\s*$", title, re.I))
+                title = re.sub(r"\s*\((delivered|released|done)\)\s*$", "", title, flags=re.I)
+                current = {"version": m.group(1), "title": title, "delivered": delivered, "items": 0, "exit": None}
+                milestones.append(current)
+            elif current and line.startswith("- `"):
+                current["items"] += 1
+            elif current and line.startswith("- Exit signal:"):
+                current["exit"] = line.split(":", 1)[1].strip()
+    return status, milestones
+
+
+def track(project):
+    rel = project.get("release") or {}
+    out = {
+        "name": project["name"],
+        "target": rel.get("target"),
+        "channel": rel.get("channel"),
+        "state": rel.get("state", "none"),
+        "roadmap": None,
+        "roadmap_status": None,
+        "delivered": 0,
+        "milestones": 0,
+        "next": None,
+    }
+    roadmap = rel.get("roadmap")
+    if roadmap:
+        path = roadmap if os.path.isabs(roadmap) else os.path.join(project["path"], roadmap)
+        out["roadmap"] = path
+        if os.path.isfile(path):
+            status, ms = parse_roadmap(path)
+            out["roadmap_status"] = status
+            out["milestones"] = len(ms)
+            out["delivered"] = sum(m["delivered"] for m in ms)
+            out["next"] = next((m for m in ms if not m["delivered"]), None)
+        else:
+            out["roadmap_status"] = "missing file"
+    return out
+
+
+def render(tracks):
+    lines = []
+    for t in tracks:
+        head = f"- {t['name']}: {t['state']}"
+        if t["target"]:
+            head += f" → {t['target']}"
+        if t["channel"]:
+            head += f" ({t['channel']})"
+        lines.append(head)
+        if t["roadmap_status"] == "missing file":
+            lines.append(f"  roadmap missing: {t['roadmap']}")
+        elif t["milestones"]:
+            lines.append(f"  roadmap {t['roadmap_status'] or '?'}: {t['delivered']}/{t['milestones']} milestones delivered")
+            n = t["next"]
+            if n:
+                lines.append(f"  next: {n['version']} {n['title']} ({n['items']} refs)")
+                if n["exit"]:
+                    lines.append(f"  exit: {n['exit']}")
+        elif t["state"] == "none":
+            lines.append("  no roadmap yet")
+    return "\n".join(lines)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--scope", choices=["work", "personal", "all"], default="personal")
+    ap.add_argument("--json", action="store_true")
+    args = ap.parse_args()
+
+    reg = yaml.safe_load(open(REGISTRY, encoding="utf-8"))
+    tracks = [
+        track(p)
+        for p in reg["projects"]
+        if p.get("status") == "active"
+        and "release" in p
+        and (args.scope == "all" or p.get("scope") == args.scope)
+    ]
+    if args.json:
+        json.dump(tracks, sys.stdout, indent=2, default=str)
+        print()
+    else:
+        print(render(tracks) or "No release tracks.")
+
+
+if __name__ == "__main__":
+    main()

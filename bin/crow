@@ -9,6 +9,7 @@
 #   crow ls              list registered projects
 #   crow runs            today's background runs
 #   crow activity [...]  raw activity (see crow-activity --help)
+#   crow releases [...]  release tracks: roadmap progress toward public releases
 set -euo pipefail
 
 CROW_HOME="${CROW_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
@@ -56,6 +57,7 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
     print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
   runs)     cdx runs --since today --json | jq -r '.runs[]? | "\(.status // "?")\t\(.session)\t\(.cwd)\t\(.run_id)"' ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
-  -h|--help|help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' ;;
+  releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
+  -h|--help|help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac
