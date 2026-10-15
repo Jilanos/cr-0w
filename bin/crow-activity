@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Collect the user's recent activity across registered projects, as Markdown.
+
+Cheap, deterministic input for the brief / daily / weekly workflows:
+  - local git commits (all branches) by the configured identities
+  - GitLab: own MRs updated, MRs awaiting review, user events (approvals, comments, merges)
+  - GitHub: own PRs updated, PRs awaiting review
+
+Usage: crow-activity [--since YYYY-MM-DD|yesterday|Nd] [--scope work|personal|all]
+"""
+import argparse
+import datetime as dt
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+REGISTRY = ROOT / "local" / "projects.yaml"
+
+
+def parse_since(value):
+    today = dt.date.today()
+    if value == "yesterday":
+        # Monday looks back to Friday.
+        return today - dt.timedelta(days=3 if today.weekday() == 0 else 1)
+    if value.endswith("d") and value[:-1].isdigit():
+        return today - dt.timedelta(days=int(value[:-1]))
+    return dt.date.fromisoformat(value)
+
+
+def run(cmd, cwd=None):
+    try:
+        out = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return None, str(exc)
+    if out.returncode != 0:
+        return None, (out.stderr or out.stdout).strip().splitlines()[-1:] or ["failed"]
+    return out.stdout, None
+
+
+def api_json(cmd):
+    out, err = run(cmd)
+    if err:
+        return None, err
+    try:
+        return json.loads(out or "[]"), None
+    except json.JSONDecodeError as exc:
+        return None, str(exc)
+
+
+def git_commits(project, emails, since):
+    path = project["path"]
+    if not (Path(path) / ".git").exists():
+        return []
+    cmd = ["git", "log", "--all", f"--since={since.isoformat()}", "--no-merges",
+           "--format=%ad|%D|%s", "--date=short"]
+    for email in emails:
+        cmd.append(f"--author={email}")
+    if project.get("subdir"):
+        cmd += ["--", project["subdir"]]
+    out, _ = run(cmd, cwd=path)
+    return [line.split("|", 2) for line in (out or "").splitlines() if line]
+
+
+def gitlab_section(since):
+    lines = []
+    iso = f"{since.isoformat()}T00:00:00Z"
+    me, err = api_json(["glab", "api", "user"])
+    if err:
+        return [f"- ⚠️ GitLab unavailable: {err}"]
+    user = me["username"]
+
+    review, _ = api_json(["glab", "api",
+                          f"merge_requests?scope=all&state=opened&reviewer_username={user}&per_page=50"])
+    lines.append("### Awaiting my review")
+    for mr in review or []:
+        lines.append(f"- {mr['references']['full']} {mr['title']} (by {mr['author']['username']}, "
+                     f"updated {mr['updated_at'][:10]})")
+    if not review:
+        lines.append("- none")
+
+    mine, _ = api_json(["glab", "api",
+                        f"merge_requests?scope=created_by_me&updated_after={iso}&per_page=50"])
+    lines.append("### My MRs (updated)")
+    for mr in mine or []:
+        lines.append(f"- {mr['references']['full']} [{mr['state']}] {mr['title']}")
+    if not mine:
+        lines.append("- none")
+
+    events, _ = api_json(["glab", "api", f"events?after={(since - dt.timedelta(days=1)).isoformat()}&per_page=100"])
+    lines.append("### My GitLab actions")
+    # Aggregate per (day, action, MR/issue) so a 20-comment review is one line.
+    grouped = {}
+    for ev in events or []:
+        action = ev.get("action_name")
+        note = ev.get("note") or {}
+        kind = note.get("noteable_type") or ev.get("target_type")
+        if action.startswith("pushed") or kind not in ("MergeRequest", "Issue"):
+            continue  # pushes are in the git log; branch/project events are noise
+        iid = note.get("noteable_iid") or ev.get("target_iid")
+        key = (ev["created_at"][:10], action, kind, iid)
+        entry = grouped.setdefault(key, {"count": 0, "title": ev.get("target_title") or ""})
+        entry["count"] += 1
+    for (day, action, kind, iid), entry in grouped.items():
+        sigil = "!" if kind == "MergeRequest" else "#"
+        times = f" ×{entry['count']}" if entry["count"] > 1 else ""
+        lines.append(f"- {day} {action}{times} {sigil}{iid} {entry['title']}")
+    if not grouped:
+        lines.append("- none")
+    return lines
+
+
+def github_section(since):
+    lines = []
+    review, err = api_json(["gh", "search", "prs", "--review-requested=@me", "--state=open",
+                            "--json", "repository,number,title,author,updatedAt", "-L", "50"])
+    if err:
+        return [f"- ⚠️ GitHub unavailable: {err}"]
+    lines.append("### Awaiting my review")
+    for pr in review or []:
+        lines.append(f"- {pr['repository']['nameWithOwner']}#{pr['number']} {pr['title']} "
+                     f"(by {pr['author']['login']})")
+    if not review:
+        lines.append("- none")
+    mine, _ = api_json(["gh", "search", "prs", "--author=@me", f"--updated=>={since.isoformat()}",
+                        "--json", "repository,number,title,state", "-L", "50"])
+    lines.append("### My PRs (updated)")
+    for pr in mine or []:
+        lines.append(f"- {pr['repository']['nameWithOwner']}#{pr['number']} [{pr['state']}] {pr['title']}")
+    if not mine:
+        lines.append("- none")
+    return lines
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--since", default="yesterday")
+    ap.add_argument("--scope", choices=["work", "personal", "all"], default="all")
+    ap.add_argument("--limit", type=int, default=20, help="max commits listed per project")
+    args = ap.parse_args()
+
+    since = parse_since(args.since)
+    reg = yaml.safe_load(REGISTRY.read_text())
+    ids = reg.get("identities", {})
+    emails = [e for v in ids.values() for e in (v if isinstance(v, list) else [v])]
+
+    print(f"# Activity since {since.isoformat()} (scope: {args.scope})\n")
+    print("## Commits")
+    any_commit = False
+    for proj in reg["projects"]:
+        if proj.get("status") != "active" or (args.scope != "all" and proj["scope"] != args.scope):
+            continue
+        commits = git_commits(proj, emails, since)
+        if commits:
+            any_commit = True
+            print(f"### {proj['name']} ({proj['scope']})")
+            for date, refs, subject in commits[:args.limit]:
+                refs = f" [{refs}]" if refs else ""
+                print(f"- {date} {subject}{refs}")
+            if len(commits) > args.limit:
+                print(f"- … +{len(commits) - args.limit} more")
+    if not any_commit:
+        print("- none")
+
+    forges = {p["forge"] for p in reg["projects"] if p.get("status") == "active"
+              and (args.scope == "all" or p["scope"] == args.scope)}
+    if "gitlab" in forges:
+        print("\n## GitLab (work)")
+        print("\n".join(gitlab_section(since)))
+    if "github" in forges:
+        print("\n## GitHub (personal)")
+        print("\n".join(github_section(since)))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

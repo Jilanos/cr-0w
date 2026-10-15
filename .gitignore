@@ -1,0 +1,4 @@
+# Uncomment `local/` before making this repo public — it holds private config and state.
+# local/
+.claude/settings.local.json
+*.bak

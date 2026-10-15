@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# crow: launcher for the CR-0W hub, built on cdx.
+#
+#   crow                 open the hub session
+#   crow brief           print the morning brief (one-shot run)
+#   crow daily           draft today's daily into the state dir (one-shot run; post it from the hub)
+#   crow weekly          build the weekly rollup + slide outline (one-shot run)
+#   crow open <project>  open a session in a registered project
+#   crow ls              list registered projects
+#   crow runs            today's background runs
+#   crow activity [...]  raw activity (see crow-activity --help)
+set -euo pipefail
+
+CROW_HOME="${CROW_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+CROW_ACCOUNT="${CROW_ACCOUNT:-main}"
+REGISTRY="$CROW_HOME/local/projects.yaml"
+export CROW_HOME
+
+project_path() {
+  python3 - "$REGISTRY" "$1" <<'EOF'
+import sys, yaml
+reg = yaml.safe_load(open(sys.argv[1]))
+for p in reg["projects"]:
+    if p["name"] == sys.argv[2]:
+        print(p["path"]); break
+else:
+    sys.exit(f"crow: unknown project '{sys.argv[2]}' (see: crow ls)")
+EOF
+}
+
+oneshot() {
+  local prompt="$1" out
+  out=$(cdx run "$CROW_ACCOUNT" --cwd "$CROW_HOME" --prompt "$prompt" --permission auto --json)
+  local ok stdout_path
+  ok=$(jq -r '.ok' <<<"$out")
+  stdout_path=$(jq -r '.stdout_path' <<<"$out")
+  if [[ "$ok" != "true" ]]; then
+    jq -r '.error // "run failed"' <<<"$out" >&2
+    exit 1
+  fi
+  cat "$stdout_path"
+  jq -r '"\n— \(.usage.total_tokens) tokens · \(.duration_seconds|floor)s · run \(.run_id)"' <<<"$out" >&2
+}
+
+cmd="${1:-hub}"
+shift || true
+case "$cmd" in
+  hub)      exec cdx "$CROW_ACCOUNT" "$CROW_HOME" ;;
+  brief)    oneshot "/brief" ;;
+  daily)    oneshot "/daily Draft only: save the draft to the state dir as drafts/daily-$(date +%F).md and print it. Do not post anything." ;;
+  weekly)   oneshot "/weekly" ;;
+  open)     exec cdx "$CROW_ACCOUNT" "$(project_path "${1:?usage: crow open <project>}")" ;;
+  ls)       python3 -c "
+import yaml
+for p in yaml.safe_load(open('$REGISTRY'))['projects']:
+    print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
+  runs)     cdx runs --since today --json | jq -r '.runs[]? | "\(.status // "?")\t\(.session)\t\(.cwd)\t\(.run_id)"' ;;
+  activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
+  -h|--help|help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
+esac
