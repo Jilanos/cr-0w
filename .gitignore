@@ -2,3 +2,5 @@
 # local/
 .claude/settings.local.json
 *.bak
+tools/crow-watch/crow-watch
+__pycache__/

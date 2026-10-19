@@ -25,7 +25,7 @@ This records the run in `<state>/runs.jsonl` so `crow runs` can show its label a
 When relaunching an interrupted run, add `--resumes <run_id>` so the old run is folded into the new one.
 
 ## Track
-- `crow watch`: a live two-pane board (Textual, run through `uv run --script`). Every agent row shows its state, project, task, last activity, context, commits and current action; the right pane shows the selected agent's timeline, commits and final report.
+- `crow watch`: a live two-pane board (Go + Bubble Tea in `tools/crow-watch`, rebuilt on demand; reads `crow-runs json`). Tall terminals stack the panes. Every agent row shows its state, project, task, last activity, context, commits and current action; the right pane shows the selected agent's timeline, commits and final report.
 - `crow runs`: the same view, printed once. `crow-runs json` gives the same data as JSON for widgets.
 - States: ● working / ◌ quiet (a run with no transcript writes for 20s or more) / ◆ waiting (a session whose last message is text, i.e. it is waiting on the user) / ○ idle.
   Finished: ✓ done / ✗ failed / ⏸ usage limit / ? lost.

@@ -59,7 +59,12 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
     print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
   runs)     exec "$CROW_HOME/bin/crow-runs" list "$@" ;;
   dispatch) exec "$CROW_HOME/bin/crow-runs" dispatch "$@" ;;
-  watch)    exec "$CROW_HOME/bin/crow-watch" "$@" ;;
+  watch)    # rebuild the Go board when its source is newer than the binary
+            src="$CROW_HOME/tools/crow-watch"; bin="$src/crow-watch"
+            if [[ ! -x "$bin" || -n "$(find "$src" -name '*.go' -newer "$bin" -o -name go.mod -newer "$bin")" ]]; then
+              (cd "$src" && go build -o crow-watch .) || exit 1
+            fi
+            exec "$bin" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
   -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
