@@ -26,5 +26,8 @@ Read the project's `reviewers` list in the hub registry (`<hub>/local/projects.y
 - The user's forge username is the project's `forge_user` in the registry.
 - Never merge a work MR. Never add AI attribution anywhere.
 
-## 5. Report
+## 5. Update the tickets
+For every ticket the MR closes, move it to the tracker's review status (e.g. Jira "Merge Review"). A ticket the MR only partly covers stays in progress. Do the same when an existing MR changes state (ready, merged → the post-merge status the team uses).
+
+## 6. Report
 Give the link, the reviewer and any pre-merge steps left.
