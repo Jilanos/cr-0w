@@ -11,3 +11,4 @@ want to trigger it by name.
 
 ## Index
 - [dispatch-background-runs](dispatch-background-runs.md): start, track and recover cdx background runs in project repos
+- [archeotech-crow-agents](archeotech-crow-agents.md): test the crow agents bar/panel module with fixtures and headless renders
