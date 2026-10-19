@@ -9,6 +9,7 @@
 #   crow ls              list registered projects
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
+#   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
 #   crow watch           live two-pane board of every agent (runs, sessions, finished)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
@@ -59,6 +60,8 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
     print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
   runs)     exec "$CROW_HOME/bin/crow-runs" list "$@" ;;
   dispatch) exec "$CROW_HOME/bin/crow-runs" dispatch "$@" ;;
+  json)     exec "$CROW_HOME/bin/crow-runs" json "$@" ;;
+  report)   exec "$CROW_HOME/bin/crow-runs" report "$@" ;;
   watch)    # rebuild the Go board when its source is newer than the binary
             src="$CROW_HOME/tools/crow-watch"; bin="$src/crow-watch"
             if [[ ! -x "$bin" || -n "$(find "$src" -name '*.go' -newer "$bin" -o -name go.mod -newer "$bin")" ]]; then
@@ -67,6 +70,6 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
             exec "$bin" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac
