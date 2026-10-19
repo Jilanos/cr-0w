@@ -9,6 +9,7 @@
 #   crow ls              list registered projects
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
+#   crow watch           live view of every agent (background runs + sessions)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
 set -euo pipefail
@@ -58,8 +59,9 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
     print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
   runs)     exec "$CROW_HOME/bin/crow-runs" list "$@" ;;
   dispatch) exec "$CROW_HOME/bin/crow-runs" dispatch "$@" ;;
+  watch)    exec "$CROW_HOME/bin/crow-runs" watch "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac

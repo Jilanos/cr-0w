@@ -24,9 +24,13 @@ Use when the user wants work done in project repos without opening a session the
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.
 
 ## Track
-- `crow runs`: ● running / ✓ done / ✗ failed / ⏸ usage limit / ? lost, plus commits made since the start.
-- `cdx runs` lists finished runs only. A live run is found through its process (`ps`, matched on `--cwd`).
-- Final report: the `result` field in `stdout_path` of the run (`cdx runs --json`).
+- `crow watch`: a live view of every agent, both background runs and interactive sessions. Each one shows its state, its last action, context size and commits since the start. Press q to quit.
+- `crow runs`: the same view, printed once. `crow-runs json` gives the same data as JSON for widgets.
+- States: ● working / ◌ quiet (a run with no transcript writes for 20s or more) / ◆ waiting (a session whose last message is text, i.e. it is waiting on the user) / ○ idle.
+  Finished: ✓ done / ✗ failed / ⏸ usage limit / ? lost.
+- Data sources: `<home>/.claude/sessions/<pid>.json` (current session id and busy/idle status; the id changes on /clear),
+  then the transcript at `<home>/.claude/projects/<cwd with non-alphanumerics replaced by ->/<session>.jsonl`, and the ledger `<state>/runs.jsonl`.
+- `cdx runs` lists finished runs only. A run's final report is the `result` field in its `stdout_path`.
 
 ## Recover
 - **⏸ usage limit** (the stdout says "You've hit your session limit · resets HH:MM"): partial work stays

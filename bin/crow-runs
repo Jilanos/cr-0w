@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""crow-runs: dispatch background runs and show what each one is doing.
+"""crow-runs: dispatch background runs and see what every agent is doing.
 
   crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--power P]
-  crow-runs [list] [--since today|7d|DATE] [--all]
+  crow-runs [list] [--since today|7d|DATE] [--all]   one-shot listing
+  crow-runs json                                     same data as JSON (for widgets)
+  crow-runs watch [--interval N]                     live view; q to quit
 
 Every dispatch is recorded in <state>/runs.jsonl (run id, project, label, start
-commit), so the listing can show which task each run works on, whether it is
-still running, and the commits it has made so far.
+commit). Live agents come from the Claude processes themselves: their cwd, cdx
+account and session transcript (what they are doing right now).
 """
-import argparse, json, os, subprocess, sys, time
+import argparse, json, os, re, select, shutil, subprocess, sys, termios, time, tty
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +22,8 @@ REG = yaml.safe_load(open(HOME / "local/projects.yaml"))
 STATE = Path(REG.get("vault", {}).get("crow_dir") or HOME / "local/state")
 LEDGER = STATE / "runs.jsonl"
 MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
+WORKING_S = 20      # transcript touched this recently = working
+TAIL_BYTES = 96_000
 
 
 def sh(*args, cwd=None):
@@ -34,22 +38,20 @@ def project(name):
     sys.exit(f"crow: unknown project '{name}' (see: crow ls)")
 
 
+def project_name(cwd):
+    best = None
+    for p in REG["projects"]:
+        if (cwd + "/").startswith(p["path"].rstrip("/") + "/") and (not best or len(p["path"]) > len(best["path"])):
+            best = p
+    if Path(cwd) == HOME:
+        return "crow (hub)"
+    return best["name"] if best else Path(cwd).name
+
+
 def ledger():
     if not LEDGER.exists():
         return []
     return [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
-
-
-def live_cwds():
-    """cwds of cdx runs whose process is still alive (cdx only lists finished runs)."""
-    out, cwds = sh("ps", "-eo", "args"), []
-    for line in out.splitlines():
-        if "cdx_manager.cli run" in line or (" run " in line and line.split()[0].endswith("cdx")):
-            parts = line.split()
-            for flag in ("--cwd", "--dir"):
-                if flag in parts:
-                    cwds.append(parts[parts.index(flag) + 1])
-    return cwds
 
 
 def finished(since):
@@ -57,13 +59,188 @@ def finished(since):
     return {r["run_id"]: r for r in (json.loads(out).get("runs", []) if out else [])}
 
 
+def iso_age(iso):
+    return time.time() - datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp()
+
+
+def fmt_age(s):
+    s = int(s)
+    if s < 60:
+        return f"{s}s"
+    return f"{s // 60}m" if s < 3600 else f"{s // 3600}h{(s % 3600) // 60:02d}"
+
+
+# ---------- live agents (Claude processes) ----------
+
+def claude_procs():
+    out = []
+    for d in Path("/proc").iterdir():
+        if not d.name.isdigit():
+            continue
+        try:
+            argv = (d / "cmdline").read_bytes().split(b"\0")
+            if not argv or not (argv[0].endswith(b"claude") or b"/claude/versions/" in os.readlink(d / "exe").encode()):
+                continue
+            argv = [a.decode(errors="replace") for a in argv if a]
+            env = dict(l.split("=", 1) for l in (d / "environ").read_bytes().decode(errors="replace").split("\0") if "=" in l)
+            out.append({
+                "pid": int(d.name), "argv": argv, "cwd": os.readlink(d / "cwd"),
+                "home": env.get("HOME", ""), "started": (d / "cmdline").stat().st_mtime,
+            })
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def arg(argv, flag):
+    return argv[argv.index(flag) + 1] if flag in argv and argv.index(flag) + 1 < len(argv) else None
+
+
+def transcript_path(home, cwd, sid):
+    return Path(home) / ".claude/projects" / re.sub(r"[^A-Za-z0-9]", "-", cwd) / f"{sid}.jsonl"
+
+
+def summarize_tool(name, inp):
+    for k in ("command", "description", "file_path", "pattern", "query", "url", "prompt", "skill"):
+        if inp.get(k):
+            v = str(inp[k]).strip().splitlines()[0]
+            return f"{name}: {v}"
+    return name
+
+
+def read_transcript(path):
+    """Last action, whether it ended on plain text (= waiting on the user), context size."""
+    info = {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": 0}
+    if not path.exists():
+        return info
+    size = path.stat().st_size
+    with path.open("rb") as f:
+        f.seek(max(0, size - TAIL_BYTES))
+        lines = f.read().decode(errors="replace").splitlines()[1:] if size > TAIL_BYTES else f.read().decode(errors="replace").splitlines()
+    for line in reversed(lines):
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        msg = e.get("message") or {}
+        if e.get("type") == "assistant" and isinstance(msg.get("content"), list):
+            if info["context_tokens"] is None and msg.get("usage"):
+                u = msg["usage"]
+                info["context_tokens"] = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+            if info["last_action"] is None:
+                for c in reversed(msg["content"]):
+                    if c.get("type") == "tool_use":
+                        info["last_action"] = summarize_tool(c.get("name", "?"), c.get("input") or {})
+                        break
+                    if c.get("type") == "text" and c.get("text", "").strip():
+                        info["last_action"] = "says: " + c["text"].strip().splitlines()[0]
+                        info["ends_on_text"] = True
+                        break
+        elif e.get("type") == "user" and info["last_action"] is None and isinstance(msg.get("content"), str):
+            info["last_action"] = "you: " + msg["content"].strip().splitlines()[0] if msg["content"].strip() else None
+        if info["last_action"] and info["context_tokens"] is not None:
+            break
+    sub = path.with_suffix("") / "subagents"
+    if sub.is_dir():
+        info["subagents_active"] = sum(1 for s in sub.glob("*.jsonl") if time.time() - s.stat().st_mtime < 60)
+    return info
+
+
+def commits_since(cwd, sha, until=None):
+    if not sha:
+        return []
+    extra = [f"--until={until}"] if until else []
+    return sh("git", "log", "--oneline", *extra, f"{sha}..HEAD", cwd=cwd).splitlines()
+
+
+def collect(since="today", include_unledgered=False):
+    now = time.time()
+    done = finished(since)
+    recs = ledger()
+    cutoff = datetime.now().astimezone().date() if since == "today" else None
+    agents, claimed = [], set()
+
+    for p in claude_procs():
+        # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
+        meta = {}
+        try:
+            meta = json.loads((Path(p["home"]) / ".claude/sessions" / f"{p['pid']}.json").read_text())
+        except (OSError, ValueError):
+            pass
+        sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
+        kind = "run" if "--print" in p["argv"] or "-p" in p["argv"] else "session"
+        account = (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
+        tpath = transcript_path(p["home"], p["cwd"], sid) if sid else None
+        mtime = tpath.stat().st_mtime if tpath and tpath.exists() else p["started"]
+        t = read_transcript(tpath) if tpath else {}
+        idle = now - mtime
+        if meta.get("status") == "busy" or idle < WORKING_S:
+            state = "working"
+        elif kind == "session" and t.get("ends_on_text"):
+            state = "waiting"
+        else:
+            state = "idle" if kind == "session" else "quiet"
+        a = {
+            "kind": kind, "pid": p["pid"], "account": account, "project": project_name(p["cwd"]),
+            "cwd": p["cwd"], "session_id": sid, "state": state,
+            "started_at": datetime.fromtimestamp(p["started"], timezone.utc).isoformat(timespec="seconds"),
+            "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active")},
+            "run_id": None, "label": None, "commits": [],
+        }
+        if kind == "run":
+            for rec in reversed(recs):
+                if rec["cwd"] == p["cwd"] and rec["run_id"] not in done and rec["run_id"] not in claimed:
+                    claimed.add(rec["run_id"])
+                    a.update(run_id=rec["run_id"], label=rec["label"], commits=commits_since(rec["cwd"], rec.get("start_sha")))
+                    break
+        agents.append(a)
+
+    past = []
+    for rec in reversed(recs):
+        if rec["run_id"] in claimed:
+            continue
+        if cutoff and datetime.fromisoformat(rec["started_at"]).astimezone().date() < cutoff:
+            continue
+        r = done.get(rec["run_id"])
+        if r:
+            if r.get("exit_code") == 0:
+                st = "done"
+            else:
+                tail = ""
+                for k in ("stdout_path", "stderr_path"):
+                    f = Path(r.get("artifacts", {}).get(k) or "/nonexistent")
+                    tail += f.read_text(errors="replace")[-800:] if f.exists() else ""
+                st = "limit" if "limit" in tail.lower() else "failed"
+        else:
+            st = "lost"
+        past.append({
+            "run_id": rec["run_id"], "project": rec["project"], "label": rec["label"], "status": st,
+            "duration_s": int(r["duration_seconds"]) if r and r.get("duration_seconds") else None,
+            "ended_at": r.get("ended_at") if r else None,
+            "commits": commits_since(rec["cwd"], rec.get("start_sha"), r.get("ended_at") if r else None),
+        })
+    if include_unledgered:
+        known = {rec["run_id"] for rec in recs}
+        for rid, r in done.items():
+            if rid not in known:
+                past.append({"run_id": rid, "project": project_name(r["cwd"]), "label": "(not dispatched by crow)",
+                             "status": "done" if r.get("exit_code") == 0 else "failed",
+                             "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": []})
+
+    busy = sum(1 for a in agents if a["kind"] == "run")
+    return {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "slots": {"busy": busy, "max": MAX_PARALLEL}, "agents": agents, "finished": past}
+
+
+# ---------- commands ----------
+
 def dispatch(a):
     p = project(a.project)
     cwd = p["path"]
-    running = live_cwds()
-    if len(running) >= MAX_PARALLEL and not a.force:
-        sys.exit(f"crow: {len(running)} runs already running (max {MAX_PARALLEL}); --force to override")
-    if cwd in running and not a.force:
+    runs = [x for x in claude_procs() if "--print" in x["argv"]]
+    if len(runs) >= MAX_PARALLEL and not a.force:
+        sys.exit(f"crow: {len(runs)} runs already running (max {MAX_PARALLEL}); --force to override")
+    if any(x["cwd"] == cwd for x in runs) and not a.force:
         sys.exit(f"crow: a run is already working in {cwd}; --force to override")
     src = ["--prompt-file", a.prompt_file] if a.prompt_file else ["--prompt", a.prompt]
     out = sh("cdx", "run", ACCOUNT, "--cwd", cwd, *src, "--power", a.power,
@@ -84,65 +261,96 @@ def dispatch(a):
     print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}")
 
 
-def ago(iso):
-    if not iso:
-        return "?"
-    s = int(time.time() - datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp())
-    return f"{s // 60}m" if s < 3600 else f"{s // 3600}h{(s % 3600) // 60:02d}"
+C = {"dim": "\033[2m", "b": "\033[1m", "g": "\033[32m", "y": "\033[33m", "r": "\033[31m", "c": "\033[36m", "m": "\033[35m", "0": "\033[0m"}
+STATE_STYLE = {"working": ("●", "g"), "quiet": ("◌", "y"), "waiting": ("◆", "m"), "idle": ("○", "dim")}
+PAST_STYLE = {"done": ("✓", "g"), "failed": ("✗", "r"), "limit": ("⏸", "y"), "lost": ("?", "dim")}
 
 
-def status_of(rec, done, alive):
-    r = done.get(rec["run_id"])
-    if r:
-        if r.get("exit_code") == 0:
-            return "done"
-        tail = ""
-        for k in ("stdout_path", "stderr_path"):
-            f = Path(r.get("artifacts", {}).get(k) or "/nonexistent")
-            tail += f.read_text(errors="replace")[-800:] if f.exists() else ""
-        return "limit" if "limit" in tail.lower() else "failed"
-    # Several runs can share a cwd over a day; only the newest unfinished one is live.
-    return "running" if rec["cwd"] in alive else "lost"
+def render(data, color=True, width=None):
+    width = width or shutil.get_terminal_size((120, 40)).columns
+    c = C if color else {k: "" for k in C}
+
+    def clip(s, indent=0):
+        s = s.replace("\n", " ")
+        return s if len(s) + indent <= width else s[: max(0, width - indent - 1)] + "…"
+
+    out = []
+    runs = [a for a in data["agents"] if a["kind"] == "run"]
+    sess = [a for a in data["agents"] if a["kind"] == "session"]
+    sl = data["slots"]
+    out.append(f"{c['b']}CR-0W agents{c['0']}  {c['dim']}{datetime.now():%H:%M:%S}{c['0']}   "
+               f"background slots {sl['busy']}/{sl['max']}   sessions {len(sess)}")
+
+    def agent_lines(a, title):
+        sym, col = STATE_STYLE[a["state"]]
+        ctx = f" · ctx {a['context_tokens'] // 1000}k" if a.get("context_tokens") else ""
+        subs = f" · {a['subagents_active']} subagents" if a.get("subagents_active") else ""
+        meta = f"{a['state']} {fmt_age(a['last_activity_s'])} ago · up {fmt_age(iso_age(a['started_at']))}{ctx}{subs} · {a['account']}"
+        out.append(clip(f"{c[col]}{sym}{c['0']} {c['b']}{a['project']:<20}{c['0']} {title}") )
+        out.append(clip(f"    {c['dim']}{meta}{c['0']}", 0))
+        if a.get("last_action"):
+            out.append(clip(f"    {c['c']}↳ {a['last_action']}{c['0']}", 0))
+        for cm in a.get("commits", [])[:3]:
+            out.append(clip(f"    {c['dim']}{cm}{c['0']}", 0))
+        if len(a.get("commits", [])) > 3:
+            out.append(f"    {c['dim']}… {len(a['commits']) - 3} more commits{c['0']}")
+
+    out.append("")
+    out.append(f"{c['b']}Background runs{c['0']}")
+    if not runs:
+        out.append(f"  {c['dim']}none{c['0']}")
+    for a in runs:
+        agent_lines(a, (a["label"] or "(not dispatched by crow)") + (f" {c['dim']}{a['run_id'][:8]}{c['0']}" if a["run_id"] else ""))
+
+    out.append("")
+    out.append(f"{c['b']}Interactive sessions{c['0']}")
+    if not sess:
+        out.append(f"  {c['dim']}none{c['0']}")
+    for a in sorted(sess, key=lambda a: a["last_activity_s"]):
+        agent_lines(a, f"{c['dim']}{(a['session_id'] or '')[:8]}{c['0']}")
+
+    if data["finished"]:
+        out.append("")
+        out.append(f"{c['b']}Finished{c['0']}")
+        for f in data["finished"]:
+            sym, col = PAST_STYLE[f["status"]]
+            d = fmt_age(f["duration_s"]) if f.get("duration_s") else "?"
+            out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['status']:<6} {d:>5}  {f['label']}  "
+                            f"{c['dim']}{f['run_id'][:8]} · {len(f['commits'])} commits{c['0']}"))
+    return out
 
 
 def listing(a):
-    since = a.since
-    done, alive = finished(since), live_cwds()
-    recs = ledger()
-    cutoff = None if since != "today" else datetime.now().astimezone().date()
-    rows, seen = [], set()
-    for rec in reversed(recs):
-        start = datetime.fromisoformat(rec["started_at"]).astimezone()
-        if cutoff and start.date() < cutoff:
-            continue
-        st = status_of(rec, done, alive)
-        if st == "running" and rec["cwd"] in seen:
-            st = "lost"
-        seen.add(rec["cwd"])
-        r = done.get(rec["run_id"], {})
-        until = [f"--until={r['ended_at']}"] if r.get("ended_at") else []
-        commits = sh("git", "log", "--oneline", *until, f"{rec['start_sha']}..HEAD", cwd=rec["cwd"]).splitlines() if rec.get("start_sha") else []
-        dur = f"{int(r['duration_seconds']) // 60}m" if r.get("duration_seconds") else ago(rec["started_at"])
-        rows.append((st, rec, commits, dur))
-    if a.all:
-        known = {rec["run_id"] for rec in recs}
-        for rid, r in done.items():
-            if rid not in known:
-                rows.append(("done" if r.get("exit_code") == 0 else "failed",
-                             {"run_id": rid, "project": Path(r["cwd"]).name, "label": "(not dispatched by crow)", "cwd": r["cwd"]},
-                             [], f"{int(r.get('duration_seconds') or 0) // 60}m"))
-    if not rows:
-        print("no runs" + (" today" if since == "today" else ""))
-        return
-    icon = {"running": "●", "done": "✓", "failed": "✗", "limit": "⏸", "lost": "?"}
-    for st, rec, commits, dur in sorted(rows, key=lambda x: x[0] != "running"):
-        print(f"{icon[st]} {st:<8} {rec['run_id'][:8]}  {rec['project']:<22} {dur:>5}  {rec['label']}")
-        for c in commits[:6]:
-            print(f"      {c}")
-        if len(commits) > 6:
-            print(f"      … {len(commits) - 6} more")
-    n = sum(1 for r in rows if r[0] == "running")
-    print(f"\n{n}/{MAX_PARALLEL} slots busy")
+    print("\n".join(render(collect(a.since, a.all), color=sys.stdout.isatty())))
+
+
+def watch(a):
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd) if sys.stdin.isatty() else None
+    sys.stdout.write("\033[?1049h\033[?25l")
+    try:
+        if old:
+            tty.setcbreak(fd)
+        while True:
+            lines = render(collect(a.since, a.all))
+            rows = shutil.get_terminal_size((120, 40)).lines
+            body = lines[: rows - 1] + [f"\033[2mrefresh {a.interval}s · q quit · r refresh\033[0m"]
+            sys.stdout.write("\033[H\033[2J" + "\n".join(body))
+            sys.stdout.flush()
+            if not old:
+                time.sleep(a.interval)
+                continue
+            r, _, _ = select.select([sys.stdin], [], [], a.interval)
+            if r:
+                k = sys.stdin.read(1)
+                if k in ("q", "Q", "\x1b"):
+                    break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if old:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stdout.write("\033[?25h\033[?1049l")
 
 
 def main():
@@ -154,11 +362,22 @@ def main():
     g.add_argument("--prompt-file"); g.add_argument("--prompt")
     d.add_argument("--power", default="medium")
     d.add_argument("--force", action="store_true")
-    for p in (ap, sub.add_parser("list")):
+    for name in ("list", "json", "watch"):
+        p = sub.add_parser(name)
         p.add_argument("--since", default="today")
         p.add_argument("--all", action="store_true", help="include runs not dispatched by crow")
+        if name == "watch":
+            p.add_argument("--interval", type=float, default=2.0)
+    ap.set_defaults(since="today", all=False)
     a = ap.parse_args()
-    dispatch(a) if a.cmd == "dispatch" else listing(a)
+    if a.cmd == "dispatch":
+        dispatch(a)
+    elif a.cmd == "json":
+        json.dump(collect(a.since, a.all), sys.stdout, indent=1); print()
+    elif a.cmd == "watch":
+        watch(a)
+    else:
+        listing(a)
 
 
 if __name__ == "__main__":
