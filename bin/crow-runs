@@ -5,6 +5,7 @@
   crow-runs [list] [--since today|7d|DATE] [--all]   one-shot listing
   crow-runs json                                     same data as JSON (for widgets)
   crow-runs report <run_id>                          final report of a finished run
+  crow-runs wait <run_id>...                         block until the runs finish (run in background to get notified)
   (live view: tools/crow-watch, via `crow watch`)
 
 Every dispatch is recorded in <state>/runs.jsonl (run id, project, label, start
@@ -68,6 +69,24 @@ def finished(since, ttl=8):
     runs = {r["run_id"]: r for r in (json.loads(out).get("runs", []) if out else [])}
     _finished_cache[since] = (time.time(), runs)
     return runs
+
+
+def wait(run_ids, poll=20):
+    """Block until every given run has finished; print one line per run as it ends.
+    Run it as a background command so the caller is notified when it exits."""
+    recs = {r["run_id"]: r for r in ledger()}
+    pending = {next((k for k in recs if k.startswith(i)), i) for i in run_ids}
+    while pending:
+        done = finished("7d", ttl=0)
+        for rid in sorted(pending):
+            r = done.get(rid)
+            if r:
+                label = recs.get(rid, {}).get("label", "")
+                status = "done" if r.get("exit_code") == 0 else "failed"
+                print(f"{status} {rid[:8]} {recs.get(rid, {}).get('project', '')}  {label}", flush=True)
+                pending.discard(rid)
+        if pending:
+            time.sleep(poll)
 
 
 def report(run_id, since="7d"):
@@ -384,6 +403,7 @@ def main():
     d.add_argument("--force", action="store_true")
     d.add_argument("--resumes", metavar="RUN_ID", help="this run continues an interrupted one (hides it from the listing)")
     sub.add_parser("report").add_argument("run_id")
+    sub.add_parser("wait").add_argument("run_ids", nargs="+")
     for name in ("list", "json"):
         p = sub.add_parser(name)
         p.add_argument("--since", default="today")
@@ -392,6 +412,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "dispatch":
         dispatch(a)
+    elif a.cmd == "wait":
+        wait(a.run_ids)
     elif a.cmd == "report":
         print(report(a.run_id) or "")
     elif a.cmd == "json":
