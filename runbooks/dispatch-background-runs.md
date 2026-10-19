@@ -37,6 +37,9 @@ This records the run in `<state>/runs.jsonl` so `crow runs` can show its label a
   in the tree. Wait for the reset, then redispatch with a "RESUME NOTE" at the top of the prompt
   saying what is already committed or uncommitted and which steps not to redo.
   Two medium runs launched together can exhaust a session window in about 90 seconds. Stagger them if the window was recently used.
+- **Deletions in auto mode**: the permission classifier blocks deleting files with real content, so the run stops and reports.
+  If the prompt already expects deletions, name the exact files in it, or plan for the owner to approve them afterwards.
+- **Odd infra failures inside a run** (e.g. Docker networking): check `uname -r` against `/usr/lib/modules`. A kernel upgraded without a reboot breaks module loading.
 - **✗ failed**: read the stdout/stderr tail before retrying. Never retry blindly.
 
 ## After
