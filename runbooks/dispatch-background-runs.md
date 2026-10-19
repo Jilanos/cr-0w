@@ -22,6 +22,7 @@ Use when the user wants work done in project repos without opening a session the
 ## Dispatch
 `crow dispatch <project> "<short label>" --prompt-file <file> [--power medium]`
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.
+When relaunching an interrupted run, add `--resumes <run_id>` so the old run is folded into the new one.
 
 ## Track
 - `crow watch`: a live view of every agent, both background runs and interactive sessions. Each one shows its state, its last action, context size and commits since the start. Press q to quit.
@@ -34,7 +35,7 @@ This records the run in `<state>/runs.jsonl` so `crow runs` can show its label a
 
 ## Recover
 - **⏸ usage limit** (the stdout says "You've hit your session limit · resets HH:MM"): partial work stays
-  in the tree. Wait for the reset, then redispatch with a "RESUME NOTE" at the top of the prompt
+  in the tree. Wait for the reset, then redispatch (`--resumes <id>`) with a "RESUME NOTE" at the top of the prompt
   saying what is already committed or uncommitted and which steps not to redo.
   Two medium runs launched together can exhaust a session window in about 90 seconds. Stagger them if the window was recently used.
 - **Deletions in auto mode**: the permission classifier blocks deleting files with real content, so the run stops and reports.

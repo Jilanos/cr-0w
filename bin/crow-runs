@@ -24,6 +24,7 @@ LEDGER = STATE / "runs.jsonl"
 MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
 WORKING_S = 20      # transcript touched this recently = working
 TAIL_BYTES = 96_000
+FINISHED_SHOWN = 5
 
 
 def sh(*args, cwd=None):
@@ -168,6 +169,8 @@ def collect(since="today", include_unledgered=False):
         except (OSError, ValueError):
             pass
         sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
+        if not sid:
+            continue  # short-lived helper process, not an agent
         kind = "run" if "--print" in p["argv"] or "-p" in p["argv"] else "session"
         account = (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
         tpath = transcript_path(p["home"], p["cwd"], sid) if sid else None
@@ -195,9 +198,17 @@ def collect(since="today", include_unledgered=False):
                     break
         agents.append(a)
 
+    superseded = {}
+    for i, rec in enumerate(recs):
+        if rec.get("resumes"):
+            superseded[rec["resumes"]] = rec["run_id"]
+        for later in recs[i + 1:]:
+            if later["project"] == rec["project"] and later["label"].startswith(rec["label"]):
+                superseded.setdefault(rec["run_id"], later["run_id"])
+                break
     past = []
     for rec in reversed(recs):
-        if rec["run_id"] in claimed:
+        if rec["run_id"] in claimed or (rec["run_id"] in superseded and not include_unledgered):
             continue
         if cutoff and datetime.fromisoformat(rec["started_at"]).astimezone().date() < cutoff:
             continue
@@ -217,6 +228,7 @@ def collect(since="today", include_unledgered=False):
             "run_id": rec["run_id"], "project": rec["project"], "label": rec["label"], "status": st,
             "duration_s": int(r["duration_seconds"]) if r and r.get("duration_seconds") else None,
             "ended_at": r.get("ended_at") if r else None,
+            "resumed_from": [k for k, v in superseded.items() if v == rec["run_id"]],
             "commits": commits_since(rec["cwd"], rec.get("start_sha"), r.get("ended_at") if r else None),
         })
     if include_unledgered:
@@ -255,6 +267,8 @@ def dispatch(a):
         "branch": sh("git", "branch", "--show-current", cwd=cwd),
         "prompt_file": a.prompt_file, "power": a.power,
     }
+    if a.resumes:
+        rec["resumes"] = next((r["run_id"] for r in ledger() if r["run_id"].startswith(a.resumes)), a.resumes)
     STATE.mkdir(parents=True, exist_ok=True)
     with LEDGER.open("a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -311,12 +325,16 @@ def render(data, color=True, width=None):
 
     if data["finished"]:
         out.append("")
-        out.append(f"{c['b']}Finished{c['0']}")
-        for f in data["finished"]:
+        out.append(f"{c['b']}Finished today{c['0']}")
+        for f in data["finished"][:FINISHED_SHOWN]:
             sym, col = PAST_STYLE[f["status"]]
             d = fmt_age(f["duration_s"]) if f.get("duration_s") else "?"
-            out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['status']:<6} {d:>5}  {f['label']}  "
-                            f"{c['dim']}{f['run_id'][:8]} · {len(f['commits'])} commits{c['0']}"))
+            ended = f" · ended {fmt_age(iso_age(f['ended_at']))} ago" if f.get("ended_at") else ""
+            resumed = f" · resumed {len(f['resumed_from'])}×" if f.get("resumed_from") else ""
+            out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['label']}"))
+            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended} · {len(f['commits'])} commits{resumed} · {f['run_id'][:8]}{c['0']}"))
+        if len(data["finished"]) > FINISHED_SHOWN:
+            out.append(f"  {c['dim']}… {len(data['finished']) - FINISHED_SHOWN} older (crow runs --all){c['0']}")
     return out
 
 
@@ -367,6 +385,7 @@ def main():
     g.add_argument("--prompt-file"); g.add_argument("--prompt")
     d.add_argument("--power", default="medium")
     d.add_argument("--force", action="store_true")
+    d.add_argument("--resumes", metavar="RUN_ID", help="this run continues an interrupted one (hides it from the listing)")
     for name in ("list", "json", "watch"):
         p = sub.add_parser(name)
         p.add_argument("--since", default="today")
