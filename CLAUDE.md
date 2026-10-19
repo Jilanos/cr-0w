@@ -10,7 +10,7 @@ You orchestrate, brief, draft and delegate. Deep repo work happens in project se
 
 ## Environment
 - cdx runs Claude with a sandboxed HOME. Never rely on `~`; use absolute paths from the registry.
-- Use `logics-manager` for per-repo task state and `cdx run` / `cdx runs` / `cdx select` for dispatch.
+- Use `logics-manager` for per-repo task state. Dispatch with `crow dispatch` and track with `crow runs` (see runbooks/dispatch-background-runs.md).
 - `bin/crow-activity` gathers git/MR/PR activity cheaply. Run it instead of exploring repos by hand.
 
 ## Priorities (resource order)
@@ -41,6 +41,12 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 ## Language & tone
 - Work artifacts (Jira, MRs, Confluence, mail, Teams): French. Code and technical docs: English.
 - Personal projects: English. Talking to the user: concise Markdown.
+
+## Runbooks & skills (build the library)
+- Before a recurring task, read `runbooks/README.md` and follow the matching runbook instead of re-exploring.
+- Whenever you work out how to do a recurring task or solve a non-obvious problem, write or update a runbook in the same session (generic in `runbooks/`, private specifics in `local/runbooks/`) and add it to the index.
+- Turn it into a skill when the user would invoke it by name. Prefer scripts in `bin/` for anything mechanical.
+- Goal: every repeat costs fewer tokens than the last.
 
 ## Session hygiene
 - On start: read the open threads and mention any that are stale or due.

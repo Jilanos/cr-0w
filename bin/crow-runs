@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""crow-runs: dispatch background runs and show what each one is doing.
+
+  crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--power P]
+  crow-runs [list] [--since today|7d|DATE] [--all]
+
+Every dispatch is recorded in <state>/runs.jsonl (run id, project, label, start
+commit), so the listing can show which task each run works on, whether it is
+still running, and the commits it has made so far.
+"""
+import argparse, json, os, subprocess, sys, time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+HOME = Path(os.environ.get("CROW_HOME") or Path(__file__).resolve().parent.parent)
+ACCOUNT = os.environ.get("CROW_ACCOUNT", "main")
+REG = yaml.safe_load(open(HOME / "local/projects.yaml"))
+STATE = Path(REG.get("vault", {}).get("crow_dir") or HOME / "local/state")
+LEDGER = STATE / "runs.jsonl"
+MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
+
+
+def sh(*args, cwd=None):
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def project(name):
+    for p in REG["projects"]:
+        if p["name"] == name:
+            return p
+    sys.exit(f"crow: unknown project '{name}' (see: crow ls)")
+
+
+def ledger():
+    if not LEDGER.exists():
+        return []
+    return [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
+
+
+def live_cwds():
+    """cwds of cdx runs whose process is still alive (cdx only lists finished runs)."""
+    out, cwds = sh("ps", "-eo", "args"), []
+    for line in out.splitlines():
+        if "cdx_manager.cli run" in line or (" run " in line and line.split()[0].endswith("cdx")):
+            parts = line.split()
+            for flag in ("--cwd", "--dir"):
+                if flag in parts:
+                    cwds.append(parts[parts.index(flag) + 1])
+    return cwds
+
+
+def finished(since):
+    out = sh("cdx", "runs", "--since", since, "--limit", "200", "--json")
+    return {r["run_id"]: r for r in (json.loads(out).get("runs", []) if out else [])}
+
+
+def dispatch(a):
+    p = project(a.project)
+    cwd = p["path"]
+    running = live_cwds()
+    if len(running) >= MAX_PARALLEL and not a.force:
+        sys.exit(f"crow: {len(running)} runs already running (max {MAX_PARALLEL}); --force to override")
+    if cwd in running and not a.force:
+        sys.exit(f"crow: a run is already working in {cwd}; --force to override")
+    src = ["--prompt-file", a.prompt_file] if a.prompt_file else ["--prompt", a.prompt]
+    out = sh("cdx", "run", ACCOUNT, "--cwd", cwd, *src, "--power", a.power,
+             "--permission", "auto", "--detach", "--json")
+    res = json.loads(out) if out else {"ok": False}
+    if not res.get("ok"):
+        sys.exit(f"crow: dispatch failed: {res.get('error')}")
+    rec = {
+        "run_id": res["run_id"], "project": p["name"], "label": a.label, "cwd": cwd,
+        "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "start_sha": sh("git", "rev-parse", "HEAD", cwd=cwd),
+        "branch": sh("git", "branch", "--show-current", cwd=cwd),
+        "prompt_file": a.prompt_file, "power": a.power,
+    }
+    STATE.mkdir(parents=True, exist_ok=True)
+    with LEDGER.open("a") as f:
+        f.write(json.dumps(rec) + "\n")
+    print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}")
+
+
+def ago(iso):
+    if not iso:
+        return "?"
+    s = int(time.time() - datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp())
+    return f"{s // 60}m" if s < 3600 else f"{s // 3600}h{(s % 3600) // 60:02d}"
+
+
+def status_of(rec, done, alive):
+    r = done.get(rec["run_id"])
+    if r:
+        if r.get("exit_code") == 0:
+            return "done"
+        tail = ""
+        for k in ("stdout_path", "stderr_path"):
+            f = Path(r.get("artifacts", {}).get(k) or "/nonexistent")
+            tail += f.read_text(errors="replace")[-800:] if f.exists() else ""
+        return "limit" if "limit" in tail.lower() else "failed"
+    # Several runs can share a cwd over a day; only the newest unfinished one is live.
+    return "running" if rec["cwd"] in alive else "lost"
+
+
+def listing(a):
+    since = a.since
+    done, alive = finished(since), live_cwds()
+    recs = ledger()
+    cutoff = None if since != "today" else datetime.now().astimezone().date()
+    rows, seen = [], set()
+    for rec in reversed(recs):
+        start = datetime.fromisoformat(rec["started_at"]).astimezone()
+        if cutoff and start.date() < cutoff:
+            continue
+        st = status_of(rec, done, alive)
+        if st == "running" and rec["cwd"] in seen:
+            st = "lost"
+        seen.add(rec["cwd"])
+        r = done.get(rec["run_id"], {})
+        until = [f"--until={r['ended_at']}"] if r.get("ended_at") else []
+        commits = sh("git", "log", "--oneline", *until, f"{rec['start_sha']}..HEAD", cwd=rec["cwd"]).splitlines() if rec.get("start_sha") else []
+        dur = f"{int(r['duration_seconds']) // 60}m" if r.get("duration_seconds") else ago(rec["started_at"])
+        rows.append((st, rec, commits, dur))
+    if a.all:
+        known = {rec["run_id"] for rec in recs}
+        for rid, r in done.items():
+            if rid not in known:
+                rows.append(("done" if r.get("exit_code") == 0 else "failed",
+                             {"run_id": rid, "project": Path(r["cwd"]).name, "label": "(not dispatched by crow)", "cwd": r["cwd"]},
+                             [], f"{int(r.get('duration_seconds') or 0) // 60}m"))
+    if not rows:
+        print("no runs" + (" today" if since == "today" else ""))
+        return
+    icon = {"running": "●", "done": "✓", "failed": "✗", "limit": "⏸", "lost": "?"}
+    for st, rec, commits, dur in sorted(rows, key=lambda x: x[0] != "running"):
+        print(f"{icon[st]} {st:<8} {rec['run_id'][:8]}  {rec['project']:<22} {dur:>5}  {rec['label']}")
+        for c in commits[:6]:
+            print(f"      {c}")
+        if len(commits) > 6:
+            print(f"      … {len(commits) - 6} more")
+    n = sum(1 for r in rows if r[0] == "running")
+    print(f"\n{n}/{MAX_PARALLEL} slots busy")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="crow runs")
+    sub = ap.add_subparsers(dest="cmd")
+    d = sub.add_parser("dispatch")
+    d.add_argument("project"); d.add_argument("label")
+    g = d.add_mutually_exclusive_group(required=True)
+    g.add_argument("--prompt-file"); g.add_argument("--prompt")
+    d.add_argument("--power", default="medium")
+    d.add_argument("--force", action="store_true")
+    for p in (ap, sub.add_parser("list")):
+        p.add_argument("--since", default="today")
+        p.add_argument("--all", action="store_true", help="include runs not dispatched by crow")
+    a = ap.parse_args()
+    dispatch(a) if a.cmd == "dispatch" else listing(a)
+
+
+if __name__ == "__main__":
+    main()
