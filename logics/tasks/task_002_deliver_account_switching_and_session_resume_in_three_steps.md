@@ -1,14 +1,15 @@
 ## task_002_deliver_account_switching_and_session_resume_in_three_steps - Deliver account switching and session resume in three steps
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
 > Progress: 25%
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
-> Indicators reviewed: 2026-10-20 17:47:35
+> Indicators reviewed: 2026-10-20 20:30:10
+> Owner: crow
 
 # AI Context
 - Summary: (unfilled: replace before this doc is used)
@@ -52,7 +53,7 @@
 - request-AC6 -> `item_009_1_4_interrupted_sessions_view_and_no_model_mode`. Proof deferred to slice closeout.
 
 # Validation
-- (no validation recorded yet)
+- 1.1 (item_006), checked locally with bin/crow-memory status on 2026-10-20: AC1 holds: in the main profile every project memory dir with content is a link into local/memory; each memory.premigrate copy matches its local/memory dir file for file; the hub session loads the 18-file cr-0w index from there. AC3 holds for the mechanism: the local/ repo has the 'memory: update' commit, and crow-memory commit runs from crow's exit trap and /wrap. Not verified: AC2. The shared profile still has persistent links to local/memory and a memory.premigrate dir from the migration, with no shared session running; an end-to-end check needs a real shared-account session, which needs the owner.
 
 # Report
 - Not started.
