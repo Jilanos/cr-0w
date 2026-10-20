@@ -1,5 +1,4 @@
-// Usage view: limits per account, today's spend, a 7-day cost chart and today's
-// sessions, fed by `crow-usage --json` every 30 seconds.
+// Usage, Savings and History views, fed by `crow-usage --json` every 30 seconds.
 package main
 
 import (
@@ -17,61 +16,105 @@ import (
 // ---------- data (mirrors crow-usage build()) ----------
 
 type limit struct {
-	Account          string `json:"account"`
-	Remaining5hPct   *int   `json:"remaining_5h_pct"`
-	Reset5hAt        string `json:"reset_5h_at"`
-	RemainingWeekPct *int   `json:"remaining_week_pct"`
-	ResetWeekAt      string `json:"reset_week_at"`
-	Active           bool   `json:"active"`
+	Account          string   `json:"account"`
+	Remaining5hPct   *int     `json:"remaining_5h_pct"`
+	Reset5hAt        string   `json:"reset_5h_at"`
+	RemainingWeekPct *int     `json:"remaining_week_pct"`
+	ResetWeekAt      string   `json:"reset_week_at"`
+	Active           bool     `json:"active"`
+	Burn5h           *float64 `json:"burn_5h_pct_per_h"`
+	EmptyAt          string   `json:"empty_at"`
 }
 
-type usageDay struct {
-	Date       string  `json:"date"`
-	CostUSD    float64 `json:"cost_usd"`
-	Tokens     int     `json:"tokens"`
-	Sessions   int     `json:"sessions"`
-	Unpriced   int     `json:"unpriced"`
-	CachePct   int     `json:"cache_pct"`
-	Input      int     `json:"input_tokens"`
-	Output     int     `json:"output_tokens"`
-	CacheWrite int     `json:"cache_write_tokens"`
-	CacheRead  int     `json:"cache_read_tokens"`
+type named struct {
+	Name     string  `json:"name"`
+	CostUSD  float64 `json:"cost_usd"`
+	Tokens   int     `json:"tokens"`
+	Sessions int     `json:"sessions"`
+	Calls    int     `json:"calls"`
+	Images   int     `json:"images"`
+}
+
+// rollup: one day or a period (today, week, month).
+type rollup struct {
+	Date        string  `json:"date"`
+	CostUSD     float64 `json:"cost_usd"`
+	Tokens      int     `json:"tokens"`
+	Sessions    int     `json:"sessions"`
+	Unpriced    int     `json:"unpriced"`
+	CachePct    int     `json:"cache_pct"`
+	Input       int     `json:"input_tokens"`
+	Output      int     `json:"output_tokens"`
+	CacheWrite  int     `json:"cache_write_tokens"`
+	CacheRead   int     `json:"cache_read_tokens"`
+	CacheSaved  float64 `json:"cache_saved_usd"`
+	RouteSaved  float64 `json:"routing_saved_usd"`
+	Runs        int     `json:"runs"`
+	RoutedRuns  int     `json:"routed_runs"`
+	Compactions int     `json:"compactions"`
+	ByProject   []named `json:"by_project"`
+	ByModel     []named `json:"by_model"`
+	Tools       []named `json:"tools"`
+}
+
+type slice struct {
+	CostUSD *float64 `json:"cost_usd"`
+	Tokens  int      `json:"tokens"`
 }
 
 type usageSession struct {
-	ID      string   `json:"id"`
-	Account string   `json:"account"`
-	Project string   `json:"project"`
-	Title   string   `json:"title"`
-	Kind    string   `json:"kind"`
-	Models  []string `json:"models"`
-	Start   string   `json:"start"`
-	End     string   `json:"end"`
-	Active  bool     `json:"active"`
-	Tokens  int      `json:"tokens"`
-	CostUSD *float64 `json:"cost_usd"`
+	ID       string           `json:"id"`
+	Account  string           `json:"account"`
+	Project  string           `json:"project"`
+	Title    string           `json:"title"`
+	Kind     string           `json:"kind"`
+	Models   []string         `json:"models"`
+	Start    string           `json:"start"`
+	End      string           `json:"end"`
+	Active   bool             `json:"active"`
+	Tokens   int              `json:"tokens"`
+	CostUSD  *float64         `json:"cost_usd"`
+	ByDay    map[string]slice `json:"by_day"`
+	Activity map[string][]int `json:"activity"`
 }
 
 type usage struct {
 	GeneratedAt string         `json:"generated_at"`
 	Limits      []limit        `json:"limits"`
-	Today       usageDay       `json:"today"`
-	Week        usageDay       `json:"week"`
-	Days        []usageDay     `json:"days"`
+	Today       rollup         `json:"today"`
+	Week        rollup         `json:"week"`
+	Month       rollup         `json:"month"`
+	Days        []rollup       `json:"days"`
+	History     []rollup       `json:"history"`
 	Sessions    []usageSession `json:"sessions"`
 	Rtk         struct {
 		SavedTokens      int     `json:"saved_tokens"`
 		SavedPct         float64 `json:"saved_pct"`
+		Commands         int     `json:"commands"`
+		TimeMs           int     `json:"time_ms"`
+		Failures         int     `json:"failures"`
 		TodaySavedTokens int     `json:"today_saved_tokens"`
 		TodaySavedPct    float64 `json:"today_saved_pct"`
 		TodayCommands    int     `json:"today_commands"`
 	} `json:"rtk"`
 	Retros struct {
 		Today            int `json:"today"`
+		Week             int `json:"week"`
 		PendingProposals int `json:"pending_proposals"`
 	} `json:"retros"`
 
-	today []usageSession // today's sessions, most recent first
+	rows   []sessRow // sessions list: today, then earlier days (newest first)
+	byID   map[string]*usageSession
+	nToday int
+}
+
+// sessRow is one line of the sessions list: a day heading or a session's slice of that day.
+type sessRow struct {
+	day  string
+	head bool
+	s    *usageSession
+	cost float64
+	tok  int
 }
 
 func parseUsage(b []byte) (*usage, error) {
@@ -79,26 +122,65 @@ func parseUsage(b []byte) (*usage, error) {
 	if err := json.Unmarshal(b, &u); err != nil {
 		return nil, err
 	}
-	// "today" is the script's last day, so the view agrees with its totals.
-	day := ""
-	if n := len(u.Days); n > 0 {
-		day = u.Days[n-1].Date
+	u.byID = map[string]*usageSession{}
+	for i := range u.Sessions {
+		u.byID[u.Sessions[i].ID] = &u.Sessions[i]
 	}
-	for _, s := range u.Sessions {
-		if s.End != "" && localDay(s.End) == day {
-			u.today = append(u.today, s)
+	days := map[string][]sessRow{}
+	for i := range u.Sessions {
+		s := &u.Sessions[i]
+		for d, x := range s.ByDay {
+			c := 0.0
+			if x.CostUSD != nil {
+				c = *x.CostUSD
+			}
+			days[d] = append(days[d], sessRow{day: d, s: s, cost: c, tok: x.Tokens})
 		}
 	}
-	sort.SliceStable(u.today, func(i, j int) bool { return u.today[i].End > u.today[j].End })
+	var keys []string
+	for d := range days {
+		keys = append(keys, d)
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(keys)))
+	today := u.todayKey()
+	for _, d := range keys {
+		rs := days[d]
+		sort.SliceStable(rs, func(i, j int) bool { return rs[i].cost > rs[j].cost })
+		if d != today {
+			u.rows = append(u.rows, sessRow{day: d, head: true})
+		} else {
+			u.nToday = len(rs)
+		}
+		u.rows = append(u.rows, rs...)
+	}
 	return &u, nil
 }
 
-func localDay(iso string) string {
-	t, err := time.Parse(time.RFC3339Nano, iso)
-	if err != nil {
-		return ""
+func (u *usage) todayKey() string {
+	if n := len(u.Days); n > 0 {
+		return u.Days[n-1].Date
 	}
-	return t.Local().Format("2006-01-02")
+	return time.Now().Format("2006-01-02")
+}
+
+// current: the account cdx marks active, else the first listed.
+func (u *usage) current() *limit {
+	for i := range u.Limits {
+		if u.Limits[i].Active {
+			return &u.Limits[i]
+		}
+	}
+	if len(u.Limits) > 0 {
+		return &u.Limits[0]
+	}
+	return nil
+}
+
+func (u *usage) selected(i int) *usageSession {
+	if u == nil || i < 0 || i >= len(u.rows) || u.rows[i].head {
+		return nil
+	}
+	return u.rows[i].s
 }
 
 type usageMsg struct {
@@ -122,49 +204,6 @@ func usageTick() tea.Cmd {
 
 // ---------- formatting ----------
 
-func human(n int) string {
-	switch {
-	case n >= 1_000_000:
-		return fmt.Sprintf("%.1fM", float64(n)/1e6)
-	case n >= 1000:
-		return fmt.Sprintf("%dk", n/1000)
-	default:
-		return fmt.Sprint(n)
-	}
-}
-
-func dollars(c *float64) string {
-	if c == nil {
-		return "–"
-	}
-	return fmt.Sprintf("$%.2f", *c)
-}
-
-func levelStyle(pct int) lipgloss.Style {
-	switch {
-	case pct < 20:
-		return lipgloss.NewStyle().Foreground(cRed).Bold(true)
-	case pct <= 50:
-		return sYellow
-	default:
-		return lipgloss.NewStyle().Foreground(cGreen)
-	}
-}
-
-// gauge: filled blocks for what is left, coloured by level; pct + reset after it.
-func gauge(pct *int, width int, reset string) []seg {
-	if pct == nil {
-		return []seg{{strings.Repeat("▱", width), sDim}, {padL("–", 5), sDim}, {"  " + pad(reset, 12), sDim}}
-	}
-	p := max(0, min(100, *pct))
-	fill := (p*width + 50) / 100
-	s := levelStyle(p)
-	return []seg{
-		{strings.Repeat("▰", fill), s}, {strings.Repeat("▱", width-fill), sDim},
-		{padL(fmt.Sprintf("%d%%", p), 5), s}, {"  " + pad(reset, 12), sDim},
-	}
-}
-
 // shortReset drops the date when the reset is on the data's own day ("Oct 20 16:20" → "16:20").
 func shortReset(s, today string) string {
 	t, err := time.Parse("2006-01-02", today)
@@ -185,281 +224,554 @@ func models(ms []string) string {
 	return strings.Join(out, ",")
 }
 
-// ---------- sections ----------
-
-func (u *usage) todayKey() string {
-	if n := len(u.Days); n > 0 {
-		return u.Days[n-1].Date
+func hhmm(iso string) string {
+	t, err := time.Parse(time.RFC3339, iso)
+	if err != nil {
+		return iso
 	}
-	return ""
+	return t.Local().Format("15:04")
 }
 
+// ---------- sections (each returns body lines for a box) ----------
+
 func (u *usage) limitLines(width int) []line {
-	nameW := 6
+	nameW := 7
 	for _, l := range u.Limits {
-		nameW = max(nameW, len(l.Account))
+		nameW = max(nameW, len(l.Account)+1)
 	}
-	head := 2 + nameW + 5 // mark, name, "  5h "
-	tail := 5 + 2 + 12    // pct, reset
-	gw := min(20, (width-head-tail-5-tail)/2)
-	split := gw < 5 // not enough room for both gauges on one line
+	tail := 5 + 2 + 20 // pct, "resets Oct 26 17:00"
+	gw := min(24, (width-2-nameW-tail*2-6)/2)
+	split := gw < 6
 	if split {
-		gw = max(3, min(20, width-head-tail))
+		gw = max(4, min(24, width-2-nameW-tail-4))
 	}
-	var out []line
-	for _, l := range u.Limits {
+	cell := func(pct *int, reset string) []seg {
+		if pct == nil {
+			return []seg{{strings.Repeat("·", gw), sDim}, {padL("–", 5), sSub}, {"  " + pad("", 13), sSub}}
+		}
+		s := levelStyle(*pct)
+		return append(lineBar(float64(*pct), gw, s), seg{padL(fmt.Sprintf("%d%%", *pct), 5), s},
+			seg{"  " + pad("resets "+shortReset(reset, u.todayKey()), 13+7), sSub})
+	}
+	head := line{{"  " + pad("account", nameW+1), sHead}, {pad("5-hour window", gw+5+2+20-1), sHead}}
+	if !split {
+		head = append(head, seg{"week", sHead})
+	}
+	out := []line{head}
+	ls := append([]limit(nil), u.Limits...)
+	sort.SliceStable(ls, func(i, j int) bool { return ls[i].Active && !ls[j].Active })
+	for _, l := range ls {
 		mark, name := seg{"  ", sPlain}, seg{pad(l.Account, nameW), sPlain}
 		if l.Active {
 			mark, name = seg{"● ", st("working").style}, seg{pad(l.Account, nameW), sBold}
 		}
-		five := append(line{mark, name, {"  5h ", sDim}}, gauge(l.Remaining5hPct, gw, shortReset(l.Reset5hAt, u.todayKey()))...)
-		week := gauge(l.RemainingWeekPct, gw, shortReset(l.ResetWeekAt, u.todayKey()))
+		five := append(line{mark, name}, cell(l.Remaining5hPct, l.Reset5hAt)...)
+		week := cell(l.RemainingWeekPct, l.ResetWeekAt)
 		if split {
-			out = append(out, five, append(line{{strings.Repeat(" ", 2+nameW), sPlain}, {"  wk ", sDim}}, week...))
+			out = append(out, five, append(line{{strings.Repeat(" ", 2+nameW-3), sPlain}, {"wk ", sSub}}, week...))
 		} else {
-			out = append(out, append(append(five, seg{"wk ", sDim}), week...))
+			out = append(out, append(append(five, seg{"  ", sPlain}), week...))
+		}
+		if l.Active && l.Burn5h != nil && *l.Burn5h > 0.5 {
+			b := line{{strings.Repeat(" ", 2+nameW), sPlain}, {fmt.Sprintf("▼ %.0f%% per hour", *l.Burn5h), sYellow}}
+			if l.EmptyAt != "" {
+				b = append(b, seg{" · runs out ~" + hhmm(l.EmptyAt) + ", before the reset", lipgloss.NewStyle().Foreground(cYellow).Bold(true)})
+			}
+			out = append(out, b)
 		}
 	}
 	if len(u.Limits) == 0 {
-		out = append(out, line{{"no limits (cdx status failed)", sDim}})
+		out = append(out, line{{"no limits (cdx status failed)", sSub}})
 	}
 	return out
 }
 
-func (u *usage) todayHead() line {
+func (u *usage) spendHead() line {
 	t, w := u.Today, u.Week
-	l := line{
-		{"TODAY", sHead.Underline(true)}, {fmt.Sprintf(" $%.2f", t.CostUSD), sBold},
-		{fmt.Sprintf(" · %s tok · %d sessions", human(t.Tokens), t.Sessions), sPlain},
-		{"   7 days ", sDim}, {fmt.Sprintf("$%.2f", w.CostUSD), sBold}, {fmt.Sprintf(" · %s tok", human(w.Tokens)), sDim},
-	}
+	l := line{{money(t.CostUSD), sBold.Foreground(cWhite)}, {" today   ", sSub}, {money(w.CostUSD), sBold}, {" last 7 days   ", sSub},
+		{money(u.Month.CostUSD), sBold}, {" 30 days", sSub}}
 	if t.Unpriced > 0 {
-		l = append(l, seg{fmt.Sprintf("  (%d unpriced)", t.Unpriced), sYellow})
+		l = append(l, seg{fmt.Sprintf("   %d unpriced", t.Unpriced), sYellow})
 	}
 	return l
 }
 
-// splitLine: where today's tokens went. Cache reads dominate the total but cost a tenth of input.
 func (u *usage) splitLine() line {
 	t := u.Today
 	return line{
-		{"new input ", sDim}, {human(t.Input), sCyan}, {" · output ", sDim}, {human(t.Output), sCyan},
-		{" · cache write ", sDim}, {human(t.CacheWrite), sCyan},
-		{" · cache read ", sDim}, {human(t.CacheRead), sCyan}, {fmt.Sprintf(" (%d%%)", t.CachePct), sDim},
+		{human(t.Tokens), sCyan}, {fmt.Sprintf(" tokens · %d sessions   ", t.Sessions), sSub},
+		{"new in ", sSub}, {human(t.Input), sCyan}, {" · out ", sSub}, {human(t.Output), sCyan},
+		{" · cache read ", sSub}, {human(t.CacheRead), sCyan}, {fmt.Sprintf(" (%d%%)", t.CachePct), sSub},
+		{" · cache write ", sSub}, {human(t.CacheWrite), sCyan},
 	}
 }
 
-// sparkLines: one column per day (bar, $ value, weekday), oldest dropped when narrow.
-func (u *usage) sparkLines(width int) []line {
-	const colW = 9
-	days := u.Days
-	if n := max(1, width/colW); len(days) > n {
+// chart: vertical bars, one column per day, height rows; tokens instead of cost when tok.
+func chart(days []rollup, width, height int, tok bool) []line {
+	if len(days) == 0 || height < 1 {
+		return nil
+	}
+	colW := max(3, min(10, width/len(days)))
+	if n := width / colW; len(days) > n {
 		days = days[len(days)-n:]
+	}
+	val := func(d rollup) float64 {
+		if tok {
+			return float64(d.Tokens)
+		}
+		return d.CostUSD
 	}
 	top := 0.0
 	for _, d := range days {
-		top = max(top, d.CostUSD)
+		top = max(top, val(d))
 	}
-	blocks := []rune("▁▂▃▄▅▆▇█")
-	var bars, vals, names line
-	for i, d := range days {
-		style := sCyan
-		if i == len(days)-1 {
-			style = sMagenta.Bold(true)
+	barW := max(1, colW-2)
+	if colW <= 4 {
+		barW = colW - 1
+	}
+	eighths := []string{" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇"}
+	var out []line
+	for r := height; r >= 1; r-- {
+		var l line
+		for i, d := range days {
+			style := sBlueFg
+			if i == len(days)-1 {
+				style = sMagenta
+			}
+			v := 0.0
+			if top > 0 {
+				v = val(d) / top * float64(height)
+			}
+			ch := " "
+			switch {
+			case v >= float64(r):
+				ch = "█"
+			case v > float64(r-1):
+				ch = eighths[int((v-float64(r-1))*8)]
+			case r == 1:
+				ch, style = "▁", sDim
+			}
+			l = append(l, seg{strings.Repeat(ch, barW), style}, seg{strings.Repeat(" ", colW-barW), sPlain})
 		}
-		b := seg{strings.Repeat("▁", colW-2) + "  ", sDim}
-		if d.CostUSD > 0 && top > 0 {
-			k := int(d.CostUSD/top*float64(len(blocks)-1) + 0.5)
-			b = seg{strings.Repeat(string(blocks[k]), colW-2) + "  ", style}
+		out = append(out, l)
+	}
+	var vals, names line
+	for i, d := range days {
+		style, ns := sSub, sSub
+		if i == len(days)-1 {
+			style, ns = sAcc, sMagenta
+		}
+		v := money(d.CostUSD)
+		if tok {
+			v = human(d.Tokens)
+		}
+		if d.CostUSD >= 10 && !tok {
+			v = fmt.Sprintf("$%.0f", d.CostUSD)
 		}
 		name := d.Date
 		if t, err := time.Parse("2006-01-02", d.Date); err == nil {
-			name = t.Format("Mon 02")
+			switch {
+			case colW >= 9:
+				name = t.Format("Mon 02")
+			case colW >= 5:
+				name = t.Format("Mon")
+			default:
+				name = t.Format("02")
+			}
 		}
-		bars = append(bars, b)
-		vals = append(vals, seg{pad(fmt.Sprintf("$%.2f", d.CostUSD), colW), style})
-		names = append(names, seg{pad(name, colW), sDim})
+		vals = append(vals, seg{pad(v, colW), style})
+		names = append(names, seg{pad(name, colW), ns})
 	}
-	return []line{bars, vals, names}
+	if colW < 6 { // values don't fit under narrow bars: names only
+		return append(out, names)
+	}
+	return append(out, vals, names)
 }
 
-// sessionCols: fixed column widths around a title column that takes the rest.
-type sessionCols struct{ account, project, title, models int }
+// sessionCols: fixed columns around a title column that takes the rest.
+type sessionCols struct{ project, title, models int }
 
-func (u *usage) cols(width int) sessionCols {
-	c := sessionCols{project: 16, models: 12}
-	accts := map[string]bool{}
-	for _, s := range u.today {
-		accts[s.Account] = true
-	}
-	if len(accts) > 1 { // one account: the column says nothing
-		c.account = 9
-	}
-	if width < 80 {
+func sessCols(width int) sessionCols {
+	c := sessionCols{project: 17, models: 13}
+	if width < 90 {
 		c.models = 0
 	}
-	c.title = max(10, width-2-c.account-c.project-c.models-7-9)
+	if width < 60 {
+		c.project = 12
+	}
+	c.title = max(10, width-2-c.project-c.models-8-9)
 	return c
 }
 
-func (u *usage) sessionHeader(width int) line {
-	c := u.cols(width)
-	h := "  "
-	if c.account > 0 {
-		h += pad("account", c.account)
-	}
-	h += pad("project", c.project) + pad("session", c.title)
+func (u *usage) sessionHeader(width int) []line {
+	c := sessCols(width)
+	h := "  " + pad("project", c.project) + pad("session", c.title)
 	if c.models > 0 {
 		h += pad("models", c.models)
 	}
-	return line{{h + padL("tokens", 7) + padL("cost", 9), sDim}}
+	return []line{{{h + padL("tokens", 8) + padL("cost", 9), sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
 }
 
-func (u *usage) sessionLine(s usageSession, width int) line {
-	c := u.cols(width)
-	mark := seg{"✓ ", lipgloss.NewStyle().Foreground(cGreen)}
+func (u *usage) rowLine(r sessRow, width int) line {
+	c := sessCols(width)
+	if r.head {
+		cost, tok := 0.0, 0
+		for _, x := range u.rows {
+			if !x.head && x.day == r.day {
+				cost += x.cost
+				tok += x.tok
+			}
+		}
+		name := r.day
+		if t, err := time.Parse("2006-01-02", r.day); err == nil {
+			name = t.Format("Monday 02 January")
+		}
+		return line{{pad(name, width-17), sAcc}, {padL(human(tok), 8), sCyan}, {padL(money(cost), 9), sYellow.Bold(true)}}
+	}
+	s := r.s
+	today := r.day == u.todayKey()
+	mark := seg{"✓ ", sOK}
 	switch {
-	case s.Active:
+	case s.Active && today:
 		mark = seg{"● ", st("working").style}
 	case s.Kind == "run":
-		mark = seg{"⚙ ", sCyan}
+		mark = seg{"󰐊 ", sCyan}
 	}
 	title := s.Title
 	if title == "" {
 		title = "session " + short(s.ID)
 	}
-	l := line{mark}
-	if c.account > 0 {
-		l = append(l, seg{pad(s.Account, c.account-1) + " ", sPlain})
+	ps, ts := sBold, sPlain
+	if !today {
+		ps, ts = sSub, sSub
 	}
-	l = append(l, seg{pad(s.Project, c.project-1) + " ", sBold}, seg{pad(title, c.title-1) + " ", sPlain})
+	l := line{mark, {pad(s.Project, c.project-1) + " ", ps}, {pad(title, c.title-1) + " ", ts}}
 	if c.models > 0 {
-		l = append(l, seg{pad(models(s.Models), c.models-1) + " ", sDim})
+		l = append(l, seg{pad(models(s.Models), c.models-1) + " ", sSub})
 	}
-	return append(l, seg{padL(human(s.Tokens), 7), sCyan}, seg{padL(dollars(s.CostUSD), 9), sYellow})
+	return append(l, seg{padL(human(r.tok), 8), sCyan}, seg{padL(money(r.cost), 9), sYellow})
 }
 
-// totalLine: the sum of the table, aligned under tokens and cost.
 func (u *usage) totalLine(width int) line {
-	c := u.cols(width)
-	tok, cost := 0, 0.0
-	for _, s := range u.today {
-		tok += s.Tokens
-		if s.CostUSD != nil {
-			cost += *s.CostUSD
+	t := u.Today
+	return line{{pad(fmt.Sprintf("  %d %s today", u.nToday, plural(u.nToday, "session", "sessions")), width-17), sSub},
+		{padL(human(t.Tokens), 8), sCyan.Bold(true)}, {padL(money(t.CostUSD), 9), sYellow.Bold(true)}}
+}
+
+// sessionBody: header, today's rows, total, then earlier days as far as rows allows.
+// Returns the body and the index in it of each u.rows entry (for selection).
+func (u *usage) sessionBody(width, rows int) ([]line, []int) {
+	body := u.sessionHeader(width)
+	idx := make([]int, len(u.rows))
+	for i, r := range u.rows {
+		if i == u.nToday && i > 0 {
+			body = append(body, line{{"  " + strings.Repeat("─", width-2), sDim}}, u.totalLine(width), line{})
 		}
+		idx[i] = len(body)
+		body = append(body, u.rowLine(r, width))
 	}
-	return line{{pad("  total", 2+c.account+c.project+c.title+c.models), sDim}, {padL(human(tok), 7), sBold}, {padL(fmt.Sprintf("$%.2f", cost), 9), sBold}}
+	if u.nToday == len(u.rows) && u.nToday > 0 {
+		body = append(body, line{{"  " + strings.Repeat("─", width-2), sDim}}, u.totalLine(width))
+	}
+	if len(u.rows) == 0 {
+		body = append(body, line{{"no sessions yet", sSub}})
+	}
+	return body, idx
 }
 
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return one
-	}
-	return many
+type saving struct {
+	name, value, rate, what string
+	style                   lipgloss.Style
 }
 
-// savingsLines: what the helpers did today, in words.
-func (u *usage) savingsLines() []line {
-	r, rt := u.Rtk, u.Retros
-	sugg := sCyan
-	if rt.PendingProposals > 0 {
-		sugg = sMagenta.Bold(true)
+func (u *usage) savingRows(p rollup, label string) []saving {
+	r := u.Rtk
+	rtk := saving{"rtk", human(r.TodaySavedTokens) + " tok", fmt.Sprintf("%.0f%%", r.TodaySavedPct),
+		fmt.Sprintf("trimmed from %d commands' output · %s all time", r.TodayCommands, human(r.SavedTokens)), sOK}
+	if label != "today" {
+		rtk = saving{"rtk", human(r.SavedTokens) + " tok", fmt.Sprintf("%.0f%%", r.SavedPct), "trimmed from command output, all time", sOK}
 	}
-	return []line{
-		{{pad("rtk", 8), sBold}, {human(r.TodaySavedTokens), sCyan}, {fmt.Sprintf(" tokens trimmed from %d commands' output today (%.0f%%)", r.TodayCommands, r.TodaySavedPct), sPlain},
-			{fmt.Sprintf(" · %s all time", human(r.SavedTokens)), sDim}},
-		{{pad("retros", 8), sBold}, {fmt.Sprint(rt.Today), sCyan}, {plural(rt.Today, " session", " sessions") + " reviewed today · ", sPlain},
-			{fmt.Sprint(rt.PendingProposals), sugg}, {plural(rt.PendingProposals, " suggested change", " suggested changes") + " awaiting your OK", sPlain}},
+	overhead := ""
+	if r.Commands > 0 {
+		overhead = fmt.Sprintf(" · %.1f s avg overhead · %d raw fallbacks", float64(r.TimeMs)/float64(r.Commands)/1000, r.Failures)
+	}
+	rtk.what += overhead
+	comp := sOK
+	if p.Compactions > 0 {
+		comp = sYellow
+	}
+	pending := sSub
+	if u.Retros.PendingProposals > 0 {
+		pending = sAcc
+	}
+	reviewed := u.Retros.Today
+	if label != "today" {
+		reviewed = u.Retros.Week
+	}
+	return []saving{
+		rtk,
+		{"prompt cache", money(p.CacheSaved), fmt.Sprintf("%d%%", p.CachePct), fmt.Sprintf("saved vs paying full input price for %s cache reads", human(p.CacheRead)), sOK},
+		{"model routing", money(p.RouteSaved), "", fmt.Sprintf("%d of %d background runs on a cheaper model, priced at Opus", p.RoutedRuns, p.Runs), sOK},
+		{"compactions", fmt.Sprint(p.Compactions), "", "sessions that filled their context window", comp},
+		{"retros", fmt.Sprint(reviewed), "", fmt.Sprintf("sessions reviewed · %d %s waiting for your OK", u.Retros.PendingProposals,
+			plural(u.Retros.PendingProposals, "suggested change", "suggested changes")), pending},
 	}
 }
 
-// ---------- layout ----------
-
-// box: rounded border, a head line, fixed lines, then body lines from off; body[sel] is highlighted (-1: none).
-func box(head line, fixed, body []line, w, h, off, sel int, focused bool) string {
-	border := cDim
-	if focused {
-		border = cBlue
+func (u *usage) savingsLines(width int, p rollup, label string) []line {
+	out := []line{{{"  " + pad("tool", 15) + padL(label, 10) + padL("rate", 6) + "   what it means", sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
+	for _, s := range u.savingRows(p, label) {
+		out = append(out, line{{"  " + pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style}, {"   " + s.what, sSub}})
 	}
-	innerW := w - 4
-	out := []string{head.render(innerW, false)}
-	for _, l := range fixed {
-		out = append(out, l.render(innerW, false))
-	}
-	for i := off; i < len(body) && len(out) < h-2; i++ {
-		out = append(out, body[i].render(innerW, i == sel))
-	}
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).
-		Padding(0, 1).Width(w - 2).Height(h - 2).MaxHeight(h).Render(strings.Join(out, "\n"))
+	return out
 }
 
-func (m model) usageView(title, footer string) string {
+// savingsCompact: one line per tool without explanations, for narrow columns.
+func (u *usage) savingsCompact(p rollup, label string) []line {
+	var out []line
+	for _, s := range u.savingRows(p, label) {
+		out = append(out, line{{pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style}})
+	}
+	return out
+}
+
+func barRows(items []named, width, n int, style lipgloss.Style, tokens bool) []line {
+	if len(items) == 0 {
+		return []line{{{"  nothing yet", sSub}}}
+	}
+	top := 0.0
+	for _, e := range items {
+		top = max(top, map[bool]float64{true: float64(e.Tokens), false: e.CostUSD}[tokens])
+	}
+	nameW := min(24, max(12, width/4))
+	barW := max(6, width-2-nameW-10-1)
+	var out []line
+	for i, e := range items {
+		if i >= n {
+			break
+		}
+		v := map[bool]float64{true: float64(e.Tokens), false: e.CostUSD}[tokens]
+		pct := 0.0
+		if top > 0 {
+			pct = v / top * 100
+		}
+		val := money(e.CostUSD)
+		if tokens {
+			val = human(e.Tokens)
+		}
+		l := line{{"  " + pad(e.Name, nameW), sBold}}
+		l = append(l, lineBar(pct, barW, style)...)
+		out = append(out, append(l, seg{padL(val, 10), sYellow}))
+	}
+	return out
+}
+
+func toolRows(tools []named, width, n int) []line {
+	nameW := min(36, max(14, width/3))
+	head := line{{"  " + pad("tool", nameW) + padL("calls", 7) + padL("tokens", 9) + padL("per call", 10) + "   share", sHead}}
+	out := []line{head}
+	top := 0
+	for _, t := range tools {
+		top = max(top, t.Tokens)
+	}
+	barW := max(4, width-2-nameW-7-9-10-3)
+	for i, t := range tools {
+		if i >= n {
+			break
+		}
+		per := 0
+		if t.Calls > 0 {
+			per = t.Tokens / t.Calls
+		}
+		ps := sSub
+		if per > 3000 {
+			ps = sYellow
+		}
+		name := t.Name
+		if t.Images > 0 {
+			name += fmt.Sprintf(" (%d img)", t.Images)
+		}
+		l := line{{"  " + pad(name, nameW), sPlain}, {padL(fmt.Sprint(t.Calls), 7), sSub}, {padL(human(t.Tokens), 9), sCyan}, {padL(human(per), 10), ps}, {"   ", sPlain}}
+		out = append(out, append(l, lineBar(float64(t.Tokens)/float64(max(1, top))*100, barW, sBlueFg)...))
+	}
+	if len(tools) == 0 {
+		out = append(out, line{{"  no tool calls yet", sSub}})
+	}
+	return out
+}
+
+func (u *usage) historyLines(width int, p rollup, label string, rows int) []line {
+	out := []line{{{"By project · " + label, sHead}}}
+	out = append(out, barRows(p.ByProject, width, 6, sBlueFg, false)...)
+	out = append(out, line{}, line{{"By model · " + label, sHead}})
+	out = append(out, barRows(p.ByModel, width, 4, sMagenta, false)...)
+	out = append(out, line{}, line{{"Context weight by tool · " + label, sHead}})
+	return append(out, toolRows(p.Tools, width, max(6, rows-len(out)-1))...)
+}
+
+// ---------- views ----------
+
+func title(name string, extra string) line {
+	l := line{{name, sAcc}}
+	if extra != "" {
+		l = append(l, seg{" " + extra, sSub})
+	}
+	return l
+}
+
+// sessionsBox: the sessions list in a box of height h, scrolled to keep the selection visible.
+func (m model) sessionsBox(w, h int) block {
 	u := m.usage
-	avail := m.h - lipgloss.Height(title) - lipgloss.Height(footer)
-	if u == nil {
-		msg := line{{"loading usage…", sDim}}
-		if m.usageErr != nil {
-			msg = line{{"crow-usage failed: " + m.usageErr.Error(), lipgloss.NewStyle().Foreground(cRed)}}
-		}
-		body := " " + msg.render(m.w-1, false) + strings.Repeat("\n", max(0, avail-1))
-		return lipgloss.JoinVertical(lipgloss.Left, title, body, footer)
+	body, idx := u.sessionBody(w-4, h-2)
+	sel := -1
+	if m.uCursor < len(idx) {
+		sel = idx[m.uCursor]
 	}
-	iw := m.w - 4
-	limits := u.limitLines(iw)
-	limH := 3 + len(limits)
-	savings := u.savingsLines()
-	savH := 3 + len(savings)
-	spark := append([]line{u.splitLine()}, u.sparkLines(iw)...)
-	rest := avail - limH - savH
-	if rest < 3 { // tiny terminal: limits first
-		savH, rest = 0, avail-limH
+	off := 0
+	if visible := h - 2; sel >= visible {
+		off = sel - visible + 1
 	}
+	return box(title("Sessions", fmt.Sprintf("today %d · then earlier days", u.nToday)), line{{"o open · c copy id", sSub}}, body, w, h, off, sel, true)
+}
 
-	// Drop order when short: sessions table, then the chart, then the today box.
-	todayH := 3 + len(spark)
-	if rest < todayH+6 && rest >= todayH {
-		todayH = rest
+func (m model) usageView(h int) block {
+	u := m.usage
+	if m.w >= 170 {
+		return m.usageGrid(h)
 	}
-	if rest < todayH {
-		spark, todayH = nil, min(3, rest)
-		if todayH < 3 {
-			todayH = 0
+	w := m.w
+	limits := box(title("Limits", ""), line{{"remaining", sSub}}, u.limitLines(w-4), w, 0, 0, -1, false)
+	chartH := 5
+	if h >= 70 {
+		chartH = 7
+	}
+	spendBody := append([]line{u.spendHead(), u.splitLine(), {}}, chart(u.Days, w-4, chartH, false)...)
+	spend := box(title("Spend", ""), nil, spendBody, w, 0, 0, -1, false)
+	var sav block
+	if w >= 100 {
+		sav = box(title("Savings", "today"), line{{"3 for details", sSub}}, u.savingsLines(w-4, u.Today, "today"), w, 0, 0, -1, false)
+	} else {
+		sav = box(title("Savings", "today"), nil, u.savingsCompact(u.Today, "today"), w, 0, 0, -1, false)
+	}
+	hist := box(title("History", "7 days"), line{{"4 for 30 days", sSub}}, u.historyLines(w-4, u.Week, "7 days", 0), w, 0, 0, -1, false)
+	minSess := min(u.nToday, 12) + 6
+	// Drop order when short: history, then the chart, then savings shrink to one line each.
+	fixed := len(limits) + len(spend) + len(sav)
+	if h-fixed-len(hist) >= minSess {
+		fixed += len(hist)
+	} else {
+		hist = nil
+	}
+	if h-fixed < minSess {
+		spend = box(title("Spend", ""), nil, []line{u.spendHead(), u.splitLine()}, w, 0, 0, -1, false)
+		fixed = len(limits) + len(spend) + len(sav)
+	}
+	if h-fixed < minSess {
+		sav = box(title("Savings", "today"), nil, []line{u.savingsOneLine()}, w, 0, 0, -1, false)
+		fixed = len(limits) + len(spend) + len(sav)
+	}
+	sess := m.sessionsBox(w, max(5, h-fixed))
+	out := append(append(append(block{}, limits...), spend...), sess...)
+	out = append(out, sav...)
+	return append(out, hist...)
+}
+
+func (u *usage) savingsOneLine() line {
+	t := u.Today
+	return line{{"rtk ", sSub}, {human(u.Rtk.TodaySavedTokens) + " tok", sOK}, {" · cache ", sSub}, {money(t.CacheSaved), sOK},
+		{" · routing ", sSub}, {money(t.RouteSaved), sOK}, {fmt.Sprintf(" · %d retros", u.Retros.Today), sSub}}
+}
+
+// usageGrid: wide terminals. Row 1: limits | spend | savings at one height; row 2: sessions | history.
+func (m model) usageGrid(h int) block {
+	u := m.usage
+	c1 := min(96, m.w*36/100)
+	c2 := min(84, m.w*28/100)
+	c3 := m.w - c1 - c2
+	lim := u.limitLines(c1 - 4)
+	sav := u.savingsLines(c3-4, u.Today, "today")
+	r1 := max(len(lim), len(sav), 10) + 2
+	spend := append([]line{u.spendHead(), u.splitLine(), {}}, chart(u.Days, c2-4, max(3, r1-2-3-2), false)...)
+	if c2 < 70 {
+		spend[1] = line{{human(u.Today.Tokens), sCyan}, {fmt.Sprintf(" tok · %d sessions · %d%% cache", u.Today.Sessions, u.Today.CachePct), sSub}}
+	}
+	row1 := hcat([]int{c1, c2, c3},
+		box(title("Limits", ""), line{{"remaining", sSub}}, lim, c1, r1, 0, -1, false),
+		box(title("Spend", ""), nil, spend, c2, r1, 0, -1, false),
+		box(title("Savings", "today"), nil, sav, c3, r1, 0, -1, false))
+	r2 := h - len(row1)
+	sw := m.w * 62 / 100
+	hw := m.w - sw
+	row2 := hcat([]int{sw, hw}, m.sessionsBox(sw, r2),
+		box(title("History", "7 days"), line{{"4 for 30 days", sSub}}, u.historyLines(hw-4, u.Week, "7 days", r2-2), hw, r2, 0, -1, false))
+	return append(row1, row2...)
+}
+
+func (m model) periodRollup() (rollup, string) {
+	switch m.period {
+	case "d":
+		return m.usage.Today, "today"
+	case "m":
+		return m.usage.Month, "30 days"
+	}
+	return m.usage.Week, "7 days"
+}
+
+func periodTabs(cur string) line {
+	l := line{}
+	for _, p := range [][2]string{{"d", "today"}, {"w", "7 days"}, {"m", "30 days"}} {
+		if p[0] == cur {
+			l = append(l, seg{" " + p[1] + " ", sTabOn}, seg{" ", sPlain})
+		} else {
+			l = append(l, seg{p[0], sDim}, seg{" " + p[1] + "  ", sSub})
 		}
 	}
-	parts := []string{title, box(line{{"LIMITS", sHead.Underline(true)}, {"  remaining · resets", sDim}}, nil, limits, m.w, limH, 0, -1, false)}
-	if todayH > 0 {
-		parts = append(parts, box(u.todayHead(), nil, spark, m.w, todayH, 0, -1, false))
+	return l
+}
+
+func (m model) savingsView(h int) block {
+	u := m.usage
+	p, label := m.periodRollup()
+	w := m.w
+	sav := box(title("Savings", label), periodTabs(m.period), u.savingsLines(w-4, p, label), w, 0, 0, -1, false)
+	expl := []line{
+		{{"rtk", sBold}, {" rewrites shell commands to compact their output before Claude reads it. Tokens are estimated (bytes ÷ 4);", sSub}},
+		{{"   ", sPlain}, {"the rate is the share of command output removed. Raw fallbacks are commands it could not filter.", sSub}},
+		{{"prompt cache", sBold}, {" re-reads earlier context at a tenth of the input price; the saving is what those reads would cost uncached.", sSub}},
+		{{"model routing", sBold}, {" prices the tokens of runs on Sonnet/Haiku at Opus rates; the difference is the saving.", sSub}},
+		{{"compactions", sBold}, {" happen when a session fills its window: a sign to split work or delegate.", sSub}},
 	}
-	tableH := rest - todayH
-	if tableH >= 6 {
-		var rows []line
-		for _, s := range u.today {
-			rows = append(rows, u.sessionLine(s, iw))
+	how := box(title("How these are measured", ""), nil, expl, w, 0, 0, -1, false)
+	rest := h - len(sav) - len(how)
+	trows := toolRows(p.Tools, w-4, max(3, rest-3-12))
+	tools := box(title("Context weight by tool", label), line{{"tokens each tool returned into the context", sSub}}, trows, w, min(len(trows)+2, rest), 0, -1, false)
+	out := append(sav, tools...)
+	if left := rest - len(tools); left >= 8 {
+		// What caching and routing saved per day, as $ (same chart as spend).
+		per := make([]rollup, len(u.History))
+		for i, d := range u.History {
+			per[i] = rollup{Date: d.Date, CostUSD: d.CacheSaved + d.RouteSaved}
 		}
-		if len(u.today) == 0 {
-			rows = append(rows, line{{"no sessions today", sDim}})
-		}
-		sel := -1
-		if len(u.today) > 0 {
-			sel = m.uCursor
-		}
-		visible := tableH - 5 // border, head, column header, total
-		off := 0
-		if sel >= visible {
-			off = sel - visible + 1
-		}
-		if end := min(len(rows), off+visible); len(u.today) > 0 {
-			rows = append(rows[:end:end], u.totalLine(iw))
-		}
-		head := line{{"SESSIONS", sHead.Underline(true)}, {fmt.Sprintf(" today (%d)", len(u.today)), sDim}}
-		parts = append(parts, box(head, []line{u.sessionHeader(iw)}, rows, m.w, tableH, off, sel, true))
-	} else if tableH > 0 {
-		parts = append(parts, strings.Repeat("\n", tableH-1))
+		out = append(out, box(title("Saved per day", "prompt cache + model routing, 30 days"), nil, chart(per, w-4, left-4, false), w, left, 0, -1, false)...)
 	}
-	if savH > 0 {
-		parts = append(parts, box(line{{"SAVINGS", sHead.Underline(true)}, {"  what the helpers did today", sDim}}, nil, savings, m.w, savH, 0, -1, false))
+	return append(out, how...)
+}
+
+func (m model) historyView(h int) block {
+	u := m.usage
+	p, label := m.periodRollup()
+	w := m.w
+	chartH := max(4, min(14, h/4))
+	tok := false
+	body := append([]line{{{money(u.Month.CostUSD), sBold}, {" in 30 days · ", sSub}, {human(u.Month.Tokens), sCyan}, {" tokens · ", sSub},
+		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, {}}, chart(u.History, w-4, chartH, tok)...)
+	cost := box(title("Cost per day", "30 days"), nil, body, w, 0, 0, -1, false)
+	rest := h - len(cost)
+	if w >= 150 {
+		half := w / 2
+		left := box(title("By project", label), periodTabs(m.period), barRows(p.ByProject, half-4, rest-2, sBlueFg, false), half, rest, 0, -1, false)
+		right := box(title("By model", label), nil, append(barRows(p.ByModel, w-half-4, 6, sMagenta, false), append([]line{{}, {{"Context weight by tool", sHead}}}, toolRows(p.Tools, w-half-4, rest-12)...)...), w-half, rest, 0, -1, false)
+		return append(cost, hcat([]int{half, w - half}, left, right)...)
 	}
-	parts = append(parts, footer)
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return append(cost, box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, rest-2), w, rest, 0, -1, false)...)
 }

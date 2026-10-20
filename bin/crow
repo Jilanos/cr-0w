@@ -11,7 +11,7 @@
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
-#   crow watch           live board of every agent (runs, sessions, finished); u: usage view
+#   crow watch           live board: 1 agents · 2 usage · 3 savings · 4 history (? for keys)
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases

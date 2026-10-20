@@ -44,12 +44,16 @@ func TestShots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	now := fixtureNow()
+	if os.Getenv("RUNS") != "" {
+		now = time.Now()
+	}
 	sizes := map[string][2]int{"vertical": {118, 95}, "laptop": {160, 45}, "wide": {240, 62}, "small": {90, 30}}
 	os.MkdirAll(dir, 0o755)
 	for name, sz := range sizes {
-		for _, view := range []string{"agents", "usage"} {
-			m := model{w: sz[0], h: sz[1], snap: snap, usage: u, showUsage: view == "usage",
-				updated: time.Date(2026, 10, 20, 13, 52, 31, 0, time.Local), reports: map[string]string{}}
+		for v, view := range []string{"agents", "usage", "savings", "history"} {
+			m := model{w: sz[0], h: sz[1], snap: snap, usage: u, view: v, period: "w", now: now,
+				updated: now, reports: map[string]string{}}
 			m.rebuild()
 			f := filepath.Join(dir, fmt.Sprintf("%s-%s.ans", view, name))
 			if err := os.WriteFile(f, []byte(m.View()), 0o644); err != nil {

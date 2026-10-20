@@ -209,7 +209,7 @@ def scan_transcript(path):
                         if c.get("type") == "tool_use":
                             names[c.get("id")] = tool_label(c.get("name") or "?")
                         elif c.get("type") == "tool_result":
-                            label = names.get(c.get("tool_use_id"), "?")
+                            label = names.get(c.get("tool_use_id"), "(unmatched result)")
                             t = tools.setdefault(label, [0, 0, 0])
                             tok, img = result_tokens(c.get("content"))
                             t[0] += 1
