@@ -1,0 +1,187 @@
+#!/usr/bin/env python3
+"""Render ANSI terminal output to a PNG, with a kitty theme and a monospace font.
+
+  ansi-shot IN.ans OUT.png [--cols N] [--theme kitty.conf] [--font F.ttf] [--size PX] [--glass HEX]
+
+Lets a tool see what a TUI looks like without a display: run the TUI's View() to a
+file (any width x height), then render it here. Colours come from the kitty theme
+(color0-15, foreground, background); --glass HEX blends the background with a
+wallpaper tint at the theme's background_opacity, to judge contrast on a
+translucent terminal. Handles SGR 0/1/2/3/4/7/22/23/24/27, 30-37, 39, 40-47, 49,
+90-97, 100-107, 38/48;5;n and 38/48;2;r;g;b.
+"""
+import argparse
+import os
+import re
+
+from fontTools.ttLib import TTFont
+from PIL import Image, ImageDraw, ImageFont
+
+
+class Fonts:
+    """Pick, per character, the first font in the chain whose cmap has it."""
+
+    def __init__(self, paths, size):
+        self.chain = []
+        for p in paths:
+            if not os.path.exists(p):
+                continue
+            tt = TTFont(p, fontNumber=0, lazy=True)
+            self.chain.append((ImageFont.truetype(p, size), set(tt.getBestCmap() or {})))
+        self.missing = set()
+
+    def get(self, ch, main):
+        if ord(ch) in self.chain[0][1]:
+            return main
+        for f, cmap in self.chain[1:]:
+            if ord(ch) in cmap:
+                self.missing.add(ch)
+                return f
+        return main
+
+SGR = re.compile(r"\x1b\[([0-9;]*)m")
+OTHER = re.compile(r"\x1b\[[0-9;?]*[A-La-ln-z]|\x1b\][^\x07]*\x07")
+# Fallback chain for glyphs the main font lacks, like kitty's: a glyph that falls back
+# renders from another font, often at a different size (that is the point of seeing it).
+FALLBACKS = ["/usr/share/fonts/TTF/DejaVuSansMono.ttf", "/usr/share/fonts/noto/NotoSansSymbols2-Regular.ttf",
+             "/usr/share/fonts/noto/NotoSansSymbols-Regular.ttf", "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"]
+
+
+# block element → (x0, y0, x1, y1) as cell fractions
+BLOCKS = {"█": (0, 0, 1, 1), "▀": (0, 0, 1, .5), "▄": (0, .5, 1, 1), "▌": (0, 0, .5, 1), "▐": (.5, 0, 1, 1)}
+BLOCKS.update({ch: (0, 1 - (i + 1) / 8, 1, 1) for i, ch in enumerate("▁▂▃▄▅▆▇")})
+BLOCKS.update({ch: (0, 0, (7 - i) / 8, 1) for i, ch in enumerate("▉▊▋▌▍▎▏")})
+
+
+def kitty_theme(path):
+    conf = {}
+    for raw in open(path, encoding="utf-8"):
+        parts = raw.split()
+        if len(parts) >= 2 and not parts[0].startswith("#"):
+            conf[parts[0]] = parts[1]
+    if "include" in conf:
+        inc = os.path.join(os.path.dirname(path), conf["include"])
+        if os.path.exists(inc):
+            conf = {**kitty_theme(inc), **conf}
+    return conf
+
+
+def hexrgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def xterm256(n, pal):
+    if n < 16:
+        return pal[n]
+    if n < 232:
+        n -= 16
+        return tuple(0 if v == 0 else 55 + v * 40 for v in (n // 36, (n // 6) % 6, n % 6))
+    v = 8 + (n - 232) * 10
+    return (v, v, v)
+
+
+def mix(a, b, t):
+    return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
+
+
+def parse(text, pal, fg0):
+    """Yield rows of cells (char, fg, bg, bold, faint, underline)."""
+    rows = []
+    st = {"fg": None, "bg": None, "bold": False, "faint": False, "ul": False, "rev": False}
+    for line in text.split("\n"):
+        line = OTHER.sub("", line)
+        cells, pos = [], 0
+        for m in list(SGR.finditer(line)) + [None]:
+            chunk = line[pos:m.start()] if m else line[pos:]
+            for ch in chunk:
+                fg, bg = st["fg"], st["bg"]
+                if st["rev"]:
+                    fg, bg = (bg or "BG"), (fg or fg0)
+                cells.append((ch, fg, bg, st["bold"], st["faint"], st["ul"]))
+            if not m:
+                break
+            pos = m.end()
+            codes = [int(c) if c else 0 for c in m.group(1).split(";")] or [0]
+            i = 0
+            while i < len(codes):
+                c = codes[i]
+                if c == 0:
+                    st = {"fg": None, "bg": None, "bold": False, "faint": False, "ul": False, "rev": False}
+                elif c == 1: st["bold"] = True
+                elif c == 2: st["faint"] = True
+                elif c == 22: st["bold"] = st["faint"] = False
+                elif c == 4: st["ul"] = True
+                elif c == 24: st["ul"] = False
+                elif c == 7: st["rev"] = True
+                elif c == 27: st["rev"] = False
+                elif 30 <= c <= 37: st["fg"] = pal[c - 30]
+                elif 90 <= c <= 97: st["fg"] = pal[c - 82]
+                elif c == 39: st["fg"] = None
+                elif 40 <= c <= 47: st["bg"] = pal[c - 40]
+                elif 100 <= c <= 107: st["bg"] = pal[c - 92]
+                elif c == 49: st["bg"] = None
+                elif c in (38, 48) and i + 1 < len(codes):
+                    key = "fg" if c == 38 else "bg"
+                    if codes[i + 1] == 5 and i + 2 < len(codes):
+                        st[key] = xterm256(codes[i + 2], pal); i += 2
+                    elif codes[i + 1] == 2 and i + 4 < len(codes):
+                        st[key] = tuple(codes[i + 2:i + 5]); i += 4
+                i += 1
+        rows.append(cells)
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("src")
+    ap.add_argument("out")
+    ap.add_argument("--theme", default="/home/" + os.environ.get("USER", "") + "/.config/kitty/current-theme.conf")
+    ap.add_argument("--font", default="/usr/share/fonts/TTF/FiraCodeNerdFontMono-Regular.ttf")
+    ap.add_argument("--bold-font", default="/usr/share/fonts/TTF/FiraCodeNerdFontMono-Bold.ttf")
+    ap.add_argument("--size", type=int, default=15)
+    ap.add_argument("--glass", help="wallpaper tint to blend the background with (e.g. 1d5a6e)")
+    ap.add_argument("--opacity", type=float, default=None, help="background opacity (default: kitty's)")
+    a = ap.parse_args()
+
+    th = kitty_theme(a.theme)
+    pal = [hexrgb(th.get(f"color{i}", "#808080")) for i in range(16)]
+    fg0, bg0 = hexrgb(th.get("foreground", "#ffffff")), hexrgb(th.get("background", "#000000"))
+    if a.glass:
+        op = a.opacity if a.opacity is not None else float(th.get("background_opacity", "1"))
+        bg0 = mix(hexrgb(a.glass), bg0, op)
+    font = ImageFont.truetype(a.font, a.size)
+    bold = ImageFont.truetype(a.bold_font, a.size) if os.path.exists(a.bold_font) else font
+    fonts = Fonts([a.font] + FALLBACKS, a.size)
+    cw = round(font.getlength("M"))
+    asc, desc = font.getmetrics()
+    ch = asc + desc + 2
+
+    rows = parse(open(a.src, encoding="utf-8", errors="replace").read().rstrip("\n"), pal, fg0)
+    cols = max((len(r) for r in rows), default=1)
+    img = Image.new("RGB", (cols * cw + 16, len(rows) * ch + 16), bg0)
+    d = ImageDraw.Draw(img)
+    for y, row in enumerate(rows):
+        for x, (c, fg, bg, b, faint, ul) in enumerate(row):
+            px, py = 8 + x * cw, 8 + y * ch
+            if bg == "BG":
+                bg = bg0
+            if bg:
+                d.rectangle([px, py, px + cw - 1, py + ch - 1], fill=bg)
+            col = fg or fg0
+            if faint:
+                col = mix(col, bg or bg0, 0.5)
+            if c in BLOCKS:  # kitty draws block elements itself, edge to edge
+                x0, y0, x1, y1 = BLOCKS[c]
+                d.rectangle([px + x0 * cw, py + y0 * ch, px + x1 * cw - 1, py + y1 * ch - 1], fill=col)
+            elif c != " ":
+                d.text((px, py + 1), c, font=fonts.get(c, bold if b else font), fill=col)
+            if ul:
+                d.line([px, py + ch - 2, px + cw - 1, py + ch - 2], fill=col)
+    img.save(a.out)
+    print(f"{a.out}: {cols}x{len(rows)} cells, {img.width}x{img.height} px"
+          + (f"; fallback glyphs: {''.join(sorted(fonts.missing))}" if fonts.missing else ""))
+
+
+if __name__ == "__main__":
+    main()
