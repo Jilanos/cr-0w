@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# crow-prepush-check: git pre-push hook that refuses a push whose new commits mention a denied pattern.
+# Patterns (extended regex, one per line, # comments) come from local/prepush-deny.txt plus
+# local/prepush-deny.<repo-dir-name>.txt. Messages and added lines are checked, not removed ones.
+# Install: ln -s <crow>/bin/crow-prepush-check <repo>/.git/hooks/pre-push   (see runbooks/overnight.md)
+set -u
+CROW_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+repo="$(basename "$(git rev-parse --show-toplevel)")"
+pats=$(cat "$CROW_HOME/local/prepush-deny.txt" "$CROW_HOME/local/prepush-deny.$repo.txt" 2>/dev/null | grep -v '^\s*#' | grep -v '^\s*$' | paste -sd'|')
+[ -z "$pats" ] && exit 0
+zero=0000000000000000000000000000000000000000
+bad=0
+if [ "${1:-}" = "--check" ]; then   # manual run: check what HEAD would push to its upstream
+  exec "$0" < <(printf "HEAD %s upstream %s\n" "$(git rev-parse HEAD)" "$(git rev-parse @{u} 2>/dev/null || echo $zero)")
+fi
+while read -r lref lsha rref rsha; do
+  [ "$lsha" = "$zero" ] && continue
+  if [ "$rsha" = "$zero" ]; then range="$lsha --not --remotes"; else range="$rsha..$lsha"; fi
+  hits=$(git log -p --format='%H%n%B' $range 2>/dev/null | grep -E '^[0-9a-f]{40}$|^\+[^+]|^[^+ -@d]' | grep -n -i -E "$pats" | head -5)
+  if [ -n "$hits" ]; then
+    echo "crow-prepush-check: refusing to push $lref: denied pattern in new commits:" >&2
+    echo "$hits" | cut -c1-160 >&2
+    bad=1
+  fi
+done
+exit $bad

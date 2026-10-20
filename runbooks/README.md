@@ -19,3 +19,4 @@ want to trigger it by name.
 - [ci-secrets](ci-secrets.md): prod-scoped CI variables and secrets (owner runs the generator script; scope/protect rules)
 - [memory](memory.md): memory lives in local/memory, linked into allowed cdx profiles (never copied)
 - [tui-render](tui-render.md): render a TUI (or ANSI mockup) to PNG in the kitty theme at real monitor sizes; fallback-glyph and contrast checks
+- [overnight](overnight.md): unattended night runs: queue, guardrails, pre-push denylist, morning report
