@@ -4,3 +4,4 @@ local/
 *.bak
 tools/crow-watch/crow-watch
 __pycache__/
+.pytest_cache/

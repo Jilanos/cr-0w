@@ -38,6 +38,7 @@ EOF
 # for the session only (no copy stays in the profile), then unlinked and committed.
 launch() {
   local dir="$1"; shift
+  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
   if [[ "$("$CROW_HOME/bin/crow-accounts" memory "$CROW_ACCOUNT")" == session ]]; then
     "$CROW_HOME/bin/crow-memory" link "$CROW_ACCOUNT"
     trap '"$CROW_HOME/bin/crow-memory" unlink "$CROW_ACCOUNT"; "$CROW_HOME/bin/crow-memory" commit' EXIT
@@ -49,6 +50,7 @@ launch() {
 
 oneshot() {
   local prompt="$1" out
+  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
   out=$(cdx run "$CROW_ACCOUNT" --cwd "$CROW_HOME" --prompt "$prompt" --permission auto --json)
   local ok stdout_path
   ok=$(jq -r '.ok' <<<"$out")
