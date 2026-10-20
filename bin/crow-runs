@@ -360,7 +360,7 @@ def render(data, color=True, width=None):
 
     def agent_lines(a, title):
         sym, col = STATE_STYLE[a["state"]]
-        ctx = f" · ctx {a['context_tokens'] // 1000}k" if a.get("context_tokens") else ""
+        ctx = f" · context {a['context_tokens'] // 1000}k tokens" if a.get("context_tokens") else ""
         subs = f" · {a['subagents_active']} subagents" if a.get("subagents_active") else ""
         meta = f"{a['state']} {fmt_age(a['last_activity_s'])} ago · up {fmt_age(iso_age(a['started_at']))}{ctx}{subs} · {a['account']}"
         out.append(clip(f"{c[col]}{sym}{c['0']} {c['b']}{a['project']:<20}{c['0']} {title}") )

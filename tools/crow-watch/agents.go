@@ -99,7 +99,7 @@ func agCols(width int) agentCols {
 
 func (m model) agentHeader(width int) []line {
 	c := agCols(width)
-	h := "  " + pad("project", c.project) + pad("task / session", c.task) + pad("state", c.state) + pad("context", 14) + padL("cost", 8) + padL("commits", 8)
+	h := "  " + pad("project", c.project) + pad("task / session", c.task) + pad("state", c.state) + pad("context used", 14) + padL("cost", 8) + padL("commits", 8)
 	return []line{{{h, sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
 }
 
@@ -232,7 +232,7 @@ func (m model) detailLines(width int) []line {
 			meta += " · " + a.Account
 		}
 		if a.ContextTokens > 0 {
-			meta += fmt.Sprintf(" · context %.0f%%", float64(a.ContextTokens)*100/float64(contextWindow()))
+			meta += fmt.Sprintf(" · context %.0f%% used", float64(a.ContextTokens)*100/float64(contextWindow()))
 		}
 		if c := m.agentCost(a.SessionID); c != "" {
 			meta += " · " + c + " so far"

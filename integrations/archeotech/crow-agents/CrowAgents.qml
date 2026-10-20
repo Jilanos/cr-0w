@@ -223,7 +223,7 @@ Item {
         readonly property int wGlyph: 18
         readonly property int wProject: 110
         readonly property int wState: 84
-        readonly property int wCtx: 84
+        readonly property int wCtx: 100
         readonly property int wCom: 60
         readonly property int wTask: width - wGlyph - wProject - wState - wCtx - wCom
         readonly property int gap: root.s2
@@ -330,7 +330,7 @@ Item {
                     HeadCell { width: panel.wGlyph + panel.wProject; leftPadding: panel.wGlyph; text: "project" }
                     HeadCell { width: panel.wTask; leftPadding: panel.gap; text: "task / session" }
                     HeadCell { width: panel.wState; leftPadding: panel.gap; text: "state" }
-                    HeadCell { width: panel.wCtx; leftPadding: panel.gap; text: "context" }
+                    HeadCell { width: panel.wCtx; leftPadding: panel.gap; text: "context used" }
                     HeadCell { width: panel.wCom; rightPadding: root.s2; horizontalAlignment: Text.AlignRight; text: "commits" }
                 }
             }
@@ -366,6 +366,17 @@ Item {
                             when: rowLoader.status === Loader.Ready
                         }
                     }
+                }
+
+                // What the context column measures, in plain words.
+                Text {
+                    width: list.width
+                    topPadding: root.s3
+                    wrapMode: Text.WordWrap
+                    text: "context used: how full each session's context window (its working memory, "
+                          + Math.round(CrowStore.contextWindow / 1000000) + "M tokens) is. Near 100 % it compacts and forgets detail."
+                    color: root.cSub
+                    font.family: root.fFamily; font.pixelSize: root.fSm
                 }
             }
         }
