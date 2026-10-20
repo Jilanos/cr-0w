@@ -4,10 +4,12 @@
   crow-sessions scan [--json]     rescan every cdx profile, write the registry, print it
   crow-sessions list [--json]     same as scan (the cache makes a rescan cheap)
   crow-sessions show <id>         one entry as JSON (id or a unique prefix)
+  crow-sessions mark-relaunched <id> <source> <target> <cwd>   record a handoff (crow-relaunch)
 
 A session is interrupted when its last user/assistant turn is a usage-limit error.
 Retros and automatic one-shot jobs (/retro, /brief, /daily, /weekly) are left out.
 Each transcript is read once per (mtime, size): unchanged files come from the cache.
+A session that ran in more than one workspace is flagged: cdx refuses to hand those off.
 
 Files, in the state dir (vault.crow_dir, else local/state):
   interrupted-sessions.json   the registry
@@ -24,7 +26,7 @@ REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
 PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
 AUTO_PREFIXES = ("/retro ", "/retro\n", "/brief", "/daily", "/weekly")
 TAIL_BYTES = 256_000
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 def registry():
@@ -121,6 +123,16 @@ def first_prompt(path):
     return None
 
 
+def workspaces(path):
+    """Every workspace (cwd) the main conversation ran in; cdx hands off only when there is one."""
+    cwds = set()
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ev in events(fh):
+            if not ev.get("isSidechain") and isinstance(ev.get("cwd"), str):
+                cwds.add(os.path.realpath(ev["cwd"]))
+    return sorted(cwds)
+
+
 def scan_one(acct, path, size):
     last, last_prompt = last_turn(path, size)
     if not last or not is_limit(last):
@@ -143,6 +155,7 @@ def scan_one(acct, path, size):
         "last_prompt": (last_prompt or "")[:400] or None,
         "transcript": path,
         "size": size,
+        "workspaces": workspaces(path),
     }
 
 
@@ -227,7 +240,16 @@ def print_list(reg):
     for s in rows:
         when = (s["last_event"] or "")[:16].replace("T", " ")
         print(f"{when}  {s['account']:<8} {one_line(s['project'], 22):<22} {s['conversation_id']}  "
-              f"{human_size(s['size']):>8}  {one_line(s['first_prompt'] or '(no opening prompt)', 60)}")
+              f"{human_size(s['size']):>8}  {one_line(s['first_prompt'] or '(no opening prompt)', 60)}"
+              + ("" if len(s["workspaces"]) == 1 else f"  [{len(s['workspaces'])} workspaces: cdx cannot hand off]"))
+
+
+def mark_relaunched(cid, source, target, cwd):
+    state = state_dir()
+    os.makedirs(state, exist_ok=True)
+    with open(os.path.join(state, "relaunches.jsonl"), "a") as fh:
+        fh.write(json.dumps({"conversation_id": cid, "source": source, "target": target, "cwd": cwd,
+                             "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
 
 
 def find(reg, ref):
@@ -247,6 +269,8 @@ def main(argv):
             print_list(reg)
     elif cmd == "show" and len(argv) == 2:
         print(json.dumps(find(scan(), argv[1]), indent=1))
+    elif cmd == "mark-relaunched" and len(argv) == 5:
+        mark_relaunched(*argv[1:])
     else:
         sys.exit(__doc__)
 

@@ -20,7 +20,7 @@ def reply(text="done"):
 
 def transcript(hub, account, sid, events, cwd="/work/proj"):
     path = hub[1] / account / "claude-home" / ".claude" / "projects" / "-work-proj" / f"{sid}.jsonl"
-    stamped = [{**e, "sessionId": sid, "cwd": cwd} if e.get("type") in ("user", "assistant") else e
+    stamped = [{"sessionId": sid, "cwd": cwd, **e} if e.get("type") in ("user", "assistant") else e
                for e in events]
     write_jsonl(path, stamped)
     return path
@@ -107,3 +107,14 @@ def test_show_by_prefix(hub):
     assert json.loads(run(hub, "crow-sessions", "show", "abc").stdout)["conversation_id"] == "abc-123"
     r = run(hub, "crow-sessions", "show", "ab")
     assert r.returncode == 1 and "2 sessions match" in r.stderr
+
+
+def test_flags_sessions_cdx_cannot_hand_off(hub):
+    transcript(hub, "main", "one", [user("go"), LIMIT], cwd="/work/proj")
+    transcript(hub, "main", "two", [user("go"), {**reply(), "cwd": "/work/proj/sub"}, LIMIT], cwd="/work/proj")
+    by = {s["conversation_id"]: s for s in scan(hub)["sessions"]}
+    assert by["one"]["workspaces"] == ["/work/proj"]
+    assert by["two"]["workspaces"] == ["/work/proj", "/work/proj/sub"]
+    out = run(hub, "crow-sessions", "list").stdout.splitlines()
+    assert "cdx cannot hand off" in next(l for l in out if " two " in l)
+    assert "cdx cannot hand off" not in next(l for l in out if " one " in l)
