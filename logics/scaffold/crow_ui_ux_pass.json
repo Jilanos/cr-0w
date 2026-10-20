@@ -1,0 +1,214 @@
+{
+  "title": "crow watch and bar modules: UI/UX pass, session titles, savings stats",
+  "references": [
+    "tools/crow-watch/main.go",
+    "tools/crow-watch/usage.go",
+    "tools/crow-watch/view_test.go",
+    "bin/crow-usage",
+    "bin/crow-runs",
+    "integrations/archeotech/crow-agents/CrowAgents.qml",
+    "integrations/archeotech/crow-agents/CrowStore.qml",
+    "integrations/archeotech/crow-usage/CrowUsage.qml",
+    "integrations/archeotech/crow-usage/CrowUsageStore.qml",
+    "runbooks/archeotech-crow-agents.md",
+    "runbooks/archeotech-crow-usage.md"
+  ],
+  "request": {
+    "complexity": "High",
+    "theme": "Hub observability",
+    "needs": [
+      "The usage numbers must be right before they are worth designing around: today's cost and the 7-day chart currently undercount, and every session is titled with the account name.",
+      "Each session needs a short human title so 'top sessions today' says what the tokens were spent on instead of listing 'cr-0w' eight times.",
+      "Information that matters (tool savings, retros, proposals) must be visible and labelled in plain words, not tucked next to the key help.",
+      "The owner wants to judge whether each token-saving tool (rtk, prompt cache, model routing, scripts) pays off, with numbers that can be tracked over time.",
+      "The usage view must use the space of a tall or vertical terminal without hiding things in sub-menus, and still degrade cleanly on small terminals.",
+      "Redundant UI should go: a gauge that already shows 1 of 2 slots doesn't need '1/2' next to it."
+    ],
+    "context": [
+      "crow watch is a Bubble Tea TUI (tools/crow-watch) with an agents view fed by `crow-runs json` every 2 s and a usage view fed by `crow-usage --json` every 30 s. Colours are ANSI slots only and the view must fill the terminal exactly (view_test.go).",
+      "The archeotech bar modules (integrations/archeotech/crow-agents, crow-usage) are QML: a bar pill plus a panel, each with a singleton store polling the same commands. They use injected theme tokens only, no hex literals in crow-usage.",
+      "crow-usage scans every cdx profile transcript, caches per-file totals by (mtime, size), prices with cdx's price table and reads limits from `cdx status --json` and savings from `rtk gain --format json`.",
+      "Bug: a session containing any `<synthetic>` model message gets cost null, which counts as $0 in day totals (8 of 48 sessions this week, one of them 29.7M tokens).",
+      "Bug: cdx writes `custom-title` and `agent-name` equal to the account name, so `title` is 'main' for 47 of 48 sessions. Transcripts also carry `last-prompt` and the real user messages.",
+      "Bug: cdx sandboxes HOME, so rtk inside sessions writes to the profile's own history.db while the bar (real HOME) reads ~/.local/share/rtk/history.db; the two surfaces can disagree.",
+      "Usage 'active' is mtime < 120 s while the agents board uses process state, so the two views can disagree about what is live.",
+      "Owner decisions: Haiku-generated titles cached by session id; usage view = responsive overview that stacks every section that fits plus tabs 1-4 (Overview, Sessions, Savings, History) for drill-down with d/w/m periods; pills keep gauge plus percentage on usage, drop the count on agents; phased delivery with renders shown after each phase.",
+      "Out of scope: placing multi-target plugins on a strip is blocked shell-side (archeotech-shell EditOverlay dedupes library tiles by id; ShellConfig._contentToStrip rejects plugin ids). Handed off to the archeotech-shell session."
+    ],
+    "acceptance_criteria": [
+      "AC1: Session cost ignores `<synthetic>` and other unpriced pseudo-models instead of voiding the session; a session is unpriced only when a real model has no price, and day totals flag unpriced sessions rather than silently counting $0.",
+      "AC2: Every session in `crow-usage --json` and every session agent in `crow-runs json` has a `title`: the dispatch label for runs, otherwise a 3-6 word Haiku title generated from the first user prompts, cached by session id in local/state and refreshed when the session has grown substantially; titles never block a poll (generation is async and bounded per poll).",
+      "AC3: rtk savings are read from every rtk history database (real HOME and each cdx profile) and summed, so the TUI and the bar show the same numbers.",
+      "AC4: Usage 'active' agrees with the agents board for sessions the board knows about.",
+      "AC5: The usage payload splits tokens into input, output, cache write and cache read per session and per day, and exposes week totals; the TUI and panel show a totals row and the split.",
+      "AC6: Savings and retros get a named section with plain labels (e.g. 'rtk: 58k tokens trimmed from command output today', 'retros: 2 sessions reviewed today, 0 suggestions awaiting your OK'), moved out of the key-help footer.",
+      "AC7: The agents pill and panel header drop the 'busy/max' count next to the slot gauge; the usage pill keeps gauge plus percentage with a cleaner look shown as renders before it is merged.",
+      "AC8: The usage view is a responsive overview that stacks limits, today, savings, sessions and history as space allows (tall terminals show everything), with tabs 1-4 for full-size drill-down and d/w/m period keys; view_test covers tall, wide and small sizes.",
+      "AC9: Limits show burn rate over the last hour and, when the current pace runs out before the reset, the projected time the limit hits zero.",
+      "AC10: A Savings tab reports per tool: rtk (tokens saved, %, parse-failure rate, time overhead, weakest commands), prompt cache ($ saved vs uncached), model routing ($ saved vs the same tokens on the top model), compactions, and tokens returned per tool/MCP server, per day and per period.",
+      "AC11: A daily rollup store keeps immutable past days so history and savings trends survive transcript cleanup; only today is recomputed.",
+      "AC12: Per-project and per-model rollups are available in the History tab.",
+      "AC13: The agents board shows context as a % of the model window with 70/85 % thresholds, sorts waiting sessions first with time-in-state, shows per-session cost, offers open/attach actions (crow term) and moves key help behind '?'.",
+      "AC14: Both archeotech panels mirror the new data (titles, totals, savings section) within their width, lint clean with qmllint, and are verified with the existing headless render harness without touching the live shell."
+    ]
+  },
+  "product": {
+    "title": "crow observability surfaces",
+    "overview": "crow watch and the archeotech bar modules are the owner's window on agents, usage limits and spend. This pass makes their numbers trustworthy, names every session, surfaces what each token-saving tool is worth, and lays the usage view out to use a tall terminal without burying information.",
+    "goals": [
+      "Trustworthy cost, token and savings numbers across all cdx accounts.",
+      "Every session identifiable at a glance by a short title.",
+      "Per-tool savings tracked over time so tools can be kept or dropped on evidence.",
+      "A usage view that shows everything that fits and drills down without hiding essentials.",
+      "Bar pills that carry no redundant text."
+    ],
+    "non_goals": [
+      "Changing archeotech-shell itself (strip placement fix is a separate hand-off).",
+      "Budgets or hard stops on dispatch.",
+      "A web dashboard or OpenTelemetry export.",
+      "Account load-balancing or automatic account switching."
+    ]
+  },
+  "backlog_items": [
+    {
+      "title": "0.1 usage data correctness and session titles",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Hub observability",
+      "request_acs": ["AC1", "AC2", "AC3", "AC4", "AC5"],
+      "problem": [
+        "Costs undercount because one `<synthetic>` message voids a whole session's price.",
+        "Sessions are all titled with the account name, so nothing tells them apart.",
+        "rtk numbers depend on which HOME reads them, and 'active' means different things in the two views."
+      ],
+      "scope_in": [
+        "bin/crow-usage pricing, title cache and Haiku titler, rtk multi-database read, token split and week totals.",
+        "bin/crow-runs json: title field for session agents from the same cache.",
+        "Fixture updates for tools/crow-watch/testdata and the QML test generators."
+      ],
+      "scope_out": [
+        "Any layout change beyond showing the new fields."
+      ],
+      "acceptance_criteria": [
+        "AC1: no session with a priced real model has cost null; synthetic messages are skipped.",
+        "AC2: every session has a non-account title; runs use their dispatch label; generation is cached, async and bounded.",
+        "AC3: rtk totals equal the sum over all history databases.",
+        "AC4: usage active state matches crow-runs for known sessions.",
+        "AC5: per-session and per-day token split plus week totals in the JSON payload."
+      ]
+    },
+    {
+      "title": "0.1 quick UI wins in crow watch and both panels",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Hub observability",
+      "request_acs": ["AC5", "AC6", "AC7", "AC14"],
+      "problem": [
+        "rtk, retros and proposals sit next to the key help with no explanation.",
+        "Totals are missing from the sessions table and the token split is not shown.",
+        "Pills and headers repeat the slot count the gauge already shows."
+      ],
+      "scope_in": [
+        "Titles in session rows (TUI usage table, agents board, usage panel top sessions, agents panel).",
+        "Totals row and token split; named Savings section with plain labels.",
+        "Drop busy/max count; usage pill restyle with renders for approval.",
+        "Show only non-zero counts in the agents summary line."
+      ],
+      "scope_out": [
+        "Tabs, burn rate and per-tool savings stats (0.2)."
+      ],
+      "acceptance_criteria": [
+        "AC5: totals row and token split visible in TUI and usage panel.",
+        "AC6: Savings section with plain-language labels in TUI and panel; footer holds key help only.",
+        "AC7: no 'n/m' count next to slot gauges; usage pill restyle approved from renders.",
+        "AC14: qmllint silent; headless renders for normal, low, error, light and grimdark."
+      ]
+    },
+    {
+      "title": "0.2 responsive usage overview, tabs and burn rate",
+      "priority": "Medium",
+      "complexity": "High",
+      "theme": "Hub observability",
+      "request_acs": ["AC8", "AC9", "AC12"],
+      "problem": [
+        "The usage view is a fixed stack that wastes a tall terminal and has nowhere to put new sections.",
+        "Limits are snapshots with no sense of pace."
+      ],
+      "scope_in": [
+        "Overview that stacks sections by priority as height allows; tabs 1-4 with d/w/m periods.",
+        "Burn rate and projected exhaustion per account.",
+        "History tab with per-project and per-model rollups."
+      ],
+      "scope_out": [
+        "Tool savings computation (separate item)."
+      ],
+      "acceptance_criteria": [
+        "AC8: view_test covers tall, wide and small; tall shows every section.",
+        "AC9: burn rate and projected zero time shown when it precedes the reset.",
+        "AC12: per-project and per-model rollups for d/w/m."
+      ]
+    },
+    {
+      "title": "0.2 tool effectiveness stats and daily rollup store",
+      "priority": "Medium",
+      "complexity": "High",
+      "theme": "Hub observability",
+      "request_acs": ["AC10", "AC11"],
+      "problem": [
+        "There is no way to tell whether rtk, prompt caching, model routing or crow scripts pay for themselves.",
+        "History disappears when transcripts are cleaned up."
+      ],
+      "scope_in": [
+        "Per-tool metrics computed in crow-usage from transcripts and rtk databases.",
+        "Daily rollup store in local/state with immutable past days.",
+        "Savings tab in crow watch and a compact savings block in the usage panel."
+      ],
+      "scope_out": [
+        "Exporting stats outside the hub."
+      ],
+      "acceptance_criteria": [
+        "AC10: Savings tab lists rtk, prompt cache, model routing, compactions and tokens per tool/MCP for the selected period.",
+        "AC11: past days are read from the rollup store, only today is recomputed, and history extends past the transcript window."
+      ]
+    },
+    {
+      "title": "0.2 agents board improvements",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Hub observability",
+      "request_acs": ["AC13", "AC14"],
+      "problem": [
+        "Raw context token counts don't say how full the window is.",
+        "Waiting sessions don't stand out, live sessions show no cost, and there is no way to jump into a session."
+      ],
+      "scope_in": [
+        "Context % bar with 70/85 thresholds, waiting-first sort with time-in-state, per-session cost.",
+        "Open/attach action via crow term; key help behind '?'.",
+        "Same data in the agents panel."
+      ],
+      "scope_out": [
+        "Killing or forking sessions."
+      ],
+      "acceptance_criteria": [
+        "AC13: board shows context %, waiting first with time-in-state, per-session cost, open action and '?' help.",
+        "AC14: agents panel mirrors it, lint clean, verified with headless renders."
+      ]
+    }
+  ],
+  "orchestration_task": {
+    "title": "Deliver the crow UI/UX pass in two phases",
+    "plan": [
+      "0.1: fix crow-usage data (synthetic pricing, titles, rtk databases, active state, token split) and update fixtures.",
+      "0.1: quick UI wins in crow watch and both QML panels; render TUI and panels, show the owner, then commit.",
+      "0.2: responsive usage overview with tabs and burn rate; show renders before finishing.",
+      "0.2: tool effectiveness stats and the daily rollup store; Savings tab.",
+      "0.2: agents board improvements and the agents panel mirror.",
+      "Update runbooks/archeotech-crow-*.md and module READMEs as behaviour changes."
+    ]
+  },
+  "context_pack": {
+    "out": "logics/context-packs/crow_ui_ux_pass.json",
+    "mode": "diff-first",
+    "profile": "normal"
+  }
+}

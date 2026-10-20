@@ -1,0 +1,331 @@
+{
+  "budgets": {
+    "max_docs": 8,
+    "max_docs_per_ref": 4
+  },
+  "changed_paths": [
+    "AGENTS.md",
+    "LOGICS.md",
+    "claude/skills/daily/SKILL.md",
+    "local/plans/crow-ui-audit-2026-10-20.md",
+    "local/runbooks/README.md",
+    "local/runbooks/obsidian-stacks.md",
+    "local/state/activity/2026-10-19.md",
+    "local/state/activity/2026-10-20.md",
+    "local/state/drafts/cdx-pr-initial-prompt.md",
+    "local/state/drafts/cdx-pr1-body.md",
+    "local/state/drafts/cdx-pr2-body.md",
+    "local/state/drafts/daily-2026-10-20.md",
+    "local/state/last-daily",
+    "local/state/retros/.worker.lock",
+    "local/state/retros/2026-10-20-archeotech-dotfiles-8be5b00e.md",
+    "local/state/retros/2026-10-20-work-repo-7ddf628b.md",
+    "local/state/retros/2026-10-20-cr-0w-d4fc6684.md",
+    "local/state/retros/digests/7ddf628b-b780-4712-8139-1037e3bd50a4.md",
+    "local/state/retros/digests/8be5b00e-7544-44a6-88f9-bf063504a8f0.md",
+    "local/state/retros/digests/d4fc6684-a47d-4ff6-bf9c-57bd372ba164.md",
+    "local/state/retros/proposals.md",
+    "local/state/retros/worker.log",
+    "local/state/runs.jsonl",
+    "local/state/usage-cache.json",
+    "logics/.cache/.gitkeep",
+    "logics/INDEX.md",
+    "logics/architecture/.gitkeep",
+    "logics/backlog/.gitkeep",
+    "logics/backlog/item_001_0_1_usage_data_correctness_and_session_titles.md",
+    "logics/backlog/item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels.md",
+    "logics/backlog/item_003_0_2_responsive_usage_overview_tabs_and_burn_rate.md",
+    "logics/backlog/item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store.md",
+    "logics/backlog/item_005_0_2_agents_board_improvements.md",
+    "logics/context-packs/crow_ui_ux_pass.json",
+    "logics/external/.gitkeep",
+    "logics/instructions.md",
+    "logics/product/.gitkeep",
+    "logics/product/prod_001_crow_observability_surfaces.md",
+    "logics/request/.gitkeep",
+    "logics/request/req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats.md",
+    "logics/roadmap/.gitkeep",
+    "logics/runbook/.gitkeep",
+    "logics/scaffold/crow_ui_ux_pass.json",
+    "logics/specs/.gitkeep",
+    "logics/tasks/.gitkeep",
+    "logics/tasks/task_001_deliver_the_crow_ui_ux_pass_in_two_phases.md"
+  ],
+  "command": "logics-manager sync context-pack req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats task_001_deliver_the_crow_ui_ux_pass_in_two_phases --mode diff-first --profile normal",
+  "companion_docs": [],
+  "docs": [
+    {
+      "ai_context": {
+        "keywords": "crow, watch, bar, modules, pass, session, titles, savings, stats",
+        "skip when": "the change is to archeotech-shell itself (strip placement of plugins) or to dispatch/run lifecycle.",
+        "summary": "Fix crow usage data (synthetic pricing, account-named titles, split rtk databases), give every session a Haiku title, surface per-tool savings, and lay the usage view out responsively with tabs; mirror it in the archeotech bar panels.",
+        "use when": "changing crow-usage/crow-runs JSON, the crow watch TUI, or the archeotech crow-agents/crow-usage modules."
+      },
+      "kind": "request",
+      "linked_refs": {
+        "item": [
+          "item_001_0_1_usage_data_correctness_and_session_titles",
+          "item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels",
+          "item_003_0_2_responsive_usage_overview_tabs_and_burn_rate",
+          "item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store",
+          "item_005_0_2_agents_board_improvements"
+        ],
+        "prod": [
+          "prod_001_crow_observability_surfaces"
+        ],
+        "req": [
+          "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats"
+        ]
+      },
+      "path": "logics/request/req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats.md",
+      "ref": "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Session cost ignores `<synthetic>` and other unpriced pseudo-models instead of voiding the session; a session is unpriced only when a real model has no price, and day totals flag unpriced sessions rather than silently counting $0.",
+          "- AC2: Every session in `crow-usage --json` and every session agent in `crow-runs json` has a `title`: the dispatch label for runs, otherwise a 3-6 word Haiku title generated from the first user prompts, cached by session id in local/state and refreshed when the session has grown substantially; titles never block a poll (generation is async and bounded per poll).",
+          "- AC3: rtk savings are read from every rtk history database (real HOME and each cdx profile) and summed, so the TUI and the bar show the same numbers.",
+          "- AC4: Usage 'active' agrees with the agents board for sessions the board knows about.",
+          "- AC5: The usage payload splits tokens into input, output, cache write and cache read per session and per day, and exposes week totals; the TUI and panel show a totals row and the split.",
+          "- AC6: Savings and retros get a named section with plain labels (e.g. 'rtk: 58k tokens trimmed from command output today', 'retros: 2 sessions reviewed today, 0 suggestions awaiting your OK'), moved out of the key-help footer."
+        ],
+        "Needs": [
+          "- The usage numbers must be right before they are worth designing around: today's cost and the 7-day chart currently undercount, and every session is titled with the account name.",
+          "- Each session needs a short human title so 'top sessions today' says what the tokens were spent on instead of listing 'cr-0w' eight times.",
+          "- Information that matters (tool savings, retros, proposals) must be visible and labelled in plain words, not tucked next to the key help.",
+          "- The owner wants to judge whether each token-saving tool (rtk, prompt cache, model routing, scripts) pays off, with numbers that can be tracked over time.",
+          "- The usage view must use the space of a tall or vertical terminal without hiding things in sub-menus, and still degrade cleanly on small terminals.",
+          "- Redundant UI should go: a gauge that already shows 1 of 2 slots doesn't need '1/2' next to it."
+        ]
+      },
+      "status": "Draft",
+      "title": "crow watch and bar modules: UI/UX pass, session titles, savings stats"
+    },
+    {
+      "ai_context": {
+        "keywords": "usage, data, correctness, session, titles",
+        "skip when": "layout-only changes.",
+        "summary": "Fix crow-usage pricing of synthetic messages, Haiku session titles cached by id, rtk read across all history databases, active-state agreement, token split and week totals.",
+        "use when": "changing bin/crow-usage or the title field in crow-runs json."
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_001_0_1_usage_data_correctness_and_session_titles"
+        ],
+        "prod": [
+          "prod_001_crow_observability_surfaces"
+        ],
+        "req": [
+          "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats"
+        ],
+        "task": [
+          "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+        ]
+      },
+      "path": "logics/backlog/item_001_0_1_usage_data_correctness_and_session_titles.md",
+      "ref": "item_001_0_1_usage_data_correctness_and_session_titles",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: no session with a priced real model has cost null; synthetic messages are skipped.",
+          "- AC2: every session has a non-account title; runs use their dispatch label; generation is cached, async and bounded.",
+          "- AC3: rtk totals equal the sum over all history databases.",
+          "- AC4: usage active state matches crow-runs for known sessions.",
+          "- AC5: per-session and per-day token split plus week totals in the JSON payload."
+        ],
+        "Problem": [
+          "- Costs undercount because one `<synthetic>` message voids a whole session's price.",
+          "- Sessions are all titled with the account name, so nothing tells them apart.",
+          "- rtk numbers depend on which HOME reads them, and 'active' means different things in the two views."
+        ]
+      },
+      "status": "Ready",
+      "title": "0.1 usage data correctness and session titles"
+    },
+    {
+      "ai_context": {
+        "keywords": "quick, wins, crow, watch, both, panels",
+        "skip when": "new tabs, burn rate or per-tool stats.",
+        "summary": "Phase-1 visible fixes: titles in rows, totals row and token split, named Savings section, no busy/max count, usage pill restyle, in crow watch and both QML panels.",
+        "use when": "touching the current crow watch usage/agents views or the QML panels before the 0.2 redesign."
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels"
+        ],
+        "prod": [
+          "prod_001_crow_observability_surfaces"
+        ],
+        "req": [
+          "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats"
+        ],
+        "task": [
+          "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+        ]
+      },
+      "path": "logics/backlog/item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels.md",
+      "ref": "item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC5: totals row and token split visible in TUI and usage panel.",
+          "- AC6: Savings section with plain-language labels in TUI and panel; footer holds key help only.",
+          "- AC7: no 'n/m' count next to slot gauges; usage pill restyle approved from renders.",
+          "- AC14: qmllint silent; headless renders for normal, low, error, light and grimdark."
+        ],
+        "Problem": [
+          "- rtk, retros and proposals sit next to the key help with no explanation.",
+          "- Totals are missing from the sessions table and the token split is not shown.",
+          "- Pills and headers repeat the slot count the gauge already shows."
+        ]
+      },
+      "status": "Ready",
+      "title": "0.1 quick UI wins in crow watch and both panels"
+    },
+    {
+      "ai_context": {
+        "keywords": "responsive, usage, overview, tabs, burn, rate",
+        "skip when": "data fixes or savings computation.",
+        "summary": "Responsive usage overview that fills tall terminals, tabs 1-4 with d/w/m periods, burn rate and projected exhaustion, per-project and per-model rollups.",
+        "use when": "reworking the usage view layout or adding pace projections."
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_003_0_2_responsive_usage_overview_tabs_and_burn_rate"
+        ],
+        "prod": [
+          "prod_001_crow_observability_surfaces"
+        ],
+        "req": [
+          "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats"
+        ],
+        "task": [
+          "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+        ]
+      },
+      "path": "logics/backlog/item_003_0_2_responsive_usage_overview_tabs_and_burn_rate.md",
+      "ref": "item_003_0_2_responsive_usage_overview_tabs_and_burn_rate",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC8: view_test covers tall, wide and small; tall shows every section.",
+          "- AC9: burn rate and projected zero time shown when it precedes the reset.",
+          "- AC12: per-project and per-model rollups for d/w/m."
+        ],
+        "Problem": [
+          "- The usage view is a fixed stack that wastes a tall terminal and has nowhere to put new sections.",
+          "- Limits are snapshots with no sense of pace."
+        ]
+      },
+      "status": "Ready",
+      "title": "0.2 responsive usage overview, tabs and burn rate"
+    },
+    {
+      "ai_context": {
+        "keywords": "deliver, crow, pass, two, phases",
+        "skip when": "shell-side archeotech changes.",
+        "summary": "Orchestrates the two-phase delivery of the crow UI/UX pass: 0.1 data fixes and quick wins, 0.2 layout, savings stats and agents board.",
+        "use when": "picking the next step of the crow UI/UX pass."
+      },
+      "kind": "task",
+      "linked_refs": {
+        "item": [
+          "item_001_0_1_usage_data_correctness_and_session_titles",
+          "item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels",
+          "item_003_0_2_responsive_usage_overview_tabs_and_burn_rate",
+          "item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store",
+          "item_005_0_2_agents_board_improvements"
+        ],
+        "prod": [
+          "prod_001_crow_observability_surfaces"
+        ],
+        "req": [
+          "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats"
+        ],
+        "task": [
+          "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+        ]
+      },
+      "path": "logics/tasks/task_001_deliver_the_crow_ui_ux_pass_in_two_phases.md",
+      "ref": "task_001_deliver_the_crow_ui_ux_pass_in_two_phases",
+      "schema_version": "1.0",
+      "sections": {
+        "Context": [
+          "- Orchestrate the scaffolded request chain and keep sibling implementation slices linked."
+        ],
+        "Validation": [
+          "- (no validation recorded yet)"
+        ]
+      },
+      "status": "Ready",
+      "title": "Deliver the crow UI/UX pass in two phases"
+    }
+  ],
+  "estimates": {
+    "char_count": 9459,
+    "companion_doc_count": 0,
+    "doc_count": 5
+  },
+  "generated_at": "2026-10-20T10:19:52Z",
+  "handoff": {
+    "companion_doc_count": 0,
+    "enabled": false,
+    "source_refs": [
+      "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats",
+      "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+    ],
+    "validation_summary_count": 0
+  },
+  "i18n": {
+    "actions": [
+      "Choose the source locale for app-owned user-facing copy.",
+      "Run logics-manager i18n init --source-locale <locale>.",
+      "Route new UI copy through stable semantic keys."
+    ],
+    "applicable": null,
+    "configured": false,
+    "contract_path": "logics/i18n/contract.json",
+    "findings": [],
+    "next_action": "Run logics-manager i18n init --source-locale <locale> for a project that owns user-facing copy.",
+    "ok": true,
+    "state": "absent"
+  },
+  "mode": "diff-first",
+  "profile": "normal",
+  "ref": "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats,task_001_deliver_the_crow_ui_ux_pass_in_two_phases",
+  "refs": [
+    "req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats",
+    "task_001_deliver_the_crow_ui_ux_pass_in_two_phases"
+  ],
+  "release": {
+    "blocking_reasons": [
+      "Missing logics/release/contract.json."
+    ],
+    "configured": false,
+    "contract_path": "logics/release/contract.json",
+    "guidance": [
+      "Release readiness must come from project-owned evidence, not conversational memory.",
+      "Use release status or validate before preparing or claiming release readiness.",
+      "Publication-oriented actions are explicit operator actions and are separate from safe read/validate actions."
+    ],
+    "next_action": "Run logics-manager release discover --write, then review and promote logics/release/contract.draft.json to logics/release/contract.json.",
+    "publication_actions": [
+      "GitHub release publication",
+      "external publication"
+    ],
+    "required_gates": [],
+    "safe_actions": [
+      "logics-manager release status",
+      "logics-manager release plan <version>",
+      "logics-manager release validate <version>"
+    ],
+    "state": "not_configured",
+    "target_id": null,
+    "target_version": null,
+    "targets": []
+  },
+  "validation_summary": []
+}
