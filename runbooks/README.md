@@ -14,3 +14,4 @@ want to trigger it by name.
 - [archeotech-crow-agents](archeotech-crow-agents.md): test the crow agents bar/panel module with fixtures and headless renders
 - [open-project-session](open-project-session.md): open a project session in a new kitty window from the hub (HOME + inherited Claude markers)
 - [session-retros](session-retros.md): automatic retrospective after every session (SessionEnd hook → queue → /retro on Sonnet)
+- [agent-tooling](agent-tooling.md): third-party agent tools installed (code graph, graphify, ast-grep, claude-hud), pinned versions, verdicts, undo
