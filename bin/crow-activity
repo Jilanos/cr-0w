@@ -92,8 +92,16 @@ def gitlab_section(since):
         unresolved = sum(1 for d in discussions or []
                          if d["notes"][0].get("resolvable") and not d["notes"][0].get("resolved"))
         reviewers = ",".join(r["username"] for r in mr.get("reviewers", [])) or "no reviewer"
-        flag = f"⚠️ {unresolved} unresolved threads" if unresolved else mr["detailed_merge_status"]
-        lines.append(f"- {mr['references']['full']} {flag} · {reviewers} · {mr['title']}")
+        # `approved` is true when no rule is pending (0 required): only approved_by means someone approved.
+        approvals, _ = api_json(["glab", "api", f"projects/{mr['project_id']}/merge_requests/{mr['iid']}/approvals"])
+        by = [a["user"]["username"] for a in (approvals or {}).get("approved_by", [])]
+        approval = f"✅ approved by {','.join(by)}" if by else "⏳ not approved"
+        detail, _ = api_json(["glab", "api", f"projects/{mr['project_id']}/merge_requests/{mr['iid']}"])
+        pipeline = ((detail or {}).get("head_pipeline") or {}).get("status") or "no pipeline"
+        if pipeline == "failed":
+            pipeline = "❌ pipeline failed"
+        flag = f"⚠️ {unresolved} unresolved threads" if unresolved else "threads resolved"
+        lines.append(f"- {mr['references']['full']} {approval} · {flag} · {pipeline} · {reviewers} · {mr['title']}")
     if not mine:
         lines.append("- none")
 
