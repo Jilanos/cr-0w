@@ -64,7 +64,7 @@
 - (no validation recorded yet)
 
 # Report
-- Not started.
+- 2026-10-20 0.1 delivered in d710fa8: synthetic pricing fix (Thu was $7 shown vs $92 real), titles (dispatch/haiku/prompt placeholder), rtk summed over 3 homes, live state from session files, token split + week totals; TUI and both panels show titles, totals, split and a SAVINGS section; slot gauges drop n/m; usage pill = gauge + bold % + divider + cost. Open: Haiku titler untested live (sandbox blocks auth) -> owner runs 'crow usage --titles'; strip placement of multi-target plugins is a shell-side fix (handed off).
 
 # Links
 - Request: `req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats`
