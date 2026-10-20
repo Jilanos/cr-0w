@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""crow-memory: keep Claude memory in local/memory, shared by every allowed cdx profile.
+
+  crow-memory status                 per profile and project: real dir, symlink or missing
+  crow-memory migrate <account>      move the account's memory dirs into local/memory, leave symlinks
+                                     (the old dir is kept as <dir>.premigrate until you delete it)
+  crow-memory link <account>         symlink local/memory/* into the profile where no memory exists
+  crow-memory unlink <account>       remove those symlinks (never touches real directories)
+  crow-memory commit                 commit pending changes in the local/ repo
+
+Memory is never copied into a profile: a link is a symlink into local/memory.
+"""
+import os, pwd, shutil, subprocess, sys
+
+HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+STORE = os.path.join(HOME, "local", "memory")
+REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
+PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
+
+
+def projects_dir(account):
+    return os.path.join(PROFILES, account, "claude-home", ".claude", "projects")
+
+
+def policy(account):
+    out = subprocess.run([os.path.join(HOME, "bin", "crow-accounts"), "policy", account],
+                         capture_output=True, text=True).stdout.strip()
+    return out or "never"
+
+
+def need_allowed(account):
+    if policy(account) == "never":
+        sys.exit(f"crow-memory: account '{account}' is not allowed (policy never)")
+
+
+def is_ours(p):
+    return os.path.islink(p) and os.path.realpath(p).startswith(os.path.realpath(STORE) + os.sep)
+
+
+def git(*a):
+    return subprocess.run(["git", "-C", os.path.join(HOME, "local"), *a], capture_output=True, text=True)
+
+
+def status():
+    for acct in sorted(a for a in os.listdir(PROFILES) if not a.startswith(".")):
+        base = projects_dir(acct)
+        if not os.path.isdir(base):
+            continue
+        for slug in sorted(os.listdir(base)):
+            m = os.path.join(base, slug, "memory")
+            if os.path.islink(m):
+                kind = "link" if is_ours(m) else "foreign-link"
+                n = len(os.listdir(m)) if os.path.isdir(m) else 0
+            elif os.path.isdir(m):
+                kind, n = "real", len(os.listdir(m))
+            else:
+                continue
+            print(f"{acct:<8} {kind:<12} {n:>3} files  {slug}")
+
+
+def migrate(account):
+    need_allowed(account)
+    base = projects_dir(account)
+    moved = 0
+    for slug in sorted(os.listdir(base)):
+        m = os.path.join(base, slug, "memory")
+        if os.path.islink(m) or not os.path.isdir(m) or not os.listdir(m):
+            continue
+        dest = os.path.join(STORE, slug)
+        os.makedirs(dest, exist_ok=True)
+        for f in os.listdir(m):
+            src, dst = os.path.join(m, f), os.path.join(dest, f)
+            if os.path.exists(dst) and open(src, "rb").read() != open(dst, "rb").read():
+                sys.exit(f"crow-memory: {dst} already exists and differs; resolve by hand")
+            if not os.path.exists(dst):
+                shutil.copy2(src, dst) if os.path.isfile(src) else shutil.copytree(src, dst)
+        os.rename(m, m + ".premigrate")
+        os.symlink(dest, m)
+        moved += 1
+        print(f"migrated {slug} ({len(os.listdir(dest))} files)")
+    print(f"{moved} project(s) migrated; originals kept as memory.premigrate")
+    commit()
+
+
+def link(account):
+    need_allowed(account)
+    base = projects_dir(account)
+    for slug in sorted(os.listdir(STORE)) if os.path.isdir(STORE) else []:
+        m = os.path.join(base, slug, "memory")
+        if os.path.islink(m) or (os.path.isdir(m) and os.listdir(m)):
+            continue
+        os.makedirs(os.path.dirname(m), exist_ok=True)
+        if os.path.isdir(m):
+            os.rmdir(m)
+        os.symlink(os.path.join(STORE, slug), m)
+
+
+def unlink(account):
+    base = projects_dir(account)
+    for slug in os.listdir(base) if os.path.isdir(base) else []:
+        m = os.path.join(base, slug, "memory")
+        if is_ours(m):
+            os.unlink(m)
+
+
+def commit():
+    git("add", "memory")
+    if git("diff", "--cached", "--quiet", "--", "memory").returncode:
+        r = git("commit", "-q", "-m", "memory: update", "--", "memory")
+        print("committed memory changes" if r.returncode == 0 else r.stderr)
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    cmd = a[0] if a else ""
+    if cmd == "status": status()
+    elif cmd == "migrate" and len(a) == 2: migrate(a[1])
+    elif cmd == "link" and len(a) == 2: link(a[1])
+    elif cmd == "unlink" and len(a) == 2: unlink(a[1])
+    elif cmd == "commit": commit()
+    else: sys.exit(__doc__)

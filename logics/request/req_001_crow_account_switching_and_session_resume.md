@@ -7,6 +7,7 @@
 > Complexity: High
 > Theme: Hub orchestration
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-10-20 17:47:35
 
 # AI Context
 - Summary: (unfilled: replace before this doc is used)
@@ -28,7 +29,7 @@
 - Automatic retros run as their own sessions in the same profile and workspace, so a 'newest transcript' lookup picks them up.
 - A first registry of limit-cut sessions exists at local/state/interrupted-sessions.md (11 sessions on 2026-10-20), built by scanning every profile's transcripts for a final limit message and excluding retros.
 - Account policy lives in local/context.md today, in prose; it must become machine-readable config in local/.
-- Memory is per cdx profile (~/.cdx/profiles/<name>/claude-home/.claude/projects/<project>/memory/): main holds 18 files for this project, shared 2, the teammates' accounts none. The private local/ repo is the chosen single source of truth.
+- Memory is per cdx profile (~/.cdx/profiles/<name>/claude-home/.claude/projects/<project>/memory/): the main account holds 18 files for this project, the shared one 2, the teammates' accounts none. The private local/ repo is the chosen single source of truth.
 
 # Acceptance criteria
 - AC1: An allowed-accounts config in local/ lists each account with a policy (use, ask-first, never); crow never targets an account marked never.

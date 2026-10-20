@@ -4,10 +4,11 @@
 > Status: Ready
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 25%
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
+> Indicators reviewed: 2026-10-20 17:47:35
 
 # AI Context
 - Summary: (unfilled: replace before this doc is used)
@@ -19,7 +20,7 @@
 - Orchestrate the scaffolded request chain and keep sibling implementation slices linked.
 
 # Plan
-- [ ] 1. 1.1: move memory into local/, wire profile access without copies, verify on main and on the shared account (ask first).
+- [ ] 1. 1.1: move memory into local/, wire profile access without copies, verify on the main and the shared account (ask first).
 - [ ] 2. 1.2: accounts file, helper and registry scanner with tests.
 - [ ] 3. 1.3: guarded relaunch command and block detection; verify with a dry run against cdx.
 - [ ] 4. 1.4: crow watch view and no-model mode; render and show the owner before finishing.

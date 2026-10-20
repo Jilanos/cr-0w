@@ -18,7 +18,7 @@
 set -euo pipefail
 
 CROW_HOME="${CROW_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
-CROW_ACCOUNT="${CROW_ACCOUNT:-main}"
+CROW_ACCOUNT="${CROW_ACCOUNT:-$("$CROW_HOME/bin/crow-accounts" default)}"
 REGISTRY="$CROW_HOME/local/projects.yaml"
 export CROW_HOME
 
@@ -32,6 +32,19 @@ for p in reg["projects"]:
 else:
     sys.exit(f"crow: unknown project '{sys.argv[2]}' (see: crow ls)")
 EOF
+}
+
+# Start an interactive cdx session. On a shared account the memory is linked from local/memory
+# for the session only (no copy stays in the profile), then unlinked and committed.
+launch() {
+  local dir="$1"; shift
+  if [[ "$("$CROW_HOME/bin/crow-accounts" memory "$CROW_ACCOUNT")" == session ]]; then
+    "$CROW_HOME/bin/crow-memory" link "$CROW_ACCOUNT"
+    trap '"$CROW_HOME/bin/crow-memory" unlink "$CROW_ACCOUNT"; "$CROW_HOME/bin/crow-memory" commit' EXIT
+    cdx "$CROW_ACCOUNT" --dir "$dir" "$@"
+  else
+    exec cdx "$CROW_ACCOUNT" --dir "$dir" "$@"
+  fi
 }
 
 oneshot() {
@@ -59,12 +72,12 @@ oneshot() {
 cmd="${1:-hub}"
 shift || true
 case "$cmd" in
-  hub)      exec cdx "$CROW_ACCOUNT" --dir "$CROW_HOME" ;;
+  hub)      launch "$CROW_HOME" ;;
   brief)    oneshot "/brief" ;;
   daily)    oneshot "/daily Draft only: save the draft to the state dir as drafts/daily-$(date +%F).md and print it. Do not post anything." ;;
   weekly)   oneshot "/weekly" ;;
   open)     dir="$(project_path "${1:?usage: crow open <project> [prompt]}")"
-            exec cdx "$CROW_ACCOUNT" --dir "$dir" ${2:+--prompt "$2"} ;;
+            launch "$dir" ${2:+--prompt "$2"} ;;
   term)     # Detach from the calling session: real HOME (kitty config) and no inherited
             # Claude/cdx variables (session markers, ANTHROPIC_PROFILE, CDX_SESSION_NAME).
             dir="$(project_path "${1:?usage: crow term <project> [prompt]}")"

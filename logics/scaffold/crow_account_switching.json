@@ -27,7 +27,7 @@
       "Automatic retros run as their own sessions in the same profile and workspace, so a 'newest transcript' lookup picks them up.",
       "A first registry of limit-cut sessions exists at local/state/interrupted-sessions.md (11 sessions on 2026-10-20), built by scanning every profile's transcripts for a final limit message and excluding retros.",
       "Account policy lives in local/context.md today, in prose; it must become machine-readable config in local/.",
-      "Memory is per cdx profile (~/.cdx/profiles/<name>/claude-home/.claude/projects/<project>/memory/): main holds 18 files for this project, shared 2, the teammates' accounts none. The private local/ repo is the chosen single source of truth."
+      "Memory is per cdx profile (~/.cdx/profiles/<name>/claude-home/.claude/projects/<project>/memory/): the main account holds 18 files for this project, the shared one 2, the teammates' accounts none. The private local/ repo is the chosen single source of truth."
     ],
     "acceptance_criteria": [
       "AC1: An allowed-accounts config in local/ lists each account with a policy (use, ask-first, never); crow never targets an account marked never.",
@@ -155,7 +155,7 @@
   "orchestration_task": {
     "title": "Deliver account switching and session resume in three steps",
     "plan": [
-      "1.1: move memory into local/, wire profile access without copies, verify on main and on the shared account (ask first).",
+      "1.1: move memory into local/, wire profile access without copies, verify on the main and the shared account (ask first).",
       "1.2: accounts file, helper and registry scanner with tests.",
       "1.3: guarded relaunch command and block detection; verify with a dry run against cdx.",
       "1.4: crow watch view and no-model mode; render and show the owner before finishing."

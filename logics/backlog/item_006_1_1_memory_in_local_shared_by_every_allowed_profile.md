@@ -1,13 +1,14 @@
 ## item_006_1_1_memory_in_local_shared_by_every_allowed_profile - 1.1 memory in local, shared by every allowed profile
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 25%
 > Complexity: Medium
 > Theme: Hub orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-10-20 17:47:35
 
 # AI Context
 - Summary: (unfilled: replace before this doc is used)

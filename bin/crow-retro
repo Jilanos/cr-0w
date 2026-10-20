@@ -22,7 +22,7 @@ STATE = os.path.join(CROW_HOME, "local", "state", "retros")
 QUEUE = os.path.join(STATE, "queue")
 LOCK = os.path.join(STATE, ".worker.lock")
 LOG = os.path.join(STATE, "worker.log")
-ACCOUNT = os.environ.get("CROW_ACCOUNT", "main")
+ACCOUNT = os.environ.get("CROW_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
 MODEL = os.environ.get("CROW_RETRO_MODEL", "sonnet")
 MIN_USER_MESSAGES = 2
 

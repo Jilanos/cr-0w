@@ -5,25 +5,39 @@ description: Draft the user's update for the team daily (French) from activity s
 
 # Daily
 
-## Gather (work scope only)
-1. Since = date in `<state>/last-daily` if present, otherwise `yesterday` (Monday looks back to Friday).
-2. `bin/crow-activity --since <since> --scope work`
-3. Jira (MCP): `assignee = currentUser() AND updated >= "<since>" ORDER BY updated DESC` (key, summary, status), plus the open-sprint query from `brief` for "today".
-4. `<state>/activity/*.md` entries since `<since>` tagged with work projects (meetings, decisions, ops, R&D).
-5. Work items in `<state>/open-threads.md` (blockers).
+The daily is a short flat list under the user's name. One line per topic, a few words each. No ticket keys, no MR numbers, no explanations. The only section is **Blocages**, and it's the most important part.
 
-## Draft (French, concise, ticket keys inline)
+## Gather (work scope only)
+1. Since = date in `<state>/last-daily` if present, otherwise the previous working day.
+2. `bin/crow-activity --since <since> --scope work`
+3. Jira (MCP): `assignee = currentUser() AND updated >= "<since>" ORDER BY updated DESC`, plus the open sprint for what's next.
+4. `<state>/activity/*.md` and work items in `<state>/open-threads.md` (non-code work: docs, admin, vendor requests, R&D).
+
+## Draft (French, lowercase, terse)
 ```
-**Hier**
-**Aujourd'hui**
-- …
+mr - retire the reporting stack
+mr - staff accounts by invitation only
+merge - scoring rules
+review MR mobile
+en cours - photo capture
+deploy en cours
+tests perf à faire
+vendor form - fill the documentation they asked for
+
 **Blocages**
-- … (or "Aucun")
+- waiting for the vendor's documentation
 ```
-Rules: group repeated actions (one line per MR/ticket, not per comment). Name outcomes, not process. No AI mention.
+- `mr - <what>`: own MR open or in review. `merge - <what>`: merged. `review MR <whose/what>`: reviews done or pending.
+- `en cours - <what>` for ongoing work, `<what> à faire` for next up. A bare topic is fine (`CGUs`).
+- Describe the feature in plain words, not the fix details or review back-and-forth. One line per MR, never per commit or thread.
+- Include non-code work from the activity log and open threads.
+- **Blocages**: always check for them. Real blockers only: waiting on someone outside the team, vendor, access, decision, broken env/CI, something stuck for 2+ days. A routine pending review is not a blocker. Name who or what is blocking. Leave the section out entirely when there are none (don't write "Aucun").
+- No AI mention.
+
+Show only the list, then at most one line of questions if something is genuinely unclear. No commentary on period covered or choices made.
 
 ## Post (📝 approval required)
 1. Show the draft and wait for an explicit OK or edits.
 2. Confluence location: `local/context.md` → "Confluence daily page". If it's TBD, ask the user for the page, then record it there.
-3. Read the page and its format first. Edit **only** the user's own section or entry for today, matching the existing format. Never touch other people's content. If the structure is unclear, give the text to paste instead.
+3. The page has one block per date, then one list per person. Edit **only** the user's list for today. Never touch other people's content. If the structure is unclear, give the text to paste instead.
 4. Write today's date to `<state>/last-daily` and append `- HH:MM [work] daily posted` to the activity log.

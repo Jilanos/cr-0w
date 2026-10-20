@@ -1,10 +1,10 @@
 ## item_007_1_2_account_policy_config_and_interrupted_session_registry - 1.2 account policy config and interrupted-session registry
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 25%
 > Complexity: Medium
 > Theme: Hub orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.

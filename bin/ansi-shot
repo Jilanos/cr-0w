@@ -12,6 +12,7 @@ translucent terminal. Handles SGR 0/1/2/3/4/7/22/23/24/27, 30-37, 39, 40-47, 49,
 """
 import argparse
 import os
+import pwd
 import re
 
 from fontTools.ttLib import TTFont
@@ -136,7 +137,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("src")
     ap.add_argument("out")
-    ap.add_argument("--theme", default="/home/" + os.environ.get("USER", "") + "/.config/kitty/current-theme.conf")
+    ap.add_argument("--theme", default=os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".config/kitty/current-theme.conf"))
     ap.add_argument("--font", default="/usr/share/fonts/TTF/FiraCodeNerdFontMono-Regular.ttf")
     ap.add_argument("--bold-font", default="/usr/share/fonts/TTF/FiraCodeNerdFontMono-Bold.ttf")
     ap.add_argument("--size", type=int, default=15)

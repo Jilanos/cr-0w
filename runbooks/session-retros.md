@@ -20,3 +20,5 @@ Every finished session gets a short retrospective, so lessons land in skills, ru
 ## Known gaps
 - Sonnet tends to miss causes on the hub side (a vague handoff prompt). The report now has a mandatory "Hub handoff" line; spot-check it.
 - cdx writes its own notify hooks into the same settings file. If retros stop appearing, check `jq .hooks.SessionEnd` there first.
+- A provider failure (usage limit reached) drops the queue entry and the retro is lost. Re-run the digests from `local/state/retros/digests/` by hand with `/retro`.
+- Retrying `claude -p` unsandboxed to test auth is blocked by the auto-mode classifier ([Safety Bypass Flag]). Test inside the sandbox or ask the user to run it with `!`.

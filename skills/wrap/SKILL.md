@@ -39,7 +39,7 @@ In the state dir:
 - `decisions.md` (only for decisions with lasting impact): `## YYYY-MM-DD [project] title` + 1–3 lines of why
 - `status.md` (hub mode, or if a project's status changed): one row per project: status, current focus, next step, blocked by
 
-In hub mode, also commit `$CROW_HOME` changes (personal rules apply).
+In hub mode, also commit `$CROW_HOME` changes (personal rules apply), and run `bin/crow-memory commit` so memory saved this session lands in `local/`.
 
 ## 5. Report
 End with exactly this shape, then stop:

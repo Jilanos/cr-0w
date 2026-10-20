@@ -60,7 +60,7 @@ TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
     "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
     "--system-prompt 'You name coding sessions. Reply with a 3-6 word title in the language of the prompts, "
     "Title Case not required, no quotes, no trailing punctuation.'")
-PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", "/home/" + os.environ.get("USER", "") + "/.cdx/profiles"))
+PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".cdx/profiles")))
 ACTIVE_SECONDS = 120
 
 

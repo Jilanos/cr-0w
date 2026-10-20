@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""crow-accounts: read the account policy from local/accounts.yaml.
+
+  crow-accounts default            name of the default account
+  crow-accounts policy <name>      use | ask-first | never (never when unknown)
+  crow-accounts memory <name>      permanent | session | none
+  crow-accounts allowed            names crow may target (policy use or ask-first)
+"""
+import os, sys
+import yaml
+
+HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+PATH = os.path.join(HOME, "local", "accounts.yaml")
+
+
+def load():
+    try:
+        return yaml.safe_load(open(PATH)) or {}
+    except FileNotFoundError:
+        sys.exit(f"crow-accounts: {PATH} is missing (copy docs/accounts.example.yaml there)")
+
+
+def find(cfg, name):
+    return next((a for a in cfg.get("accounts", []) if a["name"] == name), None)
+
+
+def main(argv):
+    cfg = load()
+    cmd = argv[0] if argv else ""
+    if cmd == "default":
+        print(cfg["default"])
+    elif cmd == "policy":
+        a = find(cfg, argv[1])
+        print(a["policy"] if a else "never")
+    elif cmd == "memory":
+        a = find(cfg, argv[1])
+        print(a.get("memory", "none") if a else "none")
+    elif cmd == "allowed":
+        for a in cfg.get("accounts", []):
+            if a["policy"] in ("use", "ask-first"):
+                print(a["name"])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

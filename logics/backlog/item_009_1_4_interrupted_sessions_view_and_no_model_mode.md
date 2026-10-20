@@ -1,10 +1,10 @@
 ## item_009_1_4_interrupted_sessions_view_and_no_model_mode - 1.4 interrupted-sessions view and no-model mode
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 25%
 > Complexity: Medium
 > Theme: Hub orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.

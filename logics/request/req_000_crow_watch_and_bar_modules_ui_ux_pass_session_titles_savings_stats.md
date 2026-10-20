@@ -7,6 +7,7 @@
 > Complexity: High
 > Theme: Hub observability
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-10-20 17:47:34
 
 # AI Context
 - Summary: Fix crow usage data (synthetic pricing, account-named titles, split rtk databases), give every session a Haiku title, surface per-tool savings, and lay the usage view out responsively with tabs; mirror it in the archeotech bar panels.

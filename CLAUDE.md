@@ -28,13 +28,13 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 | Send email, post on Teams | 📝 approval first | 📝 approval first |
 | Infra on dev | ✅ only on a claimed, free env (repo's own claim script) | ✅ |
 | Infra on int / prod | 📝 approval, every time | n/a |
-| Dispatch cdx runs | ✅ max 2 in background, account `main` | same |
+| Dispatch cdx runs | ✅ max 2 in background, on an allowed account (`local/accounts.yaml`) | same |
 
 📝 = show the exact draft and wait for an explicit OK.
 
 ## Hard rules
 - NEVER add AI attribution: no Co-Authored-By, no "Generated with", no trailers, and no mention of AI in commits, MRs, PRs, tickets or docs.
-- Delegate to project-owned tooling: vault triage → vault Claude; dev-env claiming → lambda repo.
+- Delegate to project-owned tooling: vault triage → vault Claude; dev-env claiming → the project repo.
 - Before the first commit in a repo, check `git config user.email` against `identities` for its scope. Flag mismatches instead of committing.
 - Spend tokens deliberately: scripts before exploration, smallest model/effort that fits, no speculative parallel runs.
 
