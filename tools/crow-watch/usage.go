@@ -224,12 +224,14 @@ func models(ms []string) string {
 	return strings.Join(out, ",")
 }
 
+// hhmm: an ISO time (with or without seconds) as local "15:04".
 func hhmm(iso string) string {
-	t, err := time.Parse(time.RFC3339, iso)
-	if err != nil {
-		return iso
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04Z07:00"} {
+		if t, err := time.Parse(layout, iso); err == nil {
+			return t.Local().Format("15:04")
+		}
 	}
-	return t.Local().Format("15:04")
+	return iso
 }
 
 // ---------- sections (each returns body lines for a box) ----------
@@ -808,7 +810,15 @@ func (m model) historyView(h int) block {
 		right := box(title("By model", label), nil, append(barRows(p.ByModel, w-half-4, 6, sMagenta, false), append([]line{{}, {{"Context weight by tool", sHead}}}, toolRows(p.Tools, w-half-4, rest-12)...)...), w-half, rest, 0, -1, false)
 		return append(cost, hcat([]int{half, w - half}, left, right)...)
 	}
-	br := box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, min(rest-2, 26)), w, 0, 0, -1, false)
+	// The day table needs one row per day with sessions; the breakdown's tool
+	// table takes the rest of a tall screen instead of leaving it blank.
+	days := 0
+	for _, d := range u.History {
+		if d.Sessions > 0 {
+			days++
+		}
+	}
+	br := box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, max(min(rest-2, 26), rest-2-(days+3))), w, 0, 0, -1, false)
 	out := append(cost, br...)
 	if left := rest - len(br); left >= 5 {
 		out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2, false), w, 0, 0, -1, false)...)

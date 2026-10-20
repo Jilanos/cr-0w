@@ -121,3 +121,12 @@ func TestUsageRows(t *testing.T) {
 		t.Errorf("shortReset = %q", got)
 	}
 }
+
+func TestHHMMWithoutSeconds(t *testing.T) {
+	for _, iso := range []string{"2026-10-20T18:40+02:00", "2026-10-20T18:40:00+02:00"} {
+		want := time.Date(2026, 10, 20, 16, 40, 0, 0, time.UTC).Local().Format("15:04")
+		if got := hhmm(iso); got != want {
+			t.Errorf("hhmm(%q) = %q, want %q", iso, got, want)
+		}
+	}
+}
