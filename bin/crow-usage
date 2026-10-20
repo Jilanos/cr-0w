@@ -54,7 +54,7 @@ STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 5
+CACHE_VERSION = 6
 TITLES_PER_RUN = 12
 TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
     "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "

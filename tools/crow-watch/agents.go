@@ -398,9 +398,9 @@ func (m model) agentsView(h int) block {
 	}
 	det := m.detailLines(w - 4)
 	rest := h - len(listBox)
-	tl := m.timelineLines(w-4, max(6, rest/3))
-	detH := rest - len(tl) - 2 // details take the rest: the activity log is long
-	if detH < 10 {             // short terminal: details only, no timeline
+	tl := m.timelineLines(w-4, max(6, rest/2))
+	detH := min(len(det)+2, rest-len(tl)-2) // details fit their content; the timeline follows
+	if detH < 10 {                          // short terminal: details only, no timeline
 		detH, tl = rest, nil
 	}
 	out := append(listBox, box(title("Details", ""), line{{"PgUp/PgDn scroll", sSub}}, det, w, detH, min(m.detailOff, max(0, len(det)-(detH-2))), -1, false)...)

@@ -747,21 +747,56 @@ func (m model) savingsView(h int) block {
 	tools := box(title("Context weight by tool", label), line{{"tokens each tool returned into the context", sSub}}, trows, w, min(len(trows)+2, rest), 0, -1, false)
 	out := append(sav, tools...)
 	if left := rest - len(tools); left >= 8 {
-		// What caching and routing saved per day, as $ (same chart as spend).
+		// What caching and routing saved per day: a capped chart, then one row per day as space allows.
 		per := make([]rollup, len(u.History))
 		for i, d := range u.History {
 			per[i] = rollup{Date: d.Date, CostUSD: d.CacheSaved + d.RouteSaved}
 		}
-		out = append(out, box(title("Saved per day", "prompt cache + model routing, 30 days"), nil, chart(per, w-4, left-4, false), w, left, 0, -1, false)...)
+		ch := box(title("Saved per day", "prompt cache + model routing, 30 days"), nil, chart(per, w-4, min(8, left-6), false), w, 0, 0, -1, false)
+		out = append(out, ch...)
+		if left -= len(ch); left >= 5 {
+			out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2, true), w, 0, 0, -1, false)...)
+		}
 	}
 	return append(out, how...)
+}
+
+// dayTable: newest day first, one row per day with sessions, at most rows lines.
+func (u *usage) dayTable(width, rows int, savings bool) []line {
+	head := "  " + pad("day", 14) + padL("spend", 10) + padL("tokens", 9) + padL("sessions", 10) + padL("cache", 7)
+	if savings {
+		head = "  " + pad("day", 14) + padL("spend", 10) + padL("cache saved", 13) + padL("routing", 10) + padL("compactions", 13) + padL("sessions", 10)
+	}
+	out := []line{{{head, sHead}}}
+	for i := len(u.History) - 1; i >= 0 && len(out) < rows; i-- {
+		d := u.History[i]
+		if d.Sessions == 0 {
+			continue
+		}
+		name := d.Date
+		if t, err := time.Parse("2006-01-02", d.Date); err == nil {
+			name = t.Format("Mon 02 Jan")
+		}
+		ns := sPlain
+		if d.Date == u.todayKey() {
+			ns = sAcc
+		}
+		if savings {
+			out = append(out, line{{"  " + pad(name, 14), ns}, {padL(money(d.CostUSD), 10), sYellow}, {padL(money(d.CacheSaved), 13), sOK},
+				{padL(money(d.RouteSaved), 10), sOK}, {padL(fmt.Sprint(d.Compactions), 13), sSub}, {padL(fmt.Sprint(d.Sessions), 10), sSub}})
+		} else {
+			out = append(out, line{{"  " + pad(name, 14), ns}, {padL(money(d.CostUSD), 10), sYellow}, {padL(human(d.Tokens), 9), sCyan},
+				{padL(fmt.Sprint(d.Sessions), 10), sSub}, {padL(fmt.Sprintf("%d%%", d.CachePct), 7), sSub}})
+		}
+	}
+	return out
 }
 
 func (m model) historyView(h int) block {
 	u := m.usage
 	p, label := m.periodRollup()
 	w := m.w
-	chartH := max(4, min(14, h/4))
+	chartH := max(4, min(10, h/5))
 	tok := false
 	body := append([]line{{{money(u.Month.CostUSD), sBold}, {" in 30 days · ", sSub}, {human(u.Month.Tokens), sCyan}, {" tokens · ", sSub},
 		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, {}}, chart(u.History, w-4, chartH, tok)...)
@@ -773,5 +808,10 @@ func (m model) historyView(h int) block {
 		right := box(title("By model", label), nil, append(barRows(p.ByModel, w-half-4, 6, sMagenta, false), append([]line{{}, {{"Context weight by tool", sHead}}}, toolRows(p.Tools, w-half-4, rest-12)...)...), w-half, rest, 0, -1, false)
 		return append(cost, hcat([]int{half, w - half}, left, right)...)
 	}
-	return append(cost, box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, rest-2), w, rest, 0, -1, false)...)
+	br := box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, min(rest-2, 26)), w, 0, 0, -1, false)
+	out := append(cost, br...)
+	if left := rest - len(br); left >= 5 {
+		out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2, false), w, 0, 0, -1, false)...)
+	}
+	return out
 }
