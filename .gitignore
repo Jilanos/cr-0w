@@ -1,5 +1,5 @@
-# Uncomment `local/` before making this repo public — it holds private config and state.
-# local/
+# `local/` is its own private repo (private config and state), never part of this one.
+local/
 .claude/settings.local.json
 *.bak
 tools/crow-watch/crow-watch
