@@ -1,6 +1,7 @@
 // crow-watch: live board of every agent (background runs, sessions, finished runs).
 //
-// Data comes from `crow-runs json` (the same source as `crow runs`). Colours are
+// Two views, toggled with `u`: agents (from `crow-runs json`, the same source as
+// `crow runs`) and usage (from `crow-usage --json`, see usage.go). Colours are
 // the terminal's 16 ANSI slots and no background is painted, so the board follows
 // the terminal theme. Tall terminals stack the panes; wide ones put them side by side.
 package main
@@ -65,13 +66,15 @@ type snapshot struct {
 	Finished []finished `json:"finished"`
 }
 
-func crowRuns() string {
+func crowBin(name string) string {
 	if h := os.Getenv("CROW_HOME"); h != "" {
-		return filepath.Join(h, "bin", "crow-runs")
+		return filepath.Join(h, "bin", name)
 	}
 	exe, _ := os.Executable()
-	return filepath.Join(filepath.Dir(exe), "..", "..", "bin", "crow-runs")
+	return filepath.Join(filepath.Dir(exe), "..", "..", "bin", name)
 }
+
+func crowRuns() string { return crowBin("crow-runs") }
 
 type dataMsg struct {
 	snap *snapshot
@@ -262,6 +265,12 @@ type model struct {
 	reports     map[string]string
 	notice      string
 	updated     time.Time
+
+	showUsage    bool
+	usage        *usage
+	usageErr     error
+	usageLoading bool
+	uCursor      int
 }
 
 func (m *model) rebuild() {
@@ -309,7 +318,7 @@ func keyOf(a *agent) string {
 	return fmt.Sprint(a.PID)
 }
 
-func (m model) Init() tea.Cmd { return tea.Batch(fetch, tick()) }
+func (m model) Init() tea.Cmd { return tea.Batch(fetch, tick(), fetchUsage, usageTick()) }
 
 func (m model) selected() *item {
 	if m.cursor < len(m.items) {
@@ -341,6 +350,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rebuild()
 		}
 		return m, m.maybeReport()
+	case usageTickMsg:
+		if m.usageLoading {
+			return m, usageTick()
+		}
+		m.usageLoading = true
+		return m, tea.Batch(fetchUsage, usageTick())
+	case usageMsg:
+		m.usageLoading, m.usageErr = false, msg.err
+		if msg.u != nil {
+			m.usage = msg.u
+			m.uCursor = max(0, min(m.uCursor, len(m.usage.today)-1))
+		}
 	case reportMsg:
 		m.reports[msg.id] = msg.text
 	case tea.KeyMsg:
@@ -348,12 +369,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
+		case "u":
+			m.showUsage = !m.showUsage
 		case "tab":
 			m.focusDetail = !m.focusDetail
 		case "r":
+			if m.showUsage {
+				if m.usageLoading {
+					return m, nil
+				}
+				m.usageLoading = true
+				return m, fetchUsage
+			}
 			return m, fetch
 		case "c":
-			if it := m.selected(); it != nil {
+			if m.showUsage {
+				if m.usage != nil && m.uCursor < len(m.usage.today) {
+					id := m.usage.today[m.uCursor].ID
+					if err := exec.Command("wl-copy", id).Run(); err == nil {
+						m.notice = "copied " + short(id)
+					} else {
+						m.notice = "wl-copy not available"
+					}
+				}
+			} else if it := m.selected(); it != nil {
 				if err := exec.Command("wl-copy", it.key).Run(); err == nil {
 					m.notice = "copied " + short(it.key)
 				} else {
@@ -361,7 +400,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "up", "k":
-			if m.focusDetail {
+			if m.showUsage {
+				m.uCursor = max(0, m.uCursor-1)
+			} else if m.focusDetail {
 				m.detailOff = max(0, m.detailOff-1)
 			} else if m.cursor > 0 {
 				m.cursor--
@@ -369,7 +410,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.maybeReport()
 			}
 		case "down", "j":
-			if m.focusDetail {
+			if m.showUsage {
+				if m.usage != nil {
+					m.uCursor = max(0, min(m.uCursor+1, len(m.usage.today)-1))
+				}
+			} else if m.focusDetail {
 				m.detailOff++
 			} else if m.cursor < len(m.items)-1 {
 				m.cursor++
@@ -398,9 +443,12 @@ func (m model) View() string {
 	if m.w == 0 {
 		return ""
 	}
-	title := sTitle.Render(lipgloss.PlaceHorizontal(m.w, lipgloss.Center, "CR-0W · agents", lipgloss.WithWhitespaceBackground(cMagenta)))
-	summary := m.summaryBox()
+	title := m.title()
 	footer := m.footer()
+	if m.showUsage {
+		return m.usageView(title, footer)
+	}
+	summary := m.summaryBox()
 	mainH := m.h - lipgloss.Height(title) - lipgloss.Height(summary) - lipgloss.Height(footer)
 
 	var body string
@@ -420,6 +468,18 @@ func (m model) View() string {
 			m.pane("Details", m.detailLines(dw-4), dw, mainH, m.focusDetail, false))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, title, summary, body, footer)
+}
+
+// title: the hub name and both views, the active one highlighted.
+func (m model) title() string {
+	tab := func(name string, on bool) string {
+		if on {
+			return sSel.Bold(true).Render(" " + name + " ")
+		}
+		return sTitle.Faint(true).Render(" " + name + " ")
+	}
+	t := sTitle.Render("CR-0W · ") + tab("AGENTS", !m.showUsage) + sTitle.Render("│") + tab("USAGE", m.showUsage)
+	return lipgloss.PlaceHorizontal(m.w, lipgloss.Center, t, lipgloss.WithWhitespaceBackground(cMagenta))
 }
 
 func (m model) summaryBox() string {
@@ -458,8 +518,14 @@ func (m model) summaryBox() string {
 func (m model) footer() string {
 	keys := line{
 		{"↑↓/jk", sHead}, {": navigate  ", sPlain}, {"Tab", sHead}, {": switch pane  ", sPlain},
-		{"PgUp/PgDn", sHead}, {": scroll details  ", sPlain}, {"r", sHead}, {": refresh  ", sPlain},
-		{"c", sHead}, {": copy id  ", sPlain}, {"q", sHead}, {": quit", sPlain},
+		{"PgUp/PgDn", sHead}, {": scroll details  ", sPlain}, {"u", sHead}, {": usage  ", sPlain},
+		{"r", sHead}, {": refresh  ", sPlain}, {"c", sHead}, {": copy id  ", sPlain}, {"q", sHead}, {": quit", sPlain},
+	}
+	if m.showUsage {
+		keys = line{
+			{"↑↓/jk", sHead}, {": navigate  ", sPlain}, {"u", sHead}, {": agents  ", sPlain},
+			{"r", sHead}, {": refresh  ", sPlain}, {"c", sHead}, {": copy id  ", sPlain}, {"q", sHead}, {": quit", sPlain},
+		}
 	}
 	if m.notice != "" {
 		keys = append(keys, seg{"   " + m.notice, sYellow})

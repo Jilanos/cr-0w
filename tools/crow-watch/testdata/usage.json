@@ -1,0 +1,226 @@
+{
+ "generated_at": "2026-10-20T12:30:00",
+ "limits": [
+  {
+   "account": "spare",
+   "remaining_5h_pct": 100,
+   "reset_5h_at": "Oct 20 16:20",
+   "remaining_week_pct": 67,
+   "reset_week_at": "Oct 24 11:00",
+   "active": false
+  },
+  {
+   "account": "lab",
+   "remaining_5h_pct": 96,
+   "reset_5h_at": "Oct 20 15:40",
+   "remaining_week_pct": 2,
+   "reset_week_at": "Oct 20 13:00",
+   "active": false
+  },
+  {
+   "account": "side",
+   "remaining_5h_pct": 35,
+   "reset_5h_at": "Oct 20 15:00",
+   "remaining_week_pct": null,
+   "reset_week_at": null,
+   "active": false
+  },
+  {
+   "account": "work",
+   "remaining_5h_pct": 74,
+   "reset_5h_at": "Oct 20 15:00",
+   "remaining_week_pct": 96,
+   "reset_week_at": "Oct 26 17:00",
+   "active": true
+  }
+ ],
+ "today": {
+  "cost_usd": 12.53,
+  "tokens": 32823621,
+  "sessions": 6,
+  "cache_pct": 98
+ },
+ "days": [
+  {
+   "date": "2026-10-14",
+   "cost_usd": 37.74,
+   "tokens": 90174719,
+   "sessions": 5
+  },
+  {
+   "date": "2026-10-15",
+   "cost_usd": 7.01,
+   "tokens": 253085225,
+   "sessions": 8
+  },
+  {
+   "date": "2026-10-16",
+   "cost_usd": 9.2,
+   "tokens": 18230889,
+   "sessions": 4
+  },
+  {
+   "date": "2026-10-17",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "sessions": 0
+  },
+  {
+   "date": "2026-10-18",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "sessions": 0
+  },
+  {
+   "date": "2026-10-19",
+   "cost_usd": 49.23,
+   "tokens": 158371878,
+   "sessions": 19
+  },
+  {
+   "date": "2026-10-20",
+   "cost_usd": 12.53,
+   "tokens": 32823621,
+   "sessions": 6
+  }
+ ],
+ "sessions": [
+  {
+   "id": "00000001-0000-4000-8000-000000000000",
+   "account": "work",
+   "project": "hub",
+   "title": "hub",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T10:27:44Z",
+   "end": "2026-10-20T10:27:44Z",
+   "active": true,
+   "user_messages": 3,
+   "tokens": 50842,
+   "output_tokens": 254,
+   "cache_pct": 95,
+   "cost_usd": 0.2248
+  },
+  {
+   "id": "00000002-0000-4000-8000-000000000000",
+   "account": "work",
+   "project": "hub",
+   "title": "hub",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5",
+    "<synthetic>"
+   ],
+   "start": "2026-10-20T10:27:42Z",
+   "end": "2026-10-20T10:27:42Z",
+   "active": true,
+   "user_messages": 3,
+   "tokens": 22380955,
+   "output_tokens": 111904,
+   "cache_pct": 95,
+   "cost_usd": 7.688
+  },
+  {
+   "id": "00000003-0000-4000-8000-000000000000",
+   "account": "side",
+   "project": "notes-plugin",
+   "title": "notes-plugin",
+   "kind": "run",
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T10:18:00Z",
+   "end": "2026-10-20T10:18:00Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 1840000,
+   "output_tokens": 9200,
+   "cache_pct": 95,
+   "cost_usd": 1.12
+  },
+  {
+   "id": "00000004-0000-4000-8000-000000000000",
+   "account": "side",
+   "project": "terraform-tui",
+   "title": "terraform-tui",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T10:06:00Z",
+   "end": "2026-10-20T10:06:00Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 3400000,
+   "output_tokens": 17000,
+   "cache_pct": 95,
+   "cost_usd": 2.31
+  },
+  {
+   "id": "00000005-0000-4000-8000-000000000000",
+   "account": "lab",
+   "project": "widgets",
+   "title": "widgets",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T09:19:00Z",
+   "end": "2026-10-20T09:19:00Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 4800000,
+   "output_tokens": 24000,
+   "cache_pct": 95,
+   "cost_usd": 1.08
+  },
+  {
+   "id": "00000006-0000-4000-8000-000000000000",
+   "account": "lab",
+   "project": "widgets",
+   "title": "widgets",
+   "kind": "run",
+   "models": [
+    "claude-haiku-5-5"
+   ],
+   "start": "2026-10-20T09:06:00Z",
+   "end": "2026-10-20T09:06:00Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 340000,
+   "output_tokens": 1700,
+   "cache_pct": 95,
+   "cost_usd": null
+  },
+  {
+   "id": "00000007-0000-4000-8000-000000000000",
+   "account": "work",
+   "project": "hub",
+   "title": "hub",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T14:43:00Z",
+   "end": "2026-10-19T14:43:00Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 9000000,
+   "output_tokens": 45000,
+   "cache_pct": 95,
+   "cost_usd": 12.5
+  }
+ ],
+ "rtk": {
+  "saved_tokens": 2177140,
+  "saved_pct": 29.18,
+  "commands": 5856
+ },
+ "retros": {
+  "today": 1,
+  "pending_proposals": 2
+ }
+}

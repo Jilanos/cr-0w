@@ -11,7 +11,8 @@
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
-#   crow watch           live two-pane board of every agent (runs, sessions, finished)
+#   crow watch           live board of every agent (runs, sessions, finished); u: usage view
+#   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
 set -euo pipefail
@@ -84,8 +85,9 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
               (cd "$src" && go build -o crow-watch .) || exit 1
             fi
             exec "$bin" "$@" ;;
+  usage)    exec "$CROW_HOME/bin/crow-usage" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac
