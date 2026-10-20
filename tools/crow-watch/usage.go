@@ -739,7 +739,8 @@ func (m model) savingsView(h int) block {
 	expl := []line{
 		{{"rtk", sBold}, {" rewrites shell commands to compact their output before Claude reads it. Tokens are estimated (bytes ÷ 4);", sSub}},
 		{{"   ", sPlain}, {"the rate is the share of command output removed. Raw fallbacks are commands it could not filter.", sSub}},
-		{{"prompt cache", sBold}, {" re-reads earlier context at a tenth of the input price; the saving is what those reads would cost uncached.", sSub}},
+		{{"prompt cache", sBold}, {" re-reads earlier context at a tenth of the input price;", sSub}},
+		{{"   ", sPlain}, {"the saving is what those reads would cost uncached.", sSub}},
 		{{"model routing", sBold}, {" prices the tokens of runs on Sonnet/Haiku at Opus rates; the difference is the saving.", sSub}},
 		{{"compactions", sBold}, {" happen when a session fills its window: a sign to split work or delegate.", sSub}},
 	}
