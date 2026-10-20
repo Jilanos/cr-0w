@@ -1,0 +1,129 @@
+{
+  "title": "crow account switching and session resume",
+  "references": [
+    "bin/crow",
+    "bin/crow-usage",
+    "bin/crow-runs",
+    "bin/crow-retro",
+    "tools/crow-watch/main.go",
+    "tools/crow-watch/agents.go",
+    "runbooks/dispatch-background-runs.md",
+    "runbooks/session-retros.md"
+  ],
+  "request": {
+    "complexity": "High",
+    "theme": "Hub orchestration",
+    "needs": [
+      "When the current account runs out of its 5-hour allowance the owner is blocked and cannot do much; crow should offer to continue on another allowed account instead.",
+      "Only accounts the owner allows may be used: one is personal, one is shared and must always be confirmed, the others belong to teammates and are never used.",
+      "Sessions cut off by a usage limit must be listed and relaunchable on any allowed account, whenever the owner wants.",
+      "A handoff must name the exact source conversation: without an id the provider tool takes the newest transcript, which once handed off an automatic retro session instead of the owner's real one.",
+      "While no tokens are left the owner should still have something useful to do from the hub."
+    ],
+    "context": [
+      "cdx offers `status --json` (5h and weekly usage, block, reset times per account), `can-resume <name>` and `handoff <source> <target> --source-conversation ID`. cdx is not owned by the hub's owner and must stay untouched and unaware of crow.",
+      "crow-usage already reads `cdx status --json` for limits; crow-watch already shows agents and usage and can host another view.",
+      "Automatic retros run as their own sessions in the same profile and workspace, so a 'newest transcript' lookup picks them up.",
+      "A first registry of limit-cut sessions exists at local/state/interrupted-sessions.md (11 sessions on 2026-10-20), built by scanning every profile's transcripts for a final limit message and excluding retros.",
+      "Account policy lives in local/context.md today, in prose; it must become machine-readable config in local/."
+    ],
+    "acceptance_criteria": [
+      "AC1: An allowed-accounts config in local/ lists each account with a policy (use, ask-first, never); crow never targets an account marked never.",
+      "AC2: A scanner builds the interrupted-sessions registry from transcripts (last turn is a limit message, retros and automatic jobs excluded) and is cheap on repeated runs.",
+      "AC3: Relaunching a session always passes its conversation id to the handoff and refuses to run without one.",
+      "AC4: When the active account is blocked, crow shows the recommended allowed target and asks for confirmation before any handoff; ask-first accounts always require an explicit yes.",
+      "AC5: A crow watch view lists interrupted sessions with project, age, size and first prompt, and relaunches the selected one on a chosen allowed account.",
+      "AC6: With no usable account, crow offers a no-model mode listing work that needs none (pipeline checks, diff review, registry triage).",
+      "AC7: Nothing in the change requires a change to cdx or relies on crow-specific markers inside cdx."
+    ]
+  },
+  "product": {
+    "title": "Keep working when an account runs out",
+    "overview": "crow tracks which accounts the owner may use, notices a blocked account, and relaunches cut-off sessions on an allowed one after confirmation, from a terminal view.",
+    "goals": [
+      "Never lose a session to a usage limit.",
+      "Switch accounts with one confirmation and never touch a forbidden one.",
+      "Stay useful from the hub when no tokens are left."
+    ],
+    "non_goals": [
+      "Changing cdx.",
+      "Automatic switching without confirmation.",
+      "Using a local model as orchestrator (measured separately first)."
+    ]
+  },
+  "backlog_items": [
+    {
+      "title": "1.1 account policy config and interrupted-session registry",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Hub orchestration",
+      "request_acs": ["AC1", "AC2", "AC7"],
+      "problem": [
+        "Account rules exist only as prose and the registry was built by a one-off script."
+      ],
+      "scope_in": [
+        "Machine-readable accounts file in local/ and a bin/ scanner that writes the registry as JSON plus a readable list."
+      ],
+      "scope_out": [
+        "Any UI, any handoff execution."
+      ],
+      "acceptance_criteria": [
+        "AC1: accounts file with policies is read by one helper used by every crow command.",
+        "AC2: the scanner excludes retros and automatic jobs and reuses a cache keyed by file mtime and size."
+      ]
+    },
+    {
+      "title": "1.2 guarded relaunch and block detection",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Hub orchestration",
+      "request_acs": ["AC3", "AC4", "AC7"],
+      "problem": [
+        "A handoff without an id picked the wrong session, and nothing watches for a blocked account."
+      ],
+      "scope_in": [
+        "crow command that checks `cdx can-resume`, requires an id and a confirmed allowed target, then runs the handoff; block detection from `cdx status --json`."
+      ],
+      "scope_out": [
+        "The TUI."
+      ],
+      "acceptance_criteria": [
+        "AC1: the command refuses to run without a conversation id or with a never account.",
+        "AC2: an ask-first account needs an explicit yes every time."
+      ]
+    },
+    {
+      "title": "1.3 interrupted-sessions view and no-model mode",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Hub orchestration",
+      "request_acs": ["AC5", "AC6"],
+      "problem": [
+        "Relaunching is a manual command and the owner has nothing to do while out of tokens."
+      ],
+      "scope_in": [
+        "A crow watch view over the registry with relaunch, and a no-model list of useful work."
+      ],
+      "scope_out": [
+        "Local model dispatch."
+      ],
+      "acceptance_criteria": [
+        "AC1: the view fills the terminal like the other views and degrades on small terminals.",
+        "AC2: selecting a session and an allowed account runs the guarded relaunch."
+      ]
+    }
+  ],
+  "orchestration_task": {
+    "title": "Deliver account switching and session resume in three steps",
+    "plan": [
+      "1.1: accounts file, helper and registry scanner with tests.",
+      "1.2: guarded relaunch command and block detection; verify with a dry run against cdx.",
+      "1.3: crow watch view and no-model mode; render and show the owner before finishing."
+    ]
+  },
+  "context_pack": {
+    "out": "logics/context-packs/crow_account_switching.json",
+    "mode": "diff-first",
+    "profile": "normal"
+  }
+}
