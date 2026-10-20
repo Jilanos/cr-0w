@@ -31,9 +31,10 @@ _None_
 | [item_003_0_2_responsive_usage_overview_tabs_and_burn_rate](backlog/item_003_0_2_responsive_usage_overview_tabs_and_burn_rate.md) | 0.2 responsive usage overview, tabs and burn rate | Ready |  | 0% | backlog/item_003_0_2_responsive_usage_overview_tabs_and_burn_rate.md |
 | [item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store](backlog/item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store.md) | 0.2 tool effectiveness stats and daily rollup store | Ready |  | 0% | backlog/item_004_0_2_tool_effectiveness_stats_and_daily_rollup_store.md |
 | [item_005_0_2_agents_board_improvements](backlog/item_005_0_2_agents_board_improvements.md) | 0.2 agents board improvements | Ready |  | 0% | backlog/item_005_0_2_agents_board_improvements.md |
-| [item_006_1_1_account_policy_config_and_interrupted_session_registry](backlog/item_006_1_1_account_policy_config_and_interrupted_session_registry.md) | 1.1 account policy config and interrupted-session registry | Ready |  | 0% | backlog/item_006_1_1_account_policy_config_and_interrupted_session_registry.md |
-| [item_007_1_2_guarded_relaunch_and_block_detection](backlog/item_007_1_2_guarded_relaunch_and_block_detection.md) | 1.2 guarded relaunch and block detection | Ready |  | 0% | backlog/item_007_1_2_guarded_relaunch_and_block_detection.md |
-| [item_008_1_3_interrupted_sessions_view_and_no_model_mode](backlog/item_008_1_3_interrupted_sessions_view_and_no_model_mode.md) | 1.3 interrupted-sessions view and no-model mode | Ready |  | 0% | backlog/item_008_1_3_interrupted_sessions_view_and_no_model_mode.md |
+| [item_006_1_1_memory_in_local_shared_by_every_allowed_profile](backlog/item_006_1_1_memory_in_local_shared_by_every_allowed_profile.md) | 1.1 memory in local, shared by every allowed profile | Ready |  | 0% | backlog/item_006_1_1_memory_in_local_shared_by_every_allowed_profile.md |
+| [item_007_1_2_account_policy_config_and_interrupted_session_registry](backlog/item_007_1_2_account_policy_config_and_interrupted_session_registry.md) | 1.2 account policy config and interrupted-session registry | Ready |  | 0% | backlog/item_007_1_2_account_policy_config_and_interrupted_session_registry.md |
+| [item_008_1_3_guarded_relaunch_and_block_detection](backlog/item_008_1_3_guarded_relaunch_and_block_detection.md) | 1.3 guarded relaunch and block detection | Ready |  | 0% | backlog/item_008_1_3_guarded_relaunch_and_block_detection.md |
+| [item_009_1_4_interrupted_sessions_view_and_no_model_mode](backlog/item_009_1_4_interrupted_sessions_view_and_no_model_mode.md) | 1.4 interrupted-sessions view and no-model mode | Ready |  | 0% | backlog/item_009_1_4_interrupted_sessions_view_and_no_model_mode.md |
 
 ## Tasks
 

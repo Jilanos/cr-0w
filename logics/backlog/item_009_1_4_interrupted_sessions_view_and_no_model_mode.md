@@ -1,4 +1,4 @@
-## item_008_1_3_interrupted_sessions_view_and_no_model_mode - 1.3 interrupted-sessions view and no-model mode
+## item_009_1_4_interrupted_sessions_view_and_no_model_mode - 1.4 interrupted-sessions view and no-model mode
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready

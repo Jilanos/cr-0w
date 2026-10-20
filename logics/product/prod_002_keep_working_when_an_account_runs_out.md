@@ -2,7 +2,7 @@
 > Date: 2026-10-20
 > Status: Proposed
 > Related request: `req_001_crow_account_switching_and_session_resume`
-> Related backlog: `item_006_1_1_account_policy_config_and_interrupted_session_registry`, `item_007_1_2_guarded_relaunch_and_block_detection`, `item_008_1_3_interrupted_sessions_view_and_no_model_mode`
+> Related backlog: `item_006_1_1_memory_in_local_shared_by_every_allowed_profile`, `item_007_1_2_account_policy_config_and_interrupted_session_registry`, `item_008_1_3_guarded_relaunch_and_block_detection`, `item_009_1_4_interrupted_sessions_view_and_no_model_mode`
 > Related task: `task_002_deliver_account_switching_and_session_resume_in_three_steps`
 > Related architecture: (none yet)
 > Reminder: Update status, linked refs, scope, decisions, success signals, and open questions when you edit this doc.

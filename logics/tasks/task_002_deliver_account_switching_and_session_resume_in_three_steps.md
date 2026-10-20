@@ -19,17 +19,19 @@
 - Orchestrate the scaffolded request chain and keep sibling implementation slices linked.
 
 # Plan
-- [ ] 1. 1.1: accounts file, helper and registry scanner with tests.
-- [ ] 2. 1.2: guarded relaunch command and block detection; verify with a dry run against cdx.
-- [ ] 3. 1.3: crow watch view and no-model mode; render and show the owner before finishing.
+- [ ] 1. 1.1: move memory into local/, wire profile access without copies, verify on main and on the shared account (ask first).
+- [ ] 2. 1.2: accounts file, helper and registry scanner with tests.
+- [ ] 3. 1.3: guarded relaunch command and block detection; verify with a dry run against cdx.
+- [ ] 4. 1.4: crow watch view and no-model mode; render and show the owner before finishing.
 - [ ] ADR 009 checkpoint: update affected Logics docs during each meaningful wave and leave the repo commit-ready.
 - [ ] Keep commit creation under operator control; do not force one commit per micro-step.
 - [ ] GATE: do not close until lint, audit, and scaffold validation pass.
 
 # Backlog
-- `item_006_1_1_account_policy_config_and_interrupted_session_registry`
-- `item_007_1_2_guarded_relaunch_and_block_detection`
-- `item_008_1_3_interrupted_sessions_view_and_no_model_mode`
+- `item_006_1_1_memory_in_local_shared_by_every_allowed_profile`
+- `item_007_1_2_account_policy_config_and_interrupted_session_registry`
+- `item_008_1_3_guarded_relaunch_and_block_detection`
+- `item_009_1_4_interrupted_sessions_view_and_no_model_mode`
 
 # Definition of Done (DoD)
 - [ ] Generated request, product, backlog, and task docs are present.
@@ -38,14 +40,15 @@
 - [ ] Meaningful waves followed ADR 009: affected docs updated and the repo left commit-ready without automatic commits.
 
 # AC Traceability
-- request-AC1 -> `item_006_1_1_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
-- request-AC2 -> `item_006_1_1_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
-- request-AC7 -> `item_006_1_1_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
-- request-AC3 -> `item_007_1_2_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
-- request-AC4 -> `item_007_1_2_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
-- request-AC7 -> `item_007_1_2_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
-- request-AC5 -> `item_008_1_3_interrupted_sessions_view_and_no_model_mode`. Proof deferred to slice closeout.
-- request-AC6 -> `item_008_1_3_interrupted_sessions_view_and_no_model_mode`. Proof deferred to slice closeout.
+- request-AC8 -> `item_006_1_1_memory_in_local_shared_by_every_allowed_profile`. Proof deferred to slice closeout.
+- request-AC1 -> `item_007_1_2_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
+- request-AC2 -> `item_007_1_2_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
+- request-AC7 -> `item_007_1_2_account_policy_config_and_interrupted_session_registry`. Proof deferred to slice closeout.
+- request-AC3 -> `item_008_1_3_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
+- request-AC4 -> `item_008_1_3_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
+- request-AC7 -> `item_008_1_3_guarded_relaunch_and_block_detection`. Proof deferred to slice closeout.
+- request-AC5 -> `item_009_1_4_interrupted_sessions_view_and_no_model_mode`. Proof deferred to slice closeout.
+- request-AC6 -> `item_009_1_4_interrupted_sessions_view_and_no_model_mode`. Proof deferred to slice closeout.
 
 # Validation
 - (no validation recorded yet)

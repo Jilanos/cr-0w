@@ -20,6 +20,7 @@
 - Sessions cut off by a usage limit must be listed and relaunchable on any allowed account, whenever the owner wants.
 - A handoff must name the exact source conversation: without an id the provider tool takes the newest transcript, which once handed off an automatic retro session instead of the owner's real one.
 - While no tokens are left the owner should still have something useful to do from the hub.
+- Whatever crow has learned about the owner (memory) must follow a session to any allowed account; today it sits in one profile's folder and a relaunch on another account starts without it, while the shared account must not end up holding the owner's personal memory.
 
 # Context
 - cdx offers `status --json` (5h and weekly usage, block, reset times per account), `can-resume <name>` and `handoff <source> <target> --source-conversation ID`. cdx is not owned by the hub's owner and must stay untouched and unaware of crow.
@@ -27,6 +28,7 @@
 - Automatic retros run as their own sessions in the same profile and workspace, so a 'newest transcript' lookup picks them up.
 - A first registry of limit-cut sessions exists at local/state/interrupted-sessions.md (11 sessions on 2026-10-20), built by scanning every profile's transcripts for a final limit message and excluding retros.
 - Account policy lives in local/context.md today, in prose; it must become machine-readable config in local/.
+- Memory is per cdx profile (~/.cdx/profiles/<name>/claude-home/.claude/projects/<project>/memory/): main holds 18 files for this project, shared 2, the teammates' accounts none. The private local/ repo is the chosen single source of truth.
 
 # Acceptance criteria
 - AC1: An allowed-accounts config in local/ lists each account with a policy (use, ask-first, never); crow never targets an account marked never.
@@ -36,6 +38,7 @@
 - AC5: A crow watch view lists interrupted sessions with project, age, size and first prompt, and relaunches the selected one on a chosen allowed account.
 - AC6: With no usable account, crow offers a no-model mode listing work that needs none (pipeline checks, diff review, registry triage).
 - AC7: Nothing in the change requires a change to cdx or relies on crow-specific markers inside cdx.
+- AC8: Memory lives in the private local/ repo and every allowed profile reads it from there while a crow-launched session runs; nothing is copied into a shared account's profile, and writes from any profile land back in local/.
 
 # Definition of Ready (DoR)
 - [x] Problem statement is explicit and user impact is clear.
@@ -58,6 +61,7 @@
 - runbooks/session-retros.md
 
 # Backlog
-- `item_006_1_1_account_policy_config_and_interrupted_session_registry`
-- `item_007_1_2_guarded_relaunch_and_block_detection`
-- `item_008_1_3_interrupted_sessions_view_and_no_model_mode`
+- `item_006_1_1_memory_in_local_shared_by_every_allowed_profile`
+- `item_007_1_2_account_policy_config_and_interrupted_session_registry`
+- `item_008_1_3_guarded_relaunch_and_block_detection`
+- `item_009_1_4_interrupted_sessions_view_and_no_model_mode`

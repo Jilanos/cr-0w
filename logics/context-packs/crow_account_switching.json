@@ -1,29 +1,30 @@
 {
   "budgets": {
-    "max_docs": 20,
+    "max_docs": 24,
     "max_docs_per_ref": 4
   },
   "changed_paths": [
     "claude/skills/daily/SKILL.md",
     "integrations/archeotech/crow-agents/test/gen.py",
     "integrations/archeotech/crow-agents/test/render.sh",
-    "logics/backlog/item_006_1_1_account_policy_config_and_interrupted_session_registry.md",
-    "logics/backlog/item_007_1_2_guarded_relaunch_and_block_detection.md",
-    "logics/backlog/item_008_1_3_interrupted_sessions_view_and_no_model_mode.md",
+    "logics/backlog/item_006_1_1_memory_in_local_shared_by_every_allowed_profile.md",
+    "logics/backlog/item_007_1_2_account_policy_config_and_interrupted_session_registry.md",
+    "logics/backlog/item_008_1_3_guarded_relaunch_and_block_detection.md",
+    "logics/backlog/item_009_1_4_interrupted_sessions_view_and_no_model_mode.md",
     "logics/product/prod_002_keep_working_when_an_account_runs_out.md",
     "logics/request/req_001_crow_account_switching_and_session_resume.md",
-    "logics/scaffold/crow_account_switching.json",
     "logics/tasks/task_002_deliver_account_switching_and_session_resume_in_three_steps.md"
   ],
-  "command": "logics-manager sync context-pack req_001_crow_account_switching_and_session_resume item_006_1_1_account_policy_config_and_interrupted_session_registry item_007_1_2_guarded_relaunch_and_block_detection item_008_1_3_interrupted_sessions_view_and_no_model_mode task_002_deliver_account_switching_and_session_resume_in_three_steps --mode diff-first --profile normal --handoff",
+  "command": "logics-manager sync context-pack req_001_crow_account_switching_and_session_resume item_006_1_1_memory_in_local_shared_by_every_allowed_profile item_007_1_2_account_policy_config_and_interrupted_session_registry item_008_1_3_guarded_relaunch_and_block_detection item_009_1_4_interrupted_sessions_view_and_no_model_mode task_002_deliver_account_switching_and_session_resume_in_three_steps --mode diff-first --profile normal --handoff",
   "companion_docs": [
     {
       "kind": "product",
       "linked_refs": {
         "item": [
-          "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-          "item_007_1_2_guarded_relaunch_and_block_detection",
-          "item_008_1_3_interrupted_sessions_view_and_no_model_mode"
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -70,9 +71,10 @@
       "kind": "request",
       "linked_refs": {
         "item": [
-          "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-          "item_007_1_2_guarded_relaunch_and_block_detection",
-          "item_008_1_3_interrupted_sessions_view_and_no_model_mode"
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -98,11 +100,50 @@
           "- Only accounts the owner allows may be used: one is personal, one is shared and must always be confirmed, the others belong to teammates and are never used.",
           "- Sessions cut off by a usage limit must be listed and relaunchable on any allowed account, whenever the owner wants.",
           "- A handoff must name the exact source conversation: without an id the provider tool takes the newest transcript, which once handed off an automatic retro session instead of the owner's real one.",
-          "- While no tokens are left the owner should still have something useful to do from the hub."
+          "- While no tokens are left the owner should still have something useful to do from the hub.",
+          "- Whatever crow has learned about the owner (memory) must follow a session to any allowed account; today it sits in one profile's folder and a relaunch on another account starts without it, while the shared account must not end up holding the owner's personal memory."
         ]
       },
       "status": "Draft",
       "title": "crow account switching and session resume"
+    },
+    {
+      "ai_context": {
+        "keywords": "memory, local, shared, allowed, profile",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile"
+        ],
+        "prod": [
+          "prod_002_keep_working_when_an_account_runs_out"
+        ],
+        "req": [
+          "req_001_crow_account_switching_and_session_resume"
+        ],
+        "task": [
+          "task_002_deliver_account_switching_and_session_resume_in_three_steps"
+        ]
+      },
+      "path": "logics/backlog/item_006_1_1_memory_in_local_shared_by_every_allowed_profile.md",
+      "ref": "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: after the move the main profile loads the same memories as before, verified by listing them from a session.",
+          "- AC2: a session launched on the shared account reads the same files from local/ and leaves no copy in its profile once it ends.",
+          "- AC3: a memory written from any profile appears in local/ and is committed."
+        ],
+        "Problem": [
+          "- Memory is split per cdx profile, so a session relaunched on another account loses what crow learned, and copying it into a shared account would expose personal notes."
+        ]
+      },
+      "status": "Ready",
+      "title": "1.1 memory in local, shared by every allowed profile"
     },
     {
       "ai_context": {
@@ -114,7 +155,7 @@
       "kind": "backlog",
       "linked_refs": {
         "item": [
-          "item_006_1_1_account_policy_config_and_interrupted_session_registry"
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -126,8 +167,8 @@
           "task_002_deliver_account_switching_and_session_resume_in_three_steps"
         ]
       },
-      "path": "logics/backlog/item_006_1_1_account_policy_config_and_interrupted_session_registry.md",
-      "ref": "item_006_1_1_account_policy_config_and_interrupted_session_registry",
+      "path": "logics/backlog/item_007_1_2_account_policy_config_and_interrupted_session_registry.md",
+      "ref": "item_007_1_2_account_policy_config_and_interrupted_session_registry",
       "schema_version": "1.0",
       "sections": {
         "Acceptance criteria": [
@@ -139,7 +180,7 @@
         ]
       },
       "status": "Ready",
-      "title": "1.1 account policy config and interrupted-session registry"
+      "title": "1.2 account policy config and interrupted-session registry"
     },
     {
       "ai_context": {
@@ -151,7 +192,7 @@
       "kind": "backlog",
       "linked_refs": {
         "item": [
-          "item_007_1_2_guarded_relaunch_and_block_detection"
+          "item_008_1_3_guarded_relaunch_and_block_detection"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -163,8 +204,8 @@
           "task_002_deliver_account_switching_and_session_resume_in_three_steps"
         ]
       },
-      "path": "logics/backlog/item_007_1_2_guarded_relaunch_and_block_detection.md",
-      "ref": "item_007_1_2_guarded_relaunch_and_block_detection",
+      "path": "logics/backlog/item_008_1_3_guarded_relaunch_and_block_detection.md",
+      "ref": "item_008_1_3_guarded_relaunch_and_block_detection",
       "schema_version": "1.0",
       "sections": {
         "Acceptance criteria": [
@@ -176,44 +217,7 @@
         ]
       },
       "status": "Ready",
-      "title": "1.2 guarded relaunch and block detection"
-    },
-    {
-      "ai_context": {
-        "keywords": "interrupted, sessions, view, model, mode",
-        "skip when": "(unfilled: replace before this doc is used)",
-        "summary": "(unfilled: replace before this doc is used)",
-        "use when": "(unfilled: replace before this doc is used)"
-      },
-      "kind": "backlog",
-      "linked_refs": {
-        "item": [
-          "item_008_1_3_interrupted_sessions_view_and_no_model_mode"
-        ],
-        "prod": [
-          "prod_002_keep_working_when_an_account_runs_out"
-        ],
-        "req": [
-          "req_001_crow_account_switching_and_session_resume"
-        ],
-        "task": [
-          "task_002_deliver_account_switching_and_session_resume_in_three_steps"
-        ]
-      },
-      "path": "logics/backlog/item_008_1_3_interrupted_sessions_view_and_no_model_mode.md",
-      "ref": "item_008_1_3_interrupted_sessions_view_and_no_model_mode",
-      "schema_version": "1.0",
-      "sections": {
-        "Acceptance criteria": [
-          "- AC1: the view fills the terminal like the other views and degrades on small terminals.",
-          "- AC2: selecting a session and an allowed account runs the guarded relaunch."
-        ],
-        "Problem": [
-          "- Relaunching is a manual command and the owner has nothing to do while out of tokens."
-        ]
-      },
-      "status": "Ready",
-      "title": "1.3 interrupted-sessions view and no-model mode"
+      "title": "1.3 guarded relaunch and block detection"
     },
     {
       "ai_context": {
@@ -225,9 +229,10 @@
       "kind": "task",
       "linked_refs": {
         "item": [
-          "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-          "item_007_1_2_guarded_relaunch_and_block_detection",
-          "item_008_1_3_interrupted_sessions_view_and_no_model_mode"
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -258,9 +263,10 @@
       "kind": "product",
       "linked_refs": {
         "item": [
-          "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-          "item_007_1_2_guarded_relaunch_and_block_detection",
-          "item_008_1_3_interrupted_sessions_view_and_no_model_mode"
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
         ],
         "prod": [
           "prod_002_keep_working_when_an_account_runs_out"
@@ -278,22 +284,60 @@
       "sections": {},
       "status": "Proposed",
       "title": "Keep working when an account runs out"
+    },
+    {
+      "ai_context": {
+        "keywords": "interrupted, sessions, view, model, mode",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
+        ],
+        "prod": [
+          "prod_002_keep_working_when_an_account_runs_out"
+        ],
+        "req": [
+          "req_001_crow_account_switching_and_session_resume"
+        ],
+        "task": [
+          "task_002_deliver_account_switching_and_session_resume_in_three_steps"
+        ]
+      },
+      "path": "logics/backlog/item_009_1_4_interrupted_sessions_view_and_no_model_mode.md",
+      "ref": "item_009_1_4_interrupted_sessions_view_and_no_model_mode",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: the view fills the terminal like the other views and degrades on small terminals.",
+          "- AC2: selecting a session and an allowed account runs the guarded relaunch."
+        ],
+        "Problem": [
+          "- Relaunching is a manual command and the owner has nothing to do while out of tokens."
+        ]
+      },
+      "status": "Ready",
+      "title": "1.4 interrupted-sessions view and no-model mode"
     }
   ],
   "estimates": {
-    "char_count": 9204,
+    "char_count": 11119,
     "companion_doc_count": 1,
-    "doc_count": 6
+    "doc_count": 7
   },
-  "generated_at": "2026-10-20T15:43:12Z",
+  "generated_at": "2026-10-20T15:44:38Z",
   "handoff": {
     "companion_doc_count": 1,
     "enabled": true,
     "source_refs": [
       "req_001_crow_account_switching_and_session_resume",
-      "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-      "item_007_1_2_guarded_relaunch_and_block_detection",
-      "item_008_1_3_interrupted_sessions_view_and_no_model_mode",
+      "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+      "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+      "item_008_1_3_guarded_relaunch_and_block_detection",
+      "item_009_1_4_interrupted_sessions_view_and_no_model_mode",
       "task_002_deliver_account_switching_and_session_resume_in_three_steps"
     ],
     "validation_summary_count": 1
@@ -314,12 +358,13 @@
   },
   "mode": "diff-first",
   "profile": "normal",
-  "ref": "req_001_crow_account_switching_and_session_resume,item_006_1_1_account_policy_config_and_interrupted_session_registry,item_007_1_2_guarded_relaunch_and_block_detection,item_008_1_3_interrupted_sessions_view_and_no_model_mode,task_002_deliver_account_switching_and_session_resume_in_three_steps",
+  "ref": "req_001_crow_account_switching_and_session_resume,item_006_1_1_memory_in_local_shared_by_every_allowed_profile,item_007_1_2_account_policy_config_and_interrupted_session_registry,item_008_1_3_guarded_relaunch_and_block_detection,item_009_1_4_interrupted_sessions_view_and_no_model_mode,task_002_deliver_account_switching_and_session_resume_in_three_steps",
   "refs": [
     "req_001_crow_account_switching_and_session_resume",
-    "item_006_1_1_account_policy_config_and_interrupted_session_registry",
-    "item_007_1_2_guarded_relaunch_and_block_detection",
-    "item_008_1_3_interrupted_sessions_view_and_no_model_mode",
+    "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+    "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+    "item_008_1_3_guarded_relaunch_and_block_detection",
+    "item_009_1_4_interrupted_sessions_view_and_no_model_mode",
     "task_002_deliver_account_switching_and_session_resume_in_three_steps"
   ],
   "release": {

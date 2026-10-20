@@ -1,4 +1,4 @@
-## item_007_1_2_guarded_relaunch_and_block_detection - 1.2 guarded relaunch and block detection
+## item_008_1_3_guarded_relaunch_and_block_detection - 1.3 guarded relaunch and block detection
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready

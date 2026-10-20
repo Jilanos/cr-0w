@@ -1,4 +1,4 @@
-## item_006_1_1_account_policy_config_and_interrupted_session_registry - 1.1 account policy config and interrupted-session registry
+## item_007_1_2_account_policy_config_and_interrupted_session_registry - 1.2 account policy config and interrupted-session registry
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
