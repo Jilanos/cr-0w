@@ -25,12 +25,15 @@ Singleton {
     readonly property var retros: snap && snap.retros ? snap.retros : ({})
     readonly property string todayKey: days.length ? days[days.length - 1].date : localDate(Date.now())
 
-    // Sessions touched today (local date of their last activity), costliest first.
+    // Sessions with a slice of today (`today` non-null), costliest today first.
+    // Their cost/tokens in the panel are that slice, not the whole session.
     readonly property var todaySessions: {
-        var list = (snap && snap.sessions ? snap.sessions : []).filter(s => sessionDate(s) === todayKey)
-        return list.sort((a, b) => (b.cost_usd || 0) - (a.cost_usd || 0))
+        var list = (snap && snap.sessions ? snap.sessions : []).filter(s => s && s.today)
+        return list.sort((a, b) => (b.today.cost_usd || 0) - (a.today.cost_usd || 0))
     }
     readonly property var topSessions: todaySessions.slice(0, 5)
+    readonly property real todaySessionsCost: todaySessions.reduce((a, x) => a + (x.today.cost_usd || 0), 0)
+    readonly property real todaySessionsTokens: todaySessions.reduce((a, x) => a + (x.today.tokens || 0), 0)
 
     // The account the pill follows: the one cdx marks active, else the account
     // of the most recent session, else the first listed.
@@ -47,6 +50,9 @@ Singleton {
         return limits[0]
     }
     readonly property string currentAccount: current ? current.account : ""
+    // Limits with the current account first.
+    readonly property var sortedLimits: current
+        ? [current].concat(limits.filter(l => l.account !== current.account)) : limits
 
     function configure(cfg) {
         if (!cfg) return
@@ -54,8 +60,19 @@ Singleton {
         if (cfg.interval) intervalMs = Math.max(15, cfg.interval) * 1000
     }
 
+    // A strip opener or the panel can poll before the pill pushes its config,
+    // so the first poll may run the default command. When the command changes
+    // mid-poll, one re-poll is queued for when that run exits and its output is
+    // dropped; polls never stack.
+    property string _running: ""      // command of the poll in flight
+    property bool _repoll: false
+
     function poll() {
-        if (proc.running) return       // re-run guard: never stack polls
+        if (proc.running) {
+            if (_running !== command) _repoll = true
+            return
+        }
+        _running = command
         proc.running = true
     }
 
@@ -71,9 +88,12 @@ Singleton {
         if (!iso) return NaN
         return Date.parse(String(iso).replace(/(\.\d{3})\d+/, "$1"))
     }
-    function sessionDate(s) {
-        var t = parseIso(s.end || s.start)
-        return isNaN(t) ? "" : localDate(t)
+    // ISO → local "HH:MM" ("" when missing or unparseable).
+    function clock(iso) {
+        var t = parseIso(iso)
+        if (isNaN(t)) return ""
+        var d = new Date(t)
+        return pad2(d.getHours()) + ":" + pad2(d.getMinutes())
     }
 
     // "Oct 20 15:00" → "15:00" today, "Oct 26" otherwise.
@@ -94,6 +114,12 @@ Singleton {
         return String(Math.round(n))
     }
     function money(v) { return v === null || v === undefined ? "–" : "$" + Number(v).toFixed(2) }
+    // Short money for tight cells: $463, $49.2, $0.89.
+    function moneyShort(v) {
+        if (v === null || v === undefined) return "–"
+        var n = Number(v)
+        return "$" + (n >= 100 ? Math.round(n) : n >= 10 ? n.toFixed(1) : n.toFixed(2))
+    }
 
     // "claude-opus-5-5" → "opus-5-5"; synthetic placeholders dropped.
     function modelName(models) {
@@ -102,6 +128,7 @@ Singleton {
     }
 
     function _ingest(text) {
+        if (_repoll) return           // output of a superseded command
         var d
         try { d = JSON.parse(text) } catch (e) { d = null }
         if (!d || !Array.isArray(d.limits) || !d.today) {
@@ -119,13 +146,14 @@ Singleton {
     // only marks the poll failed.
     Process {
         id: proc
-        command: store._sh(store.command)
+        command: store._sh(store._running || store.command)
         stdout: StdioCollector {
             id: out
             onStreamFinished: store._ingest(out.text)
         }
         stderr: StdioCollector { id: err }
         onExited: (code, status) => {
+            if (store._repoll) { store._repoll = false; Qt.callLater(store.poll); return }
             if (code === 0) return
             var msg = err.text.trim().split("\n").pop()
             store.available = false

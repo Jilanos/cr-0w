@@ -3,17 +3,47 @@
   "name": "Crow Usage",
   "author": "crow",
   "version": "0.1.0",
-  "description": "Claude usage from crow: 5h limit gauge and today's cost on the bar; limits per account, 7-day cost, titled top sessions with totals, savings in the panel.",
-  "canLiveIn": ["bar-zone", "panel-content"],
+  "description": "Claude usage from crow: 5h limit gauge and today's cost on the bar; limits and burn rate per account, today's spend and tokens, 7-day cost, top sessions today, savings in the panel.",
+  "canLiveIn": [
+    "bar-zone",
+    "panel-content"
+  ],
   "entry": "CrowUsage.qml",
   "icon": "󰊚",
-  "panel": { "size": 540, "axisSize": 600 },
-  "dependencies": ["crow"],
+  "panel": {
+    "size": 680,
+    "axisSize": "auto"
+  },
+  "dependencies": [
+    "crow"
+  ],
   "configSchema": {
-    "command":  { "type": "string", "label": "Usage command", "default": "crow usage --json",
-                  "placeholder": "crow usage --json",
-                  "description": "Prints the crow-usage JSON payload. Run with bash -lc; use an absolute path if crow is not on the login PATH." },
-    "interval": { "type": "int", "label": "Refresh", "default": 60, "min": 15, "max": 600, "step": 15, "unit": " s",
-                  "description": "Seconds between polls (one poller per shell)." }
+    "command": {
+      "type": "string",
+      "label": "Usage command",
+      "default": "crow usage --json",
+      "placeholder": "crow usage --json",
+      "description": "Prints the crow-usage JSON payload. Run with bash -lc; use an absolute path if crow is not on the login PATH."
+    },
+    "interval": {
+      "type": "int",
+      "label": "Refresh",
+      "default": 60,
+      "min": 15,
+      "max": 600,
+      "step": 15,
+      "unit": " s",
+      "description": "Seconds between polls (one poller per shell)."
+    },
+    "compactBelow": {
+      "type": "int",
+      "label": "Compact below",
+      "default": 1400,
+      "min": 0,
+      "max": 4000,
+      "step": 100,
+      "unit": " px",
+      "description": "When the bar is shorter than this (e.g. a vertical monitor), the pill shows only the gauge and %; the cost moves to the hover card. 0 = never compact."
+    }
   }
 }
