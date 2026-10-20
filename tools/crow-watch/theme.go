@@ -135,24 +135,16 @@ func padL(s string, w int) string {
 
 // ---------- gauges ----------
 
-// smoothBar: a solid bar with 1/8-cell precision on a dotted track (limits, charts).
-func smoothBar(pct float64, cells int, style lipgloss.Style) []seg {
-	eighths := []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
-	x := max(0, min(100, pct)) * float64(cells) / 100
-	full := int(x)
-	part := int((x - float64(full)) * 8)
-	bar := strings.Repeat("█", full) + eighths[part]
-	used := full
-	if part > 0 {
-		used++
-	}
-	return []seg{{bar, style}, {strings.Repeat("·", max(0, cells-used)), sDim}}
-}
+// gaugeGlyph draws every bar gauge: a lower half block, twice as thick as a
+// line, on a solid track of the same glyph. Block elements are drawn by the
+// terminal itself, edge to edge, so filled and empty cells join into one bar
+// while stacked rows keep a gap. "▆" is the chunkier alternative.
+var gaugeGlyph = "▄"
 
-// lineBar: a thin bar for small gauges in tables (context, slots).
+// lineBar: a bar gauge (limits, context, slots, token bars).
 func lineBar(pct float64, cells int, style lipgloss.Style) []seg {
 	on := int(max(0, min(100, pct))*float64(cells)/100 + 0.5)
-	return []seg{{strings.Repeat("━", on), style}, {strings.Repeat("━", cells-on), sDim}}
+	return []seg{{strings.Repeat(gaugeGlyph, on), style}, {strings.Repeat(gaugeGlyph, cells-on), sDim}}
 }
 
 // ---------- blocks: fixed-width rendered lines ----------

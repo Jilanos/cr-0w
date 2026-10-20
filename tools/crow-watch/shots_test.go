@@ -23,6 +23,9 @@ func TestShots(t *testing.T) {
 	if dir == "" {
 		t.Skip("set SHOTS=<dir>")
 	}
+	if g := os.Getenv("GAUGE"); g != "" {
+		gaugeGlyph = g
+	}
 	lipgloss.SetColorProfile(termenv.ANSI)
 	defer lipgloss.SetColorProfile(termenv.Ascii)
 	snap := sample()
