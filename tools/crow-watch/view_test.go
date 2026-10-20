@@ -130,3 +130,15 @@ func TestHHMMWithoutSeconds(t *testing.T) {
 		}
 	}
 }
+
+// A tall terminal shows every Usage section; a small one may drop the lower ones.
+func TestTallUsageShowsEverySection(t *testing.T) {
+	m := model{w: 118, h: 95, snap: sample(), usage: fixtureUsage(t), view: 1, period: "w", now: fixtureNow(), reports: map[string]string{}}
+	m.rebuild()
+	out := m.View()
+	for _, s := range []string{"Limits", "Spend", "Sessions", "Savings", "History"} {
+		if !strings.Contains(out, "─ "+s) {
+			t.Errorf("tall usage view is missing the %s box", s)
+		}
+	}
+}
