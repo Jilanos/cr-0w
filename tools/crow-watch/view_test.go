@@ -66,9 +66,9 @@ func TestUsageView(t *testing.T) {
 		w, h      int
 		want, not []string
 	}{
-		{100, 40, []string{"AGENTS", "USAGE", "LIMITS", "TODAY $12.53", "32.8M tok (98% cache)", "SESSIONS today (6)",
-			"opus-5-5,sonnet-5-5", "22.4M", "$7.69", "rtk saved 2.2M (29%)", "proposals pending 2"}, []string{"<synthetic>", "claude-"}},
-		{60, 20, []string{"LIMITS", "work", "spare", "TODAY", "rtk saved"}, []string{"SESSIONS"}},
+		{100, 40, []string{"AGENTS", "USAGE", "LIMITS", "TODAY $12.53", "32.8M tok · 6 sessions", "cache read", "SESSIONS today (6)",
+			"22.4M", "$7.69", "SAVINGS", "58k tokens trimmed", "2 suggested changes awaiting your OK", "billing retry dedupe", "total", "7 days"}, []string{"<synthetic>", "claude-"}},
+		{60, 22, []string{"LIMITS", "work", "spare", "TODAY", "SAVINGS"}, []string{"SESSIONS"}},
 		{50, 14, []string{"LIMITS", "spare", "lab", "side", "work"}, []string{"SESSIONS"}},
 	}
 	for _, c := range cases {

@@ -18,6 +18,10 @@ Same structure and test approach as [archeotech-crow-agents](archeotech-crow-age
    dates whole, footer on two lines, error state shows only title + stderr.
 
 ## Gotchas
+- Session titles: `local/state/session-titles.json` (source `dispatch`, `haiku` or
+  `prompt` placeholder). `crow usage --titles` runs the titler in the foreground;
+  it needs Claude auth, so it fails inside a sandboxed Claude session ("not logged in").
+  Override the model call with `CROW_TITLE_CMD`; disable spawning with `CROW_TITLES_OFF=1`.
 - A real-data render (`command` = the hub's `bin/crow-usage --json`) runs inside
   shot.sh's fake HOME: cdx and rtk can't see their state there, so costs, limits
   and rtk come out empty. That's the sandbox, not the module; check live data with

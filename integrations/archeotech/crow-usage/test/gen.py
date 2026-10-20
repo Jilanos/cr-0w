@@ -30,35 +30,44 @@ def limit(acct, h5, wk, active=False, r5=(0, "16:20"), rw=(4, "11:00")):
             "remaining_week_pct": wk, "reset_week_at": reset(*rw), "active": active}
 
 
-def session(acct, project, kind, model, cost, tokens, ago, active=False):
-    return {"id": f"{project}-{ago}", "account": acct, "project": project, "title": acct, "kind": kind,
+def split(tokens):
+    return {"input_tokens": tokens // 1000, "output_tokens": tokens // 100, "cache_write_tokens": tokens // 25,
+            "cache_read_tokens": tokens - tokens // 1000 - tokens // 100 - tokens // 25}
+
+
+def session(acct, project, kind, model, cost, tokens, ago, title, active=False):
+    return {"id": f"{project}-{ago}", "account": acct, "project": project, "title": title, "kind": kind,
             "models": [model], "start": iso(ago + 30), "end": iso(ago), "active": active,
-            "user_messages": 3, "tokens": tokens, "output_tokens": tokens // 100, "cache_pct": 95, "cost_usd": cost}
+            "user_messages": 3, "tokens": tokens, **split(tokens), "cache_pct": 95, "cost_usd": cost}
 
 
 def days(costs):
     return [{"date": (today - dt.timedelta(days=len(costs) - 1 - i)).isoformat(), "cost_usd": c,
-             "tokens": int(c * 2_500_000), "sessions": int(c // 3)} for i, c in enumerate(costs)]
+             "tokens": int(c * 2_500_000), "sessions": int(c // 3), **split(int(c * 2_500_000))}
+            for i, c in enumerate(costs)]
 
 
 def payload(limits, costs, sessions, pending=0):
     t = costs[-1]
     return {"generated_at": now.isoformat(timespec="seconds"), "limits": limits,
-            "today": {"cost_usd": t, "tokens": int(t * 2_600_000), "sessions": len(sessions), "cache_pct": 96},
+            "today": {"cost_usd": t, "tokens": int(t * 2_600_000), "sessions": len(sessions), "cache_pct": 96,
+                      "unpriced": 0, **split(int(t * 2_600_000))},
+            "week": {"cost_usd": round(sum(costs), 2), "tokens": int(sum(costs) * 2_500_000)},
             "days": days(costs), "sessions": sessions,
-            "rtk": {"saved_tokens": 2_177_937, "saved_pct": 29.2, "commands": 5873},
+            "rtk": {"saved_tokens": 2_177_937, "saved_pct": 29.2, "commands": 5873,
+                    "today_saved_tokens": 58_000, "today_saved_pct": 28.1, "today_commands": 284},
             "retros": {"today": 2, "pending_proposals": pending}}
 
 
 SESSIONS = [
-    session("work", "billing-api", "interactive", "claude-opus-5-5", 8.27, 24_678_260, 2, active=True),
-    session("work", "mobile-app", "interactive", "claude-opus-5-5", 3.61, 9_593_362, 40),
-    session("work", "hub", "run", "claude-opus-5-5", 0.74, 370_701, 4, active=True),
-    session("work", "billing-api", "run", "claude-sonnet-5-5", 0.48, 392_463, 70),
-    session("work", "docs-site", "run", "claude-sonnet-5-5", 0.21, 146_371, 90),
-    session("work", "hub", "run", "claude-haiku-5-5", 0.05, 24_070, 120),
+    session("work", "billing-api", "interactive", "claude-opus-5-5", 8.27, 24_678_260, 2, "webhook retry dedupe", active=True),
+    session("work", "mobile-app", "interactive", "claude-opus-5-5", 3.61, 9_593_362, 40, "login crash on resume"),
+    session("work", "hub", "run", "claude-opus-5-5", 0.74, 370_701, 4, "morning brief", active=True),
+    session("work", "billing-api", "run", "claude-sonnet-5-5", 0.48, 392_463, 70, "pattern gate dry run"),
+    session("work", "docs-site", "run", "claude-sonnet-5-5", 0.21, 146_371, 90, "fix broken anchors"),
+    session("work", "hub", "run", "claude-haiku-5-5", 0.05, 24_070, 120, "session retro"),
     # yesterday: must not show in today's top sessions
-    session("work", "old-thing", "interactive", "claude-opus-5-5", 40.0, 99_000_000, 60 * 30),
+    session("work", "old-thing", "interactive", "claude-opus-5-5", 40.0, 99_000_000, 60 * 30, "yesterday"),
 ]
 fx = {
     "normal": payload([limit("work", 74, 96, active=True, rw=(6, "17:00")), limit("spare", 100, 67),

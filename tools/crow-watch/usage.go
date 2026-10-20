@@ -26,17 +26,23 @@ type limit struct {
 }
 
 type usageDay struct {
-	Date     string  `json:"date"`
-	CostUSD  float64 `json:"cost_usd"`
-	Tokens   int     `json:"tokens"`
-	Sessions int     `json:"sessions"`
-	CachePct int     `json:"cache_pct"`
+	Date       string  `json:"date"`
+	CostUSD    float64 `json:"cost_usd"`
+	Tokens     int     `json:"tokens"`
+	Sessions   int     `json:"sessions"`
+	Unpriced   int     `json:"unpriced"`
+	CachePct   int     `json:"cache_pct"`
+	Input      int     `json:"input_tokens"`
+	Output     int     `json:"output_tokens"`
+	CacheWrite int     `json:"cache_write_tokens"`
+	CacheRead  int     `json:"cache_read_tokens"`
 }
 
 type usageSession struct {
 	ID      string   `json:"id"`
 	Account string   `json:"account"`
 	Project string   `json:"project"`
+	Title   string   `json:"title"`
 	Kind    string   `json:"kind"`
 	Models  []string `json:"models"`
 	Start   string   `json:"start"`
@@ -50,11 +56,15 @@ type usage struct {
 	GeneratedAt string         `json:"generated_at"`
 	Limits      []limit        `json:"limits"`
 	Today       usageDay       `json:"today"`
+	Week        usageDay       `json:"week"`
 	Days        []usageDay     `json:"days"`
 	Sessions    []usageSession `json:"sessions"`
 	Rtk         struct {
-		SavedTokens int     `json:"saved_tokens"`
-		SavedPct    float64 `json:"saved_pct"`
+		SavedTokens      int     `json:"saved_tokens"`
+		SavedPct         float64 `json:"saved_pct"`
+		TodaySavedTokens int     `json:"today_saved_tokens"`
+		TodaySavedPct    float64 `json:"today_saved_pct"`
+		TodayCommands    int     `json:"today_commands"`
 	} `json:"rtk"`
 	Retros struct {
 		Today            int `json:"today"`
@@ -217,10 +227,25 @@ func (u *usage) limitLines(width int) []line {
 }
 
 func (u *usage) todayHead() line {
+	t, w := u.Today, u.Week
+	l := line{
+		{"TODAY", sHead.Underline(true)}, {fmt.Sprintf(" $%.2f", t.CostUSD), sBold},
+		{fmt.Sprintf(" · %s tok · %d sessions", human(t.Tokens), t.Sessions), sPlain},
+		{"   7 days ", sDim}, {fmt.Sprintf("$%.2f", w.CostUSD), sBold}, {fmt.Sprintf(" · %s tok", human(w.Tokens)), sDim},
+	}
+	if t.Unpriced > 0 {
+		l = append(l, seg{fmt.Sprintf("  (%d unpriced)", t.Unpriced), sYellow})
+	}
+	return l
+}
+
+// splitLine: where today's tokens went. Cache reads dominate the total but cost a tenth of input.
+func (u *usage) splitLine() line {
 	t := u.Today
 	return line{
-		{"TODAY", sHead.Underline(true)}, {fmt.Sprintf(" $%.2f", t.CostUSD), sBold},
-		{fmt.Sprintf(" · %s tok (%d%% cache) · %d sessions", human(t.Tokens), t.CachePct, t.Sessions), sPlain},
+		{"new input ", sDim}, {human(t.Input), sCyan}, {" · output ", sDim}, {human(t.Output), sCyan},
+		{" · cache write ", sDim}, {human(t.CacheWrite), sCyan},
+		{" · cache read ", sDim}, {human(t.CacheRead), sCyan}, {fmt.Sprintf(" (%d%%)", t.CachePct), sDim},
 	}
 }
 
@@ -258,11 +283,40 @@ func (u *usage) sparkLines(width int) []line {
 	return []line{bars, vals, names}
 }
 
-func (u *usage) sessionHeader() line {
-	return line{{"  " + pad("account", 9) + pad("project", 22) + pad("models", 20) + padL("tokens", 7) + padL("cost", 9), sDim}}
+// sessionCols: fixed column widths around a title column that takes the rest.
+type sessionCols struct{ account, project, title, models int }
+
+func (u *usage) cols(width int) sessionCols {
+	c := sessionCols{project: 16, models: 12}
+	accts := map[string]bool{}
+	for _, s := range u.today {
+		accts[s.Account] = true
+	}
+	if len(accts) > 1 { // one account: the column says nothing
+		c.account = 9
+	}
+	if width < 80 {
+		c.models = 0
+	}
+	c.title = max(10, width-2-c.account-c.project-c.models-7-9)
+	return c
 }
 
-func (u *usage) sessionLine(s usageSession) line {
+func (u *usage) sessionHeader(width int) line {
+	c := u.cols(width)
+	h := "  "
+	if c.account > 0 {
+		h += pad("account", c.account)
+	}
+	h += pad("project", c.project) + pad("session", c.title)
+	if c.models > 0 {
+		h += pad("models", c.models)
+	}
+	return line{{h + padL("tokens", 7) + padL("cost", 9), sDim}}
+}
+
+func (u *usage) sessionLine(s usageSession, width int) line {
+	c := u.cols(width)
 	mark := seg{"✓ ", lipgloss.NewStyle().Foreground(cGreen)}
 	switch {
 	case s.Active:
@@ -270,15 +324,53 @@ func (u *usage) sessionLine(s usageSession) line {
 	case s.Kind == "run":
 		mark = seg{"⚙ ", sCyan}
 	}
-	return line{mark, {pad(s.Account, 8) + " ", sPlain}, {pad(s.Project, 21) + " ", sBold}, {pad(models(s.Models), 19) + " ", sDim},
-		{padL(human(s.Tokens), 7), sCyan}, {padL(dollars(s.CostUSD), 9), sYellow}}
+	title := s.Title
+	if title == "" {
+		title = "session " + short(s.ID)
+	}
+	l := line{mark}
+	if c.account > 0 {
+		l = append(l, seg{pad(s.Account, c.account-1) + " ", sPlain})
+	}
+	l = append(l, seg{pad(s.Project, c.project-1) + " ", sBold}, seg{pad(title, c.title-1) + " ", sPlain})
+	if c.models > 0 {
+		l = append(l, seg{pad(models(s.Models), c.models-1) + " ", sDim})
+	}
+	return append(l, seg{padL(human(s.Tokens), 7), sCyan}, seg{padL(dollars(s.CostUSD), 9), sYellow})
 }
 
-func (u *usage) statsLine() line {
-	return line{
-		{"rtk saved ", sDim}, {fmt.Sprintf("%s (%.0f%%)", human(u.Rtk.SavedTokens), u.Rtk.SavedPct), sCyan},
-		{" · retros today ", sDim}, {fmt.Sprint(u.Retros.Today), sCyan},
-		{" · proposals pending ", sDim}, {fmt.Sprint(u.Retros.PendingProposals), sCyan},
+// totalLine: the sum of the table, aligned under tokens and cost.
+func (u *usage) totalLine(width int) line {
+	c := u.cols(width)
+	tok, cost := 0, 0.0
+	for _, s := range u.today {
+		tok += s.Tokens
+		if s.CostUSD != nil {
+			cost += *s.CostUSD
+		}
+	}
+	return line{{pad("  total", 2+c.account+c.project+c.title+c.models), sDim}, {padL(human(tok), 7), sBold}, {padL(fmt.Sprintf("$%.2f", cost), 9), sBold}}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+// savingsLines: what the helpers did today, in words.
+func (u *usage) savingsLines() []line {
+	r, rt := u.Rtk, u.Retros
+	sugg := sCyan
+	if rt.PendingProposals > 0 {
+		sugg = sMagenta.Bold(true)
+	}
+	return []line{
+		{{pad("rtk", 8), sBold}, {human(r.TodaySavedTokens), sCyan}, {fmt.Sprintf(" tokens trimmed from %d commands' output today (%.0f%%)", r.TodayCommands, r.TodaySavedPct), sPlain},
+			{fmt.Sprintf(" · %s all time", human(r.SavedTokens)), sDim}},
+		{{pad("retros", 8), sBold}, {fmt.Sprint(rt.Today), sCyan}, {plural(rt.Today, " session", " sessions") + " reviewed today · ", sPlain},
+			{fmt.Sprint(rt.PendingProposals), sugg}, {plural(rt.PendingProposals, " suggested change", " suggested changes") + " awaiting your OK", sPlain}},
 	}
 }
 
@@ -316,9 +408,13 @@ func (m model) usageView(title, footer string) string {
 	iw := m.w - 4
 	limits := u.limitLines(iw)
 	limH := 3 + len(limits)
-	stats := " " + u.statsLine().render(m.w-1, false)
-	spark := u.sparkLines(iw)
-	rest := avail - limH - 1 // stats line
+	savings := u.savingsLines()
+	savH := 3 + len(savings)
+	spark := append([]line{u.splitLine()}, u.sparkLines(iw)...)
+	rest := avail - limH - savH
+	if rest < 3 { // tiny terminal: limits first
+		savH, rest = 0, avail-limH
+	}
 
 	// Drop order when short: sessions table, then the chart, then the today box.
 	todayH := 3 + len(spark)
@@ -339,7 +435,7 @@ func (m model) usageView(title, footer string) string {
 	if tableH >= 6 {
 		var rows []line
 		for _, s := range u.today {
-			rows = append(rows, u.sessionLine(s))
+			rows = append(rows, u.sessionLine(s, iw))
 		}
 		if len(u.today) == 0 {
 			rows = append(rows, line{{"no sessions today", sDim}})
@@ -348,16 +444,22 @@ func (m model) usageView(title, footer string) string {
 		if len(u.today) > 0 {
 			sel = m.uCursor
 		}
-		visible := tableH - 4 // border, head, column header
+		visible := tableH - 5 // border, head, column header, total
 		off := 0
 		if sel >= visible {
 			off = sel - visible + 1
 		}
+		if end := min(len(rows), off+visible); len(u.today) > 0 {
+			rows = append(rows[:end:end], u.totalLine(iw))
+		}
 		head := line{{"SESSIONS", sHead.Underline(true)}, {fmt.Sprintf(" today (%d)", len(u.today)), sDim}}
-		parts = append(parts, box(head, []line{u.sessionHeader()}, rows, m.w, tableH, off, sel, true))
+		parts = append(parts, box(head, []line{u.sessionHeader(iw)}, rows, m.w, tableH, off, sel, true))
 	} else if tableH > 0 {
 		parts = append(parts, strings.Repeat("\n", tableH-1))
 	}
-	parts = append(parts, stats, footer)
+	if savH > 0 {
+		parts = append(parts, box(line{{"SAVINGS", sHead.Underline(true)}, {"  what the helpers did today", sDim}}, nil, savings, m.w, savH, 0, -1, false))
+	}
+	parts = append(parts, footer)
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }

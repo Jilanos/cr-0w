@@ -85,15 +85,8 @@ Item {
             anchors.centerIn: parent
             spacing: 6
             Text {
-                text: root.gauge(CrowStore.busy, CrowStore.maxSlots)
+                text: CrowStore.available ? root.gauge(CrowStore.busy, CrowStore.maxSlots) : "–"
                 color: CrowStore.busy > 0 ? root.cOk : root.cMuted
-                font.family: root.fFamily; font.pixelSize: root.fBase
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                visible: root._horizontal
-                text: CrowStore.available ? CrowStore.busy + "/" + CrowStore.maxSlots : "–"
-                color: CrowStore.busy > 0 ? root.cText : root.cSub
                 font.family: root.fFamily; font.pixelSize: root.fBase
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -113,7 +106,7 @@ Item {
             CrowStore.agents.forEach(a => {
                 if (a.state !== "working" && a.state !== "waiting") return
                 var what = a.state === "waiting" ? "waiting for your reply"
-                         : (a.label ? a.label + ": " : "") + (a.last_action || "")
+                         : ((a.label || a.title) ? (a.label || a.title) + ": " : "") + (a.last_action || "")
                 if (what.length > 72) what = what.slice(0, 71) + "…"
                 lines.push(root.st(a.state).glyph + " " + a.project + "  " + what)
             })
@@ -200,7 +193,7 @@ Item {
                     Text {
                         anchors.baseline: titleTxt.baseline
                         text: CrowStore.available
-                              ? root.gauge(CrowStore.busy, CrowStore.maxSlots) + " " + CrowStore.busy + "/" + CrowStore.maxSlots
+                              ? root.gauge(CrowStore.busy, CrowStore.maxSlots)
                                 + (CrowStore.waiting > 0 ? "   ◆" + CrowStore.waiting : "")
                               : "crow unavailable"
                         color: CrowStore.available ? root.cSub : root.cErr
@@ -240,7 +233,7 @@ Item {
                 Text { width: panel.wAge; horizontalAlignment: Text.AlignRight; text: "active"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
                 Text { width: panel.wCtx; horizontalAlignment: Text.AlignRight; text: "ctx"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
                 Text { width: panel.wCom; horizontalAlignment: Text.AlignRight; text: "com"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
-                Text { leftPadding: 10; text: "task  ↳ doing now"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
+                Text { leftPadding: 10; text: "task / session  ↳ doing now"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
             }
             Rectangle { width: parent.width; height: 1; color: root.cBorder }
         }
@@ -323,6 +316,7 @@ Item {
                 readonly property string task: {
                     if (!d) return ""
                     if (d.label) return d.label
+                    if (d.title) return d.title
                     if (isFin) return ""
                     return d.kind === "session" ? "session " + CrowStore.shortId(d.session_id) : "(not dispatched by crow)"
                 }

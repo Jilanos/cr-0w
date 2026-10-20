@@ -64,7 +64,7 @@ Item {
 
     visible: _c !== null
     implicitWidth:  panelMode ? 540 : pill.implicitWidth
-    implicitHeight: panelMode ? 480 : 22
+    implicitHeight: panelMode ? 600 : 22
 
     // ════════════════════════════ bar pill ════════════════════════════════
     Item {
@@ -96,10 +96,22 @@ Item {
             }
             Text {
                 visible: root._horizontal
-                text: CrowUsageStore.available
-                      ? root.pctText(pill.pct) + " · " + CrowUsageStore.money(CrowUsageStore.today.cost_usd)
-                      : "–"
-                color: CrowUsageStore.available ? root.cText : root.cSub
+                text: CrowUsageStore.available ? root.pctText(pill.pct) : "–"
+                color: CrowUsageStore.available ? root.levelColor(pill.pct) : root.cSub
+                font.family: root.fFamily; font.pixelSize: root.fBase; font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            // Thin divider between the limit and the spend.
+            Rectangle {
+                visible: root._horizontal && CrowUsageStore.available
+                width: 1; height: root.fBase
+                color: root.cBorder
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                visible: root._horizontal && CrowUsageStore.available
+                text: CrowUsageStore.money(CrowUsageStore.today.cost_usd)
+                color: root.cSub
                 font.family: root.fFamily; font.pixelSize: root.fBase
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -160,10 +172,12 @@ Item {
         readonly property int wGauge: 66
         readonly property int wPct: 40
         readonly property int wReset: Math.floor((width - wMark - wName) / 2) - wTag - wGauge - wPct
-        // top sessions: project / model / tokens, cost takes the rest
-        readonly property int wProject: Math.floor((width - wMark) * 0.38)
-        readonly property int wModel: Math.floor((width - wMark) * 0.30)
-        readonly property int wTok: Math.floor((width - wMark) * 0.16)
+        // top sessions: project / title / tokens, cost takes the rest
+        readonly property int wProject: Math.floor((width - wMark) * 0.24)
+        readonly property int wModel: Math.floor((width - wMark) * 0.48)
+        readonly property int wTok: Math.floor((width - wMark) * 0.13)
+        readonly property real topCost: CrowUsageStore.todaySessions.reduce((a, x) => a + (x.cost_usd || 0), 0)
+        readonly property int topTokens: CrowUsageStore.todaySessions.reduce((a, x) => a + (x.tokens || 0), 0)
 
         readonly property bool hasData: CrowUsageStore.snap !== null
         readonly property var days: CrowUsageStore.days
@@ -269,9 +283,22 @@ Item {
                     Cell {
                         anchors.baseline: todayCost.baseline
                         text: CrowUsageStore.human(CrowUsageStore.today.tokens) + " tok · "
-                              + (CrowUsageStore.today.cache_pct ?? "–") + "% cache · "
                               + (CrowUsageStore.today.sessions || 0) + " sessions"
+                              + (CrowUsageStore.today.unpriced > 0 ? " · " + CrowUsageStore.today.unpriced + " unpriced" : "")
                     }
+                }
+                // Where the tokens went: cache reads dominate the count but cost a tenth of input.
+                Cell {
+                    visible: panel.hasData
+                    x: panel.wMark
+                    width: parent.width - panel.wMark
+                    font.pixelSize: root.fSm
+                    color: root.cMuted
+                    text: "in " + CrowUsageStore.human(CrowUsageStore.today.input_tokens)
+                          + " · out " + CrowUsageStore.human(CrowUsageStore.today.output_tokens)
+                          + " · cache " + CrowUsageStore.human(CrowUsageStore.today.cache_read_tokens) + " read ("
+                          + (CrowUsageStore.today.cache_pct ?? "–") + "%), "
+                          + CrowUsageStore.human(CrowUsageStore.today.cache_write_tokens) + " written"
                 }
 
                 // ── 7-day cost sparkline ──
@@ -283,7 +310,7 @@ Item {
                     Cell {
                         anchors.right: parent.right
                         anchors.baseline: weekHead.baseline
-                        text: CrowUsageStore.money(panel.weekCost) + " total · max " + CrowUsageStore.money(panel.maxDay > 0.01 ? panel.maxDay : 0)
+                        text: CrowUsageStore.money(panel.weekCost) + " · " + CrowUsageStore.human(CrowUsageStore.week.tokens) + " tok · max " + CrowUsageStore.money(panel.maxDay > 0.01 ? panel.maxDay : 0)
                         color: root.cMuted; font.pixelSize: root.fSm
                     }
                 }
@@ -348,8 +375,8 @@ Item {
                         required property var modelData
                         readonly property string glyph: modelData.active ? "●" : modelData.kind === "run" ? "⚙" : "✓"
                         Cell { width: panel.wMark; text: sess.glyph; color: sess.modelData.active ? root.cOk : root.cMuted }
-                        Cell { width: panel.wProject; text: sess.modelData.project; color: root.cText }
-                        Cell { width: panel.wModel; text: CrowUsageStore.modelName(sess.modelData.models) }
+                        Cell { width: panel.wProject; rightPadding: root.s1; text: sess.modelData.project; color: root.cText }
+                        Cell { width: panel.wModel; text: sess.modelData.title || CrowUsageStore.modelName(sess.modelData.models) }
                         Cell { width: panel.wTok; horizontalAlignment: Text.AlignRight; text: CrowUsageStore.human(sess.modelData.tokens); color: root.cMuted }
                         Cell {
                             width: body.width - panel.wMark - panel.wProject - panel.wModel - panel.wTok
@@ -360,17 +387,31 @@ Item {
                     }
                 }
 
-                // ── footer ──
-                Rectangle { visible: panel.hasData; width: parent.width; height: 1; color: root.cBorder; opacity: 0.6 }
+                Row {
+                    visible: panel.hasData && CrowUsageStore.todaySessions.length > 0
+                    Cell { width: panel.wMark + panel.wProject + panel.wModel; leftPadding: panel.wMark; text: "all " + CrowUsageStore.todaySessions.length + " today"; color: root.cMuted; font.pixelSize: root.fSm }
+                    Cell { width: panel.wTok; horizontalAlignment: Text.AlignRight; text: CrowUsageStore.human(panel.topTokens); color: root.cSub }
+                    Cell {
+                        width: body.width - panel.wMark - panel.wProject - panel.wModel - panel.wTok
+                        horizontalAlignment: Text.AlignRight
+                        text: CrowUsageStore.money(panel.topCost)
+                        color: root.cText; font.bold: true
+                    }
+                }
+
+                // ── savings: what the helpers did today, in words ──
+                Head { text: "SAVINGS TODAY"; visible: panel.hasData }
                 Row {
                     visible: panel.hasData
                     x: panel.wMark
                     spacing: root.s1
-                    Cell { text: "rtk"; color: root.cMuted }
+                    Cell { width: panel.wName; text: "rtk"; color: root.cMuted }
                     Cell {
-                        text: "saved " + CrowUsageStore.human(CrowUsageStore.rtk.saved_tokens) + " tok"
-                              + (CrowUsageStore.rtk.saved_pct !== null && CrowUsageStore.rtk.saved_pct !== undefined
-                                 ? " (" + Math.round(CrowUsageStore.rtk.saved_pct) + "%)" : "")
+                        width: body.width - panel.wMark - panel.wName - root.s1
+                        text: CrowUsageStore.human(CrowUsageStore.rtk.today_saved_tokens) + " tok trimmed"
+                              + (CrowUsageStore.rtk.today_saved_pct !== null && CrowUsageStore.rtk.today_saved_pct !== undefined
+                                 ? " (" + Math.round(CrowUsageStore.rtk.today_saved_pct) + "%)" : "")
+                              + " · " + CrowUsageStore.human(CrowUsageStore.rtk.saved_tokens) + " total"
                         color: root.cOk
                     }
                 }
@@ -378,11 +419,12 @@ Item {
                     visible: panel.hasData
                     x: panel.wMark
                     spacing: root.s1
+                    readonly property int reviewed: CrowUsageStore.retros.today || 0
                     readonly property int pending: CrowUsageStore.retros.pending_proposals || 0
-                    Cell { text: "retros"; color: root.cMuted }
-                    Cell { text: (CrowUsageStore.retros.today ?? "–") + " today ·"; color: root.cText }
+                    Cell { width: panel.wName; text: "retros"; color: root.cMuted }
+                    Cell { text: parent.reviewed + (parent.reviewed === 1 ? " session" : " sessions") + " reviewed ·"; color: root.cText }
                     Cell {
-                        text: (CrowUsageStore.retros.pending_proposals ?? "–") + " proposals pending"
+                        text: parent.pending + (parent.pending === 1 ? " suggestion" : " suggestions") + " to approve"
                         color: parent.pending > 0 ? root.cAccent : root.cText
                         font.bold: parent.pending > 0
                     }

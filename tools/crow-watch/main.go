@@ -7,6 +7,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -43,6 +45,7 @@ type agent struct {
 	Recent          []event  `json:"recent"`
 	RunID           string   `json:"run_id"`
 	Label           string   `json:"label"`
+	Title           string   `json:"title"`
 	Commits         []string `json:"commits"`
 }
 
@@ -479,7 +482,14 @@ func (m model) title() string {
 		return sTitle.Faint(true).Render(" " + name + " ")
 	}
 	t := sTitle.Render("CR-0W · ") + tab("AGENTS", !m.showUsage) + sTitle.Render("│") + tab("USAGE", m.showUsage)
-	return lipgloss.PlaceHorizontal(m.w, lipgloss.Center, t, lipgloss.WithWhitespaceBackground(cMagenta))
+	bar := lipgloss.PlaceHorizontal(m.w, lipgloss.Center, t, lipgloss.WithWhitespaceBackground(cMagenta))
+	if m.updated.IsZero() || m.w < 60 {
+		return bar
+	}
+	// Last refresh on the right edge, inside the title bar.
+	stamp := sTitle.Faint(true).Render(m.updated.Format("15:04:05") + " ")
+	cut := m.w - lipgloss.Width(stamp)
+	return ansi.Truncate(bar, cut, "") + stamp
 }
 
 func (m model) summaryBox() string {
@@ -495,16 +505,24 @@ func (m model) summaryBox() string {
 				waiting++
 			}
 		}
-		wait := sDim
-		if waiting > 0 {
-			wait = st("waiting").style
+		gauge := sDim
+		if busy > 0 {
+			gauge = st("working").style
 		}
-		l = line{
-			{"Slots: ", sHead}, {strings.Repeat("▰", busy) + strings.Repeat("▱", max(0, mx-busy)) + fmt.Sprintf(" %d/%d", busy, mx), sPlain},
-			{"   ● ", st("working").style}, {fmt.Sprintf("%d working", working), sPlain},
-			{"   ◆ ", wait}, {fmt.Sprintf("%d need you", waiting), wait},
-			{"   ✓ ", sDim}, {fmt.Sprintf("%d finished today", len(m.snap.Finished)), sDim},
-			{"   " + m.updated.Format("15:04:05"), sDim},
+		l = line{{"runs ", sHead}, {strings.Repeat("▰", busy), gauge}, {strings.Repeat("▱", max(0, mx-busy)), sDim}}
+		// Only counts that say something; the gauge already shows busy/max.
+		for _, c := range []struct {
+			n     int
+			state string
+			text  string
+		}{{waiting, "waiting", "need you"}, {working, "working", "working"}, {len(m.snap.Finished), "done", "finished today"}} {
+			if c.n > 0 {
+				s := st(c.state)
+				l = append(l, seg{"   " + s.glyph + " ", s.style}, seg{fmt.Sprintf("%d %s", c.n, c.text), sPlain})
+			}
+		}
+		if working == 0 && waiting == 0 {
+			l = append(l, seg{"   nothing running", sDim})
 		}
 	} else if m.err != nil {
 		l = line{{"crow-runs failed: " + m.err.Error(), lipgloss.NewStyle().Foreground(cRed)}}
@@ -562,7 +580,7 @@ type listMap struct{ start, end []int }
 func (m model) listLayout() ([]line, listMap) {
 	var lines []line
 	var lm listMap
-	lines = append(lines, line{{"  " + pad("project", 17) + padL("active", 6) + padL("ctx", 5) + padL("com", 4) + "  task  ↳ doing now", sDim}})
+	lines = append(lines, line{{"  " + pad("project", 17) + padL("active", 6) + padL("ctx", 5) + padL("com", 4) + "  task / session  ↳ doing now", sDim}})
 	section := func(name string, n int) {
 		lines = append(lines, line{{fmt.Sprintf("%s (%d)", name, n), sBold}})
 	}
@@ -633,7 +651,7 @@ func (m model) listScroll(lines []line, avail int) int {
 func (m model) itemLines(it item) []line {
 	if a := it.agent; a != nil {
 		s := st(a.State)
-		task := a.Label
+		task := cmp.Or(a.Label, a.Title)
 		if task == "" {
 			if a.Kind == "session" {
 				task = "session " + short(a.SessionID)
@@ -697,8 +715,8 @@ func (m model) detailLines(width int) []line {
 		out = append(out,
 			line{{s.glyph + " " + s.label + "  ", s.style}, {a.Project, sBold}},
 		)
-		if a.Label != "" {
-			out = append(out, line{{a.Label, sBold}})
+		if t := cmp.Or(a.Label, a.Title); t != "" {
+			out = append(out, line{{t, sBold}})
 		}
 		meta := fmt.Sprintf("%s · up %s · active %s ago", id, age(since(a.StartedAt)), age(float64(a.LastActivityS)))
 		if a.Account != "" {

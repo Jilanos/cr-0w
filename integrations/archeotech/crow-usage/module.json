@@ -3,11 +3,11 @@
   "name": "Crow Usage",
   "author": "crow",
   "version": "0.1.0",
-  "description": "Claude usage from crow: 5h limit gauge and today's cost on the bar; limits per account, 7-day cost, top sessions, rtk savings in the panel.",
+  "description": "Claude usage from crow: 5h limit gauge and today's cost on the bar; limits per account, 7-day cost, titled top sessions with totals, savings in the panel.",
   "canLiveIn": ["bar-zone", "panel-content"],
   "entry": "CrowUsage.qml",
   "icon": "󰊚",
-  "panel": { "size": 540, "axisSize": 480 },
+  "panel": { "size": 540, "axisSize": 600 },
   "dependencies": ["crow"],
   "configSchema": {
     "command":  { "type": "string", "label": "Usage command", "default": "crow usage --json",

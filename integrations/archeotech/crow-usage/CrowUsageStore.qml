@@ -19,6 +19,7 @@ Singleton {
     // ── derived views ───────────────────────────────────────────────────────
     readonly property var limits: snap && snap.limits ? snap.limits : []
     readonly property var today: snap && snap.today ? snap.today : ({})
+    readonly property var week: snap && snap.week ? snap.week : ({})
     readonly property var days: snap && snap.days ? snap.days : []
     readonly property var rtk: snap && snap.rtk ? snap.rtk : ({})
     readonly property var retros: snap && snap.retros ? snap.retros : ({})

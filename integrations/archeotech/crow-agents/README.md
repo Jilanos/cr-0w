@@ -5,8 +5,8 @@ sessions waiting on you, and toasts when a run ends.
 
 ## What it shows
 
-- **Bar pill** (`bar-zone`): `▰▱ 1/2  ◆1`. The gauge is background runs
-  busy/max. `◆N` (accent colour) counts sessions waiting for your reply, and only
+- **Bar pill** (`bar-zone`): `▰▱  ◆1`. The gauge is background runs
+  busy/max (one cell per slot, filled = busy). `◆N` (accent colour) counts sessions waiting for your reply, and only
   appears when N > 0. Hover for a one-line summary per working or waiting agent;
   click to open the agents panel. A dimmed pill means the last poll failed
   (the popup says "crow unavailable").

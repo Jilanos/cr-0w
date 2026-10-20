@@ -5,20 +5,25 @@ limit is left, what today cost, and where the tokens went.
 
 ## What it shows
 
-- **Bar pill** (`bar-zone`): `▰▰▰▰▱ 74% · $13.36`. The gauge and percentage are
-  the current account's 5h remaining; the amount is today's cost across all
-  accounts. Colour by remaining: success > 50 %, warning 20–50 %, error < 20 %.
+- **Bar pill** (`bar-zone`): `▰▰▰▰▱ 74% │ $13.36`. The gauge and percentage (bold,
+  level colour) are the current account's 5h remaining; after a thin divider,
+  today's cost across all accounts. Colour by remaining: success > 50 %, warning 20–50 %, error < 20 %.
   The current account is the one `cdx status` marks active, else the account of
   the most recent session, else the first listed. Hover for a one-line summary;
   click to open the usage panel. A dimmed pill means the last poll failed.
 - **Panel** (`panel-content`):
   - LIMITS: one row per account (● = current) with 5h and week gauges, % left
     and reset time (time only when the reset is today).
-  - TODAY: cost, tokens, cache hit %, sessions.
-  - LAST 7 DAYS: cost per day as bars (today highlighted), total and max.
+  - TODAY: cost, tokens, sessions; then where the tokens went (new input,
+    output, cache read with hit %, cache written).
+  - LAST 7 DAYS: cost per day as bars (today highlighted), cost and tokens total, max.
   - TOP SESSIONS TODAY: the 5 costliest sessions touched today: state
-    (● active, ⚙ background run, ✓ interactive), project, model, tokens, cost.
-  - Footer: tokens rtk saved; retros written today and proposals pending.
+    (● live, ⚙ background run, ✓ interactive), project, title, tokens, cost;
+    then a total over all of today's sessions. Titles come from crow-usage
+    (dispatch label, else a Haiku-generated title, else the first prompt).
+  - SAVINGS TODAY: tokens rtk trimmed from command output (and all-time total);
+    sessions the automatic retros reviewed, and their suggestions waiting for
+    your approval (`local/state/retros/proposals.md`).
   When a poll fails the title says so and the last good data stays (marked
   stale); with no data at all, only the error (last stderr line) is shown.
 

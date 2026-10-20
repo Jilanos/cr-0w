@@ -204,12 +204,21 @@ def commits_since(cwd, sha, until=None):
     return sh("git", "log", "--oneline", *extra, f"{sha}..HEAD", cwd=cwd).splitlines()
 
 
+def session_titles():
+    """Titles crow-usage generated (Haiku) or mapped from dispatch labels, by session id."""
+    try:
+        return json.loads((HOME / "local/state/session-titles.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 def collect(since="today", include_unledgered=False):
     now = time.time()
     done = finished(since)
     recs = ledger()
     cutoff = datetime.now().astimezone().date() if since == "today" else None
     agents, claimed = [], set()
+    titles = session_titles()
 
     for p in claude_procs():
         # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
@@ -238,7 +247,7 @@ def collect(since="today", include_unledgered=False):
             "cwd": p["cwd"], "session_id": sid, "state": state,
             "started_at": datetime.fromtimestamp(p["started"], timezone.utc).isoformat(timespec="seconds"),
             "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent")},
-            "run_id": None, "label": None, "commits": [],
+            "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
         }
         if kind == "run":
             for rec in reversed(recs):

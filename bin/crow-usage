@@ -4,16 +4,25 @@
   crow-usage            short text summary
   crow-usage --json     full payload (schema below)
   crow-usage --days N   history window (default 7)
+  crow-usage --titles   generate missing session titles now (normally a detached worker does it)
 
 Sources: every Claude transcript in the cdx profiles (interactive sessions and
 headless runs alike, subagents folded into their session), `cdx status` for the
 usage limits, `rtk gain` for the tokens rtk saved. Costs use cdx's own price
 table, so they match `cdx stats`. Per-file totals are cached by (mtime, size).
 
-JSON: {generated_at, limits[], today{}, days[], sessions[], rtk{}, retros{}}
+Session titles: cdx names every session after its account, so crow asks a small
+model (CROW_TITLE_CMD, default Haiku via `claude -p`) for a 3-6 word title from the
+first prompts, caches it by session id in local/state/session-titles.json and
+refreshes it when the session has grown. Until then the cleaned first prompt is used.
+
+JSON: {generated_at, limits[], today{}, week{}, days[], sessions[], rtk{}, retros{}}
 """
 import datetime as dt
+import fcntl
 import glob
+import pwd
+import re
 import json
 import os
 import shutil
@@ -42,6 +51,14 @@ except ImportError:
 CROW_HOME = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
+TITLES = os.path.join(STATE, "session-titles.json")
+TITLE_LOCK = os.path.join(STATE, ".titles.lock")
+CACHE_VERSION = 4
+TITLES_PER_RUN = 12
+TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
+    "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
+    "--system-prompt 'You name coding sessions. Reply with a 3-6 word title in the language of the prompts, "
+    "Title Case not required, no quotes, no trailing punctuation.'")
 PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", "/home/" + os.environ.get("USER", "") + "/.cdx/profiles"))
 ACTIVE_SECONDS = 120
 
@@ -57,7 +74,14 @@ def run_json(cmd):
 CACHE_1H_MULTIPLIER = 2.0  # cdx prices every cache write at the 5-minute rate (1.25x input)
 
 
+def pseudo_model(model):
+    """Placeholder entries such as <synthetic> carry no billable tokens of their own."""
+    return model.startswith("<") or model == "unknown"
+
+
 def price(usage, model):
+    if pseudo_model(model):
+        return 0.0
     if not estimate_cost:
         return None
     prices = token_prices()[0]
@@ -69,11 +93,39 @@ def price(usage, model):
     return cost + extra
 
 
+NOISE = re.compile(r"<(pasted_content|system-reminder|local-command-[a-z]+|command-[a-z]+)[^>]*>.*?</\1[^>]*>", re.S)
+BUILTIN_COMMANDS = {"/clear", "/compact", "/model", "/config", "/resume", "/exit", "/cost", "/status", "/login",
+                    "/logout", "/effort", "/fast", "/help", "/context", "/usage", "/permissions", "/plugin", "/mcp",
+                    "/rename", "/memory", "/hooks", "/doctor", "/theme", "/agents", "/ide", "/vim", "/rewind"}
+COMMAND = re.compile(r"<command-name>([^<]*)</command-name>(?:.*?<command-args>([^<]*)</command-args>)?", re.S)
+
+
+def typed_prompt(ev):
+    """Text the user typed in a user event, without pastes, reminders and command wrappers."""
+    if ev.get("type") != "user" or ev.get("isMeta"):
+        return None
+    content = (ev.get("message") or {}).get("content")
+    if isinstance(content, list):
+        content = " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+    if not isinstance(content, str) or "Base directory for this skill:" in content:
+        return None
+    cmd = COMMAND.search(content)
+    if cmd and cmd[1].strip() in BUILTIN_COMMANDS:
+        return None
+    if cmd and not content.lstrip().startswith("<local-command-caveat>"):
+        return " ".join(f"{cmd[1]} {cmd[2] or ''}".split())[:300] or None
+    if content.lstrip().startswith(("Caveat:", "[Request interrupted", "<task-notification")):
+        return None
+    text = " ".join(NOISE.sub(" ", content).split())
+    return text or None
+
+
 def scan_transcript(path):
     """Usage of one session file (+ its subagents), deduplicated by message id."""
     seen = set()
     per_model = {}
-    meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0}
+    meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0,
+            "prompts": [], "last_prompt": None, "branch": None}
     files = [path] + glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))
     for fpath in files:
         with open(fpath, encoding="utf-8", errors="replace") as fh:
@@ -90,11 +142,16 @@ def scan_transcript(path):
                         meta["start"] = meta["start"] or ts
                         meta["end"] = ts
                     meta["cwd"] = meta["cwd"] or ev.get("cwd")
+                    meta["branch"] = ev.get("gitBranch") or meta["branch"]
                     meta["entrypoint"] = meta["entrypoint"] or ev.get("entrypoint")
                     if ev.get("type") == "custom-title":
                         meta["title"] = ev.get("customTitle")
-                    if ev.get("type") == "user" and isinstance((ev.get("message") or {}).get("content"), str):
+                    text = typed_prompt(ev)
+                    if text:
                         meta["user_messages"] += 1
+                        meta["last_prompt"] = text[:300]
+                        if len(meta["prompts"]) < 3:
+                            meta["prompts"].append(text[:300])
                 msg = ev.get("message") or {}
                 usage = msg.get("usage")
                 if ev.get("type") != "assistant" or not usage or msg.get("id") in seen:
@@ -108,7 +165,171 @@ def scan_transcript(path):
                 m["cache_creation_tokens"] += usage.get("cache_creation_input_tokens") or 0
                 m["output_tokens"] += usage.get("output_tokens") or 0
                 m["cache_1h_tokens"] += (usage.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0
-    return {"meta": meta, "per_model": per_model}
+    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model}
+
+
+# ---------- session titles ----------
+
+def load_titles():
+    try:
+        with open(TITLES, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def real_title(meta, account):
+    """A /rename title, unless it is cdx's default (the account name, maybe with a counter)."""
+    t = (meta.get("title") or "").strip()
+    return t if t and not re.fullmatch(re.escape(account) + r"( \(\d+\))?", t) else None
+
+
+def session_title(sid, meta, account, titles):
+    """/rename title, else generated or dispatch title, else the first prompt (stored as a placeholder
+    so crow-runs can show it too, and replaced once the titler has run)."""
+    t = real_title(meta, account)
+    if t:
+        return t
+    have = titles.get(sid) or {}
+    if have.get("source") != "prompt" and have.get("title"):
+        return have["title"]
+    first = (meta.get("prompts") or [None])[0]
+    if not first:
+        return None
+    t = first if len(first) <= 48 else first[:47].rsplit(" ", 1)[0] + "…"
+    if have.get("title") != t:
+        titles[sid] = {"title": t, "source": "prompt", "prompts": 0}
+        titles["_dirty"] = True
+    return t
+
+
+def title_due(s, titles):
+    """No generated title yet, or the session has at least doubled (and grown by 5+ prompts) since."""
+    n = s.get("user_messages") or 0
+    if not n or s.get("_renamed"):
+        return False
+    have = titles.get(s["id"])
+    return not have or have.get("source") == "prompt" or (n >= 2 * have.get("prompts", 0) and n >= have.get("prompts", 0) + 5)
+
+
+def spawn_titler():
+    try:
+        subprocess.Popen([sys.executable, os.path.realpath(__file__), "--titles"], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+                         env={**os.environ, "CROW_RETRO": "1"})
+    except OSError:
+        pass
+
+
+def ask_title(meta, project):
+    lines = [f"Project: {project}"] + ([f"Branch: {meta['branch']}"] if meta.get("branch") else [])
+    lines += [f"Prompt {i + 1}: {p}" for i, p in enumerate(meta.get("prompts") or [])]
+    if meta.get("last_prompt") and meta["last_prompt"] not in (meta.get("prompts") or []):
+        lines.append(f"Latest prompt: {meta['last_prompt']}")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDECODE")}
+    env["CROW_RETRO"] = "1"
+    try:
+        out = subprocess.run(["bash", "-c", TITLE_CMD], input="\n".join(lines), capture_output=True, text=True,
+                             timeout=60, env=env, cwd=STATE)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    title = " ".join(out.stdout.strip().strip("\"'").split())
+    if out.returncode != 0 or not title or len(title) > 60 or "log in" in title.lower():
+        return None
+    return title.rstrip(".")
+
+
+def generate_titles():
+    """Worker: title the most recent sessions that need one. One worker at a time."""
+    os.makedirs(STATE, exist_ok=True)
+    with open(TITLE_LOCK, "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return 0
+        try:
+            with open(CACHE, encoding="utf-8") as fh:
+                cache = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return 0
+        titles = load_titles()
+        todo = []
+        for path, hit in cache.items():
+            meta = hit["data"].get("meta") or {}
+            account = path.split(os.sep + "profiles" + os.sep, 1)[-1].split(os.sep, 1)[0]
+            s = {"id": os.path.basename(path)[:-6], "user_messages": meta.get("user_messages"),
+                 "_renamed": bool(real_title(meta, account))}
+            if title_due(s, titles):
+                todo.append((meta.get("end") or "", s["id"], meta))
+        done = 0
+        for _, sid, meta in sorted(todo, reverse=True)[:TITLES_PER_RUN]:
+            title = ask_title(meta, os.path.basename(meta.get("cwd") or "") or "?")
+            if not title:
+                break  # the command is failing (auth, limit): retry on a later poll
+            titles[sid] = {"title": title, "source": "haiku", "prompts": meta.get("user_messages") or 0,
+                           "at": dt.datetime.now().isoformat(timespec="seconds")}
+            done += 1
+            fresh = load_titles()  # the poller may have added labels or placeholders meanwhile
+            fresh[sid] = titles[sid]
+            save_titles(fresh)
+        return done
+
+
+def dispatch_titles(titles):
+    """Background runs started by crow: their session takes the dispatch label (mapped once, then cached)."""
+    mapped = set(titles.get("_runs") or [])
+    try:
+        with open(os.path.join(STATE, "runs.jsonl"), encoding="utf-8") as fh:
+            recs = [json.loads(l) for l in fh if l.strip()]
+    except (OSError, json.JSONDecodeError):
+        return False
+    changed = False
+    for rec in recs:
+        rid = rec.get("run_id")
+        if not rid or rid in mapped:
+            continue
+        logs = glob.glob(os.path.join(PROFILES, "*", "claude-home", "log", f"cdx-run-{rid}.stdout.log"))
+        sid = None
+        for log in logs:
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    m = re.search(r'"session_id":\s*"([0-9a-f-]{36})"', line)
+                    if m:
+                        sid = m[1]
+                        break
+        if not sid:
+            continue  # still running, or no log: try again on a later poll
+        titles[sid] = {"title": rec.get("label"), "source": "dispatch", "prompts": 10 ** 6}
+        mapped.add(rid)
+        changed = True
+    if changed:
+        titles["_runs"] = sorted(mapped)
+        save_titles(titles)
+    return changed
+
+
+def save_titles(titles):
+    tmp = TITLES + f".{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(titles, fh)
+    os.replace(tmp, TITLES)
+
+
+def live_session_ids():
+    """Session ids of running Claude processes (same source as crow-runs), or None if unknown."""
+    ids, seen_any = set(), False
+    for f in glob.glob(os.path.join(PROFILES, "*", "claude-home", ".claude", "sessions", "*.json")):
+        seen_any = True
+        try:
+            pid = int(os.path.basename(f)[:-5])
+            os.kill(pid, 0)
+            with open(f, encoding="utf-8") as fh:
+                sid = json.load(fh).get("sessionId")
+        except (ValueError, OSError, json.JSONDecodeError):
+            continue
+        if sid:
+            ids.add(sid)
+    return ids if seen_any else None
 
 
 def collect_sessions(days):
@@ -120,13 +341,18 @@ def collect_sessions(days):
         cache = {}
     fresh = {}
     sessions = []
+    titles = load_titles()
+    dispatch_titles(titles)
+    live = live_session_ids()
+    due = False
     for path in glob.glob(os.path.join(PROFILES, "*", "claude-home", ".claude", "projects", "*", "*.jsonl")):
         st = os.stat(path)
         if st.st_mtime < cutoff:
             continue
         key = f"{st.st_mtime}:{st.st_size}"
         hit = cache.get(path)
-        data = hit["data"] if hit and hit["key"] == key else scan_transcript(path)
+        fresh_hit = hit and hit["key"] == key and hit["data"].get("v") == CACHE_VERSION
+        data = hit["data"] if fresh_hit else scan_transcript(path)
         fresh[path] = {"key": key, "data": data}
         if not data["per_model"]:
             continue
@@ -143,19 +369,26 @@ def collect_sessions(days):
                 cost += c
         meta = data["meta"]
         tokens = sum(totals.values())
+        sid = os.path.basename(path)[:-6]
+        if not real_title(meta, account) and title_due({"id": sid, "user_messages": meta["user_messages"]}, titles):
+            due = True
         sessions.append({
-            "id": os.path.basename(path)[:-6],
+            "id": sid,
             "account": account,
             "project": os.path.basename(meta["cwd"] or "") or "?",
-            "title": meta["title"],
+            "title": session_title(sid, meta, account, titles),
+            "branch": meta["branch"],
             "kind": "run" if meta["entrypoint"] == "sdk-cli" else "interactive",
             "models": sorted(data["per_model"]),
             "start": meta["start"],
             "end": meta["end"],
-            "active": dt.datetime.now().timestamp() - st.st_mtime < ACTIVE_SECONDS,
+            "active": sid in live if live is not None else dt.datetime.now().timestamp() - st.st_mtime < ACTIVE_SECONDS,
             "user_messages": meta["user_messages"],
             "tokens": tokens,
+            "input_tokens": totals["input_tokens"],
             "output_tokens": totals["output_tokens"],
+            "cache_write_tokens": totals["cache_creation_tokens"],
+            "cache_read_tokens": totals["cache_read_tokens"],
             "cache_pct": round(100 * totals["cache_read_tokens"] / tokens) if tokens else 0,
             "cost_usd": round(cost, 4) if priced else None,
         })
@@ -163,6 +396,14 @@ def collect_sessions(days):
     with open(CACHE, "w", encoding="utf-8") as fh:
         json.dump(fresh, fh)
     sessions.sort(key=lambda s: s["end"] or "", reverse=True)
+    if titles.pop("_dirty", False):
+        merged = load_titles()
+        for sid, t in titles.items():
+            if t != merged.get(sid) and (sid not in merged or merged[sid].get("source") == "prompt"):
+                merged[sid] = t
+        save_titles(merged)
+    if due and not os.environ.get("CROW_TITLES_OFF"):
+        spawn_titler()
     return sessions
 
 
@@ -170,17 +411,69 @@ def local_day(ts):
     return dt.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone().date().isoformat()
 
 
+TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_write_tokens", "cache_read_tokens")
+
+
+def rtk_homes():
+    """Every HOME with an rtk history: the real one and each cdx profile (cdx sandboxes HOME)."""
+    homes = [pwd.getpwuid(os.getuid()).pw_dir] + glob.glob(os.path.join(PROFILES, "*", "claude-home"))
+    return [h for h in dict.fromkeys(homes) if os.path.exists(os.path.join(h, ".local", "share", "rtk", "history.db"))]
+
+
+def rtk_stats(today):
+    """rtk gain summed over every history database, plus today's share."""
+    tot = {"saved_tokens": 0, "input_tokens": 0, "commands": 0, "time_ms": 0, "today_saved_tokens": 0,
+           "today_input_tokens": 0, "today_commands": 0, "databases": 0}
+    for home in rtk_homes():
+        env = {k: v for k, v in os.environ.items() if k != "XDG_DATA_HOME"}
+        env["HOME"] = home
+        try:
+            out = subprocess.run(["rtk", "gain", "--daily", "--format", "json"], capture_output=True, text=True,
+                                 timeout=30, env=env).stdout
+            data = json.loads(out)
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+            continue
+        sm = data.get("summary") or {}
+        tot["databases"] += 1
+        tot["saved_tokens"] += sm.get("total_saved") or 0
+        tot["input_tokens"] += sm.get("total_input") or 0
+        tot["commands"] += sm.get("total_commands") or 0
+        tot["time_ms"] += sm.get("total_time_ms") or 0
+        for d in data.get("daily") or []:
+            if d.get("date") == today:
+                tot["today_saved_tokens"] += d.get("saved_tokens") or 0
+                tot["today_input_tokens"] += d.get("input_tokens") or 0
+                tot["today_commands"] += d.get("commands") or 0
+    if not tot["databases"]:
+        return {"saved_tokens": None, "saved_pct": None, "commands": None}
+    pct = lambda saved, inp: round(100 * saved / inp, 1) if inp else None
+    return {**tot, "saved_pct": pct(tot["saved_tokens"], tot["input_tokens"]),
+            "today_saved_pct": pct(tot["today_saved_tokens"], tot["today_input_tokens"])}
+
+
+def rollup(sessions):
+    r = {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "unpriced": 0, **{k: 0 for k in TOKEN_KEYS}}
+    for s in sessions:
+        r["cost_usd"] += s["cost_usd"] or 0
+        r["unpriced"] += s["cost_usd"] is None
+        r["tokens"] += s["tokens"]
+        r["sessions"] += 1
+        for k in TOKEN_KEYS:
+            r[k] += s.get(k) or 0
+    r["cost_usd"] = round(r["cost_usd"], 2)
+    r["cache_pct"] = round(100 * r["cache_read_tokens"] / r["tokens"]) if r["tokens"] else 0
+    return r
+
+
 def build(days):
     sessions = collect_sessions(days)
     today = dt.date.today().isoformat()
-    by_day = {(dt.date.today() - dt.timedelta(days=i)).isoformat(): {"cost_usd": 0.0, "tokens": 0, "sessions": 0}
-              for i in range(days)}
+    dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(days))]
+    per_day = {d: [] for d in dates}
     for s in sessions:
         day = local_day(s["end"]) if s["end"] else None
-        if day in by_day:
-            by_day[day]["cost_usd"] += s["cost_usd"] or 0
-            by_day[day]["tokens"] += s["tokens"]
-            by_day[day]["sessions"] += 1
+        if day in per_day:
+            per_day[day].append(s)
     status = run_json(["cdx", "status", "--json"]) or {}
     limits = [{
         "account": r.get("session_name"),
@@ -190,29 +483,20 @@ def build(days):
         "reset_week_at": r.get("reset_week_at"),
         "active": r.get("active"),
     } for r in status.get("rows", []) if r.get("provider") == "claude"]
-    rtk = run_json(["rtk", "gain", "--format", "json"]) or {}
-    summary = rtk.get("summary", rtk)
     retro_dir = os.path.join(STATE, "retros")
     proposals = os.path.join(retro_dir, "proposals.md")
     pending = 0
     if os.path.exists(proposals):
         with open(proposals, encoding="utf-8") as fh:
             pending = sum(1 for line in fh if line.startswith("- [ ]"))
-    t = by_day[today]
-    today_sessions = [s for s in sessions if s["end"] and local_day(s["end"]) == today]
-    tok = sum(s["tokens"] for s in today_sessions)
-    cache = sum(s["tokens"] * s["cache_pct"] / 100 for s in today_sessions)
     return {
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "limits": limits,
-        "today": {"cost_usd": round(t["cost_usd"], 2), "tokens": t["tokens"], "sessions": t["sessions"],
-                  "cache_pct": round(100 * cache / tok) if tok else 0},
-        "days": [{"date": d, **{k: (round(v, 2) if isinstance(v, float) else v) for k, v in by_day[d].items()}}
-                 for d in sorted(by_day)],
+        "today": rollup(per_day[today]),
+        "week": rollup([s for d in dates[-7:] for s in per_day[d]]),
+        "days": [{"date": d, **rollup(per_day[d])} for d in dates],
         "sessions": sessions,
-        "rtk": {"saved_tokens": summary.get("total_saved") or summary.get("tokens_saved"),
-                "saved_pct": summary.get("avg_savings_pct") or summary.get("savings_pct"),
-                "commands": summary.get("total_commands")},
+        "rtk": rtk_stats(today),
         "retros": {"today": len(glob.glob(os.path.join(retro_dir, f"{today}-*.md"))), "pending_proposals": pending},
     }
 
@@ -228,6 +512,9 @@ def human(n):
 
 def main():
     args = sys.argv[1:]
+    if "--titles" in args:
+        print(f"{generate_titles()} titles written to {TITLES}")
+        return 0
     days = int(args[args.index("--days") + 1]) if "--days" in args else 7
     data = build(days)
     if "--json" in args:
@@ -244,12 +531,12 @@ def main():
     print("7 days   " + "".join(spark[min(7, int(d["cost_usd"] / peak * 7))] for d in data["days"])
           + "  " + " ".join(f"${d['cost_usd']:.0f}" for d in data["days"]))
     r = data["rtk"]
-    print(f"rtk      saved {human(r['saved_tokens'])} tok ({round(r['saved_pct'] or 0)}%)")
+    print(f"rtk      trimmed {human(r.get('today_saved_tokens'))} tok of command output today, "
+          f"{human(r['saved_tokens'])} all time ({round(r['saved_pct'] or 0)}%)")
     for s in [s for s in data["sessions"] if s["end"] and local_day(s["end"]) == dt.date.today().isoformat()][:10]:
         cost = f"${s['cost_usd']:.2f}" if s["cost_usd"] is not None else "?"
         mark = "●" if s["active"] else ("⚙" if s["kind"] == "run" else "✓")
-        print(f"  {mark} {s['account']:<7} {s['project'][:24]:<24} {','.join(m.replace('claude-', '') for m in s['models'])[:16]:<16} "
-              f"{human(s['tokens']):>7} {cost:>7}")
+        print(f"  {mark} {s['project'][:18]:<18} {(s['title'] or '')[:40]:<40} {human(s['tokens']):>7} {cost:>7}")
     return 0
 
 

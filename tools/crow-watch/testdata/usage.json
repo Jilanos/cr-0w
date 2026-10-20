@@ -38,50 +38,90 @@
   "cost_usd": 12.53,
   "tokens": 32823621,
   "sessions": 6,
-  "cache_pct": 98
+  "cache_pct": 98,
+  "unpriced": 0,
+  "input_tokens": 32823,
+  "output_tokens": 328236,
+  "cache_write_tokens": 1312944,
+  "cache_read_tokens": 31149618
  },
  "days": [
   {
    "date": "2026-10-14",
    "cost_usd": 37.74,
    "tokens": 90174719,
-   "sessions": 5
+   "sessions": 5,
+   "unpriced": 0,
+   "input_tokens": 90174,
+   "output_tokens": 901747,
+   "cache_write_tokens": 3606988,
+   "cache_read_tokens": 85575810
   },
   {
    "date": "2026-10-15",
    "cost_usd": 7.01,
    "tokens": 253085225,
-   "sessions": 8
+   "sessions": 8,
+   "unpriced": 0,
+   "input_tokens": 253085,
+   "output_tokens": 2530852,
+   "cache_write_tokens": 10123409,
+   "cache_read_tokens": 240177879
   },
   {
    "date": "2026-10-16",
    "cost_usd": 9.2,
    "tokens": 18230889,
-   "sessions": 4
+   "sessions": 4,
+   "unpriced": 0,
+   "input_tokens": 18230,
+   "output_tokens": 182308,
+   "cache_write_tokens": 729235,
+   "cache_read_tokens": 17301116
   },
   {
    "date": "2026-10-17",
    "cost_usd": 0.0,
    "tokens": 0,
-   "sessions": 0
+   "sessions": 0,
+   "unpriced": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0
   },
   {
    "date": "2026-10-18",
    "cost_usd": 0.0,
    "tokens": 0,
-   "sessions": 0
+   "sessions": 0,
+   "unpriced": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0
   },
   {
    "date": "2026-10-19",
    "cost_usd": 49.23,
    "tokens": 158371878,
-   "sessions": 19
+   "sessions": 19,
+   "unpriced": 0,
+   "input_tokens": 158371,
+   "output_tokens": 1583718,
+   "cache_write_tokens": 6334875,
+   "cache_read_tokens": 150294914
   },
   {
    "date": "2026-10-20",
    "cost_usd": 12.53,
    "tokens": 32823621,
-   "sessions": 6
+   "sessions": 6,
+   "unpriced": 0,
+   "input_tokens": 32823,
+   "output_tokens": 328236,
+   "cache_write_tokens": 1312944,
+   "cache_read_tokens": 31149618
   }
  ],
  "sessions": [
@@ -89,7 +129,7 @@
    "id": "00000001-0000-4000-8000-000000000000",
    "account": "work",
    "project": "hub",
-   "title": "hub",
+   "title": "billing retry dedupe",
    "kind": "run",
    "models": [
     "claude-opus-5-5"
@@ -101,13 +141,16 @@
    "tokens": 50842,
    "output_tokens": 254,
    "cache_pct": 95,
-   "cost_usd": 0.2248
+   "cost_usd": 0.2248,
+   "input_tokens": 50,
+   "cache_write_tokens": 2033,
+   "cache_read_tokens": 48251
   },
   {
    "id": "00000002-0000-4000-8000-000000000000",
    "account": "work",
    "project": "hub",
-   "title": "hub",
+   "title": "mobile login crash",
    "kind": "interactive",
    "models": [
     "claude-opus-5-5",
@@ -120,13 +163,16 @@
    "tokens": 22380955,
    "output_tokens": 111904,
    "cache_pct": 95,
-   "cost_usd": 7.688
+   "cost_usd": 7.688,
+   "input_tokens": 22380,
+   "cache_write_tokens": 895238,
+   "cache_read_tokens": 21239528
   },
   {
    "id": "00000003-0000-4000-8000-000000000000",
    "account": "side",
    "project": "notes-plugin",
-   "title": "notes-plugin",
+   "title": "hub morning brief",
    "kind": "run",
    "models": [
     "claude-sonnet-5-5"
@@ -138,13 +184,16 @@
    "tokens": 1840000,
    "output_tokens": 9200,
    "cache_pct": 95,
-   "cost_usd": 1.12
+   "cost_usd": 1.12,
+   "input_tokens": 1840,
+   "cache_write_tokens": 73600,
+   "cache_read_tokens": 1746160
   },
   {
    "id": "00000004-0000-4000-8000-000000000000",
    "account": "side",
    "project": "terraform-tui",
-   "title": "terraform-tui",
+   "title": "docs anchors fix",
    "kind": "run",
    "models": [
     "claude-opus-5-5",
@@ -157,13 +206,16 @@
    "tokens": 3400000,
    "output_tokens": 17000,
    "cache_pct": 95,
-   "cost_usd": 2.31
+   "cost_usd": 2.31,
+   "input_tokens": 3400,
+   "cache_write_tokens": 136000,
+   "cache_read_tokens": 3226600
   },
   {
    "id": "00000005-0000-4000-8000-000000000000",
    "account": "lab",
    "project": "widgets",
-   "title": "widgets",
+   "title": "billing webhook tests",
    "kind": "interactive",
    "models": [
     "claude-opus-5-5"
@@ -175,13 +227,16 @@
    "tokens": 4800000,
    "output_tokens": 24000,
    "cache_pct": 95,
-   "cost_usd": 1.08
+   "cost_usd": 1.08,
+   "input_tokens": 4800,
+   "cache_write_tokens": 192000,
+   "cache_read_tokens": 4555200
   },
   {
    "id": "00000006-0000-4000-8000-000000000000",
    "account": "lab",
    "project": "widgets",
-   "title": "widgets",
+   "title": "release notes draft",
    "kind": "run",
    "models": [
     "claude-haiku-5-5"
@@ -193,13 +248,16 @@
    "tokens": 340000,
    "output_tokens": 1700,
    "cache_pct": 95,
-   "cost_usd": null
+   "cost_usd": null,
+   "input_tokens": 340,
+   "cache_write_tokens": 13600,
+   "cache_read_tokens": 322660
   },
   {
    "id": "00000007-0000-4000-8000-000000000000",
    "account": "work",
    "project": "hub",
-   "title": "hub",
+   "title": "api pagination",
    "kind": "interactive",
    "models": [
     "claude-opus-5-5"
@@ -211,16 +269,33 @@
    "tokens": 9000000,
    "output_tokens": 45000,
    "cache_pct": 95,
-   "cost_usd": 12.5
+   "cost_usd": 12.5,
+   "input_tokens": 9000,
+   "cache_write_tokens": 360000,
+   "cache_read_tokens": 8541000
   }
  ],
  "rtk": {
   "saved_tokens": 2177140,
   "saved_pct": 29.18,
-  "commands": 5856
+  "commands": 5856,
+  "today_saved_tokens": 58000,
+  "today_saved_pct": 28.1,
+  "today_commands": 284
  },
  "retros": {
   "today": 1,
   "pending_proposals": 2
+ },
+ "week": {
+  "cost_usd": 115.71,
+  "tokens": 552686332,
+  "sessions": 42,
+  "cache_pct": 97,
+  "unpriced": 0,
+  "input_tokens": 552686,
+  "output_tokens": 5526863,
+  "cache_write_tokens": 22107453,
+  "cache_read_tokens": 524499330
  }
 }
