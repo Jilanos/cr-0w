@@ -20,6 +20,7 @@ and every comment must make the next MR better: each one is matched against the 
 ## 1. Gather
 - Unresolved threads: GitLab `glab api --paginate "projects/:id/merge_requests/<iid>/discussions?per_page=100"`, keep `resolvable && !resolved`; GitHub `gh api repos/{o}/{r}/pulls/<n>/comments` + review threads via GraphQL `isResolved`.
 - Failing pipeline: read the failed jobs' logs before believing or dismissing a "job is red" comment.
+- Approval: GitLab's `approved: true` only means no rule is pending (0 required). An MR is approved only when `approvals.approved_by` is non-empty; report who.
 
 ## 2. For each thread
 1. Check the claim in the code (neighbouring code too) before agreeing. Disagree when the reviewer is wrong, and say why.
