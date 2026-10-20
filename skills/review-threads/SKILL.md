@@ -23,7 +23,7 @@ and every comment must make the next MR better: each one is matched against the 
 - Approval: GitLab's `approved: true` only means no rule is pending (0 required). An MR is approved only when `approvals.approved_by` is non-empty; report who.
 
 ## 2. For each thread
-1. Check the claim in the code (neighbouring code too) before agreeing. Disagree when the reviewer is wrong, and say why.
+1. Check the claim in the code (neighbouring code too) before agreeing. Before designing a fix, search the repo for how it already handles the same case (existing steps/helpers/fixtures) and reuse it. Disagree when the reviewer is wrong, and say why.
 2. **Match it against the ledgers.** Known pattern → it's a *Repeat*, the worst case: note which "how to catch it" rule failed and sharpen it. New → add a row (project ledger; also `common.md` when it isn't specific to this repo's stack).
 3. Fix in the style of the repo's skill and code. Fix every other occurrence of the same problem in the MR, not only the flagged line.
 
