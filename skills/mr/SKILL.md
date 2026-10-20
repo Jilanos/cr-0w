@@ -14,8 +14,16 @@ Every MR/PR you open for the user follows this flow. Never skip a step to save t
 - Reference the ticket the way recent MRs do (e.g. `Closes KEY-123`).
 - Title: match recent merged MRs (same convention as commits, one ticket key, short).
 
+## 1b. Pattern gate (before showing anything)
+The point of the review ledgers: reviewers should never flag a known pattern twice.
+- Load `<hub>/local/reviews/common.md` and `<hub>/local/reviews/<project>.md` (hub = `readlink -f` of this skill's base dir, two levels up), plus the repo's review skill checklist if it has one (`<repo>/.claude/skills/*review*/SKILL.md`).
+- Diff: `git diff origin/<target>...HEAD`. Apply **every** row's "how to catch it" to it: actually run the greps, open the sibling files, read each docstring against its code. No row skipped because it "probably doesn't apply"; mark it n/a with a reason.
+- Fix the hits on the branch (commit them before the MR), then report:
+  `Pattern gate: N patterns checked, K fixed (<pattern>: <file:line>, ...), M n/a`.
+- A hit you can't fix alone (needs a decision) goes in the report as a question.
+
 ## 2. Validate with the user
-Show the **title** and the **description** and wait for an explicit OK. Adjust and show again if asked.
+Show the **pattern gate** result, then the **title** and the **description**, and wait for an explicit OK. Adjust and show again if asked.
 
 ## 3. Ask for the reviewer
 Read the project's `reviewers` list in the hub registry (`<hub>/local/projects.yaml`; hub path from `$CROW_HOME`, else ask). Ask which one with AskUserQuestion. Personal repos with no reviewers: skip.

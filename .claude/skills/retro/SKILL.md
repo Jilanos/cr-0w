@@ -45,6 +45,7 @@ For each finding, choose one:
 | Cross-project preference, or a hub prompt that caused the issue | hub: `local/context.md`, a hub skill, or a hub memory |
 | Mechanical friction with a fix (path, binary, auth step) | the runbook where the task lives (`runbooks/` generic, `local/runbooks/` private), or a `bin/` script if it repeats ≥2 times |
 | Same lesson in ≥2 retros | promote: a skill step, a checklist line, or a script. Mention it in the report |
+| A review session (threads addressed, MR opened) | check the ledgers in `local/reviews/` were updated for every thread, and the `mr` pattern gate ran before opening; fill gaps yourself |
 | One-off, already fixed, or no lesson | ignore (list it in the report in one line) |
 
 **Apply directly** to: files git ignores in project repos, memories, and this hub's runbooks, skills and `local/` (left uncommitted for the user). Keep edits small and in the file's existing style. Never delete or rewrite content you didn't write, only add or sharpen.
