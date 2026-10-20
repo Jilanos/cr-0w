@@ -26,3 +26,6 @@ which is ignored by this repo and meant to be its own private repo.
 3. Put `bin/` on your PATH and run `crow`.
 
 See `CLAUDE.md` for the rules the hub runs by and `runbooks/` for the procedures.
+
+## License
+MIT, see `LICENSE`.
