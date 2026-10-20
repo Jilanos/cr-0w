@@ -19,6 +19,7 @@ so applying them to every diff is how known patterns stop reaching reviewers.
 ## 1. Gather
 - MR: description, pipeline status (and failed job logs), target branch. Diff: `git fetch origin && git diff origin/<target>...origin/<branch>`.
 - Read around each change, not only the hunks: sibling functions, the same pattern elsewhere, callers.
+- If the repo has a code graph (`codebase-memory` MCP server: `detect_changes` against the target branch, `trace_path` inbound for callers of changed functions, `search_graph` across Python/Terraform/shell), use it for impact and callers instead of grepping blind.
 - Other open MRs touching the same files or keys: note clashes.
 
 ## 2. Check
