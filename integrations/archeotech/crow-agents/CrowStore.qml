@@ -23,11 +23,21 @@ Singleton {
     // Derived views
     readonly property var agents: snap && snap.agents ? snap.agents : []
     readonly property var runs: agents.filter(a => a.kind === "run")
-    readonly property var sessions: agents.filter(a => a.kind === "session")
+    // Sessions waiting on you first, then by how alive they are (stable within a rank).
+    readonly property var sessions: {
+        var rank = { waiting: 0, working: 1, quiet: 2, idle: 3 }
+        return agents.filter(a => a.kind === "session")
+                     .map((a, i) => ({ a: a, i: i }))
+                     .sort((x, y) => ((rank[x.a.state] ?? 4) - (rank[y.a.state] ?? 4)) || (x.i - y.i))
+                     .map(x => x.a)
+    }
     readonly property var finished: snap && snap.finished ? snap.finished.slice(0, 5) : []
     readonly property int busy: snap && snap.slots ? snap.slots.busy : 0
     readonly property int maxSlots: snap && snap.slots ? snap.slots.max : 2
     readonly property int waiting: sessions.filter(a => a.state === "waiting").length
+    // Context window the % bar is measured against.
+    readonly property int contextWindow: 1000000
+    function contextPct(tokens) { return tokens > 0 ? Math.min(100, Math.round(tokens * 100 / contextWindow)) : 0 }
 
     function configure(cfg) {
         if (!cfg) return
@@ -36,8 +46,19 @@ Singleton {
         if (cfg.notifications !== undefined) notifications = !!cfg.notifications
     }
 
+    // A strip opener or the panel can poll before the pill pushes its config,
+    // so the first poll may run the default command. When the command changes
+    // mid-poll, one re-poll is queued for when that run exits and its output is
+    // dropped; polls never stack.
+    property string _running: ""      // command of the poll in flight
+    property bool _repoll: false
+
     function poll() {
-        if (proc.running) return       // re-run guard: never stack polls
+        if (proc.running) {
+            if (_running !== command) _repoll = true
+            return
+        }
+        _running = command
         proc.running = true
     }
 
@@ -106,6 +127,7 @@ Singleton {
     }
 
     function _ingest(text) {
+        if (_repoll) return           // output of a superseded command
         var d
         try { d = JSON.parse(text) } catch (e) { d = null }
         if (!d || !d.slots || !Array.isArray(d.agents)) {
@@ -124,12 +146,13 @@ Singleton {
     // only marks the poll failed.
     Process {
         id: proc
-        command: store._sh(store.command)
+        command: store._sh(store._running || store.command)
         stdout: StdioCollector {
             id: out
             onStreamFinished: store._ingest(out.text)
         }
         onExited: (code, status) => {
+            if (store._repoll) { store._repoll = false; Qt.callLater(store.poll); return }
             if (code !== 0) { store.available = false; store.error = store.command + " exited " + code }
         }
     }

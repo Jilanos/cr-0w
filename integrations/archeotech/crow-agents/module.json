@@ -4,19 +4,52 @@
   "author": "crow",
   "version": "0.1.0",
   "description": "Background runs and Claude sessions from crow: slot gauge, attention badge, agents panel, run notifications.",
-  "canLiveIn": ["bar-zone", "panel-content"],
+  "canLiveIn": [
+    "bar-zone",
+    "panel-content"
+  ],
   "entry": "CrowAgents.qml",
   "icon": "󰚩",
-  "panel": { "size": 540, "axisSize": 560 },
-  "dependencies": ["crow", "notify-send", "wl-copy", "kitty"],
+  "panel": {
+    "size": 560,
+    "axisSize": "auto"
+  },
+  "dependencies": [
+    "crow",
+    "notify-send",
+    "wl-copy",
+    "kitty"
+  ],
   "configSchema": {
-    "command":       { "type": "string", "label": "Snapshot command", "default": "crow json",
-                       "placeholder": "crow json",
-                       "description": "Prints the agents snapshot as JSON. Run with bash -lc; use an absolute path if crow is not on the login PATH." },
-    "watchCommand":  { "type": "string", "label": "Open crow watch", "default": "kitty -e crow watch",
-                       "placeholder": "kitty -e crow watch",
-                       "description": "Launched by the panel's \"open crow watch\" button (bash -lc)." },
-    "notifications": { "type": "bool", "label": "Run notifications", "default": true,
-                       "description": "Toast when a background run finishes, fails or stops on the usage limit." }
+    "command": {
+      "type": "string",
+      "label": "Snapshot command",
+      "default": "crow json",
+      "placeholder": "crow json",
+      "description": "Prints the agents snapshot as JSON. Run with bash -lc; use an absolute path if crow is not on the login PATH."
+    },
+    "watchCommand": {
+      "type": "string",
+      "label": "Open crow watch",
+      "default": "kitty -e crow watch",
+      "placeholder": "kitty -e crow watch",
+      "description": "Launched by the panel's \"open crow watch\" button (bash -lc)."
+    },
+    "notifications": {
+      "type": "bool",
+      "label": "Run notifications",
+      "default": true,
+      "description": "Toast when a background run finishes, fails or stops on the usage limit."
+    },
+    "compactBelow": {
+      "type": "int",
+      "label": "Compact below",
+      "default": 1400,
+      "min": 0,
+      "max": 4000,
+      "step": 100,
+      "unit": " px",
+      "description": "When the bar is shorter than this (e.g. a vertical monitor), the pill shows only the slot gauge and the waiting badge. 0 = never compact."
+    }
   }
 }

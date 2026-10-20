@@ -4,7 +4,7 @@ import "."
 
 // Crow agents: one entry, two faces.
 //   bar-zone      → pill: slot gauge + attention badge, hover summary, click opens the panel
-//   panel-content → panel: RUNS / SESSIONS / FINISHED rows, like `crow watch`
+//   panel-content → panel: a table of RUNS / SESSIONS / FINISHED, like `crow watch`
 // The holder decides: a bar injects holderRoot (at creation), a panel host
 // injects panelRoot. Neither is `required`, so one file serves both loaders.
 // Data, polling and notifications live in the CrowStore singleton.
@@ -16,61 +16,107 @@ Item {
     property var config: ({})
     property var appearance
     readonly property var _a: appearance
-    // Token groups, each null until the theme is injected (guard per group).
+    // Token groups, each null until the theme is injected. Nothing draws before
+    // that (see `visible` below), so colour fallbacks are just "transparent".
     readonly property var _c: _a && _a.colors ? _a.colors : null
     readonly property var _f: _a && _a.font ? _a.font : null
     readonly property var _r: _a && _a.radius ? _a.radius : null
+    readonly property var _s: _a && _a.spacing ? _a.spacing : null
     readonly property var _m: _a && _a.anim ? _a.anim : null
 
     readonly property bool panelMode: !holderRoot
     readonly property bool _horizontal: !holderRoot || holderRoot.horizontal !== false
 
-    onConfigChanged: if (!panelMode) CrowStore.configure(config)
-    Component.onCompleted: { if (!panelMode) CrowStore.configure(config); CrowStore.poll() }
+    // Auto-compact: on a short bar (a vertical monitor) the pill drops the
+    // busy/max count and keeps the gauge plus ◆n.
+    readonly property int compactBelow: config && config.compactBelow !== undefined ? config.compactBelow : 1400
+    readonly property real _barLength: !holderRoot ? 0
+        : (holderRoot.horizontal !== false ? holderRoot.width : holderRoot.height)
+    readonly property bool compact: _barLength > 0 && _barLength < compactBelow
 
-    // ── theme (semantic roles only; literals are fallbacks until injection) ──
-    readonly property color cText:    _c ? _c.textPrimary   : "#cdd6f4"
-    readonly property color cSub:     _c ? _c.textSecondary : "#bac2de"
-    readonly property color cMuted:   _c ? _c.textMuted     : "#7f849c"
-    readonly property color cAccent:  _c ? _c.accent        : "#cba6f7"
-    readonly property color cOk:      _c ? _c.success       : "#a6e3a1"
-    readonly property color cWarn:    _c ? _c.warning       : "#f9e2af"
-    readonly property color cErr:     _c ? _c.error         : "#f38ba8"
-    readonly property color cInfo:    _c ? _c.info          : "#89dceb"
-    readonly property color cBorder:  _c ? _c.borderSubtle  : "#45475a"
-    readonly property color cHover:   _c ? _c.stateHover    : "#313244"
+    onConfigChanged: if (!panelMode) CrowStore.configure(config)
+    // The loader injects `config` after creation: poll on the next tick so the
+    // pill's command is in place (the store re-polls anyway if it changes).
+    Component.onCompleted: { if (!panelMode) CrowStore.configure(config); Qt.callLater(CrowStore.poll) }
+
+    // ── theme (semantic roles only) ─────────────────────────────────────────
+    readonly property color cText:   _c ? _c.textPrimary   : "transparent"
+    readonly property color cSub:    _c ? _c.textSecondary : "transparent"
+    readonly property color cMuted:  _c ? _c.textMuted     : "transparent"
+    readonly property color cAccent: _c ? _c.accent        : "transparent"
+    readonly property color cOk:     _c ? _c.success       : "transparent"
+    readonly property color cWarn:   _c ? _c.warning       : "transparent"
+    readonly property color cErr:    _c ? _c.error         : "transparent"
+    readonly property color cInfo:   _c ? _c.info          : "transparent"
+    readonly property color cBorder: _c ? _c.borderSubtle  : "transparent"
+    readonly property color cTrack:  _c ? _c.recessedTrack : "transparent"
+    readonly property color cHover:  _c ? _c.stateHover    : "transparent"
     readonly property string fFamily: _f ? _f.family : "monospace"
     readonly property int fSm:   _f ? _f.sizeSm   : 11
-    readonly property int fBase: _f ? _f.sizeBase : 13
-    readonly property int fLg:   _f ? _f.sizeLg   : 15
+    readonly property int fBase: _f ? _f.sizeBase : 12
+    readonly property int fLg:   _f ? _f.sizeLg   : 14
+    readonly property int s1: _s ? _s.s1 : 4
+    readonly property int s2: _s ? _s.s2 : 8
+    readonly property int s3: _s ? _s.s3 : 12
+    readonly property int s4: _s ? _s.s4 : 16
+    readonly property int rXs: _r ? _r.xs : 4
 
+    // Glyphs: all present in FiraCode Nerd Font (no fallback-font sizes).
     readonly property var _styles: ({
-        working: { glyph: "●", label: "working",     color: cOk },
-        quiet:   { glyph: "◌", label: "quiet",       color: cWarn },
-        waiting: { glyph: "◆", label: "needs you",   color: cAccent },
-        idle:    { glyph: "○", label: "idle",        color: cMuted },
-        done:    { glyph: "✓", label: "done",        color: cOk },
-        failed:  { glyph: "✗", label: "failed",      color: cErr },
-        limit:   { glyph: "⏸", label: "usage limit", color: cWarn },
-        lost:    { glyph: "?", label: "lost",        color: cMuted }
+        working: { glyph: "●", label: "working",   color: cOk },
+        quiet:   { glyph: "◇", label: "quiet",     color: cWarn },
+        waiting: { glyph: "◆", label: "needs you", color: cAccent },
+        idle:    { glyph: "○", label: "idle",      color: cSub },
+        done:    { glyph: "✓", label: "done",      color: cOk },
+        failed:  { glyph: "×", label: "failed",    color: cErr },
+        limit:   { glyph: "‖", label: "limit",     color: cWarn },
+        lost:    { glyph: "?", label: "lost",      color: cSub }
     })
-    function st(name) { return _styles[name] || { glyph: "?", label: name || "?", color: cMuted } }
+    function st(name) { return _styles[name] || { glyph: "?", label: name || "?", color: cSub } }
+    // Context used → level: < 70 % fine, 70–85 % warning, > 85 % critical.
+    function ctxColor(pct) { return pct > 85 ? cErr : pct >= 70 ? cWarn : cOk }
 
-    function gauge(busy, max) {
-        var n = Math.max(1, Math.min(max, 6)), s = ""
-        for (var i = 0; i < n; i++) s += i < busy ? "▰" : "▱"
-        return s
-    }
-
+    visible: _c !== null
     implicitWidth:  panelMode ? 540 : pill.implicitWidth
     implicitHeight: panelMode ? 560 : 22
+
+    // Panel footprint (manifest axisSize "auto"): width along a horizontal
+    // holder, content height along a vertical one. implicitPerp drives the
+    // depth where the holder honours it (strips); a bar dropdown uses `size`.
+    readonly property bool _panelH: !panelRoot || panelRoot.horizontal !== false
+    readonly property real _panelW: 620
+    readonly property real _panelContentH: Math.max(320, panel.contentH)
+    readonly property real implicitAxis: !panelMode ? 0 : _panelH ? _panelW : _panelContentH
+    readonly property real implicitPerp: !panelMode ? 0 : _panelH ? _panelContentH : _panelW
+
+    // One rounded cell per slot, filled = busy.
+    component SlotGauge: Row {
+        id: sg
+        property int busy: 0
+        property int slots: 2
+        property bool live: true
+        property int cellW: 8
+        property int cellH: 12
+        spacing: 3
+        Repeater {
+            model: Math.max(1, Math.min(sg.slots, 6))
+            delegate: Rectangle {
+                required property int index
+                width: sg.cellW; height: sg.cellH
+                radius: Math.min(root.rXs, 3)
+                color: sg.live && index < sg.busy ? root.cOk : root.cTrack
+                border.width: sg.live && index < sg.busy ? 0 : 1
+                border.color: root.cBorder
+            }
+        }
+    }
 
     // ════════════════════════════ bar pill ════════════════════════════════
     Item {
         id: pill
         visible: !root.panelMode
         anchors.fill: parent
-        implicitWidth: pillRow.implicitWidth + 14
+        implicitWidth: pillRow.implicitWidth + root.s3
         opacity: CrowStore.available ? 1.0 : 0.45
 
         Rectangle {
@@ -83,10 +129,17 @@ Item {
         Row {
             id: pillRow
             anchors.centerIn: parent
-            spacing: 6
+            spacing: root.s1 + 2
+            SlotGauge {
+                busy: CrowStore.busy
+                slots: CrowStore.maxSlots
+                live: CrowStore.available
+                anchors.verticalCenter: parent.verticalCenter
+            }
             Text {
-                text: CrowStore.available ? root.gauge(CrowStore.busy, CrowStore.maxSlots) : "–"
-                color: CrowStore.busy > 0 ? root.cOk : root.cMuted
+                visible: root._horizontal && !root.compact
+                text: CrowStore.available ? CrowStore.busy + "/" + CrowStore.maxSlots : "–"
+                color: root.cSub
                 font.family: root.fFamily; font.pixelSize: root.fBase
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -103,7 +156,7 @@ Item {
             if (!CrowStore.available)
                 return { primary: "crow unavailable", secondary: CrowStore.error || CrowStore.command }
             var lines = []
-            CrowStore.agents.forEach(a => {
+            CrowStore.runs.concat(CrowStore.sessions).forEach(a => {
                 if (a.state !== "working" && a.state !== "waiting") return
                 var what = a.state === "waiting" ? "waiting for your reply"
                          : ((a.label || a.title) ? (a.label || a.title) + ": " : "") + (a.last_action || "")
@@ -149,7 +202,10 @@ Item {
         id: panel
         visible: root.panelMode
         anchors.fill: parent
-        anchors.margins: 16
+        anchors.margins: root.s4
+
+        // Natural height (title + table header + rows), for implicitAxis/Perp.
+        readonly property real contentH: header.implicitHeight + 6 + list.implicitHeight + 2 * root.s4
 
         // Row model: section headers, agent/finished rows, "none" placeholders.
         readonly property var rows: {
@@ -165,39 +221,67 @@ Item {
             return out
         }
 
-        // Column widths (FiraCode-ish monospace at sizeBase ≈ 8 px/char)
+        // Columns: glyph | project | task / session (flex) | state | context | commits
         readonly property int wGlyph: 18
-        readonly property int wProject: 132
-        readonly property int wAge: 46
-        readonly property int wCtx: 46
-        readonly property int wCom: 34
+        readonly property int wProject: 110
+        readonly property int wState: 84
+        readonly property int wCtx: 84
+        readonly property int wCom: 60
+        readonly property int wTask: width - wGlyph - wProject - wState - wCtx - wCom
+        readonly property int gap: root.s2
+
+        component Cell: Text {
+            color: root.cSub
+            font.family: root.fFamily; font.pixelSize: root.fBase
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+        }
+        component HeadCell: Text {
+            color: root.cSub
+            font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: true
+            verticalAlignment: Text.AlignVCenter
+            height: parent ? parent.height : implicitHeight
+        }
 
         Column {
             id: header
             width: parent.width
-            spacing: 8
+            spacing: root.s2
 
             Item {
                 width: parent.width
-                height: titleRow.implicitHeight
+                height: Math.max(titleRow.implicitHeight, watchBtn.height)
                 Row {
                     id: titleRow
-                    spacing: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: root.s2 + 2
                     Text {
                         id: titleTxt
                         text: "󰚩  crow agents"
                         color: root.cAccent
                         font.family: root._f ? root._f.display : root.fFamily
                         font.pixelSize: root.fLg; font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    SlotGauge {
+                        visible: CrowStore.available
+                        busy: CrowStore.busy
+                        slots: CrowStore.maxSlots
+                        anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
-                        anchors.baseline: titleTxt.baseline
-                        text: CrowStore.available
-                              ? root.gauge(CrowStore.busy, CrowStore.maxSlots)
-                                + (CrowStore.waiting > 0 ? "   ◆" + CrowStore.waiting : "")
-                              : "crow unavailable"
+                        text: !CrowStore.available ? "crow unavailable"
+                              : CrowStore.busy + "/" + CrowStore.maxSlots + " runs busy"
                         color: CrowStore.available ? root.cSub : root.cErr
-                        font.family: root.fFamily; font.pixelSize: root.fBase
+                        font.family: root.fFamily; font.pixelSize: root.fSm
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        visible: CrowStore.available && CrowStore.waiting > 0
+                        text: "◆" + CrowStore.waiting + " waiting"
+                        color: root.cAccent
+                        font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
                     }
                 }
                 Rectangle {
@@ -226,21 +310,37 @@ Item {
                     }
                 }
             }
-
-            Row {
-                x: panel.wGlyph
-                Text { width: panel.wProject; text: "project"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
-                Text { width: panel.wAge; horizontalAlignment: Text.AlignRight; text: "active"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
-                Text { width: panel.wCtx; horizontalAlignment: Text.AlignRight; text: "ctx"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
-                Text { width: panel.wCom; horizontalAlignment: Text.AlignRight; text: "com"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
-                Text { leftPadding: 10; text: "task / session  ↳ doing now"; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
+            Text {
+                visible: !CrowStore.available && CrowStore.error !== ""
+                width: parent.width
+                wrapMode: Text.WrapAnywhere
+                text: CrowStore.error
+                color: root.cSub
+                font.family: root.fFamily; font.pixelSize: root.fSm
             }
-            Rectangle { width: parent.width; height: 1; color: root.cBorder }
+
+            // Table header: a recessed band with one label per column.
+            Rectangle {
+                width: parent.width
+                height: root.fSm + 12
+                radius: root.rXs
+                color: root.cTrack
+                border.width: 1
+                border.color: root.cBorder
+                Row {
+                    anchors.fill: parent
+                    HeadCell { width: panel.wGlyph + panel.wProject; leftPadding: panel.wGlyph; text: "project" }
+                    HeadCell { width: panel.wTask; leftPadding: panel.gap; text: "task / session" }
+                    HeadCell { width: panel.wState; leftPadding: panel.gap; text: "state" }
+                    HeadCell { width: panel.wCtx; leftPadding: panel.gap; text: "context" }
+                    HeadCell { width: panel.wCom; rightPadding: root.s2; horizontalAlignment: Text.AlignRight; text: "commits" }
+                }
+            }
         }
 
         Flickable {
             anchors.top: header.bottom
-            anchors.topMargin: 6
+            anchors.topMargin: 2
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -277,10 +377,11 @@ Item {
             Item {
                 id: headItem
                 property var entry
-                height: headTxt.implicitHeight + 10
+                height: headTxt.implicitHeight + root.s2 + 2
                 Text {
                     id: headTxt
                     anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 2
                     text: headItem.entry ? headItem.entry.text : ""
                     color: root.cText
                     font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: true
@@ -312,6 +413,7 @@ Item {
                 readonly property var s: root.st(d ? (isFin ? d.status : d.state) : "")
                 readonly property string rowId: !d ? "" : (d.run_id || d.session_id || "")
                 readonly property bool copied: rowId !== "" && CrowStore.copiedId === rowId
+                readonly property bool live: !isFin && !!d && (d.state === "working" || d.state === "waiting")
 
                 readonly property string task: {
                     if (!d) return ""
@@ -324,17 +426,20 @@ Item {
                     if (!d) return ""
                     if (copied) return "copied " + rowId
                     if (isFin) {
-                        var n = (d.resumed_from || []).length
-                        return s.label + (n > 0 ? " · resumed " + n + "×" : "")
+                        const n = (d.resumed_from || []).length
+                        return n > 0 ? "resumed " + n + "×" : ""
                     }
                     return d.state === "waiting" ? "waiting for your reply" : (d.last_action || "")
                 }
                 readonly property color doingColor: copied ? root.cAccent
-                    : isFin ? s.color : (d && d.state === "waiting" ? root.cAccent : root.cInfo)
-                readonly property int ctxK: d && !isFin && d.context_tokens ? Math.floor(d.context_tokens / 1000) : 0
+                    : d && !isFin && d.state === "waiting" ? root.cAccent : root.cInfo
+                readonly property string ageText: !d ? ""
+                    : CrowStore.age(isFin ? CrowStore.since(d.ended_at) : d.last_activity_s) + " ago"
+                readonly property int ctxPct: d && !isFin ? CrowStore.contextPct(d.context_tokens || 0) : 0
+                readonly property bool hasCtx: !!d && !isFin && (d.context_tokens || 0) > 0
 
                 height: rowCol.implicitHeight + 6
-                radius: root._r ? root._r.xs : 4
+                radius: root.rXs
                 color: rowMa.containsMouse ? root.cHover : "transparent"
 
                 Column {
@@ -343,45 +448,83 @@ Item {
                     width: parent.width
                     spacing: 1
                     Row {
-                        Text { width: panel.wGlyph; text: row.s.glyph; color: row.s.color; font.family: root.fFamily; font.pixelSize: root.fBase; font.bold: true }
-                        Text {
-                            width: panel.wProject; elide: Text.ElideRight
+                        height: root.fBase + 6
+                        Cell { width: panel.wGlyph; text: row.s.glyph; color: row.s.color; font.bold: true; elide: Text.ElideNone; height: parent.height }
+                        Cell {
+                            width: panel.wProject; height: parent.height
                             text: row.d ? row.d.project : ""
-                            color: root.cText; font.family: root.fFamily; font.pixelSize: root.fBase; font.bold: !row.isFin
+                            color: root.cText; font.bold: !row.isFin
                         }
-                        Text {
-                            width: panel.wAge; horizontalAlignment: Text.AlignRight
-                            text: !row.d ? "" : CrowStore.age(row.isFin ? CrowStore.since(row.d.ended_at) : row.d.last_activity_s)
-                            color: (!row.isFin && row.d && (row.d.state === "working" || row.d.state === "waiting")) ? row.s.color : root.cMuted
-                            font.family: root.fFamily; font.pixelSize: root.fBase
-                        }
-                        Text {
-                            width: panel.wCtx; horizontalAlignment: Text.AlignRight
-                            text: row.isFin ? "" : (row.ctxK > 0 ? row.ctxK + "k" : "–")
-                            color: row.ctxK >= 400 ? root.cErr : row.ctxK >= 150 ? root.cWarn : row.ctxK > 0 ? root.cOk : root.cMuted
-                            font.family: root.fFamily; font.pixelSize: root.fBase; font.bold: row.ctxK >= 400
-                        }
-                        Text {
-                            width: panel.wCom; horizontalAlignment: Text.AlignRight
-                            text: !row.d || (!row.isFin && row.d.kind !== "run") ? "" : String((row.d.commits || []).length)
-                            color: root.cInfo; font.family: root.fFamily; font.pixelSize: root.fBase
-                        }
-                        Text {
-                            leftPadding: 10
-                            width: row.width - panel.wGlyph - panel.wProject - panel.wAge - panel.wCtx - panel.wCom
-                            elide: Text.ElideRight
+                        Cell {
+                            width: panel.wTask; height: parent.height; leftPadding: panel.gap
                             text: row.task
-                            color: root.cSub; font.family: root.fFamily; font.pixelSize: root.fBase
+                            color: row.isFin ? root.cSub : root.cText
+                        }
+                        Cell {
+                            width: panel.wState; height: parent.height; leftPadding: panel.gap
+                            text: row.s.label
+                            color: row.live || row.isFin ? row.s.color : root.cSub
+                            font.bold: row.live
+                        }
+                        // Context used: a bar against the 1M window plus the % number.
+                        Item {
+                            width: panel.wCtx; height: parent.height
+                            Rectangle {
+                                id: ctxTrack
+                                visible: row.hasCtx
+                                x: panel.gap
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - panel.gap - ctxNum.width - root.s1
+                                height: 6
+                                radius: 3
+                                color: root.cTrack
+                                border.width: 1
+                                border.color: root.cBorder
+                                Rectangle {
+                                    width: Math.max(height, parent.width * row.ctxPct / 100)
+                                    height: parent.height
+                                    radius: parent.radius
+                                    color: root.ctxColor(row.ctxPct)
+                                }
+                            }
+                            Text {
+                                id: ctxNum
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 32
+                                horizontalAlignment: Text.AlignRight
+                                text: row.isFin ? "" : row.hasCtx ? row.ctxPct + "%" : "–"
+                                color: row.hasCtx ? root.ctxColor(row.ctxPct) : root.cSub
+                                font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: row.hasCtx
+                            }
+                        }
+                        Cell {
+                            width: panel.wCom; height: parent.height; rightPadding: root.s2
+                            horizontalAlignment: Text.AlignRight
+                            text: !row.d || (!row.isFin && row.d.kind !== "run") ? "" : String((row.d.commits || []).length)
+                            color: (row.d && (row.d.commits || []).length > 0) ? root.cInfo : root.cSub
                         }
                     }
                     Row {
-                        x: panel.wGlyph
-                        Text { id: arrow; text: "↳ "; color: root.cMuted; font.family: root.fFamily; font.pixelSize: root.fSm }
+                        Text { width: panel.wGlyph; text: ""; font.pixelSize: root.fSm }
                         Text {
-                            width: row.width - panel.wGlyph - arrow.implicitWidth - 4
+                            id: arrow
+                            visible: row.doing !== ""
+                            text: "↳ "; color: root.cMuted
+                            font.family: root.fFamily; font.pixelSize: root.fSm
+                        }
+                        Text {
+                            width: panel.wProject + panel.wTask - (arrow.visible ? arrow.implicitWidth : 0)
                             elide: Text.ElideRight
                             text: row.doing
                             color: row.doingColor
+                            font.family: root.fFamily; font.pixelSize: root.fSm
+                        }
+                        Text {
+                            width: panel.wState
+                            leftPadding: panel.gap
+                            text: row.ageText
+                            color: root.cSub
                             font.family: root.fFamily; font.pixelSize: root.fSm
                         }
                     }
