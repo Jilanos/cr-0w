@@ -5,7 +5,8 @@
 # Install: ln -s <crow>/bin/crow-prepush-check <repo>/.git/hooks/pre-push   (see runbooks/overnight.md)
 set -u
 CROW_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-repo="$(basename "$(git rev-parse --show-toplevel)")"
+# name of the main checkout, so a linked worktree uses its repo's deny list
+repo="$(basename "$(dirname "$(realpath "$(git rev-parse --git-common-dir)")")")"
 pats=$(cat "$CROW_HOME/local/prepush-deny.txt" "$CROW_HOME/local/prepush-deny.$repo.txt" 2>/dev/null | grep -v '^\s*#' | grep -v '^\s*$' | paste -sd'|')
 [ -z "$pats" ] && exit 0
 zero=0000000000000000000000000000000000000000
