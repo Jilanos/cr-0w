@@ -68,7 +68,6 @@ def git_commits(project, emails, since):
 
 def gitlab_section(since):
     lines = []
-    iso = f"{since.isoformat()}T00:00:00Z"
     me, err = api_json(["glab", "api", "user"])
     if err:
         return [f"- ⚠️ GitLab unavailable: {err}"]
@@ -83,11 +82,18 @@ def gitlab_section(since):
     if not review:
         lines.append("- none")
 
+    # All open MRs, not just recently updated ones: review feedback can sit for days.
     mine, _ = api_json(["glab", "api",
-                        f"merge_requests?scope=created_by_me&updated_after={iso}&per_page=50"])
-    lines.append("### My MRs (updated)")
+                        "merge_requests?scope=created_by_me&state=opened&per_page=50"])
+    lines.append("### My open MRs")
     for mr in mine or []:
-        lines.append(f"- {mr['references']['full']} [{mr['state']}] {mr['title']}")
+        discussions, _ = api_json(["glab", "api",
+                                   f"projects/{mr['project_id']}/merge_requests/{mr['iid']}/discussions?per_page=100"])
+        unresolved = sum(1 for d in discussions or []
+                         if d["notes"][0].get("resolvable") and not d["notes"][0].get("resolved"))
+        reviewers = ",".join(r["username"] for r in mr.get("reviewers", [])) or "no reviewer"
+        flag = f"⚠️ {unresolved} unresolved threads" if unresolved else mr["detailed_merge_status"]
+        lines.append(f"- {mr['references']['full']} {flag} · {reviewers} · {mr['title']}")
     if not mine:
         lines.append("- none")
 

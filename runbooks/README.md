@@ -12,3 +12,5 @@ want to trigger it by name.
 ## Index
 - [dispatch-background-runs](dispatch-background-runs.md): start, track and recover cdx background runs in project repos
 - [archeotech-crow-agents](archeotech-crow-agents.md): test the crow agents bar/panel module with fixtures and headless renders
+- [open-project-session](open-project-session.md): open a project session in a new kitty window from the hub (HOME + inherited Claude markers)
+- [session-retros](session-retros.md): automatic retrospective after every session (SessionEnd hook → queue → /retro on Sonnet)

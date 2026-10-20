@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Condense a Claude Code session transcript (.jsonl) into a compact Markdown digest.
+
+The digest keeps what a retrospective needs and drops the bulk (tool outputs,
+file contents, request blobs):
+  - every user message in full (corrections and redirections live there)
+  - assistant prose, trimmed
+  - one line per tool call, plus tool errors and denied calls
+  - files written or edited, interruptions
+
+Usage: crow-digest <session.jsonl> [--max-text N]
+"""
+import argparse
+import json
+import sys
+
+NOISE_PREFIXES = ("<command-", "<local-command", "<system-reminder>", "Caveat:")
+
+
+def short(text, limit):
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def tool_line(block):
+    name = block.get("name", "?")
+    inp = block.get("input") or {}
+    for key in ("command", "file_path", "pattern", "skill", "description", "query", "prompt"):
+        if key in inp:
+            return f"{name}: {short(inp[key], 160)}"
+    return f"{name}: {short(json.dumps(inp, ensure_ascii=False), 160)}"
+
+
+def user_text(content):
+    if isinstance(content, str):
+        return content
+    parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
+    return "\n".join(parts)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("path")
+    ap.add_argument("--max-text", type=int, default=600, help="trim assistant prose to N chars")
+    args = ap.parse_args()
+
+    meta = {}
+    out = []
+    edits = set()
+    errors = 0
+    calls = 0
+    with open(args.path, encoding="utf-8") as fh:
+        for raw in fh:
+            try:
+                ev = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            kind = ev.get("type")
+            if ev.get("cwd"):
+                meta.setdefault("cwd", ev["cwd"])
+            if ev.get("timestamp"):
+                meta.setdefault("start", ev["timestamp"])
+            if ev.get("timestamp"):
+                meta["end"] = ev["timestamp"]
+            if kind == "custom-title":
+                meta["title"] = ev.get("customTitle") or ev.get("title")
+            msg = ev.get("message") or {}
+            content = msg.get("content")
+            if kind == "user" and content is not None:
+                if isinstance(content, list) and content and content[0].get("type") == "tool_result":
+                    for block in content:
+                        if block.get("is_error"):
+                            errors += 1
+                            body = block.get("content")
+                            if isinstance(body, list):
+                                body = " ".join(b.get("text", "") for b in body if isinstance(b, dict))
+                            out.append(f"  ⚠️ tool error: {short(body, 240)}")
+                    continue
+                text = user_text(content).strip()
+                if not text:
+                    continue
+                if "[Request interrupted" in text:
+                    out.append("\n**⛔ user interrupted**")
+                    continue
+                if text.startswith(NOISE_PREFIXES) and "<command-name>" not in text:
+                    continue
+                if "Base directory for this skill:" in text:
+                    first = text.split("Base directory for this skill:", 1)[1].split("\n", 1)[0].strip()
+                    out.append(f"\n_(skill loaded: {first})_")
+                    continue
+                out.append(f"\n### 👤 User\n{text.strip()[:4000]}")
+            elif kind == "assistant" and isinstance(content, list):
+                for block in content:
+                    btype = block.get("type")
+                    if btype == "text" and block.get("text", "").strip():
+                        out.append(f"\n**🤖** {short(block['text'], args.max_text)}")
+                    elif btype == "tool_use":
+                        calls += 1
+                        out.append(f"- {tool_line(block)}")
+                        inp = block.get("input") or {}
+                        if block.get("name") in ("Write", "Edit", "NotebookEdit") and inp.get("file_path"):
+                            edits.add(inp["file_path"])
+
+    head = [
+        f"# Session digest: {meta.get('title') or args.path.rsplit('/', 1)[-1]}",
+        f"- cwd: {meta.get('cwd')}",
+        f"- span: {meta.get('start')} → {meta.get('end')}",
+        f"- tool calls: {calls}, tool errors: {errors}",
+        "- files written/edited: " + (", ".join(sorted(edits)) or "none"),
+    ]
+    sys.stdout.write("\n".join(head + out) + "\n")
+
+
+if __name__ == "__main__":
+    main()

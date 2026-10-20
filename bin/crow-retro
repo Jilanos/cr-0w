@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""Session retrospectives: queue finished sessions and analyze them one at a time.
+
+  crow-retro hook            SessionEnd hook entry point (reads the hook JSON on stdin)
+  crow-retro add <jsonl>     queue a transcript by hand, then start the worker
+  crow-retro work            process the queue (one worker at a time, holds a lock)
+  crow-retro status          queue, running worker, last reports
+
+Each queued session is condensed with crow-digest, then analyzed by a headless
+cdx run of the /retro skill. Runs started here carry CROW_RETRO=1 so their own
+SessionEnd never queues another retro.
+"""
+import datetime as dt
+import fcntl
+import json
+import os
+import subprocess
+import sys
+
+CROW_HOME = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+STATE = os.path.join(CROW_HOME, "local", "state", "retros")
+QUEUE = os.path.join(STATE, "queue")
+LOCK = os.path.join(STATE, ".worker.lock")
+LOG = os.path.join(STATE, "worker.log")
+ACCOUNT = os.environ.get("CROW_ACCOUNT", "main")
+MODEL = os.environ.get("CROW_RETRO_MODEL", "sonnet")
+MIN_USER_MESSAGES = 2
+
+
+def log(msg):
+    os.makedirs(STATE, exist_ok=True)
+    with open(LOG, "a", encoding="utf-8") as fh:
+        fh.write(f"{dt.datetime.now():%F %T} {msg}\n")
+
+
+def user_message_count(path):
+    """Messages the user typed (not tool results, skill bodies or command wrappers)."""
+    count = 0
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            try:
+                ev = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if ev.get("type") != "user":
+                continue
+            content = (ev.get("message") or {}).get("content")
+            if isinstance(content, list):
+                if not content or content[0].get("type") != "text":
+                    continue
+                content = content[0].get("text", "")
+            if not isinstance(content, str) or not content.strip():
+                continue
+            if content.startswith(("<system-reminder>", "<local-command", "Caveat:", "[Request interrupted")):
+                continue
+            if "Base directory for this skill:" in content:
+                continue
+            count += 1
+    return count
+
+
+def enqueue(transcript, session_id, cwd, reason):
+    if not transcript or not os.path.isfile(transcript):
+        return f"skip: no transcript ({transcript})"
+    n = user_message_count(transcript)
+    if n < MIN_USER_MESSAGES:
+        return f"skip: {n} user message(s) in {session_id}"
+    os.makedirs(QUEUE, exist_ok=True)
+    entry = {"transcript": transcript, "session_id": session_id, "cwd": cwd, "reason": reason,
+             "user_messages": n, "queued_at": dt.datetime.now().isoformat(timespec="seconds")}
+    with open(os.path.join(QUEUE, f"{session_id}.json"), "w", encoding="utf-8") as fh:
+        json.dump(entry, fh)
+    return f"queued {session_id} ({n} user messages, {cwd})"
+
+
+def spawn_worker():
+    env = {**os.environ, "CROW_RETRO": "1"}
+    subprocess.Popen([os.path.realpath(__file__), "work"], env=env, start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     cwd=CROW_HOME)
+
+
+def cmd_hook():
+    if os.environ.get("CROW_RETRO"):
+        return 0
+    try:
+        data = json.load(sys.stdin)
+    except json.JSONDecodeError:
+        return 0
+    msg = enqueue(data.get("transcript_path"), data.get("session_id") or "unknown",
+                  data.get("cwd"), data.get("reason"))
+    log(f"hook: {msg}")
+    if msg.startswith("queued"):
+        spawn_worker()
+    return 0
+
+
+def cmd_add(path):
+    session_id = os.path.splitext(os.path.basename(path))[0]
+    msg = enqueue(os.path.realpath(path), session_id, None, "manual")
+    print(msg)
+    if msg.startswith("queued"):
+        spawn_worker()
+    return 0
+
+
+def analyze(entry):
+    sid = entry["session_id"]
+    digest_dir = os.path.join(STATE, "digests")
+    os.makedirs(digest_dir, exist_ok=True)
+    digest = os.path.join(digest_dir, f"{sid}.md")
+    with open(digest, "w", encoding="utf-8") as fh:
+        subprocess.run([os.path.join(CROW_HOME, "bin", "crow-digest"), entry["transcript"]],
+                       stdout=fh, check=True)
+    prompt = (f"/retro digest={digest} transcript={entry['transcript']} "
+              f"cwd={entry.get('cwd') or 'unknown'} session={sid}")
+    out = subprocess.run(["cdx", "run", ACCOUNT, "--cwd", CROW_HOME, "--model", MODEL,
+                          "--permission", "auto", "--prompt", prompt, "--json"],
+                         capture_output=True, text=True)
+    try:
+        result = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        result = {"ok": False, "error": (out.stderr or out.stdout)[-400:]}
+    return result
+
+
+def cmd_work():
+    os.makedirs(STATE, exist_ok=True)
+    lock = open(LOCK, "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return 0  # another worker is draining the queue
+    while True:
+        pending = sorted((os.path.join(QUEUE, f) for f in os.listdir(QUEUE) if f.endswith(".json")),
+                         key=os.path.getmtime) if os.path.isdir(QUEUE) else []
+        if not pending:
+            return 0
+        path = pending[0]
+        with open(path, encoding="utf-8") as fh:
+            entry = json.load(fh)
+        log(f"work: analyzing {entry['session_id']}")
+        result = analyze(entry)
+        if result.get("ok"):
+            log(f"work: done {entry['session_id']} run {result.get('run_id')}")
+            os.remove(path)
+        else:
+            log(f"work: FAILED {entry['session_id']}: {result.get('error')}")
+            failed = os.path.join(STATE, "failed")
+            os.makedirs(failed, exist_ok=True)
+            os.replace(path, os.path.join(failed, os.path.basename(path)))
+
+
+def cmd_status():
+    queued = os.listdir(QUEUE) if os.path.isdir(QUEUE) else []
+    print(f"queued: {len(queued)}")
+    if os.path.exists(LOG):
+        with open(LOG, encoding="utf-8") as fh:
+            print("".join(fh.readlines()[-8:]), end="")
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print(__doc__.strip())
+        return 1
+    if args[0] == "hook":
+        return cmd_hook()
+    if args[0] == "add" and len(args) == 2:
+        return cmd_add(args[1])
+    if args[0] == "work":
+        return cmd_work()
+    if args[0] == "status":
+        return cmd_status()
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -5,7 +5,8 @@
 #   crow brief           print the morning brief (one-shot run)
 #   crow daily           draft today's daily into the state dir (one-shot run; post it from the hub)
 #   crow weekly          build the weekly rollup + slide outline (one-shot run)
-#   crow open <project>  open a session in a registered project
+#   crow open <project> [prompt]  open a session in a registered project, optionally on a first message
+#   crow term <project> [prompt]  same, in a new kitty window (safe to call from inside a Claude session)
 #   crow ls              list registered projects
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
@@ -42,7 +43,15 @@ oneshot() {
     jq -r '.error // "run failed"' <<<"$out" >&2
     exit 1
   fi
-  cat "$stdout_path"
+  # cdx stores Claude's JSON result envelope; print only the Markdown result.
+  local text
+  text=$(jq -rs 'map(select(type == "object" and .type == "result")) | last | .result // empty' "$stdout_path" 2>/dev/null)
+  [[ -z "$text" ]] && text=$(cat "$stdout_path")
+  if [[ -t 1 ]] && command -v bat >/dev/null; then
+    bat --language md --style plain --paging never <<<"$text"
+  else
+    printf '%s\n' "$text"
+  fi
   jq -r '"\n— \(.usage.total_tokens) tokens · \(.duration_seconds|floor)s · run \(.run_id)"' <<<"$out" >&2
 }
 
@@ -53,7 +62,14 @@ case "$cmd" in
   brief)    oneshot "/brief" ;;
   daily)    oneshot "/daily Draft only: save the draft to the state dir as drafts/daily-$(date +%F).md and print it. Do not post anything." ;;
   weekly)   oneshot "/weekly" ;;
-  open)     exec cdx "$CROW_ACCOUNT" --dir "$(project_path "${1:?usage: crow open <project>}")" ;;
+  open)     dir="$(project_path "${1:?usage: crow open <project> [prompt]}")"
+            exec cdx "$CROW_ACCOUNT" --dir "$dir" ${2:+--prompt "$2"} ;;
+  term)     # Detach from the calling session: real HOME (kitty config) and no inherited
+            # Claude/cdx variables (session markers, ANTHROPIC_PROFILE, CDX_SESSION_NAME).
+            dir="$(project_path "${1:?usage: crow term <project> [prompt]}")"
+            strip=(); for v in $(compgen -e | grep -E '^(CLAUDE|CLAUDECODE|ANTHROPIC_|CDX_)'); do strip+=(-u "$v"); done
+            env "${strip[@]}" HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" \
+              setsid -f kitty --title "crow · $1" "$CROW_HOME/bin/crow" open "$@" >/dev/null 2>&1 ;;
   ls)       python3 -c "
 import yaml
 for p in yaml.safe_load(open('$REGISTRY'))['projects']:
@@ -70,6 +86,6 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
             exec "$bin" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac
