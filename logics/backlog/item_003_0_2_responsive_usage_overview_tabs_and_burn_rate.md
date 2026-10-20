@@ -1,10 +1,10 @@
 ## item_003_0_2_responsive_usage_overview_tabs_and_burn_rate - 0.2 responsive usage overview, tabs and burn rate
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 100%
 > Complexity: High
 > Theme: Hub observability
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.

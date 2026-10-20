@@ -1,10 +1,10 @@
 ## item_002_0_1_quick_ui_wins_in_crow_watch_and_both_panels - 0.1 quick UI wins in crow watch and both panels
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 85%
 > Complexity: Medium
 > Theme: Hub observability
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
