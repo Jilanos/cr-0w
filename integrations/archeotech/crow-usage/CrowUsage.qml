@@ -87,21 +87,20 @@ Item {
     readonly property real implicitAxis: !panelMode ? 0 : _panelH ? _panelW : _panelContentH
     readonly property real implicitPerp: !panelMode ? 0 : _panelH ? _panelContentH : _panelW
 
-    // A limit gauge: recessed track, smooth fill proportional to %, level colour.
+    // A limit gauge, same look as crow watch: a thick bar on a solid track
+    // (no outline), fill proportional to %, level colour.
     component Gauge: Rectangle {
         id: g
         property var pct: null
         property bool live: true
         implicitWidth: 40
-        height: 6
-        radius: height / 2
-        color: root.cTrack
-        border.width: 1
-        border.color: root.cBorder
+        height: 9
+        radius: 2
+        color: root.cBorder
         Rectangle {
             readonly property real f: g.pct === null || g.pct === undefined ? 0 : Math.max(0, Math.min(100, g.pct)) / 100
             visible: g.live && f > 0
-            width: Math.max(g.height, g.width * f)
+            width: Math.max(g.radius * 2, g.width * f)
             height: g.height
             radius: g.radius
             color: root.levelColor(g.pct)

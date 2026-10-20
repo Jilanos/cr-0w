@@ -103,10 +103,8 @@ Item {
             delegate: Rectangle {
                 required property int index
                 width: sg.cellW; height: sg.cellH
-                radius: Math.min(root.rXs, 3)
-                color: sg.live && index < sg.busy ? root.cOk : root.cTrack
-                border.width: sg.live && index < sg.busy ? 0 : 1
-                border.color: root.cBorder
+                radius: 2
+                color: sg.live && index < sg.busy ? root.cOk : root.cBorder
             }
         }
     }
@@ -475,13 +473,11 @@ Item {
                                 x: panel.gap
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width - panel.gap - ctxNum.width - root.s1
-                                height: 6
-                                radius: 3
-                                color: root.cTrack
-                                border.width: 1
-                                border.color: root.cBorder
+                                height: 9
+                                radius: 2
+                                color: root.cBorder
                                 Rectangle {
-                                    width: Math.max(height, parent.width * row.ctxPct / 100)
+                                    width: Math.max(parent.radius * 2, parent.width * row.ctxPct / 100)
                                     height: parent.height
                                     radius: parent.radius
                                     color: root.ctxColor(row.ctxPct)
