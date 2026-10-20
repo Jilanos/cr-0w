@@ -44,6 +44,10 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
 - **Deletions in auto mode**: the permission classifier blocks deleting files with real content, so the run stops and reports.
   If the prompt already expects deletions, name the exact files in it, or plan for the owner to approve them afterwards.
 - **Odd infra failures inside a run** (e.g. Docker networking): check `uname -r` against `/usr/lib/modules`. A kernel upgraded without a reboot breaks module loading.
+- **Long investigations**: the prompt must say "commit in small steps (on a branch if needed) as soon as each piece passes".
+  A run that dies on the usage limit then loses nothing. Before redispatching, check worktrees (`git worktree list`) for
+  uncommitted work, and pull the run's progress notes from its transcript
+  (`jq -r 'select(.type=="assistant")|.message.content[]?|select(.type=="text")|.text' <transcript>`).
 - **✗ failed**: read the stdout/stderr tail before retrying. Never retry blindly.
 
 ## After
