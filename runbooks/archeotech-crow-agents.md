@@ -26,3 +26,8 @@ Render only with the shell checkout's `scripts/shot.sh`, from a scratch dir outs
 - A panel host injects only `panelRoot`/`appearance` (no `config`), and a bar injects
   `holderRoot`: that's why the entry declares neither as `required`.
 - In harness QML, don't put `;` between function declarations on one line: it's a syntax error.
+- Bar overlap on a narrow bar (vertical 1080 px monitor): the shell does not keep the
+  right zone out of the centred clock, it just grows left over it. Keep the pills short
+  there: both modules go compact below `compactBelow` (1400 px by default). Check with
+  `BAR_LAYOUT=<your shell-config.json> crow-usage/test/render.sh ...` → `bar-vertical-crop.png`.
+- Gauges match crow watch: 9 px bars, radius 2, solid `borderSubtle` track, no outline.

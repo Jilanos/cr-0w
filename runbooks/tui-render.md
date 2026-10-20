@@ -23,6 +23,8 @@ real monitor sizes, in the real terminal theme and font, instead of guessing.
 - ANSI 8 (bright black) is unreadable over a bright wallpaper at 50 % opacity: use ANSI 7
   for secondary text, keep 8 for borders and leaders.
 - `▰ ▱ ⚙ ↵ ↻ ⏵` are not in FiraCode. Use `━ █ ▏…▉ ● ○ ◆ ✓`, or Nerd Font icons.
+- Gauges: `lineBar` draws `▄` (lower half block) on a solid `▄` track in ANSI 8;
+  `GAUGE=▆ go test -run TestShots` renders the chunkier variant.
 - Size boxes to content; give leftover height to more content (earlier days, history), never padding.
 - QML panels and the bar: use archeotech-shell `scripts/shot.sh` (see archeotech-crow-*);
   `--exec 'wlr-randr --output HEADLESS-1 --custom-mode 1080x1920; sleep 3'` renders a vertical monitor.
