@@ -25,9 +25,9 @@ STATE = Path(REG.get("vault", {}).get("crow_dir") or HOME / "local/state")
 LEDGER = STATE / "runs.jsonl"
 MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
 WORKING_S = 20      # transcript touched this recently = working
-TAIL_BYTES = 512_000
+TAIL_BYTES = 2_000_000  # tool results are big; enough tail for ~30 recent actions
 FINISHED_SHOWN = 5
-RECENT_N = 15
+RECENT_N = 30
 
 
 def sh(*args, cwd=None):
@@ -154,7 +154,8 @@ def summarize_tool(name, inp):
 
 def read_transcript(path):
     """Last action, whether it ended on plain text (= waiting on the user), context size."""
-    info = {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": 0, "recent": []}
+    info = {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": 0, "recent": [],
+            "last_prompt": None}
     if not path.exists():
         return info
     size = path.stat().st_size
@@ -166,6 +167,8 @@ def read_transcript(path):
             e = json.loads(line)
         except ValueError:
             continue
+        if e.get("type") == "last-prompt" and info["last_prompt"] is None:
+            info["last_prompt"] = (e.get("lastPrompt") or "").strip()[:400] or None
         msg = e.get("message") or {}
         if e.get("type") == "assistant" and isinstance(msg.get("content"), list) and len(info["recent"]) < RECENT_N:
             for c in reversed(msg["content"]):
@@ -188,7 +191,8 @@ def read_transcript(path):
                         break
         elif e.get("type") == "user" and info["last_action"] is None and isinstance(msg.get("content"), str):
             info["last_action"] = "you: " + msg["content"].strip().splitlines()[0] if msg["content"].strip() else None
-        if info["last_action"] and info["context_tokens"] is not None and len(info["recent"]) >= RECENT_N:
+        if (info["last_action"] and info["context_tokens"] is not None and len(info["recent"]) >= RECENT_N
+                and info["last_prompt"]):
             break
     info["recent"] = info["recent"][:RECENT_N][::-1]
     sub = path.with_suffix("") / "subagents"
@@ -246,7 +250,7 @@ def collect(since="today", include_unledgered=False):
             "kind": kind, "pid": p["pid"], "account": account, "project": project_name(p["cwd"]),
             "cwd": p["cwd"], "session_id": sid, "state": state,
             "started_at": datetime.fromtimestamp(p["started"], timezone.utc).isoformat(timespec="seconds"),
-            "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent")},
+            "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt")},
             "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
         }
         if kind == "run":

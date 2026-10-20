@@ -20,6 +20,7 @@ JSON: {generated_at, limits[], today{}, week{}, days[], sessions[], rtk{}, retro
 """
 import datetime as dt
 import fcntl
+import functools
 import glob
 import pwd
 import re
@@ -53,7 +54,7 @@ STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 TITLES_PER_RUN = 12
 TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
     "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
@@ -120,24 +121,69 @@ def typed_prompt(ev):
     return text or None
 
 
+def _zero_usage():
+    return {"input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0, "cache_1h_tokens": 0}
+
+
+@functools.lru_cache(maxsize=4096)
+def _local_hour(ts_hour):
+    """'2026-10-20T13' (UTC) → ('2026-10-20', 15): local date and hour (offsets are whole hours here)."""
+    t = dt.datetime.fromisoformat(ts_hour + ":00:00+00:00").astimezone()
+    return t.date().isoformat(), t.hour
+
+
+def tool_label(name):
+    """mcp__atlassian__searchJiraIssuesUsingJql → atlassian · searchJiraIssuesUsingJql."""
+    if name.startswith("mcp__"):
+        parts = name.split("__")
+        return f"{parts[1]} · {parts[-1]}" if len(parts) >= 3 else name
+    return name
+
+
+IMAGE_TOKENS = 1600  # a screenshot read back costs roughly this much context, whatever its byte size
+
+
+def result_tokens(content):
+    """(text tokens, images) of a tool_result: text at ~4 chars/token, images counted apart."""
+    if isinstance(content, str):
+        return len(content) // 4, 0
+    text, images = 0, 0
+    for c in content or []:
+        if not isinstance(c, dict):
+            continue
+        if c.get("type") == "image":
+            images += 1
+        else:
+            text += len(c.get("text") or "") // 4
+    return text, images
+
+
 def scan_transcript(path):
-    """Usage of one session file (+ its subagents), deduplicated by message id."""
+    """Usage of one session file (+ its subagents), deduplicated by message id, split by local day.
+
+    Also: tokens each tool returned into the context, compactions, and 10-minute activity
+    buckets per day (for the timeline)."""
     seen = set()
-    per_model = {}
+    per_day = {}   # date → model → usage
+    tools = {}     # label → [calls, text tokens, images]
+    names = {}     # tool_use id → label
+    active = {}    # date → set of 10-minute buckets
+    compactions = 0
     meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0,
             "prompts": [], "last_prompt": None, "branch": None}
     files = [path] + glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))
     for fpath in files:
         with open(fpath, encoding="utf-8", errors="replace") as fh:
             for raw in fh:
-                if '"usage"' not in raw and '"custom-title"' not in raw and '"type":"user"' not in raw:
+                if ('"usage"' not in raw and '"custom-title"' not in raw and '"type":"user"' not in raw
+                        and '"compact_boundary"' not in raw):
                     continue
                 try:
                     ev = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
+                ts = ev.get("timestamp")
                 if fpath == path:
-                    ts = ev.get("timestamp")
                     if ts:
                         meta["start"] = meta["start"] or ts
                         meta["end"] = ts
@@ -146,6 +192,8 @@ def scan_transcript(path):
                     meta["entrypoint"] = meta["entrypoint"] or ev.get("entrypoint")
                     if ev.get("type") == "custom-title":
                         meta["title"] = ev.get("customTitle")
+                    if ev.get("type") == "system" and ev.get("subtype") == "compact_boundary":
+                        compactions += 1
                     text = typed_prompt(ev)
                     if text:
                         meta["user_messages"] += 1
@@ -153,19 +201,40 @@ def scan_transcript(path):
                         if len(meta["prompts"]) < 3:
                             meta["prompts"].append(text[:300])
                 msg = ev.get("message") or {}
+                content = msg.get("content")
+                if isinstance(content, list):
+                    for c in content:
+                        if not isinstance(c, dict):
+                            continue
+                        if c.get("type") == "tool_use":
+                            names[c.get("id")] = tool_label(c.get("name") or "?")
+                        elif c.get("type") == "tool_result":
+                            label = names.get(c.get("tool_use_id"), "?")
+                            t = tools.setdefault(label, [0, 0, 0])
+                            tok, img = result_tokens(c.get("content"))
+                            t[0] += 1
+                            t[1] += tok
+                            t[2] += img
                 usage = msg.get("usage")
-                if ev.get("type") != "assistant" or not usage or msg.get("id") in seen:
+                if ev.get("type") != "assistant" or not usage or msg.get("id") in seen or not ts:
                     continue
                 seen.add(msg.get("id"))
-                m = per_model.setdefault(msg.get("model") or "unknown", {
-                    "input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0,
-                    "cache_1h_tokens": 0})
+                day, hour = _local_hour(ts[:13])
+                active.setdefault(day, set()).add(hour * 6 + int(ts[14:16]) // 10)
+                m = per_day.setdefault(day, {}).setdefault(msg.get("model") or "unknown", _zero_usage())
                 m["input_tokens"] += usage.get("input_tokens") or 0
                 m["cache_read_tokens"] += usage.get("cache_read_input_tokens") or 0
                 m["cache_creation_tokens"] += usage.get("cache_creation_input_tokens") or 0
                 m["output_tokens"] += usage.get("output_tokens") or 0
                 m["cache_1h_tokens"] += (usage.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0
-    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model}
+    per_model = {}
+    for models in per_day.values():
+        for model, u in models.items():
+            tot = per_model.setdefault(model, _zero_usage())
+            for k, v in u.items():
+                tot[k] += v
+    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model, "per_day": per_day, "tools": tools,
+            "compactions": compactions, "active": {d: sorted(b) for d, b in active.items()}}
 
 
 # ---------- session titles ----------
@@ -332,6 +401,48 @@ def live_session_ids():
     return ids if seen_any else None
 
 
+TOP_MODEL = os.environ.get("CROW_TOP_MODEL", "claude-opus-5-5")
+RECENT_DAY = (dt.date.today() - dt.timedelta(days=1)).isoformat()  # activity buckets kept for today + yesterday
+
+
+def cache_read_price(prices, model):
+    p = prices.get(model) or {}
+    return p.get("cache_read", (p.get("input") or 0) * 0.1)
+
+
+def figures(per_model):
+    """Totals, cost and what caching / cheaper models saved, for {model: usage}."""
+    totals = {"input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0}
+    cost, priced, cache_saved, routing_saved = 0.0, True, 0.0, 0.0
+    prices = token_prices()[0] if token_prices else {}
+    for model, usage in per_model.items():
+        for k in totals:
+            totals[k] += usage.get(k, 0)
+        c = price(usage, model)
+        if c is None:
+            priced = False
+            continue
+        cost += c
+        if pseudo_model(model) or model not in prices:
+            continue
+        # Cache reads billed at the cache price instead of full input price.
+        cache_saved += usage.get("cache_read_tokens", 0) * (prices[model]["input"] - cache_read_price(prices, model)) / 1e6
+        if model != TOP_MODEL and TOP_MODEL in prices:
+            top = price(usage, TOP_MODEL)
+            if top is not None:
+                routing_saved += max(0.0, top - c)
+    return {"totals": totals, "cost_usd": cost, "priced": priced, "cache_saved_usd": cache_saved,
+            "routing_saved_usd": routing_saved}
+
+
+def slim(f):
+    t = f["totals"]
+    return {"cost_usd": round(f["cost_usd"], 4) if f["priced"] else None, "tokens": sum(t.values()),
+            "input_tokens": t["input_tokens"], "output_tokens": t["output_tokens"],
+            "cache_write_tokens": t["cache_creation_tokens"], "cache_read_tokens": t["cache_read_tokens"],
+            "cache_saved_usd": round(f["cache_saved_usd"], 4), "routing_saved_usd": round(f["routing_saved_usd"], 4)}
+
+
 def collect_sessions(days):
     cutoff = dt.datetime.now().timestamp() - days * 86400
     try:
@@ -357,16 +468,9 @@ def collect_sessions(days):
         if not data["per_model"]:
             continue
         account = path.split(os.sep + "profiles" + os.sep, 1)[1].split(os.sep, 1)[0]
-        totals = {"input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0}
-        cost, priced = 0.0, True
-        for model, usage in data["per_model"].items():
-            for k in totals:
-                totals[k] += usage.get(k, 0)
-            c = price(usage, model)
-            if c is None:
-                priced = False
-            else:
-                cost += c
+        f = figures(data["per_model"])
+        totals, cost, priced = f["totals"], f["cost_usd"], f["priced"]
+        by_day = {d: figures(models) for d, models in (data.get("per_day") or {}).items()}
         meta = data["meta"]
         tokens = sum(totals.values())
         sid = os.path.basename(path)[:-6]
@@ -391,6 +495,12 @@ def collect_sessions(days):
             "cache_read_tokens": totals["cache_read_tokens"],
             "cache_pct": round(100 * totals["cache_read_tokens"] / tokens) if tokens else 0,
             "cost_usd": round(cost, 4) if priced else None,
+            "cache_saved_usd": round(f["cache_saved_usd"], 4),
+            "routing_saved_usd": round(f["routing_saved_usd"], 4),
+            "compactions": data.get("compactions") or 0,
+            "tools": data.get("tools") or {},
+            "by_day": {d: slim(x) for d, x in by_day.items()},
+            "activity": {d: b for d, b in (data.get("active") or {}).items() if d >= RECENT_DAY},
         })
     os.makedirs(STATE, exist_ok=True)
     with open(CACHE, "w", encoding="utf-8") as fh:
@@ -451,53 +561,216 @@ def rtk_stats(today):
             "today_saved_pct": pct(tot["today_saved_tokens"], tot["today_input_tokens"])}
 
 
-def rollup(sessions):
-    r = {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "unpriced": 0, **{k: 0 for k in TOKEN_KEYS}}
-    for s in sessions:
-        r["cost_usd"] += s["cost_usd"] or 0
-        r["unpriced"] += s["cost_usd"] is None
-        r["tokens"] += s["tokens"]
+DAYS_STORE = os.path.join(STATE, "usage-days.json")
+SAMPLES = os.path.join(STATE, "limit-samples.jsonl")
+HISTORY_DAYS = 30
+ROLL_KEYS = ("cost_usd", "tokens", "input_tokens", "output_tokens", "cache_write_tokens", "cache_read_tokens",
+             "cache_saved_usd", "routing_saved_usd")
+
+
+def rollup(slices):
+    """Sum day slices [(session, slice)] into one figure set with breakdowns."""
+    r = {k: 0 for k in ROLL_KEYS}
+    r.update(cost_usd=0.0, sessions=0, unpriced=0, runs=0, routed_runs=0, compactions=0)
+    by_project, by_model, tools = {}, {}, {}
+    for s, x in slices:
+        for k in ROLL_KEYS:
+            r[k] += x.get(k) or 0
         r["sessions"] += 1
-        for k in TOKEN_KEYS:
-            r[k] += s.get(k) or 0
-    r["cost_usd"] = round(r["cost_usd"], 2)
+        r["unpriced"] += x.get("cost_usd") is None
+        r["runs"] += s["kind"] == "run"
+        r["routed_runs"] += s["kind"] == "run" and (x.get("routing_saved_usd") or 0) > 0
+        p = by_project.setdefault(s["project"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
+        p["cost_usd"] += x.get("cost_usd") or 0
+        p["tokens"] += x.get("tokens") or 0
+        p["sessions"] += 1
+        main = next((m for m in s["models"] if not pseudo_model(m)), "?").replace("claude-", "")
+        m = by_model.setdefault(main, {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
+        m["cost_usd"] += x.get("cost_usd") or 0
+        m["tokens"] += x.get("tokens") or 0
+        m["sessions"] += 1
+        if x.get("_last"):  # whole-session counters land on the session's last day
+            r["compactions"] += s.get("compactions") or 0
+            for name, (calls, tok, img) in (s.get("tools") or {}).items():
+                t = tools.setdefault(name, [0, 0, 0])
+                t[0] += calls
+                t[1] += tok
+                t[2] += img
+    for k in ("cost_usd", "cache_saved_usd", "routing_saved_usd"):
+        r[k] = round(r[k], 2)
     r["cache_pct"] = round(100 * r["cache_read_tokens"] / r["tokens"]) if r["tokens"] else 0
+    order = lambda d: sorted(({"name": k, **{kk: (round(vv, 2) if isinstance(vv, float) else vv) for kk, vv in v.items()}}
+                              for k, v in d.items()), key=lambda e: -e["cost_usd"])
+    r["by_project"], r["by_model"] = order(by_project), order(by_model)
+    r["tools"] = sorted(({"name": k, "calls": c, "tokens": t + i * IMAGE_TOKENS, "text_tokens": t, "images": i}
+                         for k, (c, t, i) in tools.items()), key=lambda e: -e["tokens"])
     return r
 
 
+def merge(rollups):
+    """Combine day rollups into a period (week, month)."""
+    r = {k: 0 for k in ROLL_KEYS}
+    r.update(cost_usd=0.0, sessions=0, unpriced=0, runs=0, routed_runs=0, compactions=0)
+    groups = {"by_project": {}, "by_model": {}}
+    tools = {}
+    for d in rollups:
+        for k in r:
+            r[k] += d.get(k) or 0
+        for g in groups:
+            for e in d.get(g) or []:
+                x = groups[g].setdefault(e["name"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
+                for k in x:
+                    x[k] += e.get(k) or 0
+        for e in d.get("tools") or []:
+            x = tools.setdefault(e["name"], {"calls": 0, "tokens": 0, "text_tokens": 0, "images": 0})
+            for k in x:
+                x[k] += e.get(k) or 0
+    for k in ("cost_usd", "cache_saved_usd", "routing_saved_usd"):
+        r[k] = round(r[k], 2)
+    r["cache_pct"] = round(100 * r["cache_read_tokens"] / r["tokens"]) if r["tokens"] else 0
+    for g, d in groups.items():
+        r[g] = sorted(({"name": k, **{kk: round(vv, 2) if isinstance(vv, float) else vv for kk, vv in v.items()}}
+                       for k, v in d.items()), key=lambda e: -e["cost_usd"])
+    r["tools"] = sorted(({"name": k, **v} for k, v in tools.items()), key=lambda e: -e["tokens"])
+    return r
+
+
+def load_store():
+    try:
+        with open(DAYS_STORE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_store(store):
+    tmp = DAYS_STORE + f".{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(store, fh)
+    os.replace(tmp, DAYS_STORE)
+
+
+def reset_dt(text, now):
+    """cdx reset strings ('Oct 20 15:00') → aware datetime, assuming the nearest year."""
+    try:
+        t = dt.datetime.strptime(f"{now.year} {text}", "%Y %b %d %H:%M").astimezone()
+    except (TypeError, ValueError):
+        return None
+    return t.replace(year=now.year + 1) if t < now - dt.timedelta(days=200) else t
+
+
+def burn_rates(limits):
+    """Record a limit sample per account (at most once a minute) and derive the 5h burn over the last hour:
+    % per hour and, if it runs out before the reset, when it hits zero."""
+    now = dt.datetime.now().astimezone()
+    samples = []
+    try:
+        with open(SAMPLES, encoding="utf-8") as fh:
+            samples = [json.loads(l) for l in fh if l.strip()]
+    except (OSError, json.JSONDecodeError):
+        samples = []
+    keep = [x for x in samples if now.timestamp() - x["t"] < 6 * 3600]
+    last = max((x["t"] for x in keep), default=0)
+    if now.timestamp() - last >= 60:
+        keep += [{"t": now.timestamp(), "a": l["account"], "h5": l["remaining_5h_pct"], "wk": l["remaining_week_pct"]}
+                 for l in limits if l.get("remaining_5h_pct") is not None]
+        tmp = SAMPLES + f".{os.getpid()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write("".join(json.dumps(x) + "\n" for x in keep))
+        os.replace(tmp, SAMPLES)
+    for l in limits:
+        l["burn_5h_pct_per_h"], l["empty_at"] = None, None
+        pts = [x for x in keep if x["a"] == l["account"] and now.timestamp() - x["t"] <= 3600]
+        # Only since the last reset (remaining jumped up).
+        for i in range(len(pts) - 1, 0, -1):
+            if pts[i]["h5"] > pts[i - 1]["h5"]:
+                pts = pts[i:]
+                break
+        if len(pts) < 2 or pts[-1]["t"] - pts[0]["t"] < 600:
+            continue
+        rate = (pts[0]["h5"] - pts[-1]["h5"]) / ((pts[-1]["t"] - pts[0]["t"]) / 3600)
+        l["burn_5h_pct_per_h"] = round(rate, 1)
+        if rate > 0.5 and l["remaining_5h_pct"]:
+            empty = now + dt.timedelta(hours=l["remaining_5h_pct"] / rate)
+            reset = reset_dt(l.get("reset_5h_at"), now)
+            if reset is None or empty < reset:
+                l["empty_at"] = empty.isoformat(timespec="minutes")
+    return limits
+
+
+def rtk_failures():
+    """Commands rtk could not filter and ran raw, summed over every database."""
+    total = 0
+    for home in rtk_homes():
+        env = {k: v for k, v in os.environ.items() if k != "XDG_DATA_HOME"}
+        env["HOME"] = home
+        try:
+            out = subprocess.run(["rtk", "gain", "--failures"], capture_output=True, text=True, timeout=30, env=env).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        m = re.search(r"Total failures:\s*(\d+)", out)
+        total += int(m[1]) if m else 0
+    return total
+
+
 def build(days):
-    sessions = collect_sessions(days)
+    sessions = collect_sessions(max(days, 7))
     today = dt.date.today().isoformat()
-    dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(days))]
-    per_day = {d: [] for d in dates}
+    window = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(max(days, 7)))]
+    slices = {d: [] for d in window}
     for s in sessions:
-        day = local_day(s["end"]) if s["end"] else None
-        if day in per_day:
-            per_day[day].append(s)
+        last = max(s["by_day"]) if s["by_day"] else None
+        for d, x in s["by_day"].items():
+            if d in slices:
+                slices[d].append((s, {**x, "_last": d == last}))
+    live = {d: rollup(slices[d]) for d in window}
+    # Past days in the scan window are complete: freeze them so history outlives transcript cleanup.
+    store = load_store()
+    changed = False
+    for d in window[1:-1]:
+        if d not in store and live[d]["sessions"]:
+            store[d] = live[d]
+            changed = True
+    if changed:
+        save_store(store)
+    hist_dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(HISTORY_DAYS))]
+    history = [{"date": d, **(live.get(d) if d in live and (d == today or live[d]["sessions"]) else store.get(d) or rollup([]))}
+               for d in hist_dates]
     status = run_json(["cdx", "status", "--json"]) or {}
-    limits = [{
+    limits = burn_rates([{
         "account": r.get("session_name"),
         "remaining_5h_pct": r.get("remaining_5h_pct"),
         "reset_5h_at": r.get("reset_5h_at"),
         "remaining_week_pct": r.get("remaining_week_pct"),
         "reset_week_at": r.get("reset_week_at"),
         "active": r.get("active"),
-    } for r in status.get("rows", []) if r.get("provider") == "claude"]
+    } for r in status.get("rows", []) if r.get("provider") == "claude"])
     retro_dir = os.path.join(STATE, "retros")
     proposals = os.path.join(retro_dir, "proposals.md")
     pending = 0
     if os.path.exists(proposals):
         with open(proposals, encoding="utf-8") as fh:
             pending = sum(1 for line in fh if line.startswith("- [ ]"))
+    rtk = rtk_stats(today)
+    rtk["failures"] = rtk_failures()
+    week = merge([h for h in history[-7:]])
+    month = merge(history)
+    strip = lambda r: {k: v for k, v in r.items() if k not in ("by_project", "by_model", "tools")}
+    for s in sessions:
+        s["today"] = s["by_day"].get(today)
+        s.pop("tools", None)
     return {
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "limits": limits,
-        "today": rollup(per_day[today]),
-        "week": rollup([s for d in dates[-7:] for s in per_day[d]]),
-        "days": [{"date": d, **rollup(per_day[d])} for d in dates],
+        "today": live[today],
+        "week": week,
+        "month": month,
+        "days": [{"date": d, **strip(live[d] if live[d]["sessions"] or d not in store else store[d])} for d in window[-7:]],
+        "history": [{"date": h["date"], **strip(h)} for h in history],
         "sessions": sessions,
-        "rtk": rtk_stats(today),
-        "retros": {"today": len(glob.glob(os.path.join(retro_dir, f"{today}-*.md"))), "pending_proposals": pending},
+        "rtk": rtk,
+        "retros": {"today": len(glob.glob(os.path.join(retro_dir, f"{today}-*.md"))), "pending_proposals": pending,
+                   "week": sum(len(glob.glob(os.path.join(retro_dir, f"{d}-*.md"))) for d in window[-7:])},
     }
 
 
