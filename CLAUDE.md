@@ -47,7 +47,7 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 - Whenever you work out how to do a recurring task or solve a non-obvious problem, write or update a runbook in the same session (generic in `runbooks/`, private specifics in `local/runbooks/`) and add it to the index.
 - Turn it into a skill when the user would invoke it by name. Prefer scripts in `bin/` for anything mechanical.
 - Working on a registered project from the hub: first load that repo's own skills (`<repo>/.claude/skills/`) and the hub's `local/skills/<project>/`, and follow them as if you were in the repo.
-- Review learning: `local/reviews/` holds the pattern ledgers (`common.md` + one per project). `review-threads` feeds them from every review comment; the `mr` pattern gate checks them before every MR.
+- Review learning: `local/reviews/` holds the pattern ledgers (`common.md` + one per project). `review-threads` feeds them from every review comment; the `review` skill applies them to every diff (peer review, self-review, and the `mr` gate before opening).
 - Goal: every repeat costs fewer tokens than the last.
 
 ## Session hygiene
