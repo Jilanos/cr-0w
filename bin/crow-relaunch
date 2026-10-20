@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""crow-relaunch: continue a session on another allowed cdx account, always by conversation id.
+
+  crow-relaunch <conversation-id> <target> [--dry-run] [--yes]
+  crow-relaunch status [--json]     allowed accounts, which are blocked, the recommended target
+
+The id may be a unique prefix of a session in the interrupted registry (crow-sessions), or a
+full id of any top-level transcript. The relaunch refuses when:
+  - no id is given, or it does not resolve to exactly one transcript;
+  - the target (or the profile holding the source) has policy never, or the target is the source;
+  - the transcript does not have exactly one workspace, or that directory is gone;
+  - `cdx can-resume <target>` says no, or `cdx status` shows the target blocked.
+Then it asks: a `use` account takes y (or --yes); an `ask-first` account needs a typed "yes"
+on a terminal every time, --yes does not count. --dry-run runs only the read-only checks
+(can-resume, status) and prints the handoff it would run; nothing is launched or prepared.
+
+The handoff is `cdx handoff <source> <target> --source-conversation <id>`, run from the
+session's workspace. Accounts with memory mode session get local/memory linked for the run.
+"""
+import json, os, pwd, re, subprocess, sys
+
+HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+BIN = os.path.join(HOME, "bin")
+REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
+PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
+ID_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def die(msg):
+    sys.exit(f"crow-relaunch: {msg}")
+
+
+def helper(*args):
+    r = subprocess.run([os.path.join(BIN, args[0]), *args[1:]], capture_output=True, text=True)
+    if r.returncode:
+        die((r.stderr or r.stdout).strip() or f"{args[0]} failed")
+    return r.stdout
+
+
+def cdx_json(*args):
+    try:
+        r = subprocess.run(["cdx", *args, "--json"], capture_output=True, text=True, timeout=60)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        die(f"cdx {' '.join(args)}: {e}")
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError:
+        die(f"cdx {' '.join(args)} gave no JSON: {(r.stderr or r.stdout).strip()[:200]}")
+
+
+def accounts():
+    return {a["name"]: a for a in json.loads(helper("crow-accounts", "json"))["accounts"]}
+
+
+# ---------- block detection ----------
+
+def limits():
+    rows = cdx_json("status").get("rows") or []
+    return {r["session_name"]: r for r in rows if r.get("session_name")}
+
+
+def blocked_reason(row):
+    if not row:
+        return "unknown to cdx"
+    if row.get("enabled") is False:
+        return "disabled"
+    if row.get("auth_status") not in (None, "authenticated"):
+        return f"auth {row['auth_status']}"
+    if row.get("remaining_5h_pct") == 0:
+        return f"5h limit (resets {row.get('reset_5h_at')})"
+    if row.get("remaining_week_pct") == 0:
+        return f"weekly limit (resets {row.get('reset_week_at')})"
+    return None
+
+
+def account_status(current):
+    accts, rows = accounts(), limits()
+    out = []
+    for name, a in accts.items():
+        if a["policy"] == "never":
+            continue
+        row = rows.get(name)
+        out.append({"name": name, "policy": a["policy"], "current": name == current,
+                    "blocked": blocked_reason(row),
+                    "remaining_5h_pct": (row or {}).get("remaining_5h_pct"),
+                    "remaining_week_pct": (row or {}).get("remaining_week_pct"),
+                    "reset_5h_at": (row or {}).get("reset_5h_at")})
+    usable = [a for a in out if not a["blocked"] and not a["current"]]
+    usable.sort(key=lambda a: (a["policy"] != "use", -min(a["remaining_5h_pct"] or 0, a["remaining_week_pct"] or 0)))
+    cur = next((a for a in out if a["current"]), None)
+    return {"current": current, "current_blocked": cur["blocked"] if cur else blocked_reason(rows.get(current)),
+            "accounts": out, "recommended": usable[0]["name"] if usable else None}
+
+
+def status(argv):
+    current = os.environ.get("CROW_ACCOUNT") or helper("crow-accounts", "default").strip()
+    st = account_status(current)
+    if "--json" in argv:
+        print(json.dumps(st, indent=1))
+        return
+    for a in st["accounts"]:
+        mark = "*" if a["current"] else " "
+        state = f"blocked: {a['blocked']}" if a["blocked"] else "ok"
+        print(f"{mark} {a['name']:<10} {a['policy']:<9} 5h {a['remaining_5h_pct']}%  week {a['remaining_week_pct']}%  {state}")
+    if st["current_blocked"]:
+        rec = st["recommended"]
+        print(f"\n{current} is blocked ({st['current_blocked']}). " +
+              (f"Recommended target: {rec} ({accounts()[rec]['policy']}); relaunch with "
+               f"`crow relaunch <id> {rec}` (see `crow sessions`)." if rec else "No allowed account is usable."))
+
+
+# ---------- relaunch ----------
+
+def resolve(ref):
+    if not ref or not ID_RE.fullmatch(ref):
+        die("a conversation id is required (see `crow sessions`); never relaunch without one")
+    reg = json.loads(helper("crow-sessions", "scan", "--json"))
+    hits = [s for s in reg["sessions"] if s["conversation_id"].startswith(ref)]
+    if len(hits) > 1:
+        die(f"{len(hits)} interrupted sessions start with '{ref}'; give more of the id")
+    if hits:
+        return hits[0]["conversation_id"], hits[0]["transcript"]
+    paths = []
+    for acct in sorted(os.listdir(PROFILES)) if os.path.isdir(PROFILES) else []:
+        base = os.path.join(PROFILES, acct, "claude-home", ".claude", "projects")
+        for slug in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+            if os.path.isfile(os.path.join(base, slug, ref + ".jsonl")):
+                paths.append(os.path.join(base, slug, ref + ".jsonl"))
+    if len(paths) != 1:
+        die(f"conversation '{ref}' matches {len(paths)} transcripts; use a full id from `crow sessions`")
+    return ref, paths[0]
+
+
+def source_account(path):
+    rel = os.path.relpath(os.path.realpath(path), os.path.realpath(PROFILES))
+    if rel.startswith(".."):
+        die(f"{path} is not inside a cdx profile")
+    return rel.split(os.sep, 1)[0]
+
+
+def workspace(path, cid):
+    """The one workspace cdx will accept for this transcript (it checks the same thing)."""
+    ids, cwds = set(), set()
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            try:
+                ev = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(ev, dict) or ev.get("isSidechain"):
+                continue
+            if ev.get("sessionId"):
+                ids.add(ev["sessionId"])
+            if isinstance(ev.get("cwd"), str):
+                cwds.add(os.path.realpath(ev["cwd"]))
+    if ids != {cid}:
+        die(f"transcript holds conversation ids {sorted(ids)}, expected only {cid}")
+    if len(cwds) != 1:
+        die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx needs exactly one")
+    ws = cwds.pop()
+    if not os.path.isdir(ws):
+        die(f"workspace {ws} no longer exists")
+    return ws
+
+
+def confirm(policy, yes):
+    if policy == "ask-first":
+        if not sys.stdin.isatty():
+            die("an ask-first account needs a typed yes on a terminal (--yes does not count)")
+        return input('This is an ask-first account. Type "yes" to hand off: ').strip() == "yes"
+    if yes:
+        return True
+    if not sys.stdin.isatty():
+        die("no terminal to confirm on; pass --yes to confirm")
+    return input("Hand off? [y/N] ").strip().lower() in ("y", "yes")
+
+
+def relaunch(argv):
+    flags = {a for a in argv if a.startswith("--")}
+    args = [a for a in argv if not a.startswith("--")]
+    if flags - {"--dry-run", "--yes"}:
+        die(f"unknown option {sorted(flags - {'--dry-run', '--yes'})[0]}")
+    if len(args) != 2:
+        die("usage: crow-relaunch <conversation-id> <target> [--dry-run] [--yes]  (an id is required)")
+    ref, target = args
+    accts = accounts()
+    tpol = accts.get(target, {}).get("policy", "never")
+    if tpol == "never":
+        die(f"account '{target}' is not allowed (policy never)")
+    cid, path = resolve(ref)
+    source = source_account(path)
+    if accts.get(source, {}).get("policy", "never") == "never":
+        die(f"the transcript sits in '{source}', an account crow never uses")
+    if source == target:
+        die(f"the session already belongs to '{target}'; pick another account")
+    ws = workspace(path, cid)
+
+    cap = cdx_json("can-resume", target)
+    if not cap.get("ok") or not cap.get("resumable"):
+        die(f"cdx can-resume {target}: {cap.get('reason') or cap.get('message') or 'not resumable'}")
+    why = blocked_reason(limits().get(target))
+    if why:
+        die(f"target '{target}' is blocked: {why}")
+
+    cmd = ["cdx", "handoff", source, target, "--source-conversation", cid]
+    print(f"session   {cid}\n  from    {source}  ({path})\n  to      {target}  (policy {tpol})\n"
+          f"  in      {ws}\n  run     {' '.join(cmd)}")
+    if "--dry-run" in flags:
+        print("dry run: checks passed, nothing launched")
+        return 0
+    if not confirm(tpol, "--yes" in flags):
+        die("cancelled")
+
+    record(cid, source, target, ws)
+    session_memory = accts[target].get("memory") == "session"
+    if session_memory:
+        helper("crow-memory", "link", target)
+    try:
+        return subprocess.run(cmd, cwd=ws, env={**os.environ, "CROW_ACCOUNT": target}).returncode
+    finally:
+        if session_memory:
+            helper("crow-memory", "unlink", target)
+            helper("crow-memory", "commit")
+
+
+def record(cid, source, target, ws):
+    helper("crow-sessions", "mark-relaunched", cid, source, target, ws)
+
+
+def main(argv):
+    if argv[:1] == ["status"]:
+        status(argv[1:])
+    elif not argv or argv[0] in ("-h", "--help", "help"):
+        sys.exit(__doc__)
+    else:
+        sys.exit(relaunch(argv))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

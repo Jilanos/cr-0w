@@ -16,6 +16,7 @@ accounts:
   - {name: shared, policy: ask-first, memory: session}
   - {name: mate,   policy: never}
   - {name: typo,   policy: usee}
+  - {name: spare,  policy: use,       memory: permanent}
 """
 
 

@@ -13,7 +13,7 @@ which is ignored by this repo and meant to be its own private repo.
 | `bin/crow` | launcher: hub session, one-shot briefs, project sessions, run dispatch, `crow watch` |
 | `bin/crow-runs`, `bin/crow-usage`, `bin/crow-activity` | background runs, usage and cost across accounts, git/MR activity |
 | `bin/crow-accounts`, `bin/crow-memory` | account policy, and memory stored once in `local/memory` and linked into allowed profiles |
-| `bin/crow-sessions` | registry of sessions cut off by a usage limit, to relaunch on another allowed account |
+| `bin/crow-sessions`, `bin/crow-relaunch` | registry of sessions cut off by a usage limit, and the guarded relaunch on another allowed account |
 | `bin/crow-retro`, `bin/crow-digest` | automatic retrospective after every session |
 | `tools/crow-watch` | the terminal board (Go, Bubble Tea) |
 | `integrations/` | optional desktop-shell widgets |

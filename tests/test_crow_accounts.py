@@ -13,7 +13,7 @@ def test_policy_of_known_unknown_and_mistyped_accounts(hub):
 
 
 def test_allowed_lists_only_use_and_ask_first(hub):
-    assert run(hub, "crow-accounts", "allowed").stdout.split() == ["main", "shared"]
+    assert run(hub, "crow-accounts", "allowed").stdout.split() == ["main", "shared", "spare"]
 
 
 def test_require_refuses_never_and_unknown(hub):
@@ -31,7 +31,8 @@ def test_default_memory_and_json(hub):
     data = json.loads(run(hub, "crow-accounts", "json").stdout)
     assert data["default"] == "main"
     assert [(a["name"], a["policy"]) for a in data["accounts"]] == [
-        ("main", "use"), ("shared", "ask-first"), ("mate", "never"), ("typo", "never")]
+        ("main", "use"), ("shared", "ask-first"), ("mate", "never"), ("typo", "never"),
+        ("spare", "use")]
 
 
 def test_missing_file_is_an_error(hub):

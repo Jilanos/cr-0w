@@ -13,6 +13,7 @@
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
 #   crow watch           live board: 1 agents · 2 usage · 3 savings · 4 history (? for keys)
 #   crow sessions [...] sessions cut off by a usage limit (see crow-sessions)
+#   crow relaunch <id> <account> [--dry-run]   continue one on another allowed account; crow relaunch status
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
@@ -102,9 +103,10 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
             fi
             exec "$bin" "$@" ;;
   sessions) exec "$CROW_HOME/bin/crow-sessions" "$@" ;;
+  relaunch) exec "$CROW_HOME/bin/crow-relaunch" "$@" ;;
   usage)    exec "$CROW_HOME/bin/crow-usage" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac
