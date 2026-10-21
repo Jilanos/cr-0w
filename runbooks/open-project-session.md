@@ -12,6 +12,7 @@ A process spawned from a Claude session inherits two things that break the new w
 `crow term` restores the real HOME (from `getent passwd`) and unsets `CLAUDE*`, `ANTHROPIC_*` and `CDX_*`.
 
 ## Starting prompt
+`crow handoff <project> --task ... --end-state ...` builds this prompt from the registry (see `sub-project-work.md`).
 `crow open|term <project> "<prompt>"` passes a first message (cdx ≥ 0.21.4, `--prompt`).
 
 Writing the handoff prompt:
