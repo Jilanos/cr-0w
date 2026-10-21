@@ -169,7 +169,7 @@ def main():
                 bg = bg0
             if bg:
                 d.rectangle([px, py, px + cw - 1, py + ch - 1], fill=bg)
-            col = fg or fg0
+            col = bg0 if fg == "BG" else (fg or fg0)
             if faint:
                 col = mix(col, bg or bg0, 0.5)
             if c in BLOCKS:  # kitty draws block elements itself, edge to edge
