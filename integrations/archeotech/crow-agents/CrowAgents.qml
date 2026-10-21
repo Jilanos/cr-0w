@@ -84,7 +84,7 @@ Item {
     // holder, content height along a vertical one. implicitPerp drives the
     // depth where the holder honours it (strips); a bar dropdown uses `size`.
     readonly property bool _panelH: !panelRoot || panelRoot.horizontal !== false
-    readonly property real _panelW: 620
+    readonly property real _panelW: 680
     readonly property real _panelContentH: Math.max(320, panel.contentH)
     readonly property real implicitAxis: !panelMode ? 0 : _panelH ? _panelW : _panelContentH
     readonly property real implicitPerp: !panelMode ? 0 : _panelH ? _panelContentH : _panelW
@@ -142,8 +142,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
             Text {
-                visible: CrowStore.available && CrowStore.waiting > 0
-                text: "◆" + CrowStore.waiting
+                visible: CrowStore.available && CrowStore.attention > 0
+                text: "◆" + CrowStore.attention
                 color: root.cAccent
                 font.family: root.fFamily; font.pixelSize: root.fBase; font.bold: true
                 anchors.verticalCenter: parent.verticalCenter
@@ -202,30 +202,33 @@ Item {
         anchors.fill: parent
         anchors.margins: root.s4
 
-        // Natural height (title + table header + rows), for implicitAxis/Perp.
+        // Natural height (title + rows), for implicitAxis/Perp.
         readonly property real contentH: header.implicitHeight + 6 + list.implicitHeight + 2 * root.s4
 
-        // Row model: section headers, agent/finished rows, "none" placeholders.
+        // Row model, grouped by what each agent asks of you (same order as crow watch):
+        // Needs you (waiting, failed, stopped by a limit), Working, Finished, Idle.
         readonly property var rows: {
             var out = []
-            function section(name, list, kind) {
-                out.push({ type: "head", text: name + " (" + list.length + ")" })
-                if (!list.length) out.push({ type: "none" })
-                list.forEach(x => out.push({ type: kind, d: x }))
+            function section(name, list, kind, always) {
+                if (!list.length && !always) return
+                out.push({ type: "head", text: name + (list.length ? "  " + list.length : "") })
+                if (!list.length) out.push({ type: "none", text: kind === "need" ? "nothing waiting on you" : "none" })
+                list.forEach(x => out.push({ type: x.run_id && !x.kind ? "fin" : x.conversation_id ? "intr" : "agent", d: x }))
             }
-            section("RUNS", CrowStore.runs, "agent")
-            section("SESSIONS", CrowStore.sessions, "agent")
-            section("FINISHED", CrowStore.finished, "fin")
+            section("NEEDS YOU", CrowStore.needsYou.concat(CrowStore.interrupted), "need", true)
+            section("WORKING", CrowStore.working, "work", true)
+            section("FINISHED", CrowStore.done, "done", false)
+            section("IDLE", CrowStore.idle, "idle", false)
             return out
         }
 
-        // Columns: glyph | project | task / session (flex) | state | context | commits
+        // Columns: glyph | project | task (flex) | what is happening | age | context (from 70 %)
         readonly property int wGlyph: 18
-        readonly property int wProject: 110
-        readonly property int wState: 84
-        readonly property int wCtx: 100
-        readonly property int wCom: 60
-        readonly property int wTask: width - wGlyph - wProject - wState - wCtx - wCom
+        readonly property int wProject: 104
+        readonly property int wAge: 64
+        readonly property int wCtx: 48
+        readonly property int wDetail: Math.round((width - wGlyph - wProject - wAge - wCtx) * 0.5)
+        readonly property int wTask: width - wGlyph - wProject - wDetail - wAge - wCtx
         readonly property int gap: root.s2
 
         component Cell: Text {
@@ -233,12 +236,6 @@ Item {
             font.family: root.fFamily; font.pixelSize: root.fBase
             elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
-        }
-        component HeadCell: Text {
-            color: root.cSub
-            font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: true
-            verticalAlignment: Text.AlignVCenter
-            height: parent ? parent.height : implicitHeight
         }
 
         Column {
@@ -269,14 +266,14 @@ Item {
                     }
                     Text {
                         text: !CrowStore.available ? "crow unavailable"
-                              : CrowStore.busy + "/" + CrowStore.maxSlots + " runs busy"
+                              : CrowStore.busy + " of " + CrowStore.maxSlots + " run slots busy"
                         color: CrowStore.available ? root.cSub : root.cErr
                         font.family: root.fFamily; font.pixelSize: root.fSm
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
-                        visible: CrowStore.available && CrowStore.waiting > 0
-                        text: "◆" + CrowStore.waiting + " waiting"
+                        visible: CrowStore.available && CrowStore.attention > 0
+                        text: "◆ " + CrowStore.attention + " need" + (CrowStore.attention === 1 ? "s" : "") + " you"
                         color: root.cAccent
                         font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: true
                         anchors.verticalCenter: parent.verticalCenter
@@ -316,24 +313,6 @@ Item {
                 color: root.cSub
                 font.family: root.fFamily; font.pixelSize: root.fSm
             }
-
-            // Table header: a recessed band with one label per column.
-            Rectangle {
-                width: parent.width
-                height: root.fSm + 12
-                radius: root.rXs
-                color: root.cTrack
-                border.width: 1
-                border.color: root.cBorder
-                Row {
-                    anchors.fill: parent
-                    HeadCell { width: panel.wGlyph + panel.wProject; leftPadding: panel.wGlyph; text: "project" }
-                    HeadCell { width: panel.wTask; leftPadding: panel.gap; text: "task / session" }
-                    HeadCell { width: panel.wState; leftPadding: panel.gap; text: "state" }
-                    HeadCell { width: panel.wCtx; leftPadding: panel.gap; text: "context used" }
-                    HeadCell { width: panel.wCom; rightPadding: root.s2; horizontalAlignment: Text.AlignRight; text: "commits" }
-                }
-            }
         }
 
         Flickable {
@@ -367,17 +346,6 @@ Item {
                         }
                     }
                 }
-
-                // What the context column measures, in plain words.
-                Text {
-                    width: list.width
-                    topPadding: root.s3
-                    wrapMode: Text.WordWrap
-                    text: "context used: how full each session's context window (its working memory, "
-                          + Math.round(CrowStore.contextWindow / 1000000) + "M tokens) is. Near 100 % it compacts and forgets detail."
-                    color: root.cSub
-                    font.family: root.fFamily; font.pixelSize: root.fSm
-                }
             }
         }
 
@@ -401,12 +369,13 @@ Item {
         Component {
             id: noneComp
             Item {
+                id: noneItem
                 property var entry
                 height: noneTxt.implicitHeight + 4
                 Text {
                     id: noneTxt
                     x: panel.wGlyph
-                    text: "none"
+                    text: noneItem.entry ? noneItem.entry.text : ""
                     color: root.cMuted
                     font.family: root.fFamily; font.pixelSize: root.fSm
                 }
@@ -418,122 +387,93 @@ Item {
                 id: row
                 property var entry
                 readonly property var d: entry ? entry.d : null
-                readonly property bool isFin: !!entry && entry.type === "fin"
-                readonly property var s: root.st(d ? (isFin ? d.status : d.state) : "")
-                readonly property string rowId: !d ? "" : (d.run_id || d.session_id || "")
+                readonly property string type: entry ? entry.type : ""
+                readonly property bool isFin: type === "fin"
+                readonly property bool isIntr: type === "intr"
+                readonly property var s: root.st(!d ? "" : isIntr ? "limit" : isFin ? d.status : d.state)
+                readonly property string rowId: !d ? "" : (d.run_id || d.session_id || d.conversation_id || "")
                 readonly property bool copied: rowId !== "" && CrowStore.copiedId === rowId
-                readonly property bool live: !isFin && !!d && (d.state === "working" || d.state === "waiting")
+                readonly property bool quiet: !!d && !isFin && !isIntr && d.state === "idle"
 
                 readonly property string task: {
                     if (!d) return ""
                     if (d.label) return d.label
                     if (d.title) return d.title
+                    if (isIntr) return String(d.first_prompt || "").split("\n")[0] || "session " + CrowStore.shortId(d.conversation_id)
                     if (isFin) return ""
                     return d.kind === "session" ? "session " + CrowStore.shortId(d.session_id) : "(not dispatched by crow)"
                 }
+                // What is happening, in words: the one column to read.
                 readonly property string doing: {
                     if (!d) return ""
-                    if (copied) return "copied " + rowId
-                    if (isFin) {
-                        const n = (d.resumed_from || []).length
-                        return n > 0 ? "resumed " + n + "×" : ""
+                    if (copied) return "copied " + CrowStore.shortId(rowId)
+                    if (isIntr) {
+                        const lim = d.limit === "five_hour" ? "5h limit" : d.limit === "seven_day" ? "weekly limit" : "usage limit"
+                        const back = d.resets_at ? ", back " + Qt.formatTime(new Date(d.resets_at * 1000), "HH:mm") : ""
+                        return d.account + " " + lim + back
                     }
-                    return d.state === "waiting" ? "waiting for your reply" : (d.last_action || "")
+                    if (isFin) {
+                        const n = (d.commits || []).length
+                        const parts = [d.status === "limit" ? "usage limit" : row.s.label]
+                        if (n) parts.push(n + (n === 1 ? " commit" : " commits"))
+                        if ((d.resumed_from || []).length) parts.push("resumed " + d.resumed_from.length + "×")
+                        return parts.join(" · ")
+                    }
+                    return d.state === "waiting" ? "waiting for your reply" : String(d.last_action || "").split("\n")[0]
                 }
                 readonly property color doingColor: copied ? root.cAccent
-                    : d && !isFin && d.state === "waiting" ? root.cAccent : root.cInfo
-                readonly property string ageText: !d ? ""
-                    : CrowStore.age(isFin ? CrowStore.since(d.ended_at) : d.last_activity_s) + " ago"
-                readonly property int ctxPct: d && !isFin ? CrowStore.contextPct(d.context_tokens || 0) : 0
-                readonly property bool hasCtx: !!d && !isFin && (d.context_tokens || 0) > 0
+                    : isIntr ? root.cWarn
+                    : isFin ? row.s.color
+                    : d && d.state === "waiting" ? root.cAccent
+                    : quiet ? root.cSub : root.cInfo
+                readonly property string ageText: {
+                    if (!d) return ""
+                    if (isIntr) {
+                        const t = Date.parse(String(d.last_event).replace(/(\.\d{3})\d+/, "$1"))
+                        return isNaN(t) ? "" : "at " + Qt.formatTime(new Date(t), "HH:mm")
+                    }
+                    return CrowStore.age(isFin ? CrowStore.since(d.ended_at) : d.last_activity_s) + (isFin ? " ago" : "")
+                }
+                readonly property int ctxPct: d && !isFin && !isIntr ? CrowStore.contextPct(d.context_tokens || 0) : 0
 
-                height: rowCol.implicitHeight + 6
+                height: root.fBase + 10
                 radius: root.rXs
                 color: rowMa.containsMouse ? root.cHover : "transparent"
 
-                Column {
-                    id: rowCol
-                    y: 3
-                    width: parent.width
-                    spacing: 1
-                    Row {
-                        height: root.fBase + 6
-                        Cell { width: panel.wGlyph; text: row.s.glyph; color: row.s.color; font.bold: true; elide: Text.ElideNone; height: parent.height }
-                        Cell {
-                            width: panel.wProject; height: parent.height
-                            text: row.d ? row.d.project : ""
-                            color: root.cText; font.bold: !row.isFin
-                        }
-                        Cell {
-                            width: panel.wTask; height: parent.height; leftPadding: panel.gap
-                            text: row.task
-                            color: row.isFin ? root.cSub : root.cText
-                        }
-                        Cell {
-                            width: panel.wState; height: parent.height; leftPadding: panel.gap
-                            text: row.s.label
-                            color: row.live || row.isFin ? row.s.color : root.cSub
-                            font.bold: row.live
-                        }
-                        // Context used: a bar against the 1M window plus the % number.
-                        Item {
-                            width: panel.wCtx; height: parent.height
-                            Rectangle {
-                                id: ctxTrack
-                                visible: row.hasCtx
-                                x: panel.gap
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - panel.gap - ctxNum.width - root.s1
-                                height: 9
-                                radius: 2
-                                color: root.cBorder
-                                Rectangle {
-                                    width: Math.max(parent.radius * 2, parent.width * row.ctxPct / 100)
-                                    height: parent.height
-                                    radius: parent.radius
-                                    color: root.ctxColor(row.ctxPct)
-                                }
-                            }
-                            Text {
-                                id: ctxNum
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 32
-                                horizontalAlignment: Text.AlignRight
-                                text: row.isFin ? "" : row.hasCtx ? row.ctxPct + "%" : "–"
-                                color: row.hasCtx ? root.ctxColor(row.ctxPct) : root.cSub
-                                font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: row.hasCtx
-                            }
-                        }
-                        Cell {
-                            width: panel.wCom; height: parent.height; rightPadding: root.s2
-                            horizontalAlignment: Text.AlignRight
-                            text: !row.d || (!row.isFin && row.d.kind !== "run") ? "" : String((row.d.commits || []).length)
-                            color: (row.d && (row.d.commits || []).length > 0) ? root.cInfo : root.cSub
-                        }
+                Row {
+                    anchors.fill: parent
+                    Cell { width: panel.wGlyph; height: parent.height; text: row.s.glyph; color: row.s.color; font.bold: true; elide: Text.ElideNone }
+                    Cell {
+                        width: panel.wProject; height: parent.height
+                        text: row.d ? row.d.project : ""
+                        color: row.quiet ? root.cSub : root.cText
+                        font.bold: !row.quiet && !(row.isFin && row.d && row.d.status === "done")
                     }
-                    Row {
-                        Text { width: panel.wGlyph; text: ""; font.pixelSize: root.fSm }
-                        Text {
-                            id: arrow
-                            visible: row.doing !== ""
-                            text: "↳ "; color: root.cMuted
-                            font.family: root.fFamily; font.pixelSize: root.fSm
-                        }
-                        Text {
-                            width: panel.wProject + panel.wTask - (arrow.visible ? arrow.implicitWidth : 0)
-                            elide: Text.ElideRight
-                            text: row.doing
-                            color: row.doingColor
-                            font.family: root.fFamily; font.pixelSize: root.fSm
-                        }
-                        Text {
-                            width: panel.wState
-                            leftPadding: panel.gap
-                            text: row.ageText
-                            color: root.cSub
-                            font.family: root.fFamily; font.pixelSize: root.fSm
-                        }
+                    Cell {
+                        width: panel.wTask; height: parent.height; leftPadding: panel.gap
+                        text: row.task
+                        color: row.quiet || row.isFin ? root.cSub : root.cText
+                    }
+                    Cell {
+                        width: panel.wDetail; height: parent.height; leftPadding: panel.gap
+                        text: row.doing
+                        color: row.doingColor
+                        font.pixelSize: root.fSm
+                        font.bold: row.d && !row.isFin && !row.isIntr && row.d.state === "waiting"
+                    }
+                    Cell {
+                        width: panel.wAge; height: parent.height
+                        horizontalAlignment: Text.AlignRight
+                        text: row.ageText
+                        font.pixelSize: root.fSm
+                    }
+                    // Context only once a session nears compaction.
+                    Cell {
+                        width: panel.wCtx; height: parent.height; rightPadding: root.s1
+                        horizontalAlignment: Text.AlignRight
+                        text: row.ctxPct >= 70 ? row.ctxPct + "%" : ""
+                        color: root.ctxColor(row.ctxPct)
+                        font.pixelSize: root.fSm; font.bold: true
                     }
                 }
 
@@ -543,10 +483,10 @@ Item {
                     hoverEnabled: true
                     cursorShape: row.rowId ? Qt.PointingHandCursor : Qt.ArrowCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    // Left: open the session (a headless run has no window: copy its id).
-                    // Right: copy the session id.
+                    // Left: open the session (a headless run or a stopped session has no window: copy its id).
+                    // Right: copy the id.
                     onClicked: mouse => {
-                        if (mouse.button === Qt.RightButton || !row.d || row.d.kind === "run" || row.isFin) CrowStore.copy(row.rowId)
+                        if (mouse.button === Qt.RightButton || !row.d || row.isFin || row.isIntr || row.d.kind === "run") CrowStore.copy(row.rowId)
                         else CrowStore.openSession(row.d)
                     }
                 }

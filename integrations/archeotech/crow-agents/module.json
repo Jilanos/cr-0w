@@ -41,6 +41,13 @@
       "default": true,
       "description": "Toast when a background run finishes, fails or stops on the usage limit."
     },
+    "sessionsCommand": {
+      "type": "string",
+      "label": "Interrupted sessions command",
+      "default": "crow sessions list --json",
+      "placeholder": "crow sessions list --json",
+      "description": "Lists sessions stopped by a usage limit (shown under Needs you). Empty turns it off."
+    },
     "compactBelow": {
       "type": "int",
       "label": "Compact below",

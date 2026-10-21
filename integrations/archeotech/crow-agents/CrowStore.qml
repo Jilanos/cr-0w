@@ -11,6 +11,9 @@ Singleton {
 
     property string command: "crow json"
     property string watchCommand: "kitty -e crow watch"
+    // Sessions cut off by a usage limit (crow-sessions); "" turns the list off.
+    property string sessionsCommand: "crow sessions list --json"
+    property var registry: []         // last good crow-sessions list
     property bool notifications: true
     property int intervalMs: 5000
 
@@ -35,6 +38,21 @@ Singleton {
     readonly property int busy: snap && snap.slots ? snap.slots.busy : 0
     readonly property int maxSlots: snap && snap.slots ? snap.slots.max : 2
     readonly property int waiting: sessions.filter(a => a.state === "waiting").length
+
+    // Stopped by a limit in the last 24 h, not relaunched, not open again.
+    readonly property var interrupted: {
+        var live = {}
+        agents.forEach(a => { if (a.session_id) live[a.session_id] = true })
+        return (registry || []).filter(s => !s.relaunched && !live[s.conversation_id]
+                                            && since(s.last_event) >= 0 && since(s.last_event) < 86400)
+    }
+    // Board groups, in the order the panel lists them (same as crow watch).
+    readonly property var needsYou: sessions.filter(a => a.state === "waiting")
+        .concat(finished.filter(f => f.status !== "done"))
+    readonly property var working: runs.concat(sessions.filter(a => a.state === "working" || a.state === "quiet"))
+    readonly property var done: finished.filter(f => f.status === "done")
+    readonly property var idle: sessions.filter(a => a.state === "idle")
+    readonly property int attention: needsYou.length + interrupted.length
     // Context window the % bar is measured against.
     readonly property int contextWindow: 1000000
     function contextPct(tokens) { return tokens > 0 ? Math.min(100, Math.round(tokens * 100 / contextWindow)) : 0 }
@@ -43,6 +61,7 @@ Singleton {
         if (!cfg) return
         if (cfg.command) command = cfg.command
         if (cfg.watchCommand) watchCommand = cfg.watchCommand
+        if (cfg.sessionsCommand !== undefined) sessionsCommand = cfg.sessionsCommand
         if (cfg.notifications !== undefined) notifications = !!cfg.notifications
     }
 
@@ -172,5 +191,37 @@ Singleton {
         onTriggered: store.poll()
     }
     Timer { id: copiedTimer; interval: 1500; onTriggered: store.copiedId = "" }
+
+    // The registry changes rarely and a scan costs more than a snapshot: once a minute.
+    // Same queueing as poll(): a command change mid-scan re-scans once it exits.
+    property string _regRunning: ""
+    property bool _regAgain: false
+    function scanRegistry() {
+        if (sessionsCommand === "") { registry = []; return }
+        if (regProc.running) { if (_regRunning !== sessionsCommand) _regAgain = true; return }
+        _regRunning = sessionsCommand
+        regProc.running = true
+    }
+    Process {
+        id: regProc
+        command: store._sh(store._regRunning || store.sessionsCommand)
+        onExited: if (store._regAgain) { store._regAgain = false; Qt.callLater(store.scanRegistry) }
+        stdout: StdioCollector {
+            id: regOut
+            onStreamFinished: {
+                if (store._regAgain || store._regRunning !== store.sessionsCommand) return
+                try { var d = JSON.parse(regOut.text); if (d && Array.isArray(d.sessions)) store.registry = d.sessions } catch (e) {}
+            }
+        }
+    }
+    Timer {
+        interval: 60000
+        running: store.sessionsCommand !== ""
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: store.scanRegistry()
+    }
     onCommandChanged: poll()
+    // The pill pushes its config after the first tick: rescan with the new command.
+    onSessionsCommandChanged: { registry = []; scanRegistry() }
 }
