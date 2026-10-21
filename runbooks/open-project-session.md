@@ -19,3 +19,5 @@ Writing the handoff prompt:
 - State the end state the user's approval unlocks (e.g. "once I approve an MR: commit, push, post replies, resolve threads").
   A bare "show me before committing" made a session stop after the commit and wait for a push it could have done.
 - Keep the task list; drop instructions the skill already covers.
+- Start with "Read local/owner-prefs.md in the hub" (absolute path from `local/context.md`): repo sessions don't load hub memory.
+- Name the worktree to use (`<repo>.wt/<topic>`), never /tmp.
