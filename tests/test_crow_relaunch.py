@@ -110,7 +110,7 @@ def test_dry_run_checks_cdx_and_launches_nothing(hub, cdx, session):
 
 
 def test_use_account_hands_off_with_the_id_from_the_workspace(hub, cdx, session):
-    r = relaunch(hub, cdx, "abc", "spare", "--yes")
+    r = relaunch(hub, cdx, "abc", "spare", "--yes", "--here")
     assert r.returncode == 0, r.stderr
     (h,) = handoffs(cdx)
     assert h["argv"] == ["handoff", "main", "spare", "--source-conversation", "abc-123"]
@@ -119,6 +119,29 @@ def test_use_account_hands_off_with_the_id_from_the_workspace(hub, cdx, session)
     assert (rec["conversation_id"], rec["source"], rec["target"]) == ("abc-123", "main", "spare")
     out = run(hub, "crow-sessions", "list").stdout
     assert "0 interrupted session(s), 1 already relaunched" in out
+
+
+def test_default_opens_a_new_kitty_window(hub, cdx, session, tmp_path):
+    d = tmp_path / "winbin"
+    d.mkdir()
+    log = tmp_path / "setsid.log"
+    (d / "setsid").write_text('#!/bin/sh\necho "$@" >> "$SETSID_LOG"\n')
+    (d / "setsid").chmod(0o755)
+    r = relaunch(hub, cdx, "abc", "spare", "--yes",
+                 extra={"PATH": f"{d}:{cdx[0]['PATH']}", "SETSID_LOG": str(log), "CDX_SESSION_NAME": "x"})
+    assert r.returncode == 0, r.stderr
+    line = log.read_text()
+    assert "-f kitty --title" in line and f"--directory {session}" in line
+    assert line.strip().endswith(f"_run abc-123 main spare {session}")
+    assert handoffs(cdx) == []  # the handoff runs inside the window, not here
+    assert (hub[0] / "local" / "state" / "relaunches.jsonl").exists()
+
+
+def test_window_runner_hands_off_from_the_workspace(hub, cdx, session):
+    r = relaunch(hub, cdx, "_run", "abc-123", "main", "spare", session)
+    assert r.returncode == 0, r.stderr
+    (h,) = handoffs(cdx)
+    assert h["cwd"] == session and h["account"] == "spare"
 
 
 def test_use_account_without_tty_needs_yes(hub, cdx, session):
@@ -166,7 +189,7 @@ def test_ask_first_rejects_anything_but_yes(hub, cdx, session, answer):
 
 
 def test_ask_first_hands_off_after_a_typed_yes(hub, cdx, session):
-    code, out = on_tty(hub, cdx, "yes", "abc", "shared")
+    code, out = on_tty(hub, cdx, "yes", "abc", "shared", "--here")
     assert code == 0, out
     (h,) = handoffs(cdx)
     assert h["argv"] == ["handoff", "main", "shared", "--source-conversation", "abc-123"]

@@ -13,7 +13,7 @@
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
 #   crow watch           live board: 1 agents · 2 usage · 3 savings · 4 history (? for keys)
 #   crow sessions [...] sessions cut off by a usage limit (see crow-sessions)
-#   crow relaunch <id> <account> [--dry-run]   continue one on another allowed account; crow relaunch status
+#   crow relaunch <id> <account> [--dry-run] [--here]   continue one on another allowed account; crow relaunch status
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases

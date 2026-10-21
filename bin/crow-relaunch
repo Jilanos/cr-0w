@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """crow-relaunch: continue a session on another allowed cdx account, always by conversation id.
 
-  crow-relaunch <conversation-id> <target> [--dry-run] [--yes]
+  crow-relaunch <conversation-id> <target> [--dry-run] [--yes] [--here]
   crow-relaunch status [--json]     allowed accounts, which are blocked, the recommended target
 
 The id may be a unique prefix of a session in the interrupted registry (crow-sessions), or a
@@ -15,7 +15,8 @@ on a terminal every time, --yes does not count. --dry-run runs only the read-onl
 (can-resume, status) and prints the handoff it would run; nothing is launched or prepared.
 
 The handoff is `cdx handoff <source> <target> --source-conversation <id>`, run from the
-session's workspace. Accounts with memory mode session get local/memory linked for the run.
+session's workspace in a new kitty window (detached, real HOME, no inherited Claude/cdx
+variables); --here runs it in the current terminal instead. Accounts with memory mode session get local/memory linked for the run.
 """
 import json, os, pwd, re, subprocess, sys
 
@@ -23,6 +24,7 @@ HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.re
 BIN = os.path.join(HOME, "bin")
 REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
 PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
+CDX_VERSION_NOTE = "0.21"
 ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
@@ -156,7 +158,8 @@ def workspace(path, cid):
     if ids != {cid}:
         die(f"transcript holds conversation ids {sorted(ids)}, expected only {cid}")
     if len(cwds) != 1:
-        die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx needs exactly one")
+        die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx {CDX_VERSION_NOTE} "
+            "needs exactly one (patch: local/state/night/shots/*/cdx-handoff-multi-workspace.patch)")
     ws = cwds.pop()
     if not os.path.isdir(ws):
         die(f"workspace {ws} no longer exists")
@@ -178,8 +181,9 @@ def confirm(policy, yes):
 def relaunch(argv):
     flags = {a for a in argv if a.startswith("--")}
     args = [a for a in argv if not a.startswith("--")]
-    if flags - {"--dry-run", "--yes"}:
-        die(f"unknown option {sorted(flags - {'--dry-run', '--yes'})[0]}")
+    known = {"--dry-run", "--yes", "--here"}
+    if flags - known:
+        die(f"unknown option {sorted(flags - known)[0]}")
     if len(args) != 2:
         die("usage: crow-relaunch <conversation-id> <target> [--dry-run] [--yes]  (an id is required)")
     ref, target = args
@@ -212,7 +216,12 @@ def relaunch(argv):
         die("cancelled")
 
     record(cid, source, target, ws)
-    session_memory = accts[target].get("memory") == "session"
+    if "--here" in flags:
+        return run_handoff(cmd, ws, target, accts[target].get("memory") == "session")
+    return open_window(cid, source, target, ws)
+
+
+def run_handoff(cmd, ws, target, session_memory):
     if session_memory:
         helper("crow-memory", "link", target)
     try:
@@ -223,6 +232,33 @@ def relaunch(argv):
             helper("crow-memory", "commit")
 
 
+def open_window(cid, source, target, ws):
+    """Detach like `crow term`: real HOME (kitty config), no inherited Claude/cdx variables."""
+    env = {k: v for k, v in os.environ.items() if not re.match(r"(CLAUDE|CLAUDECODE|ANTHROPIC_|CDX_)", k)}
+    env["HOME"] = REAL_HOME
+    cmd = ["setsid", "-f", "kitty", "--title", f"crow · relaunch {target}", "--directory", ws,
+           os.path.join(BIN, "crow-relaunch"), "_run", cid, source, target, ws]
+    try:
+        subprocess.run(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        die(f"could not open a kitty window ({e}); rerun with --here")
+    print(f"opened a kitty window on {target}")
+    return 0
+
+
+def run_in_window(argv):
+    """Inside the new window: the handoff itself (already confirmed and recorded)."""
+    if len(argv) != 4:
+        die("_run is internal: <id> <source> <target> <workspace>")
+    cid, source, target, ws = argv
+    rc = run_handoff(["cdx", "handoff", source, target, "--source-conversation", cid], ws, target,
+                     accounts().get(target, {}).get("memory") == "session")
+    if rc:
+        input(f"handoff exited {rc}; press Enter to close ")
+    return rc
+
+
 def record(cid, source, target, ws):
     helper("crow-sessions", "mark-relaunched", cid, source, target, ws)
 
@@ -230,6 +266,8 @@ def record(cid, source, target, ws):
 def main(argv):
     if argv[:1] == ["status"]:
         status(argv[1:])
+    elif argv[:1] == ["_run"]:
+        sys.exit(run_in_window(argv[1:]))
     elif not argv or argv[0] in ("-h", "--help", "help"):
         sys.exit(__doc__)
     else:
