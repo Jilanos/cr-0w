@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# crow-commit-msg-check: git commit-msg hook enforcing the owner's commit format and the private message deny list.
+# Format: type[SCOPE]: message   type = new|chg|fix, SCOPE = file kinds touched, uppercase, '/'-separated
+#   e.g. chg[PY/MD]: lock and time-box the migration runs
+# Merge, Revert, fixup! and squash! messages pass. Install: ln -s <crow>/bin/crow-commit-msg-check <hooks dir>/commit-msg
+# Check a message by hand: crow-commit-msg-check <file>   or   echo "subject" | crow-commit-msg-check -
+set -u
+CROW_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+file="${1:--}"
+msg=$(if [ "$file" = - ]; then cat; else cat "$file"; fi | grep -v '^#')
+subject=$(printf '%s\n' "$msg" | sed -n '/./{p;q}')
+case "$subject" in Merge\ *|Revert\ *|fixup!\ *|squash!\ *|amend!\ *) exit 0 ;; esac
+bad=0
+if ! printf '%s' "$subject" | grep -qE '^(new|chg|fix)\[[A-Z0-9]+(/[A-Z0-9]+)*\]: [^ ]'; then
+  echo "commit-msg: subject must be 'type[SCOPE]: message' (type new|chg|fix, SCOPE like PY or SH/MD):" >&2
+  echo "  got: $subject" >&2
+  bad=1
+fi
+# Attribution and other forbidden lines: local/commit-msg-deny.txt (private, one regex per line)
+pats=$(grep -v '^\s*#' "$CROW_HOME/local/commit-msg-deny.txt" 2>/dev/null | grep -v '^\s*$' | paste -sd'|')
+if [ -n "$pats" ] && printf '%s\n' "$msg" | grep -qiE "$pats"; then
+  echo "commit-msg: the message matches local/commit-msg-deny.txt" >&2
+  bad=1
+fi
+exit $bad
