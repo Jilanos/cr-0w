@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# crow-night-preflight: checks to run before leaving overnight runs unattended (see runbooks/overnight.md).
+# Usage: crow-night-preflight [repo-path ...]
+# Prints one OK/WARN/FAIL line per check; exits 1 if any FAIL. Repo paths get the per-repo checks.
+set -u
+export HOME="${CROW_REAL_HOME:-/home/$(id -un)}"   # gh/glab/docker configs live in the real home
+fails=0
+ok()   { printf '  OK    %s\n' "$*"; }
+warn() { printf '  WARN  %s\n' "$*"; }
+fail() { printf '  FAIL  %s\n' "$*"; fails=1; }
+
+echo "Machine"
+ac=$(cat /sys/class/power_supply/A{C,DP}*/online 2>/dev/null | head -1)
+bat=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -1)
+if [ -z "$bat" ]; then ok "no battery"
+elif [ "$ac" = 1 ]; then ok "on AC, battery ${bat}%"
+else fail "on battery (${bat}%): plug in before leaving"; fi
+if systemd-inhibit --list --no-legend 2>/dev/null | grep -q 'crow-night'; then ok "sleep inhibited (crow-night)"
+else warn "sleep not inhibited: systemd-inhibit --what=sleep:idle:handle-lid-switch --who=crow-night --why=overnight-runs sleep 14h &"; fi
+
+# A package upgraded since boot only takes effect at the next login/reboot: a surprise for the morning
+if [ -r /var/log/pacman.log ]; then
+  boot=$(date -d "$(uptime -s)" +%FT%T)
+  ups=$(awk -v b="$boot" '/\[ALPM\] upgraded/ { t=substr($1,2,19); if (t > b) print $4 }' /var/log/pacman.log | sort -u)
+  if [ -n "$ups" ]; then warn "upgraded since boot, not live until reboot/relogin: $(echo $ups | cut -c1-200)"
+  else ok "no package upgraded since boot"; fi
+fi
+if [ ! -d "/usr/lib/modules/$(uname -r)" ]; then fail "running kernel $(uname -r) has no modules dir: reboot first (docker networking breaks)"; fi
+
+echo "Tools"
+if docker info >/dev/null 2>&1; then
+  if docker run --rm --network bridge busybox true >/dev/null 2>&1; then ok "docker (bridge network works)"
+  else warn "docker runs but bridge networking fails"; fi
+else warn "docker unavailable: jobs needing a database will pause"; fi
+command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 && ok "gh logged in" || warn "gh not logged in"; }
+command -v glab >/dev/null && { glab auth status >/dev/null 2>&1 && ok "glab logged in" || warn "glab not logged in"; }
+command -v cdx >/dev/null && { echo "Accounts"; cdx status 2>/dev/null | grep -E '^\S+\s+(enabled|disabled)' | sed 's/^/        /'; }
+
+for repo in "$@"; do
+  name=$(basename "$repo"); echo "Repo $name"
+  [ -d "$repo/.git" ] || [ -f "$repo/.git" ] || { fail "$repo is not a git checkout"; continue; }
+  br=$(git -C "$repo" branch --show-current)
+  def=$(git -C "$repo" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+  [ -n "$def" ] && [ "$br" != "$def" ] && warn "main checkout is on '$br', not '$def': runs must use their own worktree"
+  dirty=$(git -C "$repo" status --porcelain | wc -l)
+  [ "$dirty" -gt 0 ] && warn "$dirty uncommitted files: list them as Protected in the job"
+  ok "identity $(git -C "$repo" config user.email)"
+  hook=$(git -C "$repo" rev-parse --git-common-dir 2>/dev/null)/hooks/pre-push
+  case "$hook" in /*) ;; *) hook="$repo/$hook" ;; esac
+  [ -e "$hook" ] && ok "pre-push hook installed" || warn "no pre-push hook (crow-prepush-check)"
+  [ -e "${hook%/*}/commit-msg" ] && ok "commit-msg hook installed" || warn "no commit-msg hook (crow-commit-msg-check)"
+  if grep -rlsE 'git[^"]*push' "$repo/.claude/hooks" "$repo/.claude/settings.json" >/dev/null 2>&1; then
+    warn "repo has its own push rule in .claude/: check what it allows before promising pushes"
+  fi
+done
+exit $fails
