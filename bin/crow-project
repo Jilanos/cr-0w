@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""crow-project: work on a registered project from the hub with that repo's own tools.
+
+  crow-project work <project> [--json]
+      Index of what the repo brings (instructions, skills, commands, agents) to read on
+      demand, plus what a hub session cannot run for it (hooks, permission denies, git hooks).
+  crow-project handoff <project> --task T --end-state E [--context C]
+      Write a hand-off note to <state>/handoffs/ and print the first prompt of the repo
+      session (`crow handoff` opens it with `crow term`).
+  crow-project which <path>
+      Name of the registered project that owns a path (worktrees included), or nothing.
+
+Claude Code loads another repo's skills with --add-dir, but never its hooks or permission
+rules: repo-owned work goes to a repo session; `work` covers lookups and small fixes.
+"""
+import argparse, json, os, re, subprocess, sys
+from datetime import datetime
+from pathlib import Path
+
+import yaml
+
+HOME = Path(os.environ.get("CROW_HOME") or Path(__file__).resolve().parent.parent)
+REG = yaml.safe_load(open(HOME / "local/projects.yaml"))
+STATE = Path(REG.get("vault", {}).get("crow_dir") or HOME / "local/state")
+
+
+def projects():
+    return [p for p in REG["projects"] if Path(p["path"]).resolve() != HOME.resolve()]
+
+
+def project(name):
+    for p in projects():
+        if p["name"] == name or name in p.get("aliases", []):
+            return p
+    sys.exit(f"crow: unknown project '{name}' (see: crow ls)")
+
+
+def owner_of(path):
+    """Registered project owning path; <repo>.wt/* and <repo>.live count as the repo."""
+    path = os.path.abspath(path).rstrip("/") + "/"
+    best = None
+    for p in projects():
+        root = p["path"].rstrip("/")
+        for prefix in (root + "/", root + ".wt/", root + ".live/"):
+            if path.startswith(prefix) and (not best or len(root) > len(best["path"].rstrip("/"))):
+                best = p
+    return best
+
+
+def frontmatter(path):
+    try:
+        text = path.read_text(errors="replace")
+    except OSError:
+        return {}
+    m = re.match(r"---\n(.*?)\n---", text, re.S)
+    if not m:
+        return {}
+    try:
+        meta = yaml.safe_load(m.group(1))
+    except yaml.YAMLError:
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def entries(folder):
+    """Skills, commands or agents in a .claude subfolder: <name>/SKILL.md or <name>.md."""
+    out = []
+    if not folder.is_dir():
+        return out
+    for item in sorted(folder.iterdir()):
+        f = item / "SKILL.md" if item.is_dir() else item
+        if f.suffix != ".md" or not f.is_file():
+            continue
+        meta = frontmatter(f)
+        desc = " ".join(str(meta.get("description", "")).split())
+        out.append({"name": meta.get("name") or item.stem, "description": desc, "path": str(f)})
+    return out
+
+
+def settings(root):
+    hooks, deny, ask = [], [], []
+    for name in ("settings.json", "settings.local.json"):
+        f = root / ".claude" / name
+        try:
+            data = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        for event, groups in (data.get("hooks") or {}).items():
+            for g in groups:
+                for h in g.get("hooks", []):
+                    hooks.append({"event": event, "matcher": g.get("matcher", ""), "command": h.get("command", ""), "file": str(f)})
+        perms = data.get("permissions") or {}
+        deny += perms.get("deny", [])
+        ask += perms.get("ask", [])
+    return hooks, deny, ask
+
+
+def git_hooks(root):
+    r = subprocess.run(["git", "-C", str(root), "rev-parse", "--git-path", "hooks"], capture_output=True, text=True)
+    out = []
+    if r.returncode == 0:
+        d = Path(r.stdout.strip())
+        d = d if d.is_absolute() else root / d
+        if d.is_dir():
+            out = sorted(f.name for f in d.iterdir() if f.is_file() and os.access(f, os.X_OK) and not f.name.endswith(".sample"))
+    if (root / ".pre-commit-config.yaml").exists():
+        out.append("pre-commit (.pre-commit-config.yaml)")
+    return out
+
+
+def index(p):
+    root = Path(p["path"])
+    claude = root / ".claude"
+    hooks, deny, ask = settings(root)
+    instructions = [str(f) for f in (root / "CLAUDE.md", claude / "CLAUDE.md", root / "CLAUDE.local.md", root / "AGENTS.md") if f.is_file()]
+    instructions += [str(f) for f in sorted((claude / "rules").glob("*.md"))] if (claude / "rules").is_dir() else []
+    hub_notes = [str(f) for f in sorted((HOME / "local/skills" / p["name"]).rglob("*.md"))] if (HOME / "local/skills" / p["name"]).is_dir() else []
+    ledger = HOME / "local/reviews" / f"{p['name']}.md"
+    return {
+        "name": p["name"], "path": str(root), "scope": p.get("scope"), "forge": p.get("forge"),
+        "reviewers": p.get("reviewers", []), "logics": (root / "logics").is_dir(),
+        "instructions": instructions,
+        "skills": entries(claude / "skills"), "commands": entries(claude / "commands"), "agents": entries(claude / "agents"),
+        "hub_notes": hub_notes, "review_ledger": str(ledger) if ledger.is_file() else None,
+        "not_in_hub": {"hooks": hooks, "deny": deny, "ask": ask, "git_hooks": git_hooks(root)},
+    }
+
+
+def print_index(ix):
+    print(f"# {ix['name']} ({ix['scope']}, {ix['forge']}) at {ix['path']}")
+    print("\nRead first, follow as if in the repo:")
+    for f in ix["instructions"] or ["(no CLAUDE.md / AGENTS.md)"]:
+        print(f"  {f}")
+    for label in ("skills", "commands", "agents"):
+        if ix[label]:
+            print(f"\nRepo {label} (read the file when the task matches):")
+            for s in ix[label]:
+                print(f"  {s['name']}: {s['description'][:140] or '(no description)'}\n    {s['path']}")
+    if ix["hub_notes"] or ix["review_ledger"]:
+        print("\nHub notes for this project:")
+        for f in ix["hub_notes"] + ([ix["review_ledger"]] if ix["review_ledger"] else []):
+            print(f"  {f}")
+    if ix["logics"]:
+        print(f"\nLogics: yes (run logics-manager from {ix['path']})")
+    n = ix["not_in_hub"]
+    if n["hooks"] or n["deny"] or n["ask"]:
+        print("\nNOT active in a hub session (only a repo session runs these):")
+        for h in n["hooks"]:
+            print(f"  hook {h['event']} [{h['matcher'] or '*'}]: {h['command']}")
+        for r in n["deny"]:
+            print(f"  deny {r}  (treat as forbidden here too)")
+        for r in n["ask"]:
+            print(f"  ask {r}  (get the owner's OK here too)")
+    if n["git_hooks"]:
+        print(f"\nGit hooks still run from here: {', '.join(n['git_hooks'])}")
+    print("\nStay here for lookups and small fixes. Code beyond a small fix, design, MR/push or review work:"
+          f"\n  crow handoff {ix['name']} --task \"...\" --end-state \"...\"")
+
+
+def handoff(p, task, end_state, context, now=None):
+    ix = index(p)
+    now = now or datetime.now()
+    lines = [
+        f"Hand-off from the crow hub ({now:%Y-%m-%d %H:%M}).",
+        "",
+        f"Task: {task}",
+        f"End state: {end_state}",
+    ]
+    if context:
+        lines += ["", f"Context from the hub: {context}"]
+    docs = [Path(f).relative_to(ix["path"]).as_posix() for f in ix["instructions"]]
+    names = [s["name"] for s in ix["skills"] + ix["commands"]]
+    use = [f"follow {', '.join(docs)}"] if docs else []
+    use += [f"use its skills by name when they match ({', '.join(names)})"] if names else []
+    if use:
+        lines += ["", f"Use this repo's own tools: {' and '.join(use)}."]
+    hub = []
+    prefs = HOME / "local/owner-prefs.md"
+    if prefs.is_file():
+        hub.append(f"Owner preferences (all projects): {prefs}")
+    for f in ix["hub_notes"]:
+        hub.append(f"Hub notes for this repo: {f}")
+    if ix["review_ledger"]:
+        hub.append(f"Review patterns for this repo: {ix['review_ledger']} and {HOME / 'local/reviews/common.md'}")
+    if p.get("forge") in ("github", "gitlab"):
+        rv = f" (reviewers: {', '.join(ix['reviewers'])})" if ix["reviewers"] else ""
+        hub.append(f"Opening an MR/PR: use the `mr` skill (repo template, title validated first, owner assigned, ask which reviewer{rv}).")
+    hub.append("Commits: `type[SCOPE]: message` (new|chg|fix, SCOPE = file kinds, uppercase, `/`-separated), no AI attribution.")
+    hub.append(f"Worktrees: {ix['path']}.wt/<name>, never /tmp.")
+    if p.get("scope") == "work":
+        hub.append("Work repo: show each change before committing, ask before every push, never merge.")
+    lines += ["", "Hub rules that apply here:"] + [f"- {h}" for h in hub]
+    lines += ["", "When done or blocked, run /wrap so the hub can pick up the outcome."]
+    text = "\n".join(lines) + "\n"
+    out = STATE / "handoffs" / f"{now:%Y-%m-%d-%H%M}-{p['name']}.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
+    return out, text
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="crow-project", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    w = sub.add_parser("work"); w.add_argument("project"); w.add_argument("--json", action="store_true")
+    h = sub.add_parser("handoff"); h.add_argument("project")
+    h.add_argument("--task", required=True); h.add_argument("--end-state", required=True,
+                   help="what the owner's approval unlocks, e.g. 'commit and push after my OK, open the MR with the mr skill'")
+    h.add_argument("--context", default="")
+    s = sub.add_parser("which"); s.add_argument("path")
+    a = ap.parse_args()
+    if a.cmd == "work":
+        ix = index(project(a.project))
+        print(json.dumps(ix, indent=2)) if a.json else print_index(ix)
+    elif a.cmd == "handoff":
+        out, text = handoff(project(a.project), a.task, a.end_state, a.context)
+        print(f"crow: hand-off note saved to {out}", file=sys.stderr)
+        sys.stdout.write(text)
+    elif a.cmd == "which":
+        p = owner_of(a.path)
+        if p:
+            print(p["name"])
+        else:
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
