@@ -112,8 +112,9 @@ def main():
         proj = meta.get("project", "other")
         label = meta.get("label", rid)
         by_proj.setdefault(proj, []).append((rid, label, meta, text, sec))
-        if sec.get("Paused for the owner", "").strip():
-            needs.append(f"<h3>{html.escape(proj)} · {html.escape(label)}</h3>" + md(sec["Paused for the owner"]))
+        paused = sec.get("Paused for the owner", "").strip()
+        if paused and not re.match(r"^[-*\s]*(nothing|none)\b[.:]?\s*$", paused.splitlines()[0], re.I):
+            needs.append(f"<h3>{html.escape(proj)} · {html.escape(label)}</h3>" + md(paused))
 
     cards = []
     for proj, items in by_proj.items():
