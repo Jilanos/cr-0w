@@ -31,3 +31,6 @@ Render only with the shell checkout's `scripts/shot.sh`, from a scratch dir outs
   there: both modules go compact below `compactBelow` (1400 px by default). Check with
   `BAR_LAYOUT=<your shell-config.json> crow-usage/test/render.sh ...` → `bar-vertical-crop.png`.
 - Gauges match crow watch: 9 px bars, radius 2, solid `borderSubtle` track, no outline.
+- Row clicks: left opens the session through `crow focus` (kitty remote control finds the
+  window holding the session pid or one of its parents; no window: `cdx <account> --dir <cwd>
+  --resume` in a new kitty window), right copies the id. `crow focus ... --dry-run` shows the plan.

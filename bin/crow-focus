@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""crow-focus: bring a Claude session to the front, or resume it when no window holds it.
+
+  crow-focus --pid PID --account ACCOUNT --cwd DIR [--dry-run]
+
+Focus: asks every kitty instance (remote control, socket-only) for its windows and focuses the
+one running PID, matching the window's own process or any ancestor of PID (the shell the
+session was started from). Resume: when no window holds it (the process is gone or runs
+outside kitty), opens a new kitty window in DIR running `cdx ACCOUNT --dir DIR --resume`.
+--dry-run prints what it would do and does nothing.
+"""
+import glob, json, os, pwd, subprocess, sys
+
+REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+
+
+def ancestors(pid, proc="/proc"):
+    """pid and its parents, nearest first."""
+    out = []
+    while pid > 1 and pid not in out:
+        out.append(pid)
+        try:
+            with open(f"{proc}/{pid}/stat") as fh:
+                pid = int(fh.read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return out
+
+
+def find_window(kitty_ls, pid, chain=None):
+    """(window id, os window focused) of the window holding pid, else None."""
+    chain = chain if chain is not None else ancestors(pid)
+    for osw in kitty_ls:
+        for tab in osw.get("tabs", []):
+            for win in tab.get("windows", []):
+                pids = {win.get("pid")} | {p.get("pid") for p in win.get("foreground_processes", [])}
+                if pids & set(chain):
+                    return win["id"]
+    return None
+
+
+def kitty_ls(sock):
+    r = subprocess.run(["kitten", "@", "--to", sock, "ls"], capture_output=True, text=True, timeout=5)
+    return json.loads(r.stdout) if r.returncode == 0 else []
+
+
+def focus(pid):
+    for sock in sorted(glob.glob(f"{RUNTIME}/kitty-*")):
+        sock = "unix:" + sock
+        try:
+            wid = find_window(kitty_ls(sock), pid)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            continue
+        if wid is not None:
+            subprocess.run(["kitten", "@", "--to", sock, "focus-window", "--match", f"id:{wid}"], check=True)
+            return sock, wid
+    return None
+
+
+def clean_env():
+    """Detach from the calling session: real HOME, no inherited Claude/cdx variables."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC_", "CDX_"))}
+    env["HOME"] = REAL_HOME
+    return env
+
+
+def main(argv):
+    opts, dry = {}, "--dry-run" in argv
+    args = [a for a in argv if a != "--dry-run"]
+    for i in range(0, len(args) - 1, 2):
+        opts[args[i].lstrip("-")] = args[i + 1]
+    try:
+        pid = int(opts.get("pid", 0))
+    except ValueError:
+        sys.exit(__doc__)
+    account, cwd = opts.get("account"), opts.get("cwd")
+    if not account or not cwd:
+        sys.exit(__doc__)
+    if dry:
+        print(f"focus the kitty window holding pid {pid}, else: kitty --directory {cwd} cdx {account} --dir {cwd} --resume")
+        return 0
+    if pid and (hit := focus(pid)):
+        print(f"focused window {hit[1]}")
+        return 0
+    if not os.path.isdir(cwd):
+        sys.exit(f"crow-focus: {cwd} is gone, cannot resume")
+    subprocess.Popen(["kitty", "--title", f"crow · {os.path.basename(cwd)}", "--directory", cwd,
+                      "cdx", account, "--dir", cwd, "--resume"], env=clean_env(), cwd=cwd,
+                     start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
+    print("resuming in a new kitty window")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

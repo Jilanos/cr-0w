@@ -542,7 +542,13 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: row.rowId ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: CrowStore.copy(row.rowId)
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    // Left: open the session (a headless run has no window: copy its id).
+                    // Right: copy the session id.
+                    onClicked: mouse => {
+                        if (mouse.button === Qt.RightButton || !row.d || row.d.kind === "run" || row.isFin) CrowStore.copy(row.rowId)
+                        else CrowStore.openSession(row.d)
+                    }
                 }
             }
         }

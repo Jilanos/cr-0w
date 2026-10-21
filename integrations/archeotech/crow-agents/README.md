@@ -13,8 +13,9 @@ sessions waiting on you, and toasts when a run ends.
 - **Panel** (`panel-content`): the same groups and two-line rows as `crow watch`:
   RUNS / SESSIONS / FINISHED (5 most recent). Row: state glyph, project, last
   activity, context (k), commits, task; then `↳` what it's doing now, "waiting
-  for your reply", or the finished status (+ `resumed N×`). Click a row to copy
-  its run/session id (`wl-copy`). "open crow watch" launches the watch command.
+  for your reply", or the finished status (+ `resumed N×`). Left click on a session
+  focuses its kitty window (`crow focus`), or resumes it in a new one when none holds it;
+  right click copies the run/session id (`wl-copy`), and so does a left click on a headless run. "open crow watch" launches the watch command.
 - **Notifications** (`notify-send`): a background run finished (done or failed),
   and, as a separate critical toast, a run stopped on the usage limit. Runs that
   had already ended when the shell started don't fire; a run never fires twice.

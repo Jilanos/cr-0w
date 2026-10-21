@@ -70,6 +70,13 @@ Singleton {
         Quickshell.execDetached(_sh(watchCommand))
     }
 
+    // Focus the session's kitty window, or resume it in a new one when none holds it.
+    function openSession(d) {
+        if (!d || !d.account || !d.cwd) return
+        Quickshell.execDetached(["bash", "-lc", 'PATH="$HOME/.local/bin:$PATH"; exec crow focus --pid "$1" --account "$2" --cwd "$3"',
+                                 "crow-focus", String(d.pid || 0), String(d.account), String(d.cwd)])
+    }
+
     function copy(id) {
         if (!id) return
         Quickshell.execDetached(["wl-copy", id])
