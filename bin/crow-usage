@@ -713,6 +713,27 @@ def rtk_failures():
     return total
 
 
+def resolve_days(window, live, store):
+    """Per-day rollups for the scan window, oldest first; updates store in place.
+
+    Finished days read from the store, frozen once the day is over, so history survives
+    transcript cleanup. Only today and yesterday (late writes after midnight) are recomputed
+    from transcripts; yesterday is saved on every run so it freezes when it ages out.
+    A finished day missing from the store is frozen from the transcripts, when it has any.
+    Returns ({date: rollup}, store_changed)."""
+    out, changed = {}, False
+    for i, d in enumerate(window):
+        recent = i >= len(window) - 2
+        if d in store and not recent:
+            out[d] = store[d]
+            continue
+        out[d] = live[d] if live[d]["sessions"] or d not in store else store[d]
+        if i < len(window) - 1 and live[d]["sessions"] and store.get(d) != live[d]:
+            store[d] = live[d]
+            changed = True
+    return out, changed
+
+
 def build(days):
     sessions = collect_sessions(max(days, 7))
     today = dt.date.today().isoformat()
@@ -724,18 +745,12 @@ def build(days):
             if d in slices:
                 slices[d].append((s, {**x, "_last": d == last}))
     live = {d: rollup(slices[d]) for d in window}
-    # Past days in the scan window are complete: freeze them so history outlives transcript cleanup.
     store = load_store()
-    changed = False
-    for d in window[1:-1]:
-        if d not in store and live[d]["sessions"]:
-            store[d] = live[d]
-            changed = True
+    days, changed = resolve_days(window, live, store)
     if changed:
         save_store(store)
     hist_dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(HISTORY_DAYS))]
-    history = [{"date": d, **(live.get(d) if d in live and (d == today or live[d]["sessions"]) else store.get(d) or rollup([]))}
-               for d in hist_dates]
+    history = [{"date": d, **(days.get(d) or store.get(d) or rollup([]))} for d in hist_dates]
     status = run_json(["cdx", "status", "--json"]) or {}
     limits = burn_rates([{
         "account": r.get("session_name"),
@@ -765,7 +780,7 @@ def build(days):
         "today": live[today],
         "week": week,
         "month": month,
-        "days": [{"date": d, **strip(live[d] if live[d]["sessions"] or d not in store else store[d])} for d in window[-7:]],
+        "days": [{"date": d, **strip(days[d])} for d in window[-7:]],
         "history": [{"date": h["date"], **strip(h)} for h in history],
         "sessions": sessions,
         "rtk": rtk,
