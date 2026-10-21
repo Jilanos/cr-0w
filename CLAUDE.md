@@ -47,10 +47,14 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 - Before a recurring task, read `runbooks/README.md` and follow the matching runbook instead of re-exploring.
 - Whenever you work out how to do a recurring task or solve a non-obvious problem, write or update a runbook in the same session (generic in `runbooks/`, private specifics in `local/runbooks/`) and add it to the index.
 - Turn it into a skill when the user would invoke it by name. Prefer scripts in `bin/` for anything mechanical.
-- Working on a registered project from the hub: first load that repo's own skills (`<repo>/.claude/skills/`) and the hub's `local/skills/<project>/`, and follow them as if you were in the repo.
-- Before proposing any design in a repo, search it for how it already solves the same thing (steps, helpers, CI jobs) and build on that. Never announce an obstacle (new account, secret, ticket) before checking. Beyond small fixes, hand the work to a repo session (`crow term <project> "<prompt>"`).
+- Before proposing any design in a repo, search it for how it already solves the same thing (steps, helpers, CI jobs) and build on that. Never announce an obstacle (new account, secret, ticket) before checking.
 - Review learning: `local/reviews/` holds the pattern ledgers (`common.md` + one per project). `review-threads` feeds them from every review comment; the `review` skill applies them to every diff (peer review, self-review, and the `mr` gate before opening).
 - Goal: every repeat costs fewer tokens than the last.
+
+## Registered projects (runbooks/sub-project-work.md)
+- A hub session never runs a repo's hooks or permission rules. Request mostly about one repo (code beyond a small fix, design, MR/push, review threads): `crow handoff <project> --task "..." --end-state "..."` opens a repo session with a hand-off note; keep only the hub part.
+- Lookup or small fix from the hub: run `crow work <project>` first, read the instructions and matching skills it lists, honour its denies as if they applied here.
+- `bin/crow-hub-guard` asks before any commit, push, rebase or MR in a registered repo and before a worktree in /tmp. Prefer handing off over approving it; an OK covers that one command only.
 
 ## Session hygiene
 - On start: read the open threads and mention any that are stale or due.
