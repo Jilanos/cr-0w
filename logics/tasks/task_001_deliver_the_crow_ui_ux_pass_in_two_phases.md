@@ -69,6 +69,10 @@
 - 2026-10-21 night (branch night/crow-ui-fixes): item_004 AC11 done (finished days frozen in usage-days.json, today and yesterday recomputed; tests/test_crow_usage_store.py); item_005 AC14 row click done (left opens or resumes via crow focus, right copies the id); short gauge bars keep one filled and one empty cell.
 - Open: the half-block gauge sits below the label's x-height centre (glyph geometry, needs an owner choice); item_005 AC14 per-session cost in the agents panel waits for the design pass; `crow focus` resume path (cdx --resume) unverified live.
 
+# Notes
+## What matters on the board (design pass, 2026-10-21)
+crow watch and the two bar panels get glanced at, not studied: the owner opens them to answer four questions, in this order. First, who needs me: a session waiting for a reply, a run that failed, a session stopped by a usage limit that could go on another account. These come first, with how long they have waited. Second, what is working right now: one line per live agent saying what it is doing this minute; the context gauge only matters once a session nears compaction (70 % and up), so below that it can stay out of the row. Third, what finished while I was away: each finished run with its outcome and commit count, plus its report in the details, which is the morning read. Fourth, account headroom: how much of the 5-hour and weekly windows is left, whether the account in use runs out before its reset, and which account the work can move to. Cost is a figure to glance at (today's total, per-agent cost on the row), not a section. Everything else is analysis and belongs in Savings and History, or in the selected row's details: the in/out/cache token split, per-session model names, tool weights, the savings prose, the who-worked-when timeline. Today that analysis crowds the four answers off the first screen. Comparison of the options: [crow watch UX options](../../docs/crow-watch-ux-options.md).
+
 # Links
 - Request: `req_000_crow_watch_and_bar_modules_ui_ux_pass_session_titles_savings_stats`
 - Product brief(s): `prod_001_crow_observability_surfaces`

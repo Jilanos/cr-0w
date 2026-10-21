@@ -18,6 +18,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ---------- data (mirrors crow-runs collect()) ----------
@@ -59,6 +60,22 @@ type finished struct {
 	Commits     []string `json:"commits"`
 }
 
+// interrupted: a session cut off by a usage limit (mirrors crow-sessions list --json).
+type interrupted struct {
+	ID          string   `json:"conversation_id"`
+	Account     string   `json:"account"`
+	Project     string   `json:"project"`
+	Cwd         string   `json:"cwd"`
+	Branch      string   `json:"branch"`
+	LastEvent   string   `json:"last_event"`
+	Limit       string   `json:"limit"`
+	ResetsAt    int64    `json:"resets_at"`
+	FirstPrompt string   `json:"first_prompt"`
+	LastPrompt  string   `json:"last_prompt"`
+	Workspaces  []string `json:"workspaces"`
+	Relaunched  any      `json:"relaunched"`
+}
+
 type snapshot struct {
 	Slots struct {
 		Busy int `json:"busy"`
@@ -95,6 +112,24 @@ func fetch() tea.Msg {
 	return dataMsg{snap: &s}
 }
 
+type sessionsMsg struct{ list []interrupted }
+
+// fetchInterrupted reads the registry of sessions stopped by a limit; a failure
+// leaves the board as it was (the registry is an extra, not the board's source).
+func fetchInterrupted() tea.Msg {
+	out, err := exec.Command(crowBin("crow-sessions"), "list", "--json").Output()
+	if err != nil {
+		return sessionsMsg{}
+	}
+	var reg struct {
+		Sessions []interrupted `json:"sessions"`
+	}
+	if json.Unmarshal(out, &reg) != nil {
+		return sessionsMsg{}
+	}
+	return sessionsMsg{list: reg.Sessions}
+}
+
 func fetchReport(id string) tea.Cmd {
 	return func() tea.Msg {
 		out, _ := exec.Command(crowBin("crow-runs"), "report", id).Output()
@@ -117,10 +152,23 @@ const (
 
 var viewNames = []string{"Agents", "Usage", "Savings", "History"}
 
+// Agent groups, in the order the board lists them: what needs the owner, what
+// is working, what finished, then idle sessions.
+const (
+	gNeed = iota
+	gWork
+	gDone
+	gIdle
+)
+
+var groupNames = []string{"Needs you", "Working", "Finished", "Idle"}
+
 type item struct {
 	key   string
+	group int
 	agent *agent
 	fin   *finished
+	intr  *interrupted
 }
 
 type model struct {
@@ -139,6 +187,7 @@ type model struct {
 
 	usage        *usage
 	usageErr     error
+	intr         []interrupted // sessions stopped by a usage limit
 	usageLoading bool
 	uCursor      int
 	period       string // d | w | m (Savings, History)
@@ -152,36 +201,55 @@ func (m model) clock() time.Time {
 	return time.Now()
 }
 
-// rebuild orders the agent list: runs, then sessions waiting on you first, then finished runs.
+// recentStop: interrupted sessions older than this are history, not something to act on.
+const recentStop = 24 * time.Hour
+
+// rebuild orders the agent list by what it asks of the owner: sessions waiting
+// on a reply, failed runs and sessions stopped by a limit first; then runs and
+// working sessions; then finished runs; idle sessions last.
 func (m *model) rebuild() {
 	m.items = nil
 	if m.snap == nil {
 		return
 	}
+	groups := make([][]item, len(groupNames))
+	add := func(g int, it item) { it.group = g; groups[g] = append(groups[g], it) }
+	live := map[string]bool{}
 	for i := range m.snap.Agents {
-		if a := &m.snap.Agents[i]; a.Kind == "run" {
-			m.items = append(m.items, item{key: keyOf(a), agent: a})
+		a := &m.snap.Agents[i]
+		live[a.SessionID] = true
+		switch {
+		case a.State == "waiting":
+			add(gNeed, item{key: keyOf(a), agent: a})
+		case a.Kind == "run" || a.State == "working" || a.State == "quiet":
+			add(gWork, item{key: keyOf(a), agent: a})
+		default:
+			add(gIdle, item{key: keyOf(a), agent: a})
 		}
 	}
-	var sess []item
-	for i := range m.snap.Agents {
-		if a := &m.snap.Agents[i]; a.Kind == "session" {
-			sess = append(sess, item{key: keyOf(a), agent: a})
-		}
-	}
-	rank := map[string]int{"waiting": 0, "working": 1, "quiet": 2, "idle": 3}
-	for i := 1; i < len(sess); i++ { // stable insertion sort: waiting, working, then the rest
-		for j := i; j > 0 && rank[sess[j].agent.State] < rank[sess[j-1].agent.State]; j-- {
-			sess[j], sess[j-1] = sess[j-1], sess[j]
-		}
-	}
-	m.items = append(m.items, sess...)
 	for i := range m.snap.Finished {
 		if i >= 8 {
 			break
 		}
 		f := &m.snap.Finished[i]
-		m.items = append(m.items, item{key: f.RunID, fin: f})
+		g := gDone
+		if f.Status != "done" {
+			g = gNeed
+		}
+		add(g, item{key: f.RunID, fin: f})
+	}
+	for i := range m.intr {
+		s := &m.intr[i]
+		if s.Relaunched != nil || live[s.ID] {
+			continue
+		}
+		if sec := m.since(s.LastEvent); sec < 0 || sec > recentStop.Seconds() {
+			continue
+		}
+		add(gNeed, item{key: s.ID, intr: s})
+	}
+	for _, g := range groups {
+		m.items = append(m.items, g...)
 	}
 	m.cursor = 0
 	for i, it := range m.items {
@@ -204,7 +272,9 @@ func keyOf(a *agent) string {
 	return fmt.Sprint(a.PID)
 }
 
-func (m model) Init() tea.Cmd { return tea.Batch(fetch, tick(), fetchUsage, usageTick()) }
+func (m model) Init() tea.Cmd {
+	return tea.Batch(fetch, tick(), fetchUsage, fetchInterrupted, usageTick())
+}
 
 func (m model) selected() *item {
 	if m.cursor < len(m.items) {
@@ -257,13 +327,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, usageTick()
 		}
 		m.usageLoading = true
-		return m, tea.Batch(fetchUsage, usageTick())
+		return m, tea.Batch(fetchUsage, fetchInterrupted, usageTick())
 	case usageMsg:
 		m.usageLoading, m.usageErr = false, msg.err
 		if msg.u != nil {
 			m.usage = msg.u
 			m.uCursor = max(0, min(m.uCursor, len(m.usage.rows)-1))
 		}
+	case sessionsMsg:
+		m.intr = msg.list
+		m.rebuild()
 	case reportMsg:
 		m.reports[msg.id] = msg.text
 	case tea.KeyMsg:
@@ -309,10 +382,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter", "o":
 			if m.view == vAgents {
 				if it := m.selected(); it != nil {
-					if it.agent != nil {
+					switch {
+					case it.agent != nil:
 						m.notice = openProject(it.agent.Project)
-					} else {
+					case it.fin != nil:
 						m.notice = openProject(it.fin.Project)
+					default:
+						m.notice = openProject(it.intr.Project)
 					}
 				}
 			} else if s := m.usage.selected(m.uCursor); s != nil {
@@ -426,7 +502,11 @@ func (m model) statusRight() line {
 			p := *c.Remaining5hPct
 			l = append(l, seg{c.Account + " ", sSub})
 			l = append(l, lineBar(float64(p), 8, levelStyle(p))...)
-			l = append(l, seg{fmt.Sprintf(" %d%%", p), levelStyle(p)}, seg{"  ·  ", sDim})
+			l = append(l, seg{fmt.Sprintf(" %d%%", p), levelStyle(p)})
+			if c.EmptyAt != "" { // runs out before its reset: the one headroom fact to see from every view
+				l = append(l, seg{" out ~" + hhmm(c.EmptyAt), lipgloss.NewStyle().Foreground(cYellow).Bold(true)})
+			}
+			l = append(l, seg{"  ·  ", sDim})
 		}
 		l = append(l, seg{money(u.Today.CostUSD), sBold}, seg{" today", sSub}, seg{"  ·  ", sDim})
 	}
@@ -465,8 +545,8 @@ func (m model) helpView(h int) block {
 	for _, r := range rows {
 		body = append(body, line{{"  " + pad(r[0], 18), sAcc}, {r[1], sPlain}})
 	}
-	body = append(body, line{}, line{{"  Glyphs  ", sHead}, {"● working  ◆ needs you  ○ idle  ✓ done  ✗ failed  ‖ usage limit", sSub}},
-		line{{"  Context ", sHead}, {" share of the model's context window the session fills; compacts near 100 %", sSub}})
+	body = append(body, line{}, line{{"  Glyphs  ", sHead}, {"● working  ◆ needs you  ○ idle  ✓ done  ✗ failed  ‖ stopped by a usage limit", sSub}},
+		line{{"  Context ", sHead}, {" ctx 82 %: the share of the context window a session fills, shown from 70 %; it compacts near 100 %", sSub}})
 	w := min(m.w, 90)
 	b := box(line{{"Keys", sAcc}}, nil, body, w, 0, 0, -1, true)
 	pad := strings.Repeat(" ", (m.w-w)/2)

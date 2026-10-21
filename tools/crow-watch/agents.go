@@ -62,22 +62,6 @@ func clockOf(iso string) string {
 	return t.Local().Format("15:04")
 }
 
-// ctxCell: context as a thin bar + %, green < 70, yellow 70–85, red above.
-func ctxCell(tokens int) []seg {
-	if tokens == 0 {
-		return []seg{{pad("–", 14), sSub}}
-	}
-	pct := float64(tokens) * 100 / float64(contextWindow())
-	style := sOK
-	switch {
-	case pct >= 85:
-		style = sErr
-	case pct >= 70:
-		style = lipgloss.NewStyle().Foreground(cYellow).Bold(true)
-	}
-	return append(lineBar(pct, 8, style), seg{padL(fmt.Sprintf("%.0f%%", pct), 5) + " ", style})
-}
-
 // agentCost: what the agent's session has cost so far, from the usage data.
 func (m model) agentCost(sid string) string {
 	if m.usage == nil {
@@ -89,107 +73,188 @@ func (m model) agentCost(sid string) string {
 	return ""
 }
 
-type agentCols struct{ project, task, state int }
+// rowCols: one line per agent. Fixed project, age, context and cost columns
+// around a task and a "what is happening" column that share the rest.
+type rowCols struct{ project, task, detail, age, ctx, cost int }
 
-func agCols(width int) agentCols {
-	c := agentCols{project: 18, state: 15}
-	c.task = max(12, width-2-c.project-c.state-14-8-8)
+func agCols(width int) rowCols {
+	c := rowCols{project: 16, age: 9, ctx: 9, cost: 8}
+	if width < 100 {
+		c.project, c.cost = 13, 0
+	}
+	flex := max(20, width-2-c.project-c.age-c.ctx-c.cost)
+	c.task = max(12, flex*45/100)
+	c.detail = flex - c.task
 	return c
 }
 
-func (m model) agentHeader(width int) []line {
-	c := agCols(width)
-	h := "  " + pad("project", c.project) + pad("task / session", c.task) + pad("state", c.state) + pad("context used", 14) + padL("cost", 8) + padL("commits", 8)
-	return []line{{{h, sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
+// ctxTag: the context gauge only once a session nears compaction (70 % and up).
+func ctxTag(tokens int) seg {
+	pct := float64(tokens) * 100 / float64(contextWindow())
+	switch {
+	case tokens == 0 || pct < 70:
+		return seg{"", sPlain}
+	case pct >= 85:
+		return seg{fmt.Sprintf("ctx %.0f%%", pct), sErr}
+	default:
+		return seg{fmt.Sprintf("ctx %.0f%%", pct), lipgloss.NewStyle().Foreground(cYellow).Bold(true)}
+	}
 }
 
-func (m model) itemLines(it item, width int) []line {
+// commitCount: "3 commits", or "" when there are none.
+func commitCount(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d %s", n, plural(n, "commit", "commits"))
+}
+
+func joinDot(parts ...string) string {
+	var out []string
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, " · ")
+}
+
+// limitName: the registry's limit kind in words.
+func limitName(kind string) string {
+	switch kind {
+	case "five_hour":
+		return "5h limit"
+	case "seven_day", "week", "weekly":
+		return "weekly limit"
+	}
+	return "usage limit"
+}
+
+// intrTitle: the session's title from the usage data, else its first prompt.
+func (m model) intrTitle(s *interrupted) string {
+	if m.usage != nil {
+		if u := m.usage.byID[s.ID]; u != nil && u.Title != "" {
+			return u.Title
+		}
+	}
+	t, _, _ := strings.Cut(strings.TrimSpace(s.FirstPrompt), "\n")
+	return cmp.Or(t, "session "+short(s.ID))
+}
+
+func resetClock(unix int64) string {
+	if unix <= 0 {
+		return ""
+	}
+	return time.Unix(unix, 0).Local().Format("15:04")
+}
+
+// itemLine: one row. glyph · project · task · what is happening · age · context · cost.
+func (m model) itemLine(it item, width int) line {
 	c := agCols(width)
-	if a := it.agent; a != nil {
+	var glyph seg
+	var project, task, when, cost string
+	var detail seg
+	ctx := seg{"", sPlain}
+	ps, ts := sBold, sPlain
+	switch {
+	case it.agent != nil:
+		a := it.agent
 		s := st(a.State)
-		task := cmp.Or(a.Label, a.Title)
+		glyph = seg{s.glyph + " ", s.style}
+		project = a.Project
+		task = cmp.Or(a.Label, a.Title)
 		if task == "" {
 			task = map[bool]string{true: "session " + short(a.SessionID), false: "(not dispatched by crow)"}[a.Kind == "session"]
 		}
-		doing, dstyle := a.LastAction, sCyan
-		if a.State == "waiting" {
-			doing, dstyle = "waiting for your reply", sMagenta
+		action, _, _ := strings.Cut(a.LastAction, "\n")
+		switch a.State {
+		case "waiting":
+			detail = seg{"waiting for your reply", sMagenta}
+		case "idle":
+			detail, ps, ts = seg{action, sSub}, sSub, sSub
+		default:
+			detail = seg{action, sCyan}
 		}
-		stateStyle := s.style
-		if a.State == "idle" {
-			stateStyle = sSub
+		when = age(float64(a.LastActivityS))
+		ctx = ctxTag(a.ContextTokens)
+		cost = m.agentCost(a.SessionID)
+	case it.fin != nil:
+		f := it.fin
+		s := st(f.Status)
+		glyph = seg{s.glyph + " ", s.style}
+		project, task = f.Project, f.Label
+		resumed := ""
+		if len(f.ResumedFrom) > 0 {
+			resumed = fmt.Sprintf("resumed %d×", len(f.ResumedFrom))
 		}
-		commits := ""
-		if a.Kind == "run" {
-			commits = fmt.Sprint(len(a.Commits))
+		detail = seg{joinDot(s.label, commitCount(len(f.Commits)), resumed), s.style}
+		if f.Status == "done" {
+			ps, ts = sPlain, sSub
 		}
-		row := line{{s.glyph + " ", s.style}, {pad(a.Project, c.project-1) + " ", sBold}, {pad(task, c.task-1) + " ", sPlain},
-			{pad(s.label+" "+age(float64(a.LastActivityS)), c.state), stateStyle}}
-		row = append(row, ctxCell(a.ContextTokens)...)
-		row = append(row, seg{padL(m.agentCost(a.SessionID), 8), sYellow}, seg{padL(commits, 8), sCyan})
-		return []line{row, {{"  ↳ ", sDim}, {doing, dstyle}}}
+		if sec := m.since(f.EndedAt); sec >= 0 {
+			when = age(sec) + " ago"
+		}
+	default:
+		s := it.intr
+		glyph = seg{"‖ ", st("limit").style}
+		project, task = s.Project, m.intrTitle(s)
+		what := s.Account + " " + limitName(s.Limit)
+		if r := resetClock(s.ResetsAt); r != "" {
+			what += ", back " + r
+		}
+		if len(s.Workspaces) > 1 {
+			what += fmt.Sprintf(" · %d folders", len(s.Workspaces))
+		}
+		detail = seg{what, sYellow}
+		when = "at " + clockOf(s.LastEvent)
+		cost = m.agentCost(s.ID)
 	}
-	f := it.fin
-	s := st(f.Status)
-	extra := ""
-	if len(f.ResumedFrom) > 0 {
-		extra = fmt.Sprintf(" · resumed %d×", len(f.ResumedFrom))
+	l := line{glyph, {pad(project, c.project-1) + " ", ps}, {pad(task, c.task-1) + " ", ts},
+		{pad(detail.text, c.detail-1) + " ", detail.style}, {padL(when, c.age-1) + " ", sSub}, {padL(ctx.text, c.ctx-1) + " ", ctx.style}}
+	if c.cost > 0 {
+		l = append(l, seg{padL(cost, c.cost), sYellow})
 	}
-	return []line{{{s.glyph + " ", s.style}, {pad(f.Project, c.project-1) + " ", sPlain}, {pad(f.Label, c.task-1) + " ", sSub},
-		{pad(s.label+ended(m.since(f.EndedAt))+extra, c.state+14), s.style}, {padL("", 8), sPlain},
-		{padL(fmt.Sprint(len(f.Commits)), 8), sCyan}}}
+	return l
 }
 
-// agentList: group headings and rows; lm maps each item to its line range for selection.
+// agentList: the rows under group headings; lm maps each item to its line range for selection.
 type listMap struct{ start, end []int }
 
 func (m model) agentList(width int) ([]line, listMap) {
-	lines := m.agentHeader(width)
+	var lines []line
 	var lm listMap
-	runs, sess, nfin := 0, 0, 0
+	count := map[int]int{}
 	for _, it := range m.items {
-		switch {
-		case it.fin != nil:
-			nfin++
-		case it.agent.Kind == "run":
-			runs++
-		default:
-			sess++
-		}
+		count[it.group]++
 	}
-	slots := ""
-	if m.snap != nil {
-		slots = fmt.Sprintf("%d of %d slots busy", m.snap.Slots.Busy, m.snap.Slots.Max)
-	}
-	heading := func(name, extra string) {
-		if len(lines) > 2 {
+	heading := func(g int) {
+		if len(lines) > 0 {
 			lines = append(lines, line{})
 		}
-		lines = append(lines, line{{name, sAcc}, {"  " + extra, sSub}})
-	}
-	group := ""
-	for _, it := range m.items {
-		g := "fin"
-		if it.agent != nil {
-			g = it.agent.Kind
+		extra := fmt.Sprint(count[g])
+		switch g {
+		case gNeed:
+			if count[g] == 0 {
+				extra = "nothing waiting on you"
+			}
+		case gWork:
+			if m.snap != nil {
+				extra = fmt.Sprintf("%d of %d run slots busy", m.snap.Slots.Busy, m.snap.Slots.Max)
+			}
 		}
-		if g != group {
-			if g == "session" && group == "" {
-				heading("Runs", slots)
-				lines = append(lines, line{{"  none", sSub}})
-			}
-			switch g {
-			case "run":
-				heading("Runs", slots)
-			case "session":
-				heading("Sessions", fmt.Sprintf("%d open · waiting first", sess))
-			default:
-				heading("Finished today", fmt.Sprint(nfin))
-			}
-			group = g
+		lines = append(lines, line{{groupNames[g], sAcc}, {"  " + extra, sSub}})
+	}
+	if m.snap != nil {
+		heading(gNeed) // always shown: "nothing waiting on you" is an answer too
+	}
+	group := gNeed
+	for _, it := range m.items {
+		if it.group != group {
+			group = it.group
+			heading(group)
 		}
 		lm.start = append(lm.start, len(lines))
-		lines = append(lines, m.itemLines(it, width)...)
+		lines = append(lines, m.itemLine(it, width))
 		lm.end = append(lm.end, len(lines))
 	}
 	if len(m.items) == 0 {
@@ -210,6 +275,16 @@ func (m model) detailLines(width int) []line {
 		return []line{{{"nothing selected", sSub}}}
 	}
 	var out []line
+	wrap := func(text string, maxLines int) {
+		ls := strings.Split(lipgloss.NewStyle().Width(width-2).Render(strings.TrimSpace(text)), "\n")
+		for i, l := range ls {
+			if i == maxLines {
+				out = append(out, line{{"  …", sSub}})
+				break
+			}
+			out = append(out, line{{"  " + strings.TrimRight(l, " "), sPlain}})
+		}
+	}
 	commits := func(cs []string) {
 		if len(cs) == 0 {
 			return
@@ -219,6 +294,27 @@ func (m model) detailLines(width int) []line {
 			sha, msg, _ := strings.Cut(c, " ")
 			out = append(out, line{{sha, sYellow}, {" " + msg, sPlain}})
 		}
+	}
+	if s := it.intr; s != nil {
+		out = append(out, line{{"‖ stopped by the " + limitName(s.Limit) + "  ", st("limit").style}, {s.Project + "  ", sBold}, {m.intrTitle(s), sPlain}})
+		meta := joinDot("session "+short(s.ID), "on "+s.Account, "stopped "+clockOf(s.LastEvent))
+		if r := resetClock(s.ResetsAt); r != "" {
+			meta += " · resets " + r
+		}
+		if c := m.agentCost(s.ID); c != "" {
+			meta += " · " + c + " so far"
+		}
+		out = append(out, line{{meta, sSub}}, line{{joinDot(s.Cwd, s.Branch), sSub}})
+		if len(s.Workspaces) > 1 {
+			out = append(out, line{{fmt.Sprintf("ran in %d folders: cdx cannot hand it to another account as is", len(s.Workspaces)), sYellow}})
+		}
+		if s.LastPrompt != "" {
+			out = append(out, line{}, line{{"Last prompt", sHead}})
+			wrap(s.LastPrompt, 3)
+		}
+		out = append(out, line{}, line{{"Relaunch on another account", sHead}},
+			line{{"  crow relaunch " + short(s.ID), sCyan}, {"   asks before it moves the session", sSub}})
+		return out
 	}
 	if a := it.agent; a != nil {
 		s := st(a.State)
@@ -240,14 +336,18 @@ func (m model) detailLines(width int) []line {
 		if a.SubagentsActive > 0 {
 			meta += fmt.Sprintf(" · %d subagents", a.SubagentsActive)
 		}
-		out = append(out, line{{meta, sSub}}, line{{a.Cwd, sSub}})
+		out = append(out, line{{meta, sSub}})
+		if a.Cwd != "" {
+			out = append(out, line{{a.Cwd, sSub}})
+		}
 		if a.LastPrompt != "" {
 			out = append(out, line{}, line{{"Latest prompt", sHead}})
-			for _, l := range strings.Split(lipgloss.NewStyle().Width(width-2).Render(a.LastPrompt), "\n") {
-				out = append(out, line{{"  " + strings.TrimRight(l, " "), sPlain}})
-			}
+			wrap(a.LastPrompt, 3)
 		}
-		out = append(out, line{}, line{{"Recent activity", sHead}})
+		commits(a.Commits)
+		if len(a.Recent) > 0 {
+			out = append(out, line{}, line{{"Recent activity", sHead}})
+		}
 		for i := len(a.Recent) - 1; i >= 0; i-- { // newest first
 			e := a.Recent[i]
 			tool, rest, _ := strings.Cut(e.Action, ": ")
@@ -258,7 +358,6 @@ func (m model) detailLines(width int) []line {
 			rest, _, _ = strings.Cut(rest, "\n")
 			out = append(out, line{{clockOf(e.TS) + "  ", sSub}, {pad(tool, 16), ts}, {rest, sPlain}})
 		}
-		commits(a.Commits)
 		return out
 	}
 	f := it.fin
@@ -268,9 +367,7 @@ func (m model) detailLines(width int) []line {
 	if len(f.ResumedFrom) > 0 {
 		meta += " · resumed after " + short(f.ResumedFrom[0])
 	}
-	out = append(out, line{{meta, sSub}})
-	commits(f.Commits)
-	out = append(out, line{}, line{{"Report", sHead}})
+	out = append(out, line{{meta, sSub}}, line{}, line{{"Report", sHead}})
 	rep, ok := m.reports[f.RunID]
 	switch {
 	case !ok:
@@ -282,6 +379,7 @@ func (m model) detailLines(width int) []line {
 			out = append(out, line{{strings.TrimRight(l, " "), sPlain}})
 		}
 	}
+	commits(f.Commits)
 	return out
 }
 
@@ -381,13 +479,12 @@ func (m model) agentsView(h int) block {
 	if m.cursor < len(lm.start) {
 		sel = lm.start[m.cursor]
 	}
-	listH := min(len(list)+2, max(10, h*55/100))
+	listH := min(len(list)+2, max(10, h*60/100))
 	off := 0
 	if m.cursor < len(lm.end) && lm.end[m.cursor] > listH-2 {
 		off = lm.end[m.cursor] - (listH - 2)
 	}
 	hint := line{{"o open in kitty · c copy id", sSub}}
-	// box highlights one line; the selected item spans two, so mark both by rendering them plain.
 	listBox := m.agentBox(list, lm, listW, listH, off, sel, hint)
 	if wide {
 		tl := m.timelineLines(listW-4, h-listH-2)
@@ -396,16 +493,15 @@ func (m model) agentsView(h int) block {
 		right := box(title("Details", ""), line{{"PgUp/PgDn scroll", sSub}}, det, w-listW, h, min(m.detailOff, max(0, len(det)-(h-2))), -1, false)
 		return hcat([]int{listW, w - listW}, left, right)
 	}
+	// Details fit their content; the timeline only takes what is left once
+	// there is room for a useful one.
 	det := m.detailLines(w - 4)
 	rest := h - len(listBox)
-	tl := m.timelineLines(w-4, max(6, rest/2))
-	detH := min(len(det)+2, rest-len(tl)-2) // details fit their content; the timeline follows
-	if detH < 10 {                          // short terminal: details only, no timeline
-		detH, tl = rest, nil
-	}
+	detH := min(len(det)+2, rest)
 	out := append(listBox, box(title("Details", ""), line{{"PgUp/PgDn scroll", sSub}}, det, w, detH, min(m.detailOff, max(0, len(det)-(detH-2))), -1, false)...)
-	if tl != nil {
-		out = append(out, box(title("Today", "who worked when"), nil, tl, w, len(tl)+2, 0, -1, false)...)
+	if left := rest - detH; left >= 8 {
+		tl := m.timelineLines(w-4, left-2)
+		out = append(out, box(title("Today", "who worked when"), nil, tl, w, min(len(tl)+2, left), 0, -1, false)...)
 	}
 	return out
 }
