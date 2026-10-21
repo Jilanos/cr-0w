@@ -310,6 +310,8 @@ def collect(since="today", include_unledgered=False):
 # ---------- commands ----------
 
 def dispatch(a):
+    if subprocess.run([str(HOME / "bin/crow-accounts"), "require", ACCOUNT]).returncode:
+        sys.exit(1)
     p = project(a.project)
     cwd = p["path"]
     runs = [x for x in claude_procs() if "--print" in x["argv"]]

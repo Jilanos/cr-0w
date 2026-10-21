@@ -33,6 +33,7 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 📝 = show the exact draft and wait for an explicit OK.
 
 ## Hard rules
+- Commit subjects use `type[SCOPE]: message` in every repo: type `new`/`chg`/`fix`, SCOPE the file kinds touched, uppercase, `/`-separated (e.g. `chg[PY/MD]: ...`). A repo's own history or a different convention does not override it. `bin/crow-commit-msg-check` enforces it as a commit-msg hook.
 - NEVER add AI attribution: no Co-Authored-By, no "Generated with", no trailers, and no mention of AI in commits, MRs, PRs, tickets or docs.
 - Delegate to project-owned tooling: vault triage → vault Claude; dev-env claiming → the project repo.
 - Before the first commit in a repo, check `git config user.email` against `identities` for its scope. Flag mismatches instead of committing.

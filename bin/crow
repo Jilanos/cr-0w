@@ -12,6 +12,8 @@
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
 #   crow watch           live board: 1 agents · 2 usage · 3 savings · 4 history (? for keys)
+#   crow sessions [...] sessions cut off by a usage limit (see crow-sessions)
+#   crow relaunch <id> <account> [--dry-run]   continue one on another allowed account; crow relaunch status
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
@@ -38,6 +40,7 @@ EOF
 # for the session only (no copy stays in the profile), then unlinked and committed.
 launch() {
   local dir="$1"; shift
+  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
   if [[ "$("$CROW_HOME/bin/crow-accounts" memory "$CROW_ACCOUNT")" == session ]]; then
     "$CROW_HOME/bin/crow-memory" link "$CROW_ACCOUNT"
     trap '"$CROW_HOME/bin/crow-memory" unlink "$CROW_ACCOUNT"; "$CROW_HOME/bin/crow-memory" commit' EXIT
@@ -49,6 +52,7 @@ launch() {
 
 oneshot() {
   local prompt="$1" out
+  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
   out=$(cdx run "$CROW_ACCOUNT" --cwd "$CROW_HOME" --prompt "$prompt" --permission auto --json)
   local ok stdout_path
   ok=$(jq -r '.ok' <<<"$out")
@@ -98,9 +102,11 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
               (cd "$src" && go build -o crow-watch .) || exit 1
             fi
             exec "$bin" "$@" ;;
+  sessions) exec "$CROW_HOME/bin/crow-sessions" "$@" ;;
+  relaunch) exec "$CROW_HOME/bin/crow-relaunch" "$@" ;;
   usage)    exec "$CROW_HOME/bin/crow-usage" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac

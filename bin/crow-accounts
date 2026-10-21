@@ -5,8 +5,12 @@
   crow-accounts policy <name>      use | ask-first | never (never when unknown)
   crow-accounts memory <name>      permanent | session | none
   crow-accounts allowed            names crow may target (policy use or ask-first)
+  crow-accounts require <name>     exit 1 unless crow may target the account
+  crow-accounts json               every account with its policy and memory mode
+
+An unknown account, or a policy that is not one of use / ask-first / never, counts as never.
 """
-import os, sys
+import json, os, sys
 import yaml
 
 HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -20,8 +24,20 @@ def load():
         sys.exit(f"crow-accounts: {PATH} is missing (copy docs/accounts.example.yaml there)")
 
 
+POLICIES = ("use", "ask-first", "never")
+
+
+def accounts(cfg):
+    out = []
+    for a in cfg.get("accounts") or []:
+        pol = a.get("policy")
+        out.append({"name": a["name"], "policy": pol if pol in POLICIES else "never",
+                    "memory": a.get("memory", "none")})
+    return out
+
+
 def find(cfg, name):
-    return next((a for a in cfg.get("accounts", []) if a["name"] == name), None)
+    return next((a for a in accounts(cfg) if a["name"] == name), None)
 
 
 def main(argv):
@@ -34,11 +50,17 @@ def main(argv):
         print(a["policy"] if a else "never")
     elif cmd == "memory":
         a = find(cfg, argv[1])
-        print(a.get("memory", "none") if a else "none")
+        print(a["memory"] if a else "none")
     elif cmd == "allowed":
-        for a in cfg.get("accounts", []):
-            if a["policy"] in ("use", "ask-first"):
+        for a in accounts(cfg):
+            if a["policy"] != "never":
                 print(a["name"])
+    elif cmd == "require" and len(argv) == 2:
+        a = find(cfg, argv[1])
+        if not a or a["policy"] == "never":
+            sys.exit(f"crow: account '{argv[1]}' is not allowed (policy never, see local/accounts.yaml)")
+    elif cmd == "json":
+        print(json.dumps({"default": cfg.get("default"), "accounts": accounts(cfg)}))
     else:
         sys.exit(__doc__)
 

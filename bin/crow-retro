@@ -4,6 +4,7 @@
   crow-retro hook            SessionEnd hook entry point (reads the hook JSON on stdin)
   crow-retro add <jsonl>     queue a transcript by hand, then start the worker
   crow-retro work            process the queue (one worker at a time, holds a lock)
+  crow-retro retry           requeue retros that failed on a usage limit, then start the worker
   crow-retro status          queue, running worker, last reports
 
 Each queued session is condensed with crow-digest, then analyzed by a headless
@@ -16,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 CROW_HOME = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STATE = os.path.join(CROW_HOME, "local", "state", "retros")
@@ -124,6 +126,47 @@ def analyze(entry):
     return result
 
 
+RETRY_AFTER_S = 20 * 60
+MAX_ATTEMPTS = 3
+
+
+def transient(err):
+    """A usage limit (or a provider that refused before doing any work) is worth retrying later."""
+    e = err.lower()
+    return "limit" in e or ('duration_api_ms":0' in e and 'total_cost_usd":0' in e)
+
+
+def requeue_failed(force=False):
+    """Move transient failures back to the queue once they are old enough (or at once with force)."""
+    failed = os.path.join(STATE, "failed")
+    if not os.path.isdir(failed):
+        return 0
+    n = 0
+    for f in os.listdir(failed):
+        src = os.path.join(failed, f)
+        try:
+            with open(src, encoding="utf-8") as fh:
+                entry = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not entry.get("transient") or entry.get("attempts", 0) >= MAX_ATTEMPTS:
+            continue
+        if not force and time.time() - os.path.getmtime(src) < RETRY_AFTER_S:
+            continue
+        os.makedirs(QUEUE, exist_ok=True)
+        os.replace(src, os.path.join(QUEUE, f))
+        n += 1
+    return n
+
+
+def cmd_retry():
+    n = requeue_failed(force=True)
+    print(f"requeued {n} retro(s)")
+    if n:
+        spawn_worker()
+    return 0
+
+
 def cmd_work():
     os.makedirs(STATE, exist_ok=True)
     lock = open(LOCK, "w")
@@ -131,6 +174,7 @@ def cmd_work():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         return 0  # another worker is draining the queue
+    requeue_failed()
     while True:
         pending = sorted((os.path.join(QUEUE, f) for f in os.listdir(QUEUE) if f.endswith(".json")),
                          key=os.path.getmtime) if os.path.isdir(QUEUE) else []
@@ -145,7 +189,12 @@ def cmd_work():
             log(f"work: done {entry['session_id']} run {result.get('run_id')}")
             os.remove(path)
         else:
-            log(f"work: FAILED {entry['session_id']}: {result.get('error')}")
+            err = str(result.get("error"))
+            log(f"work: FAILED {entry['session_id']}: {err}")
+            entry["attempts"] = entry.get("attempts", 0) + 1
+            entry["transient"] = transient(err)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(entry, fh)
             failed = os.path.join(STATE, "failed")
             os.makedirs(failed, exist_ok=True)
             os.replace(path, os.path.join(failed, os.path.basename(path)))
@@ -165,6 +214,8 @@ def main():
     if not args:
         print(__doc__.strip())
         return 1
+    if args[0] == "retry":
+        return cmd_retry()
     if args[0] == "hook":
         return cmd_hook()
     if args[0] == "add" and len(args) == 2:
