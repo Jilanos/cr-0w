@@ -21,8 +21,11 @@ table, so they match `cdx stats`. Per-file totals are cached by (mtime, size).
 
 Session titles: cdx names every session after its account, so crow asks a small
 model (CROW_TITLE_CMD, default Haiku via `claude -p`) for a 3-6 word title from the
-first prompts, caches it by session id in local/state/session-titles.json and
-refreshes it when the session has grown. Until then the cleaned first prompt is used.
+whole session (most edited files and recent prompts weigh more than the opening one),
+caches it by session id in local/state/session-titles.json and retitles when the session
+grew (4+ prompts and x1.5) or moved project. Dispatch labels and /rename win and are kept.
+Without a model the title is "project: most edited files" (else the first prompt).
+Bounded to CROW_TITLES_PER_DAY model calls (default 40, ~0.001 USD each on Haiku).
 
 JSON: {generated_at, limits[], today{}, week{}, days[], sessions[], rtk{}, retros{}}
 sessions[] also carry projects[] {name, cost_usd, tokens, share_pct} and multi_project; by_project entries carry shared_sessions.
@@ -65,11 +68,13 @@ STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 7
+CACHE_VERSION = 8
 TITLES_PER_RUN = 12
+TITLES_PER_DAY = int(os.environ.get("CROW_TITLES_PER_DAY") or 40)  # model calls; ~0.001 USD each on Haiku
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
     "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
-    "--system-prompt 'You name coding sessions. Reply with a 3-6 word title in the language of the prompts, "
+    "--system-prompt 'You name coding sessions. Reply with a 3-6 word title for the main work of the whole session, not its opening prompt, in the language of the prompts, naming the project when it is not obvious, "
     "Title Case not required, no quotes, no trailing punctuation.'")
 PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".cdx/profiles")))
 ACTIVE_SECONDS = 120
@@ -252,7 +257,7 @@ def scan_transcript(path, registry=None):
     active = {}    # date → set of 10-minute buckets
     compactions = 0
     meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0,
-            "prompts": [], "last_prompt": None, "branch": None}
+            "prompts": [], "last_prompt": None, "branch": None, "recent": [], "files": {}, "last_cwd": None}
     files = [path] + glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))
     registry = load_registry() if registry is None else registry
     turns = []     # (file index, turn) in transcript order; turn = {day, model, usage, blocks}
@@ -273,6 +278,7 @@ def scan_transcript(path, registry=None):
                         meta["start"] = meta["start"] or ts
                         meta["end"] = ts
                     meta["cwd"] = meta["cwd"] or ev.get("cwd")
+                    meta["last_cwd"] = ev.get("cwd") or meta["last_cwd"]
                     meta["branch"] = ev.get("gitBranch") or meta["branch"]
                     meta["entrypoint"] = meta["entrypoint"] or ev.get("entrypoint")
                     if ev.get("type") == "custom-title":
@@ -283,6 +289,7 @@ def scan_transcript(path, registry=None):
                     if text:
                         meta["user_messages"] += 1
                         meta["last_prompt"] = text[:300]
+                        meta["recent"] = (meta["recent"] + [text[:200]])[-4:]
                         if len(meta["prompts"]) < 3:
                             meta["prompts"].append(text[:300])
                 msg = ev.get("message") or {}
@@ -296,6 +303,10 @@ def scan_transcript(path, registry=None):
                             names[c.get("id")] = tool_label(c.get("name") or "?")
                             if turn is not None:
                                 turn["blocks"].append(c)
+                            fp = (c.get("input") or {}).get("file_path") if c.get("name") in EDIT_TOOLS else None
+                            if isinstance(fp, str) and fp:
+                                base = os.path.basename(fp)
+                                meta["files"][base] = meta["files"].get(base, 0) + 1
                         elif c.get("type") == "tool_result":
                             label = names.get(c.get("tool_use_id"), "(unmatched result)")
                             t = tools.setdefault(label, [0, 0, 0])
@@ -350,8 +361,59 @@ def real_title(meta, account):
     return t if t and not re.fullmatch(re.escape(account) + r"( \(\d+\))?", t) else None
 
 
+def clip(text, n):
+    return text if len(text) <= n else text[:n - 1].rsplit(" ", 1)[0] + "…"
+
+
+def dir_project(meta):
+    return os.path.basename(meta.get("cwd") or "") or "?"
+
+
+def fallback_title(meta):
+    """Readable title without a model: project, then the files edited most (else the first prompt,
+    else the branch), so two sessions in one repo stay tellable apart."""
+    project = dir_project(meta)
+    files = sorted((meta.get("files") or {}).items(), key=lambda kv: (-kv[1], kv[0]))[:2]
+    if files:
+        return f"{project}: " + ", ".join(clip(f, 28) for f, _ in files)
+    first = (meta.get("prompts") or [None])[0]
+    branch = meta.get("branch")
+    if first:
+        return clip(f"{project}: {first}" if project != "?" else first, 48)
+    if branch and branch not in ("main", "master", "HEAD"):
+        return f"{project} ({branch})"
+    return None
+
+
+def title_context(meta):
+    """What the titler sees: the main work (most edited files, recent prompts) ahead of the opening
+    prompt, which is often a small errand."""
+    lines = [f"Project: {dir_project(meta)}"]
+    if meta.get("branch"):
+        lines.append(f"Branch: {meta['branch']}")
+    last = os.path.basename(meta.get("last_cwd") or "")
+    if last and last != dir_project(meta):
+        lines.append(f"Moved to project: {last}")
+    files = sorted((meta.get("files") or {}).items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    if files:
+        lines.append("Most edited files: " + ", ".join(f"{f} ({n})" for f, n in files))
+    lines.append(f"Opening prompt (may be a side errand): {clip((meta.get('prompts') or ['-'])[0], 160)}")
+    for i, p in enumerate(meta.get("recent") or []):
+        lines.append(f"Recent prompt {i + 1}: {clip(p, 200)}")
+    return lines
+
+
+def budget_left(titles):
+    return TITLES_PER_DAY - (titles.get("_calls") or {}).get(dt.date.today().isoformat(), 0)
+
+
+def spend_call(titles):
+    today = dt.date.today().isoformat()
+    titles["_calls"] = {today: (titles.get("_calls") or {}).get(today, 0) + 1}  # older days dropped
+
+
 def session_title(sid, meta, account, titles):
-    """/rename title, else generated or dispatch title, else the first prompt (stored as a placeholder
+    """/rename title, else generated or dispatch title, else a readable fallback: project + main files (stored as a placeholder
     so crow-runs can show it too, and replaced once the titler has run)."""
     t = real_title(meta, account)
     if t:
@@ -359,10 +421,9 @@ def session_title(sid, meta, account, titles):
     have = titles.get(sid) or {}
     if have.get("source") != "prompt" and have.get("title"):
         return have["title"]
-    first = (meta.get("prompts") or [None])[0]
-    if not first:
+    t = fallback_title(meta)
+    if not t:
         return None
-    t = first if len(first) <= 48 else first[:47].rsplit(" ", 1)[0] + "…"
     if have.get("title") != t:
         titles[sid] = {"title": t, "source": "prompt", "prompts": 0}
         titles["_dirty"] = True
@@ -370,12 +431,19 @@ def session_title(sid, meta, account, titles):
 
 
 def title_due(s, titles):
-    """No generated title yet, or the session has at least doubled (and grown by 5+ prompts) since."""
+    """No generated title yet, or the session grew by 4+ prompts and half again since, or moved to
+    another project (2+ new prompts). Dispatch labels and /rename titles are never regenerated."""
     n = s.get("user_messages") or 0
     if not n or s.get("_renamed"):
         return False
     have = titles.get(s["id"])
-    return not have or have.get("source") == "prompt" or (n >= 2 * have.get("prompts", 0) and n >= have.get("prompts", 0) + 5)
+    if not have or have.get("source") == "prompt":
+        return True
+    if have.get("source") != "haiku":
+        return False
+    done = have.get("prompts", 0)
+    moved = s.get("project") and have.get("project") and s["project"] != have["project"]
+    return (n >= 1.5 * done and n >= done + 4) or bool(moved and n >= done + 2)
 
 
 def spawn_titler():
@@ -387,11 +455,8 @@ def spawn_titler():
         pass
 
 
-def ask_title(meta, project):
-    lines = [f"Project: {project}"] + ([f"Branch: {meta['branch']}"] if meta.get("branch") else [])
-    lines += [f"Prompt {i + 1}: {p}" for i, p in enumerate(meta.get("prompts") or [])]
-    if meta.get("last_prompt") and meta["last_prompt"] not in (meta.get("prompts") or []):
-        lines.append(f"Latest prompt: {meta['last_prompt']}")
+def ask_title(meta):
+    lines = title_context(meta)
     env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDECODE")}
     env["CROW_RETRO"] = "1"
     try:
@@ -424,19 +489,26 @@ def generate_titles():
             meta = hit["data"].get("meta") or {}
             account = path.split(os.sep + "profiles" + os.sep, 1)[-1].split(os.sep, 1)[0]
             s = {"id": os.path.basename(path)[:-6], "user_messages": meta.get("user_messages"),
+                 "project": dir_project({"cwd": meta.get("last_cwd")}) if meta.get("last_cwd") else None,
                  "_renamed": bool(real_title(meta, account))}
             if title_due(s, titles):
                 todo.append((meta.get("end") or "", s["id"], meta))
         done = 0
         for _, sid, meta in sorted(todo, reverse=True)[:TITLES_PER_RUN]:
-            title = ask_title(meta, os.path.basename(meta.get("cwd") or "") or "?")
+            if budget_left(titles) <= 0:
+                break  # daily cap reached: placeholders stay readable, resume tomorrow
+            spend_call(titles)
+            title = ask_title(meta)
             if not title:
+                save_titles({**load_titles(), "_calls": titles["_calls"]})
                 break  # the command is failing (auth, limit): retry on a later poll
             titles[sid] = {"title": title, "source": "haiku", "prompts": meta.get("user_messages") or 0,
+                           "project": dir_project({"cwd": meta.get("last_cwd") or meta.get("cwd")}),
                            "at": dt.datetime.now().isoformat(timespec="seconds")}
             done += 1
             fresh = load_titles()  # the poller may have added labels or placeholders meanwhile
             fresh[sid] = titles[sid]
+            fresh["_calls"] = titles["_calls"]
             save_titles(fresh)
         return done
 
@@ -587,7 +659,8 @@ def collect_sessions(days):
                            for n, t in proj_tot.items()), key=lambda e: -e["tokens"])
         tokens = sum(totals.values())
         sid = os.path.basename(path)[:-6]
-        if not real_title(meta, account) and title_due({"id": sid, "user_messages": meta["user_messages"]}, titles):
+        if not real_title(meta, account) and title_due({"id": sid, "user_messages": meta["user_messages"],
+                                                               "project": dir_project({"cwd": meta.get("last_cwd")}) if meta.get("last_cwd") else None}, titles):
             due = True
         sessions.append({
             "id": sid,
@@ -625,7 +698,7 @@ def collect_sessions(days):
     if titles.pop("_dirty", False):
         merged = load_titles()
         for sid, t in titles.items():
-            if t != merged.get(sid) and (sid not in merged or merged[sid].get("source") == "prompt"):
+            if not sid.startswith("_") and t != merged.get(sid) and (sid not in merged or merged[sid].get("source") == "prompt"):
                 merged[sid] = t
         save_titles(merged)
     if due and not os.environ.get("CROW_TITLES_OFF"):
