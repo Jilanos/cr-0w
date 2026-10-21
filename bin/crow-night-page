@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""crow-night-page: rebuild the overnight morning page from the night state on disk.
+
+Reads <night>/log.md, <night>/queue.md, <night>/reports/<run8>.md and <state>/runs.jsonl
+(run id -> project, label, start) and writes <night>/report-<date>.html: a "needs you" box
+built from every report's "Paused for the owner" section, one card per project with each
+run's Card block, screenshots found under the paths the report names, and the full report
+behind a fold, then the night log. Safe to run after every finished run (see runbooks/overnight.md).
+
+usage: crow-night-page [--night DIR] [--date YYYY-MM-DD]
+"""
+import argparse, datetime as dt, glob, html, json, os, re
+from pathlib import Path
+
+import subprocess
+
+import markdown
+
+# local/ lives only in the main checkout, so resolve it even when run from a worktree
+CROW = Path(subprocess.check_output(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse",
+                                     "--path-format=absolute", "--git-common-dir"], text=True).strip()).parent
+SECTIONS = ("Shipped", "Paused for the owner", "Next eligible", "Problems", "Card")
+HEAD = re.compile(r"^\s*(?:#+\s*)?(?:\*\*)?(" + "|".join(SECTIONS) + r")(?:\*\*)?\s*:?\s*(?:\*\*)?\s*(.*)$", re.I)
+
+CSS = """
+:root{--bg:#f3f4f8;--surface:#fff;--fg:#1b1e2b;--muted:#5d6276;--line:#dcdfe9;--accent:#5b4bd6;--accent-soft:#ebe8fc;
+--ok:#1f8a5b;--ok-soft:#e1f3ea;--wait:#a86400;--wait-soft:#fbeedb;--bad:#b8323f;
+--body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;--display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12131c;--surface:#1b1d2a;--fg:#e6e7f0;--muted:#9a9eb4;--line:#2d3044;
+--accent:#a597ff;--accent-soft:#2a2550;--ok:#5fd39a;--ok-soft:#173326;--wait:#f0b45a;--wait-soft:#3a2b14;--bad:#ff7d8a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12131c;--surface:#1b1d2a;--fg:#e6e7f0;--muted:#9a9eb4;--line:#2d3044;--accent:#a597ff;--accent-soft:#2a2550;
+--ok:#5fd39a;--ok-soft:#173326;--wait:#f0b45a;--wait-soft:#3a2b14;--bad:#ff7d8a;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--body)}
+main{max-width:1180px;margin:0 auto;padding:28px 16px 64px}h1,h2,h3{font-family:var(--display);line-height:1.2}
+h1{font-size:2rem;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 20px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+.stat b{font-size:1.3rem;display:block}.needs{background:var(--wait-soft);border:1px solid var(--wait);border-radius:12px;padding:6px 18px 12px;margin-bottom:26px}
+.needs h2{color:var(--wait);margin:10px 0}.needs h3{margin:14px 0 4px;font-size:1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px 18px 14px;min-width:0}
+.run{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}.run:first-of-type{border-top:0}
+.tag{display:inline-block;font:600 .75rem var(--mono);padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+.tag.done{background:var(--ok-soft);color:var(--ok)}.tag.run{background:var(--wait-soft);color:var(--wait)}
+.shots{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.shots a{flex:1 1 150px;max-width:260px}.shots img{width:100%;border-radius:6px;border:1px solid var(--line)}
+details{margin-top:6px}summary{cursor:pointer;color:var(--muted)}code,pre{font-family:var(--mono);font-size:.85em}
+pre{overflow-x:auto;background:var(--bg);padding:8px;border-radius:6px}table{border-collapse:collapse;display:block;overflow-x:auto}
+td,th{border:1px solid var(--line);padding:3px 8px}.log li{margin:2px 0}.log{color:var(--muted);font-size:.92rem}
+img{max-width:100%}
+"""
+
+
+def md(text):
+    return markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists"])
+
+
+def sections(text):
+    out, cur = {}, None
+    for line in text.splitlines():
+        m = HEAD.match(line)
+        if m:
+            cur = next(s for s in SECTIONS if s.lower() == m.group(1).lower())
+            out[cur] = (m.group(2) + "\n") if m.group(2).strip() else ""
+        elif cur:
+            out[cur] += line + "\n"
+    return out
+
+
+def shots_for(text, night):
+    pngs = []
+    for p in re.findall(r"(/[^\s`'\")]*?/shots/[^\s`'\")]+)", text):
+        p = p.rstrip(".,:;")
+        base = Path(p.split("*")[0])
+        cands = [base] if base.suffix == ".png" else sorted(base.rglob("*.png")) if base.is_dir() else \
+            [Path(x) for x in sorted(glob.glob(p))] if "*" in p else []
+        pngs += [c for c in cands if c.suffix == ".png" and c.exists()]
+    seen, res = set(), []
+    for c in pngs:
+        if c not in seen:
+            seen.add(c); res.append(c)
+    return [os.path.relpath(c, night) for c in res[:8]]
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--night", default=str(CROW / "local/state/night"))
+    ap.add_argument("--date", default=dt.date.today().isoformat())
+    a = ap.parse_args()
+    night = Path(a.night)
+    runs = {}
+    rj = night.parent / "runs.jsonl"
+    if rj.exists():
+        for line in rj.read_text().splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if r.get("run_id"):
+                runs[r["run_id"][:8]] = r
+    log = (night / "log.md").read_text() if (night / "log.md").exists() else ""
+    queue = (night / "queue.md").read_text() if (night / "queue.md").exists() else ""
+    started = log.split("\n- ", 1)[1][:5] if "\n- " in log else ""
+    reports = sorted((night / "reports").glob("*.md"), key=lambda p: p.stat().st_mtime)
+    running = re.findall(r"RUN (\w{8})", queue)
+    queued = len(re.findall(r"^\|\s*\w+\s*\|\s*job-[^|]+\|[^|]+\|[^|]+\|\s*\|", queue, re.M))
+
+    by_proj, needs = {}, []
+    for rp in reports:
+        rid = rp.stem
+        meta = runs.get(rid, {})
+        text = rp.read_text()
+        sec = sections(text)
+        proj = meta.get("project", "other")
+        label = meta.get("label", rid)
+        by_proj.setdefault(proj, []).append((rid, label, meta, text, sec))
+        if sec.get("Paused for the owner", "").strip():
+            needs.append(f"<h3>{html.escape(proj)} · {html.escape(label)}</h3>" + md(sec["Paused for the owner"]))
+
+    cards = []
+    for proj, items in by_proj.items():
+        body = [f"<h2>{html.escape(proj)}</h2>"]
+        for rid, label, meta, text, sec in items:
+            t = meta.get("started_at", "")
+            when = dt.datetime.fromisoformat(t).astimezone().strftime("%H:%M") if t else ""
+            shots = shots_for(text, night)
+            body.append(f'<div class="run"><p><span class="tag done">done</span><b>{html.escape(label)}</b> '
+                        f'<span class="sub">{rid} · started {when}</span></p>')
+            body.append(md(sec.get("Card") or sec.get("Shipped") or text[:1500]))
+            if shots:
+                body.append('<div class="shots">' + "".join(
+                    f'<a href="{html.escape(s)}"><img loading="lazy" src="{html.escape(s)}" alt="{html.escape(Path(s).name)}"></a>' for s in shots) + "</div>")
+            body.append(f"<details><summary>Full report</summary>{md(text)}</details></div>")
+        cards.append('<section class="card">' + "".join(body) + "</section>")
+
+    entries = [l[2:] for l in log.splitlines() if l.startswith("- ")]
+    page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Night Shift {html.escape(a.date)}</title><style>{CSS}</style></head><body><main>
+<h1>Night shift</h1><p class="sub">Report for {html.escape(a.date)} · rebuilt {dt.datetime.now().strftime('%H:%M')} · started {html.escape(started)}</p>
+<div class="stats"><div class="stat"><b>{len(reports)}</b>runs finished</div><div class="stat"><b>{len(running)}</b>running</div>
+<div class="stat"><b>{queued}</b>queued</div><div class="stat"><b>{len(needs)}</b>need you</div></div>
+<section class="needs"><h2>Needs you</h2>{''.join(needs) or '<p>Nothing yet.</p>'}</section>
+<div class="grid">{''.join(cards)}</div>
+<h2>Night log</h2><ul class="log">{''.join(f'<li>{html.escape(e)}</li>' for e in entries)}</ul>
+</main></body></html>"""
+    out = night / f"report-{a.date}.html"
+    out.write_text(page)
+    print(out)
+
+
+if __name__ == "__main__":
+    main()
