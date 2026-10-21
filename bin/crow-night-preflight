@@ -37,6 +37,17 @@ command -v glab >/dev/null && { glab auth status >/dev/null 2>&1 && ok "glab log
 command -v cdx >/dev/null && { echo "Accounts"; cdx status 2>/dev/null | grep -E '^\S+\s+(enabled|disabled)' | sed 's/^/        /'; }
 
 here="$(dirname "$(readlink -f "$0")")"  # before any cd: $0 may be relative
+registry="${CROW_HOME:-$here/..}/local/projects.yaml"
+# Prints the registry scope of a repo path (a worktree under <path>.wt counts as its project).
+scope_of() {
+  local real; real=$(readlink -f "$1")
+  awk -v r="$real" '
+    /^  - name:/ { if (p != "" && (r == p || index(r, p ".wt/") == 1)) { print s; found = 1; exit } p = ""; s = "" }
+    /^    scope:/ { s = $2 }
+    /^    path:/ { p = substr($0, index($0, $2)) }
+    END { if (!found && p != "" && (r == p || index(r, p ".wt/") == 1)) print s }
+  ' "$registry" 2>/dev/null
+}
 for repo in "$@"; do
   name=$(basename "$repo"); echo "Repo $name"
   [ -d "$repo/.git" ] || [ -f "$repo/.git" ] || { fail "$repo is not a git checkout"; continue; }
@@ -50,7 +61,9 @@ for repo in "$@"; do
   case "$hook" in /*) ;; *) hook="$repo/$hook" ;; esac
   [ -e "$hook" ] && ok "pre-push hook installed" || warn "no pre-push hook (crow-prepush-check)"
   [ -e "${hook%/*}/commit-msg" ] && ok "commit-msg hook installed" || warn "no commit-msg hook (crow-commit-msg-check)"
-  if (cd "$repo" && "$here/crow-prepush-check" --history 2>/dev/null); then ok "pushed history has no denied pattern"
+  if [ "$(scope_of "$repo")" = work ]; then
+    ok "history audit skipped: registry scope is work (history legitimately holds work names)"
+  elif (cd "$repo" && "$here/crow-prepush-check" --history 2>/dev/null); then ok "pushed history has no denied pattern"
   else fail "pushed history contains a denied pattern: run crow-prepush-check --history in $name"; fi
   if grep -rlsE 'git[^"]*push' "$repo/.claude/hooks" "$repo/.claude/settings.json" >/dev/null 2>&1; then
     warn "repo has its own push rule in .claude/: check what it allows before promising pushes"
