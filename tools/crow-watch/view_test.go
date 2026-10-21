@@ -88,11 +88,14 @@ func contains(t *testing.T, what, out string, want, not []string) {
 func TestUsageSections(t *testing.T) {
 	u := fixtureUsage(t)
 	tall := model{w: 118, h: 95, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "tall", tall.View(), []string{"Limits", "Spend", "Sessions", "Savings", "History", "prompt cache", "runs out ~", "today"}, []string{"<synthetic>", "claude-"})
+	contains(t, "tall", tall.View(), []string{"Limits", "Spend", "Sessions", "Savings", "rtk", "cache", "runs out ~", "today"},
+		[]string{"<synthetic>", "claude-", "cache read", "─ History", "opus-5-5"})
 	small := model{w: 90, h: 30, usage: u, view: vUsage, now: fixtureNow()}
 	contains(t, "small", small.View(), []string{"Limits", "Sessions"}, []string{"By project"})
 	wide := model{w: 240, h: 62, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "History", "By project"}, nil)
+	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "By project"}, []string{"Context weight"})
+	hist := model{w: 118, h: 95, usage: u, view: vHistory, period: "w", now: fixtureNow()}
+	contains(t, "history keeps the token split", hist.View(), []string{"cache read", "cache write"}, nil)
 }
 
 // sampleIntr: the registry as crow-sessions lists it: one recent stop, one
@@ -194,12 +197,12 @@ func TestHHMMWithoutSeconds(t *testing.T) {
 	}
 }
 
-// A tall terminal shows every Usage section; a small one may drop the lower ones.
+// A tall terminal shows every Usage section; the breakdowns stay on the History tab.
 func TestTallUsageShowsEverySection(t *testing.T) {
 	m := model{w: 118, h: 95, snap: sample(), usage: fixtureUsage(t), view: 1, period: "w", now: fixtureNow(), reports: map[string]string{}}
 	m.rebuild()
 	out := m.View()
-	for _, s := range []string{"Limits", "Spend", "Sessions", "Savings", "History"} {
+	for _, s := range []string{"Limits", "Spend", "Sessions", "Savings"} {
 		if !strings.Contains(out, "─ "+s) {
 			t.Errorf("tall usage view is missing the %s box", s)
 		}
