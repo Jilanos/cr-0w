@@ -216,6 +216,17 @@ def session_titles():
         return {}
 
 
+def project_usage():
+    """Today's usage per project and the split of multi-project sessions (written by crow-usage)."""
+    try:
+        view = json.loads((STATE / "usage-projects.json").read_text())
+    except (OSError, ValueError):
+        return {"today": [], "sessions": {}}
+    if view.get("date") != datetime.now().astimezone().date().isoformat():
+        view["today"] = []
+    return view
+
+
 def collect(since="today", include_unledgered=False):
     now = time.time()
     done = finished(since)
@@ -303,7 +314,12 @@ def collect(since="today", include_unledgered=False):
                              "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": []})
 
     busy = sum(1 for a in agents if a["kind"] == "run")
-    return {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    pu = project_usage()
+    for a in agents:
+        split = pu["sessions"].get(a["session_id"])
+        a["multi_project"] = bool(split)
+        a["projects"] = split["projects"] if split else []
+    return {"usage_by_project": pu["today"], "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "slots": {"busy": busy, "max": MAX_PARALLEL}, "agents": agents, "finished": past}
 
 

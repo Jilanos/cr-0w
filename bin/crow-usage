@@ -5,6 +5,14 @@
   crow-usage --json     full payload (schema below)
   crow-usage --days N   history window (default 7)
   crow-usage --titles   generate missing session titles now (normally a detached worker does it)
+  crow-usage --backfill-projects [--days N]   one-off: re-split the frozen days by project (see below)
+
+Projects: a session's usage is split by the turns that worked in each registered project (local/projects.yaml
+paths and their <path>.wt/ worktrees), judged from the paths its tool calls touched (file_path, path, cwd,
+`git -C`, `cd`, absolute paths in Bash). A turn without a clear target stays with the previous turn's project;
+the first turns count for the session cwd. Frozen days keep the cwd attribution they were saved with, new
+daily files carry the split ("attribution": "touched"); --backfill-projects rewrites only by_project of the
+frozen days that still have transcripts.
 
 Sources: every Claude transcript in the cdx profiles (interactive sessions and
 headless runs alike, subagents folded into their session), `cdx status` for the
@@ -17,6 +25,7 @@ first prompts, caches it by session id in local/state/session-titles.json and
 refreshes it when the session has grown. Until then the cleaned first prompt is used.
 
 JSON: {generated_at, limits[], today{}, week{}, days[], sessions[], rtk{}, retros{}}
+sessions[] also carry projects[] {name, cost_usd, tokens, share_pct} and multi_project; by_project entries carry shared_sessions.
 """
 import datetime as dt
 import fcntl
@@ -29,6 +38,8 @@ import os
 import shutil
 import subprocess
 import sys
+
+import yaml
 
 
 def _cdx_python():
@@ -49,12 +60,12 @@ except ImportError:
         os.execv(interp, [interp, os.path.realpath(__file__), *sys.argv[1:]])
     estimate_cost = token_prices = None
 
-CROW_HOME = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+CROW_HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 6
+CACHE_VERSION = 7
 TITLES_PER_RUN = 12
 TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
     "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
@@ -158,7 +169,78 @@ def result_tokens(content):
     return text, images
 
 
-def scan_transcript(path):
+# ---------- per-project attribution ----------
+
+def load_registry():
+    """[(name, path)] from local/projects.yaml, longest path first (a nested project beats its parent)."""
+    try:
+        with open(os.path.join(CROW_HOME, "local", "projects.yaml"), encoding="utf-8") as fh:
+            reg = yaml.safe_load(fh) or {}
+    except (OSError, yaml.YAMLError):
+        return []
+    out = [(p["name"], os.path.realpath(p["path"]).rstrip("/")) for p in reg.get("projects") or []
+           if p.get("name") and p.get("path")]
+    return sorted(out, key=lambda e: -len(e[1]))
+
+
+def registry_sig(registry):
+    return "|".join(f"{n}={p}" for n, p in registry)
+
+
+def project_of(path, registry):
+    """Registered project owning an absolute path (or its .wt/ worktree), else None."""
+    if not path or not path.startswith("/"):
+        return None
+    path = os.path.normpath(path)
+    for name, root in registry:
+        for base in (root, root + ".wt"):
+            if path == base or path.startswith(base + "/"):
+                return name
+    return None
+
+
+ABS_PATH = re.compile(r"(?<![\w.~$-])(/[A-Za-z0-9_.@+-][^\s\"'`;|&<>()]*)")
+
+
+def touched_paths(name, inp, cwd):
+    """Absolute paths a tool call acted on."""
+    if not isinstance(inp, dict):
+        return []
+    out = []
+    for k in ("file_path", "path", "notebook_path", "cwd", "directory"):
+        if isinstance(inp.get(k), str):
+            out.append(inp[k])
+    cmd = inp.get("command")
+    if isinstance(cmd, str):
+        out += ABS_PATH.findall(cmd)
+        for m in re.finditer(r"\bgit\s+-C\s+(\"[^\"]+\"|'[^']+'|\S+)", cmd):
+            out.append(m[1].strip("\"'"))
+        for m in re.finditer(r"(?:^|[;&|(]\s*|&&\s*)cd\s+(\"[^\"]+\"|'[^']+'|[^\s;&|]+)", cmd):
+            out.append(m[1].strip("\"'"))
+    return [p if p.startswith("/") else os.path.join(cwd or "/", p) for p in out if p and not p.startswith(("~", "$"))]
+
+
+def turn_project(blocks, cwd, registry):
+    """Project a turn's tool calls point at (majority of the touched paths), or None."""
+    votes = {}
+    for b in blocks:
+        for p in touched_paths(b.get("name"), b.get("input"), cwd):
+            proj = project_of(p, registry)
+            if proj:
+                votes[proj] = votes.get(proj, 0) + 1
+    return max(votes, key=votes.get) if votes else None
+
+
+def add_usage(models, model, usage):
+    m = models.setdefault(model or "unknown", _zero_usage())
+    m["input_tokens"] += usage.get("input_tokens") or 0
+    m["cache_read_tokens"] += usage.get("cache_read_input_tokens") or 0
+    m["cache_creation_tokens"] += usage.get("cache_creation_input_tokens") or 0
+    m["output_tokens"] += usage.get("output_tokens") or 0
+    m["cache_1h_tokens"] += (usage.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0
+
+
+def scan_transcript(path, registry=None):
     """Usage of one session file (+ its subagents), deduplicated by message id, split by local day.
 
     Also: tokens each tool returned into the context, compactions, and 10-minute activity
@@ -172,7 +254,10 @@ def scan_transcript(path):
     meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0,
             "prompts": [], "last_prompt": None, "branch": None}
     files = [path] + glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))
-    for fpath in files:
+    registry = load_registry() if registry is None else registry
+    turns = []     # (file index, turn) in transcript order; turn = {day, model, usage, blocks}
+    for fi, fpath in enumerate(files):
+        by_id = {}
         with open(fpath, encoding="utf-8", errors="replace") as fh:
             for raw in fh:
                 if ('"usage"' not in raw and '"custom-title"' not in raw and '"type":"user"' not in raw
@@ -202,12 +287,15 @@ def scan_transcript(path):
                             meta["prompts"].append(text[:300])
                 msg = ev.get("message") or {}
                 content = msg.get("content")
+                turn = by_id.get(msg.get("id")) if ev.get("type") == "assistant" and msg.get("id") else None
                 if isinstance(content, list):
                     for c in content:
                         if not isinstance(c, dict):
                             continue
                         if c.get("type") == "tool_use":
                             names[c.get("id")] = tool_label(c.get("name") or "?")
+                            if turn is not None:
+                                turn["blocks"].append(c)
                         elif c.get("type") == "tool_result":
                             label = names.get(c.get("tool_use_id"), "(unmatched result)")
                             t = tools.setdefault(label, [0, 0, 0])
@@ -221,19 +309,28 @@ def scan_transcript(path):
                 seen.add(msg.get("id"))
                 day, hour = _local_hour(ts[:13])
                 active.setdefault(day, set()).add(hour * 6 + int(ts[14:16]) // 10)
-                m = per_day.setdefault(day, {}).setdefault(msg.get("model") or "unknown", _zero_usage())
-                m["input_tokens"] += usage.get("input_tokens") or 0
-                m["cache_read_tokens"] += usage.get("cache_read_input_tokens") or 0
-                m["cache_creation_tokens"] += usage.get("cache_creation_input_tokens") or 0
-                m["output_tokens"] += usage.get("output_tokens") or 0
-                m["cache_1h_tokens"] += (usage.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0
+                add_usage(per_day.setdefault(day, {}), msg.get("model"), usage)
+                turn = {"day": day, "model": msg.get("model"), "usage": usage,
+                        "blocks": [c for c in content if isinstance(c, dict) and c.get("type") == "tool_use"]
+                        if isinstance(content, list) else []}
+                turns.append((fi, turn))
+                if msg.get("id"):
+                    by_id[msg["id"]] = turn
+    home = project_of(meta["cwd"], registry) or os.path.basename(meta["cwd"] or "") or "?"
+    per_proj = {}  # project → date → model → usage
+    sticky, last_fi = home, 0
+    for fi, turn in turns:
+        if fi != last_fi:
+            sticky, last_fi = home, fi  # a subagent starts where the session was started
+        sticky = turn_project(turn["blocks"], meta["cwd"], registry) or sticky
+        add_usage(per_proj.setdefault(sticky, {}).setdefault(turn["day"], {}), turn["model"], turn["usage"])
     per_model = {}
     for models in per_day.values():
         for model, u in models.items():
             tot = per_model.setdefault(model, _zero_usage())
             for k, v in u.items():
                 tot[k] += v
-    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model, "per_day": per_day, "tools": tools,
+    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model, "per_day": per_day, "per_proj": per_proj, "reg": registry_sig(registry), "tools": tools,
             "compactions": compactions, "active": {d: sorted(b) for d, b in active.items()}}
 
 
@@ -452,6 +549,8 @@ def collect_sessions(days):
         cache = {}
     fresh = {}
     sessions = []
+    registry = load_registry()
+    sig = registry_sig(registry)
     titles = load_titles()
     dispatch_titles(titles)
     live = live_session_ids()
@@ -462,8 +561,8 @@ def collect_sessions(days):
             continue
         key = f"{st.st_mtime}:{st.st_size}"
         hit = cache.get(path)
-        fresh_hit = hit and hit["key"] == key and hit["data"].get("v") == CACHE_VERSION
-        data = hit["data"] if fresh_hit else scan_transcript(path)
+        fresh_hit = hit and hit["key"] == key and hit["data"].get("v") == CACHE_VERSION and hit["data"].get("reg") == sig
+        data = hit["data"] if fresh_hit else scan_transcript(path, registry)
         fresh[path] = {"key": key, "data": data}
         if not data["per_model"]:
             continue
@@ -472,6 +571,20 @@ def collect_sessions(days):
         totals, cost, priced = f["totals"], f["cost_usd"], f["priced"]
         by_day = {d: figures(models) for d, models in (data.get("per_day") or {}).items()}
         meta = data["meta"]
+        by_day_project = {}
+        proj_tot = {}
+        for proj, days_ in (data.get("per_proj") or {}).items():
+            for d, models in days_.items():
+                x = figures(models)
+                by_day_project.setdefault(d, {})[proj] = slim(x)
+                t = proj_tot.setdefault(proj, {"cost_usd": 0.0, "tokens": 0, "priced": True})
+                t["tokens"] += sum(x["totals"].values())
+                t["cost_usd"] += x["cost_usd"]
+                t["priced"] = t["priced"] and x["priced"]
+        whole = sum(t["tokens"] for t in proj_tot.values()) or 1
+        projects = sorted(({"name": n, "cost_usd": round(t["cost_usd"], 4) if t["priced"] else None,
+                            "tokens": t["tokens"], "share_pct": round(100 * t["tokens"] / whole)}
+                           for n, t in proj_tot.items()), key=lambda e: -e["tokens"])
         tokens = sum(totals.values())
         sid = os.path.basename(path)[:-6]
         if not real_title(meta, account) and title_due({"id": sid, "user_messages": meta["user_messages"]}, titles):
@@ -500,6 +613,9 @@ def collect_sessions(days):
             "compactions": data.get("compactions") or 0,
             "tools": data.get("tools") or {},
             "by_day": {d: slim(x) for d, x in by_day.items()},
+            "projects": projects,
+            "multi_project": len(projects) > 1,
+            "by_day_project": by_day_project,
             "activity": {d: b for d, b in (data.get("active") or {}).items() if d >= RECENT_DAY},
         })
     os.makedirs(STATE, exist_ok=True)
@@ -563,6 +679,7 @@ def rtk_stats(today):
 
 DAYS_STORE = os.path.join(STATE, "usage-days.json")
 SAMPLES = os.path.join(STATE, "limit-samples.jsonl")
+PROJECT_VIEW = os.path.join(STATE, "usage-projects.json")
 HISTORY_DAYS = 30
 ROLL_KEYS = ("cost_usd", "tokens", "input_tokens", "output_tokens", "cache_write_tokens", "cache_read_tokens",
              "cache_saved_usd", "routing_saved_usd")
@@ -580,10 +697,13 @@ def rollup(slices):
         r["unpriced"] += x.get("cost_usd") is None
         r["runs"] += s["kind"] == "run"
         r["routed_runs"] += s["kind"] == "run" and (x.get("routing_saved_usd") or 0) > 0
-        p = by_project.setdefault(s["project"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
-        p["cost_usd"] += x.get("cost_usd") or 0
-        p["tokens"] += x.get("tokens") or 0
-        p["sessions"] += 1
+        split = x.get("_projects") or {s["project"]: x}
+        for name, px in split.items():
+            p = by_project.setdefault(name, {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "shared_sessions": 0})
+            p["cost_usd"] += px.get("cost_usd") or 0
+            p["tokens"] += px.get("tokens") or 0
+            p["sessions"] += 1
+            p["shared_sessions"] += len(split) > 1
         main = next((m for m in s["models"] if not pseudo_model(m)), "?").replace("claude-", "")
         m = by_model.setdefault(main, {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
         m["cost_usd"] += x.get("cost_usd") or 0
@@ -602,6 +722,7 @@ def rollup(slices):
     order = lambda d: sorted(({"name": k, **{kk: (round(vv, 2) if isinstance(vv, float) else vv) for kk, vv in v.items()}}
                               for k, v in d.items()), key=lambda e: -e["cost_usd"])
     r["by_project"], r["by_model"] = order(by_project), order(by_model)
+    r["attribution"] = "touched"
     r["tools"] = sorted(({"name": k, "calls": c, "tokens": t + i * IMAGE_TOKENS, "text_tokens": t, "images": i}
                          for k, (c, t, i) in tools.items()), key=lambda e: -e["tokens"])
     return r
@@ -618,7 +739,7 @@ def merge(rollups):
             r[k] += d.get(k) or 0
         for g in groups:
             for e in d.get(g) or []:
-                x = groups[g].setdefault(e["name"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0})
+                x = groups[g].setdefault(e["name"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "shared_sessions": 0})
                 for k in x:
                     x[k] += e.get(k) or 0
         for e in d.get("tools") or []:
@@ -713,17 +834,53 @@ def rtk_failures():
     return total
 
 
-def build(days):
-    sessions = collect_sessions(max(days, 7))
-    today = dt.date.today().isoformat()
-    window = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(max(days, 7)))]
+def live_rollups(sessions, window):
     slices = {d: [] for d in window}
     for s in sessions:
         last = max(s["by_day"]) if s["by_day"] else None
         for d, x in s["by_day"].items():
             if d in slices:
-                slices[d].append((s, {**x, "_last": d == last}))
-    live = {d: rollup(slices[d]) for d in window}
+                slices[d].append((s, {**x, "_last": d == last, "_projects": s["by_day_project"].get(d)}))
+    return {d: rollup(slices[d]) for d in window}
+
+
+def backfill_projects(days):
+    """One-off: give the frozen days the touched-project split. Only by_project (and its marker) is replaced,
+    and only where the transcripts still cover the whole day (as many sessions as were frozen)."""
+    window = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(days))]
+    live = live_rollups(collect_sessions(days), window)
+    store = load_store()
+    done, skipped = [], []
+    for d in window[:-1]:
+        old = store.get(d)
+        if not old or old.get("attribution") == "touched":
+            continue
+        if live[d]["sessions"] < old.get("sessions", 0):
+            skipped.append(d)
+            continue
+        old["by_project"], old["attribution"] = live[d]["by_project"], "touched"
+        done.append(d)
+    if done:
+        save_store(store)
+    return done, skipped
+
+
+def write_project_view(data):
+    """Small file for crow-runs: today's per-project totals and each session's split."""
+    view = {"date": dt.date.today().isoformat(), "today": data["today"]["by_project"],
+            "sessions": {s["id"]: {"projects": s["projects"], "multi_project": s["multi_project"]}
+                         for s in data["sessions"] if s["multi_project"]}}
+    tmp = PROJECT_VIEW + f".{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(view, fh)
+    os.replace(tmp, PROJECT_VIEW)
+
+
+def build(days):
+    sessions = collect_sessions(max(days, 7))
+    today = dt.date.today().isoformat()
+    window = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(max(days, 7)))]
+    live = live_rollups(sessions, window)
     # Past days in the scan window are complete: freeze them so history outlives transcript cleanup.
     store = load_store()
     changed = False
@@ -759,7 +916,8 @@ def build(days):
     for s in sessions:
         s["today"] = s["by_day"].get(today)
         s.pop("tools", None)
-    return {
+        s.pop("by_day_project", None)
+    out = {
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "limits": limits,
         "today": live[today],
@@ -772,6 +930,8 @@ def build(days):
         "retros": {"today": len(glob.glob(os.path.join(retro_dir, f"{today}-*.md"))), "pending_proposals": pending,
                    "week": sum(len(glob.glob(os.path.join(retro_dir, f"{d}-*.md"))) for d in window[-7:])},
     }
+    write_project_view(out)
+    return out
 
 
 def human(n):
@@ -789,6 +949,12 @@ def main():
         print(f"{generate_titles()} titles written to {TITLES}")
         return 0
     days = int(args[args.index("--days") + 1]) if "--days" in args else 7
+    if "--backfill-projects" in args:
+        done, skipped = backfill_projects(max(days, HISTORY_DAYS) if "--days" not in args else days)
+        print(f"{len(done)} frozen days re-split by project" + (f": {', '.join(done)}" if done else ""))
+        if skipped:
+            print(f"left as they were (transcripts no longer cover them): {', '.join(skipped)}")
+        return 0
     data = build(days)
     if "--json" in args:
         json.dump(data, sys.stdout)
@@ -803,6 +969,12 @@ def main():
     peak = max((d["cost_usd"] for d in data["days"]), default=0) or 1
     print("7 days   " + "".join(spark[min(7, int(d["cost_usd"] / peak * 7))] for d in data["days"])
           + "  " + " ".join(f"${d['cost_usd']:.0f}" for d in data["days"]))
+    bp = data["today"]["by_project"]
+    if bp:
+        print("by project today (turns that worked there; * = sessions shared with another project)")
+        for e in bp[:8]:
+            print(f"  {e['name'][:24]:<24} {human(e['tokens']):>7} {'$%.2f' % e['cost_usd']:>7}  "
+                  f"{e['sessions']} sessions{'*' if e['shared_sessions'] else ''}")
     r = data["rtk"]
     print(f"rtk      trimmed {human(r.get('today_saved_tokens'))} tok of command output today, "
           f"{human(r['saved_tokens'])} all time ({round(r['saved_pct'] or 0)}%)")
