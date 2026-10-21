@@ -17,7 +17,13 @@ fi
 while read -r lref lsha rref rsha; do
   [ "$lsha" = "$zero" ] && continue
   if [ "$rsha" = "$zero" ]; then range="$lsha --not --remotes"; else range="$rsha..$lsha"; fi
-  hits=$(git log -p --format='%H%n%B' $range 2>/dev/null | grep -E '^[0-9a-f]{40}$|^\+[^+]|^[^+ -@d]' | grep -n -i -E "$pats" | head -5)
+  if [ "$rsha" != "$zero" ] && ! git merge-base --is-ancestor "$rsha" "$lsha" 2>/dev/null; then
+    # Rewritten history: check every new message, but only the diffs the remote doesn't already have
+    hits=$( { git log --format='%H%n%B' $range; git log -p --cherry-pick --right-only --no-merges --format='%H' "$rsha...$lsha"; } 2>/dev/null \
+      | grep -E '^[0-9a-f]{40}$|^\+[^+]|^[^+ -@d]' | grep -n -i -E "$pats" | head -5)
+  else
+    hits=$(git log -p --format='%H%n%B' $range 2>/dev/null | grep -E '^[0-9a-f]{40}$|^\+[^+]|^[^+ -@d]' | grep -n -i -E "$pats" | head -5)
+  fi
   if [ -n "$hits" ]; then
     echo "crow-prepush-check: refusing to push $lref: denied pattern in new commits:" >&2
     echo "$hits" | cut -c1-160 >&2
