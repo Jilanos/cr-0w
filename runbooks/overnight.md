@@ -27,7 +27,7 @@ Unattended work while the owner is away. The hub session is the orchestrator; ru
 - Pre-push hook: `bin/crow-prepush-check` refuses a push whose new commits match `local/prepush-deny.txt` (plus `local/prepush-deny.<repo>.txt`). Install with a symlink to `<repo>/.git/hooks/pre-push` (resolve the hooks dir with `git rev-parse --git-common-dir`, as an absolute path); keep any hook a repo already has.
 
 ## Pacing and accounts
-- Read `cdx status` before the first launch. Max 3 parallel runs, staggered by about 3 minutes.
+- Read `cdx status --refresh` before the first launch and before every floor decision: plain `cdx status` can show cached numbers from before a 5h reset. Max 3 parallel runs, staggered by about 3 minutes.
 - If the main account is blocked, start at most 2 runs on a shared account, and a third only when its 5-hour window shows 60% or more left.
 - Stop new runs on the main account early enough that its window is fresh when the owner starts. Floors are written as numbers in `queue.md`, never improvised.
 - A run that stops on a usage limit is redispatched with a RESUME NOTE on the other allowed account.
