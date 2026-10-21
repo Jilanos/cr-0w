@@ -2,6 +2,7 @@
 # crow-prepush-check: git pre-push hook that refuses a push whose new commits mention a denied pattern.
 # Patterns (extended regex, one per line, # comments) come from local/prepush-deny.txt plus
 # local/prepush-deny.<repo-dir-name>.txt. Messages and added lines are checked, not removed ones.
+# --history audits everything already pushed (run by crow-night-preflight).
 # Install: ln -s <crow>/bin/crow-prepush-check <repo>/.git/hooks/pre-push   (see runbooks/overnight.md)
 set -u
 CROW_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
@@ -11,6 +12,11 @@ pats=$(cat "$CROW_HOME/local/prepush-deny.txt" "$CROW_HOME/local/prepush-deny.$r
 [ -z "$pats" ] && exit 0
 zero=0000000000000000000000000000000000000000
 bad=0
+if [ "${1:-}" = "--history" ]; then  # audit: everything already pushed, not only new commits
+  hits=$(git log -p --format='%H%n%B' --remotes=origin 2>/dev/null | grep -E '^[0-9a-f]{40}$|^\+[^+]|^[^+ -@d]' | grep -a -i -E "$pats" | sort -u)
+  [ -z "$hits" ] && exit 0
+  echo "crow-prepush-check: denied patterns in pushed history:" >&2; echo "$hits" | cut -c1-160 | head -20 >&2; exit 1
+fi
 if [ "${1:-}" = "--check" ]; then   # manual run: check what HEAD would push to its upstream
   exec "$0" < <(printf "HEAD %s upstream %s\n" "$(git rev-parse HEAD)" "$(git rev-parse @{u} 2>/dev/null || echo $zero)")
 fi

@@ -49,6 +49,8 @@ for repo in "$@"; do
   case "$hook" in /*) ;; *) hook="$repo/$hook" ;; esac
   [ -e "$hook" ] && ok "pre-push hook installed" || warn "no pre-push hook (crow-prepush-check)"
   [ -e "${hook%/*}/commit-msg" ] && ok "commit-msg hook installed" || warn "no commit-msg hook (crow-commit-msg-check)"
+  if (cd "$repo" && "$(dirname "$(readlink -f "$0")")/crow-prepush-check" --history 2>/dev/null); then ok "pushed history has no denied pattern"
+  else fail "pushed history contains a denied pattern: run crow-prepush-check --history in $name"; fi
   if grep -rlsE 'git[^"]*push' "$repo/.claude/hooks" "$repo/.claude/settings.json" >/dev/null 2>&1; then
     warn "repo has its own push rule in .claude/: check what it allows before promising pushes"
   fi
