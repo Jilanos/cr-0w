@@ -1,5 +1,7 @@
 # Overnight runs
 
+Prepare a night with the `night` skill (`/night`), about an hour before the owner stops.
+
 Unattended work while the owner is away. The hub session is the orchestrator; runs are tracked cdx runs. The orchestrator can die at any moment (usage limit, battery, crash): everything the owner needs in the morning must already be on disk.
 
 ## Before the owner leaves
