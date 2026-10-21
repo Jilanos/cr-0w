@@ -142,3 +142,17 @@ func TestTallUsageShowsEverySection(t *testing.T) {
 		}
 	}
 }
+
+func TestLineBarShortWidths(t *testing.T) {
+	count := func(pct float64, cells int) int {
+		return len([]rune(lineBar(pct, cells, sOK)[0].text))
+	}
+	for _, c := range []struct {
+		pct         float64
+		cells, want int
+	}{{3, 4, 1}, {97, 4, 3}, {0, 4, 0}, {100, 4, 4}, {50, 4, 2}, {50, 1, 1}} {
+		if got := count(c.pct, c.cells); got != c.want {
+			t.Errorf("lineBar(%v,%d) filled %d, want %d", c.pct, c.cells, got, c.want)
+		}
+	}
+}
