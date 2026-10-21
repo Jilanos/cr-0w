@@ -36,6 +36,7 @@ command -v gh >/dev/null && { gh auth status >/dev/null 2>&1 && ok "gh logged in
 command -v glab >/dev/null && { glab auth status >/dev/null 2>&1 && ok "glab logged in" || warn "glab not logged in"; }
 command -v cdx >/dev/null && { echo "Accounts"; cdx status 2>/dev/null | grep -E '^\S+\s+(enabled|disabled)' | sed 's/^/        /'; }
 
+here="$(dirname "$(readlink -f "$0")")"  # before any cd: $0 may be relative
 for repo in "$@"; do
   name=$(basename "$repo"); echo "Repo $name"
   [ -d "$repo/.git" ] || [ -f "$repo/.git" ] || { fail "$repo is not a git checkout"; continue; }
@@ -49,7 +50,7 @@ for repo in "$@"; do
   case "$hook" in /*) ;; *) hook="$repo/$hook" ;; esac
   [ -e "$hook" ] && ok "pre-push hook installed" || warn "no pre-push hook (crow-prepush-check)"
   [ -e "${hook%/*}/commit-msg" ] && ok "commit-msg hook installed" || warn "no commit-msg hook (crow-commit-msg-check)"
-  if (cd "$repo" && "$(dirname "$(readlink -f "$0")")/crow-prepush-check" --history 2>/dev/null); then ok "pushed history has no denied pattern"
+  if (cd "$repo" && "$here/crow-prepush-check" --history 2>/dev/null); then ok "pushed history has no denied pattern"
   else fail "pushed history contains a denied pattern: run crow-prepush-check --history in $name"; fi
   if grep -rlsE 'git[^"]*push' "$repo/.claude/hooks" "$repo/.claude/settings.json" >/dev/null 2>&1; then
     warn "repo has its own push rule in .claude/: check what it allows before promising pushes"
