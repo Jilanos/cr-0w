@@ -23,6 +23,12 @@ Render only with the shell checkout's `scripts/shot.sh`, from a scratch dir outs
 6. Lint: `/usr/lib/qt6/bin/qmllint CrowAgents.qml CrowStore.qml` (should be silent).
 
 ## Gotchas
+- Rendering a worktree (not the checkout the installed symlinks point at): copy the shell
+  checkout without `.git` to a scratch dir, link `<copy>/modules/crow-agents` and
+  `crow-usage` to the worktree's module dirs, and pass `--root <copy>` to shot.sh. Bundled
+  modules are scanned before `~/.local/share/archeotech/modules`, and the first id wins, so
+  the installed symlinks never change. Keep the default TMPDIR: a long one breaks mango's
+  IPC socket path (`--keep` then shows only mango.log).
 - A panel host injects only `panelRoot`/`appearance` (no `config`), and a bar injects
   `holderRoot`: that's why the entry declares neither as `required`.
 - In harness QML, don't put `;` between function declarations on one line: it's a syntax error.
