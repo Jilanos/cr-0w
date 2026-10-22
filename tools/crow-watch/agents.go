@@ -83,9 +83,47 @@ func agCols(width int, rows []agentRow) rowCols {
 	return c
 }
 
+// mixed: the board holds more than Claude, so rows name each account's provider.
+func (m model) mixed() bool {
+	other := func(p string) bool { return p != "" && p != "claude" }
+	if m.usage != nil && m.usage.mixed {
+		return true
+	}
+	if m.snap != nil {
+		for _, a := range m.snap.Agents {
+			if other(a.Provider) {
+				return true
+			}
+		}
+		for _, f := range m.snap.Finished {
+			if other(f.Provider) {
+				return true
+			}
+		}
+	}
+	for _, s := range m.intr {
+		if other(s.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
+// windowOf: the agent's own context window when its provider reports one (Codex), else crow's.
+func windowOf(a *agent) int {
+	if a.ContextWindow > 0 {
+		return a.ContextWindow
+	}
+	return contextWindow()
+}
+
 // ctxTag: the context gauge only once a session nears compaction (70 % and up).
-func ctxTag(tokens int) seg {
-	pct := float64(tokens) * 100 / float64(contextWindow())
+func ctxTag(tokens int, window ...int) seg {
+	w := contextWindow()
+	if len(window) > 0 && window[0] > 0 {
+		w = window[0]
+	}
+	pct := float64(tokens) * 100 / float64(w)
 	switch {
 	case tokens == 0 || pct < 70:
 		return seg{"", sPlain}
@@ -177,7 +215,7 @@ func (m model) itemRow(it item) agentRow {
 			detail = seg{action, sCyan}
 		}
 		when = age(float64(a.LastActivityS))
-		ctx = ctxTag(a.ContextTokens)
+		ctx = ctxTag(a.ContextTokens, a.ContextWindow)
 	case it.fin != nil:
 		f := it.fin
 		s := st(f.Status)
@@ -187,7 +225,11 @@ func (m model) itemRow(it item) agentRow {
 		if len(f.ResumedFrom) > 0 {
 			resumed = fmt.Sprintf("resumed %d×", len(f.ResumedFrom))
 		}
-		detail = seg{joinDot(s.label, commitCount(len(f.Commits)), resumed), s.style}
+		on := ""
+		if m.mixed() {
+			on = who(true, f.Provider, f.Account)
+		}
+		detail = seg{joinDot(s.label, commitCount(len(f.Commits)), resumed, on), s.style}
 		if f.Status == "done" {
 			ps, ts = sPlain, sSub
 		}
@@ -198,7 +240,7 @@ func (m model) itemRow(it item) agentRow {
 		s := it.intr
 		glyph = seg{"‖ ", st("limit").style}
 		project, task = s.Project, m.intrTitle(s)
-		what := s.Account + " " + limitName(s.Limit)
+		what := who(m.mixed(), s.Provider, s.Account) + " " + limitName(s.Limit)
 		if r := resetClock(s.ResetsAt); r != "" {
 			what += ", back " + r
 		}
@@ -305,7 +347,7 @@ func (m model) detailLines(width int) []line {
 	}
 	if s := it.intr; s != nil {
 		out = append(out, line{{"‖ stopped by the " + limitName(s.Limit) + "  ", st("limit").style}, {s.Project + "  ", sBold}, {m.intrTitle(s), sPlain}})
-		meta := joinDot("session "+short(s.ID), "on "+s.Account, "stopped "+clockOf(s.LastEvent))
+		meta := joinDot("session "+short(s.ID), "on "+who(m.mixed(), s.Provider, s.Account), "stopped "+clockOf(s.LastEvent))
 		if r := resetClock(s.ResetsAt); r != "" {
 			meta += " · resets " + r
 		}
@@ -317,8 +359,11 @@ func (m model) detailLines(width int) []line {
 			out = append(out, line{}, line{{"Last prompt", sHead}})
 			wrap(s.LastPrompt, 3)
 		}
-		out = append(out, line{}, line{{"Relaunch on another account", sHead}},
-			line{{"  crow relaunch " + short(s.ID), sCyan}, {"   asks before it moves the session", sSub}})
+		out = append(out, line{}, line{{"Relaunch", sHead}},
+			line{{"  R", sCyan}, {"  or  crow relaunch " + short(s.ID) + " <account>", sCyan}},
+			line{{"  same account: native resume of this exact conversation", sSub}},
+			line{{"  another account or provider: transfer to a new conversation, linked to this one", sSub}},
+			line{{"  shows the exact target and asks before anything moves", sSub}})
 		return out
 	}
 	if a := it.agent; a != nil {
@@ -330,10 +375,10 @@ func (m model) detailLines(width int) []line {
 		out = append(out, line{{s.glyph + " " + s.label + "  ", s.style}, {a.Project + "  ", sBold}, {cmp.Or(a.Label, a.Title), sPlain}})
 		meta := fmt.Sprintf("%s · up %s · active %s ago", id, age(m.since(a.StartedAt)), age(float64(a.LastActivityS)))
 		if a.Account != "" {
-			meta += " · " + a.Account
+			meta += " · " + who(m.mixed(), a.Provider, a.Account)
 		}
 		if a.ContextTokens > 0 {
-			meta += fmt.Sprintf(" · context %.0f%% used", float64(a.ContextTokens)*100/float64(contextWindow()))
+			meta += fmt.Sprintf(" · context %.0f%% used", float64(a.ContextTokens)*100/float64(windowOf(a)))
 		}
 		if a.SubagentsActive > 0 {
 			meta += fmt.Sprintf(" · %d subagents", a.SubagentsActive)

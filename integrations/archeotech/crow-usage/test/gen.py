@@ -80,7 +80,7 @@ def payload(limits, costs, sessions, pending=0, routed=0, compactions=0):
             continue
         for key, acc in ((s["project"], by_project), (s["models"][0].replace("claude-", ""), by_model)):
             e = acc.setdefault(key, {"name": key, "cost_usd": 0, "tokens": 0, "sessions": 0})
-            e["cost_usd"] = round(e["cost_usd"] + s["today"]["cost_usd"], 2)
+            e["cost_usd"] = round(e["cost_usd"] + (s["today"]["cost_usd"] or 0), 2)
             e["tokens"] += s["today"]["tokens"]
             e["sessions"] += 1
     tools = [{"name": "Bash", "calls": 839, "tokens": 360_659, "text_tokens": 360_659, "images": 0},
@@ -122,6 +122,19 @@ fx = {
                                                   burn=31.0, empty_in=23)],
                    [12.5, 22.1, 31.0, 28.4, 45.9, 61.2, 58.77], SESSIONS[:3], pending=3, compactions=1),
 }
+# Claude and Codex: limits and sessions name their provider; a Codex model without a price keeps
+# its tokens and an unknown cost ("–"), and the oldest day has nothing priced (cost null, not $0).
+mixed = payload([{**limit("work", 74, 96, active=True), "provider": "claude"},
+                 {**limit("codex-work", 81, 76, r5=(0, "17:20")), "provider": "codex", "source": "cdx status --cached"}],
+                [37.74, 7.01, 9.2, 0.0, 0.0, 49.23, 13.36],
+                [{**s, "provider": "claude"} for s in SESSIONS[:3]]
+                + [{**session("codex-work", "billing-api", "interactive", "gpt-unreleased", 0.0, 3_300, 5,
+                              "codex: retry design", active=True, today_cost=0), "provider": "codex", "cost_usd": None,
+                    "today": {**slice_(0, 3_300), "cost_usd": None}}])
+mixed["schema_version"] = 2
+mixed["today"]["unpriced"] = 1
+mixed["days"][0].update(cost_usd=None, unpriced=mixed["days"][0]["sessions"] or 1)
+fx["mixed"] = mixed
 for k, v in fx.items():
     with open(os.path.join(out, "fx", f"{k}.json"), "w") as fh:
         json.dump(v, fh, indent=1)

@@ -39,11 +39,15 @@ Singleton {
     readonly property int maxSlots: snap && snap.slots ? snap.slots.max : 2
     readonly property int waiting: sessions.filter(a => a.state === "waiting").length
 
+    // More than Claude in the payloads: rows then name each account's provider ("codex:work").
+    readonly property bool mixed: agents.concat(snap && snap.finished ? snap.finished : []).concat(registry || [])
+        .some(a => a.provider && a.provider !== "claude")
     // Stopped by a limit in the last 24 h, not relaunched, not open again.
+    // A conversation is its provider + id: the same id under another provider is another one.
     readonly property var interrupted: {
         var live = {}
-        agents.forEach(a => { if (a.session_id) live[a.session_id] = true })
-        return (registry || []).filter(s => !s.relaunched && !live[s.conversation_id]
+        agents.forEach(a => { if (a.session_id) live[(a.provider || "claude") + ":" + a.session_id] = true })
+        return (registry || []).filter(s => !s.relaunched && !live[(s.provider || "claude") + ":" + s.conversation_id]
                                             && since(s.last_event) >= 0 && since(s.last_event) < 86400)
     }
     // Board groups, in the order the panel lists them (same as crow watch).
@@ -55,7 +59,24 @@ Singleton {
     readonly property int attention: needsYou.length + interrupted.length
     // Context window the % bar is measured against.
     readonly property int contextWindow: 1000000
-    function contextPct(tokens) { return tokens > 0 ? Math.min(100, Math.round(tokens * 100 / contextWindow)) : 0 }
+    // Against the agent's own window when its provider reports one (Codex); unknown tokens show nothing.
+    function contextPct(tokens, window) {
+        var w = window > 0 ? window : contextWindow
+        return tokens > 0 ? Math.min(100, Math.round(tokens * 100 / w)) : 0
+    }
+    // An account as rows show it: bare in Claude-only payloads, "provider:account" once mixed.
+    function who(d) {
+        if (!d || !d.account) return ""
+        return mixed ? (d.provider || "?") + ":" + d.account : d.account
+    }
+
+    // A stopped session: crow relaunch picks the recommended allowed account, prints the exact
+    // target and mode (native resume or transfer) and asks before anything moves.
+    function relaunch(s) {
+        if (!s || !s.conversation_id || !s.account) return
+        Quickshell.execDetached(["bash", "-lc", 'PATH="$HOME/.local/bin:$PATH"; exec kitty --title "crow · relaunch" crow relaunch "$1" auto --source "$2" --here',
+                                 "crow-relaunch", String(s.conversation_id), String(s.account)])
+    }
 
     function configure(cfg) {
         if (!cfg) return

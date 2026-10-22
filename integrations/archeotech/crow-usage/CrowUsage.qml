@@ -162,7 +162,7 @@ Item {
             if (!CrowUsageStore.available)
                 return { primary: "crow usage unavailable", secondary: CrowUsageStore.error || CrowUsageStore.command }
             var c = pill.cur, t = CrowUsageStore.today
-            var head = c ? c.account + ": " + root.pctText(c.remaining_5h_pct) + " 5h (reset " + CrowUsageStore.shortReset(c.reset_5h_at)
+            var head = c ? CrowUsageStore.who(c) + ": " + root.pctText(c.remaining_5h_pct) + " 5h (reset " + CrowUsageStore.shortReset(c.reset_5h_at)
                            + ") · " + root.pctText(c.remaining_week_pct) + " week"
                          : "no limits (cdx status failed)"
             var sub = "today " + CrowUsageStore.money(t.cost_usd) + " · " + CrowUsageStore.human(t.tokens) + " tok · "
@@ -304,7 +304,7 @@ Item {
                         Row {
                             Cell { width: panel.wMark; text: acct.cur ? "●" : ""; color: root.cAccent; elide: Text.ElideNone }
                             Cell {
-                                width: panel.wName; text: acct.modelData.account
+                                width: panel.wName; text: CrowUsageStore.who(acct.modelData)
                                 color: acct.cur ? root.cText : root.cSub; font.bold: acct.cur
                             }
                             Repeater {
@@ -432,7 +432,9 @@ Item {
                             Text {
                                 width: spark.barW
                                 horizontalAlignment: Text.AlignHCenter
-                                text: dayCol.cost >= 10 ? "$" + Math.round(dayCol.cost) : CrowUsageStore.money(dayCol.cost)
+                                // a day with nothing priced is unknown ("–"), not $0.00
+                                text: dayCol.modelData.cost_usd === null ? CrowUsageStore.money(null)
+                                    : dayCol.cost >= 10 ? "$" + Math.round(dayCol.cost) : CrowUsageStore.money(dayCol.cost)
                                 color: dayCol.isToday ? root.cText : root.cSub
                                 font.family: root.fFamily; font.pixelSize: root.fSm; font.bold: dayCol.isToday
                             }

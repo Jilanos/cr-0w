@@ -49,6 +49,21 @@ fx = {
     ]},
     "idle": {"slots": {"busy": 0, "max": 2}, "agents": [], "finished": []},
 }
+# Claude and Codex together: provider:account on every row, Codex context against its own window,
+# a Codex run that failed and a Codex agent whose context is unknown (null, shows nothing).
+mixed = json.loads(json.dumps(fx["busy"]))
+for a in mixed["agents"]:
+    a["provider"] = "claude"
+codex = agent("session", "billing-api", "working", 300_000, 3, "exec: go test ./...", 6, title="codex: retry design")
+codex.update(provider="codex", account="codex-work", context_window=400_000)
+unknown = agent("run", "docs-site", "quiet", None, 80, "shell: npm run build", 7, label="codex build check")
+unknown.update(provider="codex", account="codex-work", subagents_active=None)
+mixed["agents"] += [codex, unknown]
+for f in mixed["finished"]:
+    f.update(provider="claude", account="work")
+mixed["finished"].append({**fin(4, "billing-api", "codex pagination", "failed", 30), "provider": "codex",
+                          "account": "codex-work"})
+fx["mixed"] = mixed
 for k, v in fx.items():
     with open(os.path.join(out, "fx", f"{k}.json"), "w") as fh:
         json.dump(v, fh, indent=1)
@@ -63,6 +78,9 @@ stops = {"sessions": [
     {"conversation_id": "5ab51b0c-0000-4000-8000-000000000002", "account": "work", "project": "hub",
      "cwd": "/srv/hub", "last_event": iso(30), "limit": "five_hour", "resets_at": 0,
      "first_prompt": "already moved", "workspaces": ["/srv/hub"], "relaunched": {"target": "spare"}},
+    {"conversation_id": "01a16410-0000-7d51-8db9-000000000003", "provider": "codex", "account": "codex-work",
+     "project": "billing-api", "cwd": "/srv/billing-api", "last_event": iso(20), "limit": None, "resets_at": None,
+     "first_prompt": "codex: retry design", "workspaces": ["/srv/billing-api"], "relaunched": None},
 ]}
 with open(os.path.join(out, "fx", "sessions.json"), "w") as fh:
     json.dump(stops, fh, indent=1)
@@ -75,7 +93,7 @@ for k, cmd in cmds.items():
         "top": {"type": "bar", "size": 30, "content": [
             {"id": "workspaces", "config": {}, "align": "left"},
             {"id": "clock", "config": {}, "align": "center"},
-            {"id": "plugin:crow-agents", "config": {"command": cmd, "sessionsCommand": sessions_cmd if k == "busy" else ""},
+            {"id": "plugin:crow-agents", "config": {"command": cmd, "sessionsCommand": sessions_cmd if k in ("busy", "mixed") else ""},
              "align": "right"},
             {"id": "battery", "config": {}, "align": "right"},
             {"id": "power", "config": {}, "align": "right"}]},

@@ -50,6 +50,10 @@ Singleton {
         return limits[0]
     }
     readonly property string currentAccount: current ? current.account : ""
+    // More than Claude in the payload: accounts show their provider ("codex:work").
+    readonly property bool mixed: limits.concat(snap && snap.sessions ? snap.sessions : [])
+        .some(x => x.provider && x.provider !== "claude")
+    function who(x) { return !x ? "" : mixed ? (x.provider || "?") + ":" + x.account : x.account }
     // Limits with the current account first.
     readonly property var sortedLimits: current
         ? [current].concat(limits.filter(l => l.account !== current.account)) : limits

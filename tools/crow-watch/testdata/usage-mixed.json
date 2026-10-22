@@ -1,0 +1,4200 @@
+{
+ "generated_at": "2026-10-20T16:02:10",
+ "limits": [
+  {
+   "account": "work",
+   "remaining_5h_pct": 100,
+   "reset_5h_at": "Oct 20 20:40",
+   "remaining_week_pct": 98,
+   "reset_week_at": "Oct 27 12:00",
+   "active": false,
+   "burn_5h_pct_per_h": null,
+   "empty_at": null,
+   "provider": "claude",
+   "source": "cdx status --cached",
+   "age_s": 60
+  },
+  {
+   "account": "spare",
+   "remaining_5h_pct": 100,
+   "reset_5h_at": "Oct 20 16:20",
+   "remaining_week_pct": 100,
+   "reset_week_at": "Oct 27 07:00",
+   "active": false,
+   "burn_5h_pct_per_h": null,
+   "empty_at": null,
+   "provider": "claude",
+   "source": "cdx status --cached",
+   "age_s": 60
+  },
+  {
+   "account": "side",
+   "remaining_5h_pct": 58,
+   "reset_5h_at": "Oct 20 16:20",
+   "remaining_week_pct": 60,
+   "reset_week_at": "Oct 24 11:00",
+   "active": false,
+   "burn_5h_pct_per_h": null,
+   "empty_at": null,
+   "provider": "claude",
+   "source": "cdx status --cached",
+   "age_s": 60
+  },
+  {
+   "account": "lab",
+   "remaining_5h_pct": 57,
+   "reset_5h_at": "Oct 20 20:00",
+   "remaining_week_pct": 80,
+   "reset_week_at": "Oct 26 17:00",
+   "active": true,
+   "burn_5h_pct_per_h": 18.0,
+   "empty_at": "2026-10-20T18:40+02:00",
+   "provider": "claude",
+   "source": "cdx status --cached",
+   "age_s": 60
+  },
+  {
+   "account": "cx",
+   "remaining_5h_pct": 100,
+   "reset_5h_at": "Oct 20 20:40",
+   "remaining_week_pct": 98,
+   "reset_week_at": "Oct 27 12:00",
+   "active": false,
+   "burn_5h_pct_per_h": null,
+   "empty_at": null,
+   "provider": "codex",
+   "source": "cdx status --cached",
+   "age_s": 7200,
+   "windows": {
+    "five_hour": "codex 5h",
+    "week": "codex week"
+   }
+  }
+ ],
+ "today": {
+  "cost_usd": 51.06,
+  "tokens": 125677169,
+  "input_tokens": 1620,
+  "output_tokens": 565675,
+  "cache_write_tokens": 2761894,
+  "cache_read_tokens": 122347980,
+  "cache_saved_usd": 463.01,
+  "routing_saved_usd": 0.89,
+  "sessions": 15,
+  "unpriced": 1,
+  "runs": 10,
+  "routed_runs": 4,
+  "compactions": 0,
+  "cache_pct": 97,
+  "by_project": [
+   {
+    "name": "hub",
+    "cost_usd": 36.73,
+    "tokens": 91906075,
+    "sessions": 11
+   },
+   {
+    "name": "billing-api",
+    "cost_usd": 10.4,
+    "tokens": 23785269,
+    "sessions": 2
+   },
+   {
+    "name": "mobile-app",
+    "cost_usd": 3.93,
+    "tokens": 9985825,
+    "sessions": 2
+   }
+  ],
+  "by_model": [
+   {
+    "name": "opus-5-5",
+    "cost_usd": 50.12,
+    "tokens": 124687621,
+    "sessions": 11
+   },
+   {
+    "name": "sonnet-5-5",
+    "cost_usd": 0.94,
+    "tokens": 989548,
+    "sessions": 4
+   }
+  ],
+  "tools": [
+   {
+    "name": "Bash",
+    "calls": 839,
+    "tokens": 360659,
+    "text_tokens": 360659,
+    "images": 0
+   },
+   {
+    "name": "Read",
+    "calls": 117,
+    "tokens": 200373,
+    "text_tokens": 38773,
+    "images": 101
+   },
+   {
+    "name": "tracker \u00b7 searchIssues",
+    "calls": 4,
+    "tokens": 13677,
+    "text_tokens": 13677,
+    "images": 0
+   },
+   {
+    "name": "WebSearch",
+    "calls": 14,
+    "tokens": 9997,
+    "text_tokens": 9997,
+    "images": 0
+   },
+   {
+    "name": "Artifact",
+    "calls": 2,
+    "tokens": 9748,
+    "text_tokens": 9748,
+    "images": 0
+   },
+   {
+    "name": "WebFetch",
+    "calls": 27,
+    "tokens": 8365,
+    "text_tokens": 8365,
+    "images": 0
+   },
+   {
+    "name": "AskUserQuestion",
+    "calls": 25,
+    "tokens": 4229,
+    "text_tokens": 4229,
+    "images": 0
+   },
+   {
+    "name": "Write",
+    "calls": 32,
+    "tokens": 1283,
+    "text_tokens": 1283,
+    "images": 0
+   },
+   {
+    "name": "Agent",
+    "calls": 3,
+    "tokens": 789,
+    "text_tokens": 789,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getAccessibl",
+    "calls": 2,
+    "tokens": 340,
+    "text_tokens": 340,
+    "images": 0
+   },
+   {
+    "name": "Edit",
+    "calls": 8,
+    "tokens": 238,
+    "text_tokens": 238,
+    "images": 0
+   },
+   {
+    "name": "SubagentHandback",
+    "calls": 3,
+    "tokens": 45,
+    "text_tokens": 45,
+    "images": 0
+   },
+   {
+    "name": "Skill",
+    "calls": 3,
+    "tokens": 15,
+    "text_tokens": 15,
+    "images": 0
+   },
+   {
+    "name": "ToolSearch",
+    "calls": 6,
+    "tokens": 0,
+    "text_tokens": 0,
+    "images": 0
+   }
+  ],
+  "by_provider": [
+   {
+    "name": "claude",
+    "cost_usd": 51.06,
+    "tokens": 125677169,
+    "sessions": 3,
+    "unpriced": 0
+   },
+   {
+    "name": "codex",
+    "cost_usd": null,
+    "tokens": 1200,
+    "sessions": 1,
+    "unpriced": 1
+   }
+  ]
+ },
+ "week": {
+  "cost_usd": 235.38,
+  "tokens": 600482407,
+  "input_tokens": 7604,
+  "output_tokens": 2381972,
+  "cache_write_tokens": 10850370,
+  "cache_read_tokens": 587242461,
+  "cache_saved_usd": 2228.77,
+  "routing_saved_usd": 1.16,
+  "sessions": 55,
+  "unpriced": 0,
+  "runs": 30,
+  "routed_runs": 4,
+  "compactions": 2,
+  "cache_pct": 98,
+  "by_project": [
+   {
+    "name": "hub",
+    "cost_usd": 80.78,
+    "tokens": 220081334,
+    "sessions": 20
+   },
+   {
+    "name": "terraform-tui",
+    "cost_usd": 67.03,
+    "tokens": 204089644,
+    "sessions": 3
+   },
+   {
+    "name": "mobile-app",
+    "cost_usd": 52.27,
+    "tokens": 115582587,
+    "sessions": 13
+   },
+   {
+    "name": "docs-site",
+    "cost_usd": 12.44,
+    "tokens": 19785281,
+    "sessions": 6
+   },
+   {
+    "name": "billing-api",
+    "cost_usd": 10.7,
+    "tokens": 24006794,
+    "sessions": 3
+   },
+   {
+    "name": "infra",
+    "cost_usd": 4.83,
+    "tokens": 6851095,
+    "sessions": 4
+   },
+   {
+    "name": "widgets",
+    "cost_usd": 3.87,
+    "tokens": 6100643,
+    "sessions": 3
+   },
+   {
+    "name": "notes-plugin",
+    "cost_usd": 3.44,
+    "tokens": 3985029,
+    "sessions": 3
+   }
+  ],
+  "by_model": [
+   {
+    "name": "opus-5-5",
+    "cost_usd": 234.44,
+    "tokens": 599492859,
+    "sessions": 51
+   },
+   {
+    "name": "sonnet-5-5",
+    "cost_usd": 0.94,
+    "tokens": 989548,
+    "sessions": 4
+   }
+  ],
+  "tools": [
+   {
+    "name": "Bash",
+    "calls": 3343,
+    "tokens": 1607977,
+    "text_tokens": 1607977,
+    "images": 0
+   },
+   {
+    "name": "Read",
+    "calls": 300,
+    "tokens": 489368,
+    "text_tokens": 73368,
+    "images": 260
+   },
+   {
+    "name": "WebFetch",
+    "calls": 93,
+    "tokens": 115616,
+    "text_tokens": 115616,
+    "images": 0
+   },
+   {
+    "name": "WebSearch",
+    "calls": 89,
+    "tokens": 64948,
+    "text_tokens": 64948,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 searchIssues",
+    "calls": 12,
+    "tokens": 42884,
+    "text_tokens": 42884,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getIssue",
+    "calls": 14,
+    "tokens": 21250,
+    "text_tokens": 21250,
+    "images": 0
+   },
+   {
+    "name": "Artifact",
+    "calls": 2,
+    "tokens": 9748,
+    "text_tokens": 9748,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getConfluenc",
+    "calls": 1,
+    "tokens": 9555,
+    "text_tokens": 9555,
+    "images": 0
+   },
+   {
+    "name": "AskUserQuestion",
+    "calls": 46,
+    "tokens": 6451,
+    "text_tokens": 6451,
+    "images": 0
+   },
+   {
+    "name": "Write",
+    "calls": 120,
+    "tokens": 4960,
+    "text_tokens": 4960,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 editIssueIssu",
+    "calls": 2,
+    "tokens": 4052,
+    "text_tokens": 4052,
+    "images": 0
+   },
+   {
+    "name": "Agent",
+    "calls": 16,
+    "tokens": 4005,
+    "text_tokens": 4005,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 searchConflu",
+    "calls": 1,
+    "tokens": 1113,
+    "text_tokens": 1113,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getTransitio",
+    "calls": 1,
+    "tokens": 1014,
+    "text_tokens": 1014,
+    "images": 0
+   },
+   {
+    "name": "Edit",
+    "calls": 31,
+    "tokens": 959,
+    "text_tokens": 959,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getAccessibl",
+    "calls": 4,
+    "tokens": 680,
+    "text_tokens": 680,
+    "images": 0
+   },
+   {
+    "name": "?",
+    "calls": 1,
+    "tokens": 258,
+    "text_tokens": 258,
+    "images": 0
+   },
+   {
+    "name": "TaskStop",
+    "calls": 1,
+    "tokens": 222,
+    "text_tokens": 222,
+    "images": 0
+   },
+   {
+    "name": "SubagentHandback",
+    "calls": 14,
+    "tokens": 210,
+    "text_tokens": 210,
+    "images": 0
+   },
+   {
+    "name": "Monitor",
+    "calls": 2,
+    "tokens": 150,
+    "text_tokens": 150,
+    "images": 0
+   },
+   {
+    "name": "Skill",
+    "calls": 19,
+    "tokens": 141,
+    "text_tokens": 141,
+    "images": 0
+   },
+   {
+    "name": "SendMessage",
+    "calls": 3,
+    "tokens": 120,
+    "text_tokens": 120,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 createIssueIs",
+    "calls": 3,
+    "tokens": 108,
+    "text_tokens": 108,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 transitionJi",
+    "calls": 8,
+    "tokens": 105,
+    "text_tokens": 105,
+    "images": 0
+   },
+   {
+    "name": "SendFeedback",
+    "calls": 1,
+    "tokens": 44,
+    "text_tokens": 44,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 createIssueL",
+    "calls": 2,
+    "tokens": 18,
+    "text_tokens": 18,
+    "images": 0
+   },
+   {
+    "name": "ToolSearch",
+    "calls": 26,
+    "tokens": 8,
+    "text_tokens": 8,
+    "images": 0
+   }
+  ]
+ },
+ "month": {
+  "cost_usd": 235.38,
+  "tokens": 600482407,
+  "input_tokens": 7604,
+  "output_tokens": 2381972,
+  "cache_write_tokens": 10850370,
+  "cache_read_tokens": 587242461,
+  "cache_saved_usd": 2228.77,
+  "routing_saved_usd": 1.16,
+  "sessions": 55,
+  "unpriced": 0,
+  "runs": 30,
+  "routed_runs": 4,
+  "compactions": 2,
+  "cache_pct": 98,
+  "by_project": [
+   {
+    "name": "hub",
+    "cost_usd": 80.78,
+    "tokens": 220081334,
+    "sessions": 20
+   },
+   {
+    "name": "terraform-tui",
+    "cost_usd": 67.03,
+    "tokens": 204089644,
+    "sessions": 3
+   },
+   {
+    "name": "mobile-app",
+    "cost_usd": 52.27,
+    "tokens": 115582587,
+    "sessions": 13
+   },
+   {
+    "name": "docs-site",
+    "cost_usd": 12.44,
+    "tokens": 19785281,
+    "sessions": 6
+   },
+   {
+    "name": "billing-api",
+    "cost_usd": 10.7,
+    "tokens": 24006794,
+    "sessions": 3
+   },
+   {
+    "name": "infra",
+    "cost_usd": 4.83,
+    "tokens": 6851095,
+    "sessions": 4
+   },
+   {
+    "name": "widgets",
+    "cost_usd": 3.87,
+    "tokens": 6100643,
+    "sessions": 3
+   },
+   {
+    "name": "notes-plugin",
+    "cost_usd": 3.44,
+    "tokens": 3985029,
+    "sessions": 3
+   }
+  ],
+  "by_model": [
+   {
+    "name": "opus-5-5",
+    "cost_usd": 234.44,
+    "tokens": 599492859,
+    "sessions": 51
+   },
+   {
+    "name": "sonnet-5-5",
+    "cost_usd": 0.94,
+    "tokens": 989548,
+    "sessions": 4
+   }
+  ],
+  "tools": [
+   {
+    "name": "Bash",
+    "calls": 3343,
+    "tokens": 1607977,
+    "text_tokens": 1607977,
+    "images": 0
+   },
+   {
+    "name": "Read",
+    "calls": 300,
+    "tokens": 489368,
+    "text_tokens": 73368,
+    "images": 260
+   },
+   {
+    "name": "WebFetch",
+    "calls": 93,
+    "tokens": 115616,
+    "text_tokens": 115616,
+    "images": 0
+   },
+   {
+    "name": "WebSearch",
+    "calls": 89,
+    "tokens": 64948,
+    "text_tokens": 64948,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 searchIssues",
+    "calls": 12,
+    "tokens": 42884,
+    "text_tokens": 42884,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getIssue",
+    "calls": 14,
+    "tokens": 21250,
+    "text_tokens": 21250,
+    "images": 0
+   },
+   {
+    "name": "Artifact",
+    "calls": 2,
+    "tokens": 9748,
+    "text_tokens": 9748,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getConfluenc",
+    "calls": 1,
+    "tokens": 9555,
+    "text_tokens": 9555,
+    "images": 0
+   },
+   {
+    "name": "AskUserQuestion",
+    "calls": 46,
+    "tokens": 6451,
+    "text_tokens": 6451,
+    "images": 0
+   },
+   {
+    "name": "Write",
+    "calls": 120,
+    "tokens": 4960,
+    "text_tokens": 4960,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 editIssueIssu",
+    "calls": 2,
+    "tokens": 4052,
+    "text_tokens": 4052,
+    "images": 0
+   },
+   {
+    "name": "Agent",
+    "calls": 16,
+    "tokens": 4005,
+    "text_tokens": 4005,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 searchConflu",
+    "calls": 1,
+    "tokens": 1113,
+    "text_tokens": 1113,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getTransitio",
+    "calls": 1,
+    "tokens": 1014,
+    "text_tokens": 1014,
+    "images": 0
+   },
+   {
+    "name": "Edit",
+    "calls": 31,
+    "tokens": 959,
+    "text_tokens": 959,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 getAccessibl",
+    "calls": 4,
+    "tokens": 680,
+    "text_tokens": 680,
+    "images": 0
+   },
+   {
+    "name": "?",
+    "calls": 1,
+    "tokens": 258,
+    "text_tokens": 258,
+    "images": 0
+   },
+   {
+    "name": "TaskStop",
+    "calls": 1,
+    "tokens": 222,
+    "text_tokens": 222,
+    "images": 0
+   },
+   {
+    "name": "SubagentHandback",
+    "calls": 14,
+    "tokens": 210,
+    "text_tokens": 210,
+    "images": 0
+   },
+   {
+    "name": "Monitor",
+    "calls": 2,
+    "tokens": 150,
+    "text_tokens": 150,
+    "images": 0
+   },
+   {
+    "name": "Skill",
+    "calls": 19,
+    "tokens": 141,
+    "text_tokens": 141,
+    "images": 0
+   },
+   {
+    "name": "SendMessage",
+    "calls": 3,
+    "tokens": 120,
+    "text_tokens": 120,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 createIssueIs",
+    "calls": 3,
+    "tokens": 108,
+    "text_tokens": 108,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 transitionJi",
+    "calls": 8,
+    "tokens": 105,
+    "text_tokens": 105,
+    "images": 0
+   },
+   {
+    "name": "SendFeedback",
+    "calls": 1,
+    "tokens": 44,
+    "text_tokens": 44,
+    "images": 0
+   },
+   {
+    "name": "tracker \u00b7 createIssueL",
+    "calls": 2,
+    "tokens": 18,
+    "text_tokens": 18,
+    "images": 0
+   },
+   {
+    "name": "ToolSearch",
+    "calls": 26,
+    "tokens": 8,
+    "text_tokens": 8,
+    "images": 0
+   }
+  ]
+ },
+ "days": [
+  {
+   "date": "2026-10-14",
+   "cost_usd": null,
+   "tokens": 67561672,
+   "input_tokens": 1070,
+   "output_tokens": 245974,
+   "cache_write_tokens": 1496661,
+   "cache_read_tokens": 65817967,
+   "cache_saved_usd": 249.27,
+   "routing_saved_usd": 0.27,
+   "sessions": 7,
+   "unpriced": 7,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 1,
+   "cache_pct": 97
+  },
+  {
+   "date": "2026-10-15",
+   "cost_usd": 83.71,
+   "tokens": 231709277,
+   "input_tokens": 2120,
+   "output_tokens": 637653,
+   "cache_write_tokens": 3616471,
+   "cache_read_tokens": 227453033,
+   "cache_saved_usd": 864.32,
+   "routing_saved_usd": 0,
+   "sessions": 9,
+   "unpriced": 0,
+   "runs": 1,
+   "routed_runs": 0,
+   "compactions": 1,
+   "cache_pct": 98
+  },
+  {
+   "date": "2026-10-16",
+   "cost_usd": 9.32,
+   "tokens": 17908996,
+   "input_tokens": 392,
+   "output_tokens": 149258,
+   "cache_write_tokens": 433803,
+   "cache_read_tokens": 17325543,
+   "cache_saved_usd": 65.84,
+   "routing_saved_usd": 0,
+   "sessions": 5,
+   "unpriced": 0,
+   "runs": 3,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 97
+  },
+  {
+   "date": "2026-10-17",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-18",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-19",
+   "cost_usd": 63.39,
+   "tokens": 157625293,
+   "input_tokens": 2402,
+   "output_tokens": 783412,
+   "cache_write_tokens": 2541541,
+   "cache_read_tokens": 154297938,
+   "cache_saved_usd": 586.33,
+   "routing_saved_usd": 0,
+   "sessions": 19,
+   "unpriced": 0,
+   "runs": 16,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 98
+  },
+  {
+   "date": "2026-10-20",
+   "cost_usd": 51.06,
+   "tokens": 125677169,
+   "input_tokens": 1620,
+   "output_tokens": 565675,
+   "cache_write_tokens": 2761894,
+   "cache_read_tokens": 122347980,
+   "cache_saved_usd": 463.01,
+   "routing_saved_usd": 0.89,
+   "sessions": 15,
+   "unpriced": 0,
+   "runs": 10,
+   "routed_runs": 4,
+   "compactions": 0,
+   "cache_pct": 97
+  }
+ ],
+ "history": [
+  {
+   "date": "2026-09-21",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-22",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-23",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-24",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-25",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-26",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-27",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-28",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-29",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-09-30",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-01",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-02",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-03",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-04",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-05",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-06",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-07",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-08",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-09",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-10",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-11",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-12",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-13",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-14",
+   "cost_usd": 27.9,
+   "tokens": 67561672,
+   "input_tokens": 1070,
+   "output_tokens": 245974,
+   "cache_write_tokens": 1496661,
+   "cache_read_tokens": 65817967,
+   "cache_saved_usd": 249.27,
+   "routing_saved_usd": 0.27,
+   "sessions": 7,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 1,
+   "cache_pct": 97
+  },
+  {
+   "date": "2026-10-15",
+   "cost_usd": 83.71,
+   "tokens": 231709277,
+   "input_tokens": 2120,
+   "output_tokens": 637653,
+   "cache_write_tokens": 3616471,
+   "cache_read_tokens": 227453033,
+   "cache_saved_usd": 864.32,
+   "routing_saved_usd": 0,
+   "sessions": 9,
+   "unpriced": 0,
+   "runs": 1,
+   "routed_runs": 0,
+   "compactions": 1,
+   "cache_pct": 98
+  },
+  {
+   "date": "2026-10-16",
+   "cost_usd": 9.32,
+   "tokens": 17908996,
+   "input_tokens": 392,
+   "output_tokens": 149258,
+   "cache_write_tokens": 433803,
+   "cache_read_tokens": 17325543,
+   "cache_saved_usd": 65.84,
+   "routing_saved_usd": 0,
+   "sessions": 5,
+   "unpriced": 0,
+   "runs": 3,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 97
+  },
+  {
+   "date": "2026-10-17",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-18",
+   "cost_usd": 0.0,
+   "tokens": 0,
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "cache_write_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_saved_usd": 0,
+   "routing_saved_usd": 0,
+   "sessions": 0,
+   "unpriced": 0,
+   "runs": 0,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 0
+  },
+  {
+   "date": "2026-10-19",
+   "cost_usd": 63.39,
+   "tokens": 157625293,
+   "input_tokens": 2402,
+   "output_tokens": 783412,
+   "cache_write_tokens": 2541541,
+   "cache_read_tokens": 154297938,
+   "cache_saved_usd": 586.33,
+   "routing_saved_usd": 0,
+   "sessions": 19,
+   "unpriced": 0,
+   "runs": 16,
+   "routed_runs": 0,
+   "compactions": 0,
+   "cache_pct": 98
+  },
+  {
+   "date": "2026-10-20",
+   "cost_usd": 51.06,
+   "tokens": 125677169,
+   "input_tokens": 1620,
+   "output_tokens": 565675,
+   "cache_write_tokens": 2761894,
+   "cache_read_tokens": 122347980,
+   "cache_saved_usd": 463.01,
+   "routing_saved_usd": 0.89,
+   "sessions": 15,
+   "unpriced": 0,
+   "runs": 10,
+   "routed_runs": 4,
+   "compactions": 0,
+   "cache_pct": 97
+  }
+ ],
+ "sessions": [
+  {
+   "id": "01a16410-0000-7d51-8db9-000000000001",
+   "account": "cx",
+   "project": "hub",
+   "title": "codex fixes the webhook retry",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "gpt-6.1-sol"
+   ],
+   "start": "2026-10-20T10:05:19.691Z",
+   "end": "2026-10-20T14:02:07.389Z",
+   "active": true,
+   "user_messages": 2,
+   "tokens": 27299383,
+   "input_tokens": 282,
+   "output_tokens": 139304,
+   "cache_write_tokens": 568731,
+   "cache_read_tokens": 26591066,
+   "cache_pct": 97,
+   "cost_usd": null,
+   "cache_saved_usd": 100.7601,
+   "routing_saved_usd": 0.1158,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": null,
+     "tokens": 27299383,
+     "input_tokens": 282,
+     "output_tokens": 139304,
+     "cache_write_tokens": 568731,
+     "cache_read_tokens": 26591066,
+     "cache_saved_usd": 100.7601,
+     "routing_saved_usd": 0.1158
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     73,
+     74,
+     75,
+     83,
+     90,
+     91,
+     96
+    ]
+   },
+   "today": {
+    "cost_usd": 10.8333,
+    "tokens": 27299383,
+    "input_tokens": 282,
+    "output_tokens": 139304,
+    "cache_write_tokens": 568731,
+    "cache_read_tokens": 26591066,
+    "cache_saved_usd": 100.7601,
+    "routing_saved_usd": 0.1158
+   },
+   "limit_share": {
+    "five_hour_pct": 7.1,
+    "week_pct": 1.3
+   },
+   "provider": "codex"
+  },
+  {
+   "id": "13f3961c-b13e-ce02-8773-39492d2231b7",
+   "account": "lab",
+   "project": "hub",
+   "title": "webhook retry dedupe",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T10:05:19.691Z",
+   "end": "2026-10-20T14:02:07.389Z",
+   "active": true,
+   "user_messages": 2,
+   "tokens": 27299383,
+   "input_tokens": 282,
+   "output_tokens": 139304,
+   "cache_write_tokens": 568731,
+   "cache_read_tokens": 26591066,
+   "cache_pct": 97,
+   "cost_usd": 10.8333,
+   "cache_saved_usd": 100.7601,
+   "routing_saved_usd": 0.1158,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 10.8333,
+     "tokens": 27299383,
+     "input_tokens": 282,
+     "output_tokens": 139304,
+     "cache_write_tokens": 568731,
+     "cache_read_tokens": 26591066,
+     "cache_saved_usd": 100.7601,
+     "routing_saved_usd": 0.1158
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     73,
+     74,
+     75,
+     83,
+     90,
+     91,
+     96
+    ]
+   },
+   "today": {
+    "cost_usd": 10.8333,
+    "tokens": 27299383,
+    "input_tokens": 282,
+    "output_tokens": 139304,
+    "cache_write_tokens": 568731,
+    "cache_read_tokens": 26591066,
+    "cache_saved_usd": 100.7601,
+    "routing_saved_usd": 0.1158
+   },
+   "limit_share": {
+    "five_hour_pct": 7.1,
+    "week_pct": 1.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "d880aa2f-3dcc-cca9-669f-68fab22783bc",
+   "account": "lab",
+   "project": "hub",
+   "title": "login crash on resume",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:43:53.831Z",
+   "end": "2026-10-20T13:42:50.891Z",
+   "active": true,
+   "user_messages": 24,
+   "tokens": 35159705,
+   "input_tokens": 430,
+   "output_tokens": 150822,
+   "cache_write_tokens": 792942,
+   "cache_read_tokens": 34215511,
+   "cache_pct": 97,
+   "cost_usd": 13.826,
+   "cache_saved_usd": 130.0189,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 10.0385,
+     "tokens": 29701655,
+     "input_tokens": 388,
+     "output_tokens": 141797,
+     "cache_write_tokens": 268564,
+     "cache_read_tokens": 29290906,
+     "cache_saved_usd": 111.3054,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-20": {
+     "cost_usd": 3.7875,
+     "tokens": 5458050,
+     "input_tokens": 42,
+     "output_tokens": 9025,
+     "cache_write_tokens": 524378,
+     "cache_read_tokens": 4924605,
+     "cache_saved_usd": 18.7135,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     88,
+     89,
+     90,
+     91,
+     92,
+     93,
+     94,
+     95,
+     96,
+     98,
+     99,
+     100
+    ],
+    "2026-10-20": [
+     73,
+     75,
+     90,
+     94
+    ]
+   },
+   "today": {
+    "cost_usd": 3.7875,
+    "tokens": 5458050,
+    "input_tokens": 42,
+    "output_tokens": 9025,
+    "cache_write_tokens": 524378,
+    "cache_read_tokens": 4924605,
+    "cache_saved_usd": 18.7135,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 9.1,
+    "week_pct": 1.6
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "e116c646-88ca-cb09-d3cc-337a2472c9c7",
+   "account": "lab",
+   "project": "billing-api",
+   "title": "morning brief",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T13:02:02.987Z",
+   "end": "2026-10-20T13:42:22.605Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 12570538,
+   "input_tokens": 220,
+   "output_tokens": 64550,
+   "cache_write_tokens": 181688,
+   "cache_read_tokens": 12324080,
+   "cache_pct": 98,
+   "cost_usd": 5.2102,
+   "cache_saved_usd": 46.8315,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 5.2102,
+     "tokens": 12570538,
+     "input_tokens": 220,
+     "output_tokens": 64550,
+     "cache_write_tokens": 181688,
+     "cache_read_tokens": 12324080,
+     "cache_saved_usd": 46.8315,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     90,
+     91,
+     92,
+     93,
+     94
+    ]
+   },
+   "today": {
+    "cost_usd": 5.2102,
+    "tokens": 12570538,
+    "input_tokens": 220,
+    "output_tokens": 64550,
+    "cache_write_tokens": 181688,
+    "cache_read_tokens": 12324080,
+    "cache_saved_usd": 46.8315,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 3.4,
+    "week_pct": 0.6
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "1e97bd5b-2498-cb21-f9e7-08e5cf4e14e6",
+   "account": "lab",
+   "project": "hub",
+   "title": "fix broken anchors",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T08:08:49.655Z",
+   "end": "2026-10-20T13:08:24.993Z",
+   "active": true,
+   "user_messages": 16,
+   "tokens": 54185129,
+   "input_tokens": 540,
+   "output_tokens": 155225,
+   "cache_write_tokens": 721668,
+   "cache_read_tokens": 53307696,
+   "cache_pct": 98,
+   "cost_usd": 17.3765,
+   "cache_saved_usd": 202.5692,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 17.3765,
+     "tokens": 54185129,
+     "input_tokens": 540,
+     "output_tokens": 155225,
+     "cache_write_tokens": 721668,
+     "cache_read_tokens": 53307696,
+     "cache_saved_usd": 202.5692,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     60,
+     61,
+     62,
+     63,
+     64,
+     66,
+     67,
+     68,
+     69,
+     70,
+     71,
+     72,
+     73,
+     74,
+     82,
+     90
+    ]
+   },
+   "today": {
+    "cost_usd": 17.3765,
+    "tokens": 54185129,
+    "input_tokens": 540,
+    "output_tokens": 155225,
+    "cache_write_tokens": 721668,
+    "cache_read_tokens": 53307696,
+    "cache_saved_usd": 202.5692,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 11.4,
+    "week_pct": 2.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "57528643-db10-c1de-db17-a8fe6a3bfd73",
+   "account": "lab",
+   "project": "billing-api",
+   "title": "pattern gate dry run",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T10:13:12.272Z",
+   "end": "2026-10-20T10:32:17.998Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 11214731,
+   "input_tokens": 178,
+   "output_tokens": 70427,
+   "cache_write_tokens": 199176,
+   "cache_read_tokens": 10944950,
+   "cache_pct": 98,
+   "cost_usd": 5.1916,
+   "cache_saved_usd": 41.5908,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 5.1916,
+     "tokens": 11214731,
+     "input_tokens": 178,
+     "output_tokens": 70427,
+     "cache_write_tokens": 199176,
+     "cache_read_tokens": 10944950,
+     "cache_saved_usd": 41.5908,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     73,
+     74,
+     75
+    ]
+   },
+   "today": {
+    "cost_usd": 5.1916,
+    "tokens": 11214731,
+    "input_tokens": 178,
+    "output_tokens": 70427,
+    "cache_write_tokens": 199176,
+    "cache_read_tokens": 10944950,
+    "cache_saved_usd": 41.5908,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 3.4,
+    "week_pct": 0.6
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "ebc98b09-c586-c3e9-d3a1-73b4629ca945",
+   "account": "lab",
+   "project": "hub",
+   "title": "session retro",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T10:11:23.227Z",
+   "end": "2026-10-20T10:11:57.802Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 335558,
+   "input_tokens": 12,
+   "output_tokens": 3222,
+   "cache_write_tokens": 54826,
+   "cache_read_tokens": 277498,
+   "cache_pct": 83,
+   "cost_usd": 0.307,
+   "cache_saved_usd": 0.4995,
+   "routing_saved_usd": 0.2515,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.307,
+     "tokens": 335558,
+     "input_tokens": 12,
+     "output_tokens": 3222,
+     "cache_write_tokens": 54826,
+     "cache_read_tokens": 277498,
+     "cache_saved_usd": 0.4995,
+     "routing_saved_usd": 0.2515
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     73
+    ]
+   },
+   "today": {
+    "cost_usd": 0.307,
+    "tokens": 335558,
+    "input_tokens": 12,
+    "output_tokens": 3222,
+    "cache_write_tokens": 54826,
+    "cache_read_tokens": 277498,
+    "cache_saved_usd": 0.4995,
+    "routing_saved_usd": 0.2515
+   },
+   "limit_share": {
+    "five_hour_pct": 0.2,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "0e9bcf36-2f70-c887-6ae1-ca781a2810ab",
+   "account": "lab",
+   "project": "hub",
+   "title": "release notes draft",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T10:05:20.848Z",
+   "end": "2026-10-20T10:05:35.770Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 115156,
+   "input_tokens": 8,
+   "output_tokens": 1455,
+   "cache_write_tokens": 17007,
+   "cache_read_tokens": 96686,
+   "cache_pct": 84,
+   "cost_usd": 0.1019,
+   "cache_saved_usd": 0.174,
+   "routing_saved_usd": 0.0826,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.1019,
+     "tokens": 115156,
+     "input_tokens": 8,
+     "output_tokens": 1455,
+     "cache_write_tokens": 17007,
+     "cache_read_tokens": 96686,
+     "cache_saved_usd": 0.174,
+     "routing_saved_usd": 0.0826
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     72
+    ]
+   },
+   "today": {
+    "cost_usd": 0.1019,
+    "tokens": 115156,
+    "input_tokens": 8,
+    "output_tokens": 1455,
+    "cache_write_tokens": 17007,
+    "cache_read_tokens": 96686,
+    "cache_saved_usd": 0.174,
+    "routing_saved_usd": 0.0826
+   },
+   "limit_share": {
+    "five_hour_pct": 0.1,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "bc94aa8c-6c1b-c99a-d9f4-31db51ed67ac",
+   "account": "lab",
+   "project": "hub",
+   "title": "api pagination",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T09:48:38.963Z",
+   "end": "2026-10-20T10:02:29.698Z",
+   "active": false,
+   "user_messages": 2,
+   "tokens": 266907,
+   "input_tokens": 12,
+   "output_tokens": 3102,
+   "cache_write_tokens": 18289,
+   "cache_read_tokens": 245504,
+   "cache_pct": 92,
+   "cost_usd": 0.2026,
+   "cache_saved_usd": 0.9329,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.2026,
+     "tokens": 266907,
+     "input_tokens": 12,
+     "output_tokens": 3102,
+     "cache_write_tokens": 18289,
+     "cache_read_tokens": 245504,
+     "cache_saved_usd": 0.9329,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     70,
+     72
+    ]
+   },
+   "today": {
+    "cost_usd": 0.2026,
+    "tokens": 266907,
+    "input_tokens": 12,
+    "output_tokens": 3102,
+    "cache_write_tokens": 18289,
+    "cache_read_tokens": 245504,
+    "cache_saved_usd": 0.9329,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 0.1,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "4ac8c680-c0c7-c23a-89c4-b7b99cd5037e",
+   "account": "lab",
+   "project": "hub",
+   "title": "infra plan review",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T09:29:55.468Z",
+   "end": "2026-10-20T09:40:11.594Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 2719765,
+   "input_tokens": 76,
+   "output_tokens": 33779,
+   "cache_write_tokens": 89982,
+   "cache_read_tokens": 2595928,
+   "cache_pct": 95,
+   "cost_usd": 1.9149,
+   "cache_saved_usd": 9.8645,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 1.9149,
+     "tokens": 2719765,
+     "input_tokens": 76,
+     "output_tokens": 33779,
+     "cache_write_tokens": 89982,
+     "cache_read_tokens": 2595928,
+     "cache_saved_usd": 9.8645,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     68,
+     69,
+     70
+    ]
+   },
+   "today": {
+    "cost_usd": 1.9149,
+    "tokens": 2719765,
+    "input_tokens": 76,
+    "output_tokens": 33779,
+    "cache_write_tokens": 89982,
+    "cache_read_tokens": 2595928,
+    "cache_saved_usd": 9.8645,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 1.3,
+    "week_pct": 0.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "1d7947d7-6f95-cc15-d38d-84cdfadca8ff",
+   "account": "lab",
+   "project": "hub",
+   "title": "usage pill for the bar",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T09:32:16.076Z",
+   "end": "2026-10-20T09:33:05.426Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 230233,
+   "input_tokens": 14,
+   "output_tokens": 3460,
+   "cache_write_tokens": 32087,
+   "cache_read_tokens": 194672,
+   "cache_pct": 85,
+   "cost_usd": 0.3649,
+   "cache_saved_usd": 0.7398,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.3649,
+     "tokens": 230233,
+     "input_tokens": 14,
+     "output_tokens": 3460,
+     "cache_write_tokens": 32087,
+     "cache_read_tokens": 194672,
+     "cache_saved_usd": 0.7398,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     69
+    ]
+   },
+   "today": {
+    "cost_usd": 0.3649,
+    "tokens": 230233,
+    "input_tokens": 14,
+    "output_tokens": 3460,
+    "cache_write_tokens": 32087,
+    "cache_read_tokens": 194672,
+    "cache_saved_usd": 0.7398,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 0.2,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "cc48671e-8167-c368-de6e-dab44a08d64d",
+   "account": "lab",
+   "project": "hub",
+   "title": "MR review threads",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T09:27:37.175Z",
+   "end": "2026-10-20T09:31:22.680Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 889895,
+   "input_tokens": 34,
+   "output_tokens": 22241,
+   "cache_write_tokens": 68999,
+   "cache_read_tokens": 798621,
+   "cache_pct": 90,
+   "cost_usd": 1.1567,
+   "cache_saved_usd": 3.0348,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 1.1567,
+     "tokens": 889895,
+     "input_tokens": 34,
+     "output_tokens": 22241,
+     "cache_write_tokens": 68999,
+     "cache_read_tokens": 798621,
+     "cache_saved_usd": 3.0348,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     68,
+     69
+    ]
+   },
+   "today": {
+    "cost_usd": 1.1567,
+    "tokens": 889895,
+    "input_tokens": 34,
+    "output_tokens": 22241,
+    "cache_write_tokens": 68999,
+    "cache_read_tokens": 798621,
+    "cache_saved_usd": 3.0348,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 0.8,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "23707176-a9f6-cce2-d8f5-601b57f808b6",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "flaky test triage",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T09:18:44.965Z",
+   "end": "2026-10-20T09:19:29.238Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 392463,
+   "input_tokens": 16,
+   "output_tokens": 4276,
+   "cache_write_tokens": 53258,
+   "cache_read_tokens": 334913,
+   "cache_pct": 85,
+   "cost_usd": 0.3228,
+   "cache_saved_usd": 0.6028,
+   "routing_saved_usd": 0.2558,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.3228,
+     "tokens": 392463,
+     "input_tokens": 16,
+     "output_tokens": 4276,
+     "cache_write_tokens": 53258,
+     "cache_read_tokens": 334913,
+     "cache_saved_usd": 0.6028,
+     "routing_saved_usd": 0.2558
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     67
+    ]
+   },
+   "today": {
+    "cost_usd": 0.3228,
+    "tokens": 392463,
+    "input_tokens": 16,
+    "output_tokens": 4276,
+    "cache_write_tokens": 53258,
+    "cache_read_tokens": 334913,
+    "cache_saved_usd": 0.6028,
+    "routing_saved_usd": 0.2558
+   },
+   "limit_share": {
+    "five_hour_pct": 0.2,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "c5f41f75-a845-cda4-fc19-fe5f36572827",
+   "account": "lab",
+   "project": "hub",
+   "title": "webhook retry dedupe",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-20T09:06:30.832Z",
+   "end": "2026-10-20T09:06:50.110Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 146371,
+   "input_tokens": 8,
+   "output_tokens": 1839,
+   "cache_write_tokens": 41954,
+   "cache_read_tokens": 102570,
+   "cache_pct": 70,
+   "cost_usd": 0.2067,
+   "cache_saved_usd": 0.1846,
+   "routing_saved_usd": 0.1862,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.2067,
+     "tokens": 146371,
+     "input_tokens": 8,
+     "output_tokens": 1839,
+     "cache_write_tokens": 41954,
+     "cache_read_tokens": 102570,
+     "cache_saved_usd": 0.1846,
+     "routing_saved_usd": 0.1862
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     66
+    ]
+   },
+   "today": {
+    "cost_usd": 0.2067,
+    "tokens": 146371,
+    "input_tokens": 8,
+    "output_tokens": 1839,
+    "cache_write_tokens": 41954,
+    "cache_read_tokens": 102570,
+    "cache_saved_usd": 0.1846,
+    "routing_saved_usd": 0.1862
+   },
+   "limit_share": {
+    "five_hour_pct": 0.1,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "1bb9ae8d-d180-c17e-875f-705125db306c",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "login crash on resume",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T08:19:41.381Z",
+   "end": "2026-10-20T08:54:07.396Z",
+   "active": false,
+   "user_messages": 7,
+   "tokens": 9593362,
+   "input_tokens": 164,
+   "output_tokens": 50210,
+   "cache_write_tokens": 144089,
+   "cache_read_tokens": 9398899,
+   "cache_pct": 98,
+   "cost_usd": 3.6051,
+   "cache_saved_usd": 35.7158,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 3.6051,
+     "tokens": 9593362,
+     "input_tokens": 164,
+     "output_tokens": 50210,
+     "cache_write_tokens": 144089,
+     "cache_read_tokens": 9398899,
+     "cache_saved_usd": 35.7158,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     61,
+     62,
+     63,
+     64,
+     65
+    ]
+   },
+   "today": {
+    "cost_usd": 3.6051,
+    "tokens": 9593362,
+    "input_tokens": 164,
+    "output_tokens": 50210,
+    "cache_write_tokens": 144089,
+    "cache_read_tokens": 9398899,
+    "cache_saved_usd": 35.7158,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 2.4,
+    "week_pct": 0.4
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "912e46e6-dce4-c3c0-f315-9108adf8aa15",
+   "account": "lab",
+   "project": "hub",
+   "title": "morning brief",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-20T08:06:19.957Z",
+   "end": "2026-10-20T08:07:16.101Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 259628,
+   "input_tokens": 14,
+   "output_tokens": 3560,
+   "cache_write_tokens": 45762,
+   "cache_read_tokens": 210292,
+   "cache_pct": 81,
+   "cost_usd": 0.4794,
+   "cache_saved_usd": 0.7991,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-20": {
+     "cost_usd": 0.4794,
+     "tokens": 259628,
+     "input_tokens": 14,
+     "output_tokens": 3560,
+     "cache_write_tokens": 45762,
+     "cache_read_tokens": 210292,
+     "cache_saved_usd": 0.7991,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-20": [
+     60
+    ]
+   },
+   "today": {
+    "cost_usd": 0.4794,
+    "tokens": 259628,
+    "input_tokens": 14,
+    "output_tokens": 3560,
+    "cache_write_tokens": 45762,
+    "cache_read_tokens": 210292,
+    "cache_saved_usd": 0.7991,
+    "routing_saved_usd": 0.0
+   },
+   "limit_share": {
+    "five_hour_pct": 0.3,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "91f1e3ca-97e0-c018-dc14-afd0b0d95984",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "fix broken anchors",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T14:23:46.133Z",
+   "end": "2026-10-19T14:40:53.699Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 4956225,
+   "input_tokens": 104,
+   "output_tokens": 81978,
+   "cache_write_tokens": 152225,
+   "cache_read_tokens": 4721918,
+   "cache_pct": 95,
+   "cost_usd": 3.8022,
+   "cache_saved_usd": 17.9433,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 3.8022,
+     "tokens": 4956225,
+     "input_tokens": 104,
+     "output_tokens": 81978,
+     "cache_write_tokens": 152225,
+     "cache_read_tokens": 4721918,
+     "cache_saved_usd": 17.9433,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     98,
+     99,
+     100
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.4
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "0d233d6a-eb85-c808-f3bb-178f6db47128",
+   "account": "lab",
+   "project": "billing-api",
+   "title": "pattern gate dry run",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T14:39:36.961Z",
+   "end": "2026-10-19T14:40:34.747Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 221525,
+   "input_tokens": 14,
+   "output_tokens": 2309,
+   "cache_write_tokens": 27502,
+   "cache_read_tokens": 191700,
+   "cache_pct": 87,
+   "cost_usd": 0.3046,
+   "cache_saved_usd": 0.7285,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.3046,
+     "tokens": 221525,
+     "input_tokens": 14,
+     "output_tokens": 2309,
+     "cache_write_tokens": 27502,
+     "cache_read_tokens": 191700,
+     "cache_saved_usd": 0.7285,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     99,
+     100
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "00e69031-8e10-c5f9-fa62-6af689acd965",
+   "account": "lab",
+   "project": "hub",
+   "title": "session retro",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T14:27:14.304Z",
+   "end": "2026-10-19T14:38:48.676Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 4763286,
+   "input_tokens": 110,
+   "output_tokens": 40022,
+   "cache_write_tokens": 115905,
+   "cache_read_tokens": 4607249,
+   "cache_pct": 97,
+   "cost_usd": 2.6496,
+   "cache_saved_usd": 17.5075,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 2.6496,
+     "tokens": 4763286,
+     "input_tokens": 110,
+     "output_tokens": 40022,
+     "cache_write_tokens": 115905,
+     "cache_read_tokens": 4607249,
+     "cache_saved_usd": 17.5075,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     98,
+     99
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "6a2a2f2a-55f7-ccf1-f6af-f9f9fd957b02",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "release notes draft",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T14:07:40.558Z",
+   "end": "2026-10-19T14:19:59.732Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 1341253,
+   "input_tokens": 60,
+   "output_tokens": 19420,
+   "cache_write_tokens": 49621,
+   "cache_read_tokens": 1272152,
+   "cache_pct": 95,
+   "cost_usd": 1.04,
+   "cache_saved_usd": 4.8342,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 1.04,
+     "tokens": 1341253,
+     "input_tokens": 60,
+     "output_tokens": 19420,
+     "cache_write_tokens": 49621,
+     "cache_read_tokens": 1272152,
+     "cache_saved_usd": 4.8342,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     96,
+     97
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "e3579c2f-3318-c873-62c2-85e27851b6a2",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "api pagination",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T13:50:19.274Z",
+   "end": "2026-10-19T14:04:49.147Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 7420921,
+   "input_tokens": 146,
+   "output_tokens": 45775,
+   "cache_write_tokens": 136222,
+   "cache_read_tokens": 7238778,
+   "cache_pct": 98,
+   "cost_usd": 3.4536,
+   "cache_saved_usd": 27.5074,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 3.4536,
+     "tokens": 7420921,
+     "input_tokens": 146,
+     "output_tokens": 45775,
+     "cache_write_tokens": 136222,
+     "cache_read_tokens": 7238778,
+     "cache_saved_usd": 27.5074,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     95,
+     96
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.4
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "d20062f6-2d75-c7b1-8bbc-c37b684a1fca",
+   "account": "lab",
+   "project": "infra",
+   "title": "infra plan review",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T13:52:31.868Z",
+   "end": "2026-10-19T13:55:39.111Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 632874,
+   "input_tokens": 34,
+   "output_tokens": 9225,
+   "cache_write_tokens": 30852,
+   "cache_read_tokens": 592763,
+   "cache_pct": 94,
+   "cost_usd": 0.55,
+   "cache_saved_usd": 2.2525,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.55,
+     "tokens": 632874,
+     "input_tokens": 34,
+     "output_tokens": 9225,
+     "cache_write_tokens": 30852,
+     "cache_read_tokens": 592763,
+     "cache_saved_usd": 2.2525,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     95
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "0de0112a-b89a-c636-f6b4-427d52c3bccb",
+   "account": "lab",
+   "project": "notes-plugin",
+   "title": "usage pill for the bar",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T13:50:21.809Z",
+   "end": "2026-10-19T13:52:12.336Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 633767,
+   "input_tokens": 32,
+   "output_tokens": 8959,
+   "cache_write_tokens": 35872,
+   "cache_read_tokens": 588904,
+   "cache_pct": 93,
+   "cost_usd": 0.5841,
+   "cache_saved_usd": 2.2378,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.5841,
+     "tokens": 633767,
+     "input_tokens": 32,
+     "output_tokens": 8959,
+     "cache_write_tokens": 35872,
+     "cache_read_tokens": 588904,
+     "cache_saved_usd": 2.2378,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     95
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "91381753-ed90-ce89-d05b-9fb12fcdda59",
+   "account": "lab",
+   "project": "notes-plugin",
+   "title": "MR review threads",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T13:08:43.403Z",
+   "end": "2026-10-19T13:15:45.093Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 2082424,
+   "input_tokens": 64,
+   "output_tokens": 29601,
+   "cache_write_tokens": 86232,
+   "cache_read_tokens": 1966527,
+   "cache_pct": 94,
+   "cost_usd": 1.6754,
+   "cache_saved_usd": 7.4728,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 1.6754,
+     "tokens": 2082424,
+     "input_tokens": 64,
+     "output_tokens": 29601,
+     "cache_write_tokens": 86232,
+     "cache_read_tokens": 1966527,
+     "cache_saved_usd": 7.4728,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     90,
+     91
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "6024d55e-eca7-ca5b-d88c-32cb6d2c6c00",
+   "account": "lab",
+   "project": "infra",
+   "title": "flaky test triage",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:56:38.821Z",
+   "end": "2026-10-19T13:08:05.299Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 4438857,
+   "input_tokens": 128,
+   "output_tokens": 44006,
+   "cache_write_tokens": 91575,
+   "cache_read_tokens": 4303148,
+   "cache_pct": 97,
+   "cost_usd": 2.4739,
+   "cache_saved_usd": 16.352,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 2.4739,
+     "tokens": 4438857,
+     "input_tokens": 128,
+     "output_tokens": 44006,
+     "cache_write_tokens": 91575,
+     "cache_read_tokens": 4303148,
+     "cache_saved_usd": 16.352,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     89,
+     90
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "ee9fb2aa-822b-cc82-f2cf-d3bc416cafdd",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "webhook retry dedupe",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:56:39.041Z",
+   "end": "2026-10-19T13:07:11.195Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 4445367,
+   "input_tokens": 128,
+   "output_tokens": 34690,
+   "cache_write_tokens": 99033,
+   "cache_read_tokens": 4311516,
+   "cache_pct": 97,
+   "cost_usd": 2.3489,
+   "cache_saved_usd": 16.3838,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 2.3489,
+     "tokens": 4445367,
+     "input_tokens": 128,
+     "output_tokens": 34690,
+     "cache_write_tokens": 99033,
+     "cache_read_tokens": 4311516,
+     "cache_saved_usd": 16.3838,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     89,
+     90
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "28590dd8-4e13-caa9-8877-1df4db74e1cd",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "login crash on resume",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:45:16.389Z",
+   "end": "2026-10-19T12:46:49.067Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 269649,
+   "input_tokens": 20,
+   "output_tokens": 2580,
+   "cache_write_tokens": 21590,
+   "cache_read_tokens": 245459,
+   "cache_pct": 91,
+   "cost_usd": 0.2735,
+   "cache_saved_usd": 0.9327,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.2735,
+     "tokens": 269649,
+     "input_tokens": 20,
+     "output_tokens": 2580,
+     "cache_write_tokens": 21590,
+     "cache_read_tokens": 245459,
+     "cache_saved_usd": 0.9327,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     88
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "d449df0e-a64a-cfc2-d516-9f21b4b66dc9",
+   "account": "lab",
+   "project": "infra",
+   "title": "morning brief",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:45:15.368Z",
+   "end": "2026-10-19T12:46:39.407Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 394136,
+   "input_tokens": 26,
+   "output_tokens": 5647,
+   "cache_write_tokens": 31199,
+   "cache_read_tokens": 357264,
+   "cache_pct": 91,
+   "cost_usd": 0.4341,
+   "cache_saved_usd": 1.3576,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.4341,
+     "tokens": 394136,
+     "input_tokens": 26,
+     "output_tokens": 5647,
+     "cache_write_tokens": 31199,
+     "cache_read_tokens": 357264,
+     "cache_saved_usd": 1.3576,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     88
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "b8135478-cf04-c16c-6da5-b971edcf76b5",
+   "account": "lab",
+   "project": "hub",
+   "title": "fix broken anchors",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-16T09:50:18.568Z",
+   "end": "2026-10-19T12:40:55.930Z",
+   "active": false,
+   "user_messages": 59,
+   "tokens": 73394991,
+   "input_tokens": 650,
+   "output_tokens": 175760,
+   "cache_write_tokens": 952509,
+   "cache_read_tokens": 72266072,
+   "cache_pct": 98,
+   "cost_usd": 22.7336,
+   "cache_saved_usd": 274.6111,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-16": {
+     "cost_usd": 0.6959,
+     "tokens": 746585,
+     "input_tokens": 24,
+     "output_tokens": 7376,
+     "cache_write_tokens": 83421,
+     "cache_read_tokens": 655764,
+     "cache_saved_usd": 2.4919,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-19": {
+     "cost_usd": 22.0377,
+     "tokens": 72648406,
+     "input_tokens": 626,
+     "output_tokens": 168384,
+     "cache_write_tokens": 869088,
+     "cache_read_tokens": 71610308,
+     "cache_saved_usd": 272.1192,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     59,
+     60,
+     61,
+     63,
+     64,
+     68,
+     69,
+     70,
+     71,
+     72,
+     79,
+     80,
+     81,
+     82,
+     83,
+     84,
+     86,
+     87,
+     88
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 2.7
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "b7d44c80-9052-c932-6af5-ea8572c6f06d",
+   "account": "lab",
+   "project": "hub",
+   "title": "pattern gate dry run",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T12:05:22.127Z",
+   "end": "2026-10-19T12:20:07.250Z",
+   "active": false,
+   "user_messages": 7,
+   "tokens": 913918,
+   "input_tokens": 38,
+   "output_tokens": 9177,
+   "cache_write_tokens": 23730,
+   "cache_read_tokens": 880973,
+   "cache_pct": 96,
+   "cost_usd": 0.4785,
+   "cache_saved_usd": 3.3477,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 0.4785,
+     "tokens": 913918,
+     "input_tokens": 38,
+     "output_tokens": 9177,
+     "cache_write_tokens": 23730,
+     "cache_read_tokens": 880973,
+     "cache_saved_usd": 3.3477,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     84,
+     85,
+     86
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "fa5fa9b8-d10e-c452-6a73-36268c2c16af",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "session retro",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T11:38:14.197Z",
+   "end": "2026-10-19T11:51:35.378Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 4581492,
+   "input_tokens": 110,
+   "output_tokens": 30603,
+   "cache_write_tokens": 123403,
+   "cache_read_tokens": 4427376,
+   "cache_pct": 97,
+   "cost_usd": 2.4852,
+   "cache_saved_usd": 16.824,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 2.4852,
+     "tokens": 4581492,
+     "input_tokens": 110,
+     "output_tokens": 30603,
+     "cache_write_tokens": 123403,
+     "cache_read_tokens": 4427376,
+     "cache_saved_usd": 16.824,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     81,
+     82,
+     83
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "2eab5720-ce20-c9ad-89c0-240959307d0d",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "release notes draft",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T11:38:14.389Z",
+   "end": "2026-10-19T11:45:17.416Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 2683676,
+   "input_tokens": 84,
+   "output_tokens": 20038,
+   "cache_write_tokens": 88582,
+   "cache_read_tokens": 2574972,
+   "cache_pct": 96,
+   "cost_usd": 1.6247,
+   "cache_saved_usd": 9.7849,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 1.6247,
+     "tokens": 2683676,
+     "input_tokens": 84,
+     "output_tokens": 20038,
+     "cache_write_tokens": 88582,
+     "cache_read_tokens": 2574972,
+     "cache_saved_usd": 9.7849,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     81,
+     82
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "270930fe-6000-c4bc-6192-5f545db28d45",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "api pagination",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T09:51:57.146Z",
+   "end": "2026-10-19T10:09:49.354Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 7004760,
+   "input_tokens": 142,
+   "output_tokens": 35974,
+   "cache_write_tokens": 141513,
+   "cache_read_tokens": 6827131,
+   "cache_pct": 97,
+   "cost_usd": 3.2176,
+   "cache_saved_usd": 25.9431,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 3.2176,
+     "tokens": 7004760,
+     "input_tokens": 142,
+     "output_tokens": 35974,
+     "cache_write_tokens": 141513,
+     "cache_read_tokens": 6827131,
+     "cache_saved_usd": 25.9431,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     71,
+     72
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.4
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "ce7052be-8746-cd7b-6d86-5381be2fcffb",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "infra plan review",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-19T09:57:55.398Z",
+   "end": "2026-10-19T10:08:19.844Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 8491102,
+   "input_tokens": 148,
+   "output_tokens": 53227,
+   "cache_write_tokens": 148833,
+   "cache_read_tokens": 8288894,
+   "cache_pct": 98,
+   "cost_usd": 3.9136,
+   "cache_saved_usd": 31.4978,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-19": {
+     "cost_usd": 3.9136,
+     "tokens": 8491102,
+     "input_tokens": 148,
+     "output_tokens": 53227,
+     "cache_write_tokens": 148833,
+     "cache_read_tokens": 8288894,
+     "cache_saved_usd": 31.4978,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {
+    "2026-10-19": [
+     71,
+     72
+    ]
+   },
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.5
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "7777c23f-8c15-c3d3-fc33-cab8bffc9a76",
+   "account": "lab",
+   "project": "hub",
+   "title": "usage pill for the bar",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T21:07:13.095Z",
+   "end": "2026-10-15T23:21:45.437Z",
+   "active": false,
+   "user_messages": 29,
+   "tokens": 14224957,
+   "input_tokens": 280,
+   "output_tokens": 75179,
+   "cache_write_tokens": 150850,
+   "cache_read_tokens": 13998648,
+   "cache_pct": 98,
+   "cost_usd": 5.1262,
+   "cache_saved_usd": 53.1949,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 0.5767,
+     "tokens": 1068478,
+     "input_tokens": 44,
+     "output_tokens": 6733,
+     "cache_write_tokens": 33762,
+     "cache_read_tokens": 1027939,
+     "cache_saved_usd": 3.9062,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-16": {
+     "cost_usd": 4.5494,
+     "tokens": 13156479,
+     "input_tokens": 236,
+     "output_tokens": 68446,
+     "cache_write_tokens": 117088,
+     "cache_read_tokens": 12970709,
+     "cache_saved_usd": 49.2887,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.6
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "7eea2dda-b269-cdb6-687f-ae449db4a1b2",
+   "account": "lab",
+   "project": "docs-site",
+   "title": "MR review threads",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T22:55:23.353Z",
+   "end": "2026-10-15T23:01:51.316Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 1351866,
+   "input_tokens": 44,
+   "output_tokens": 29292,
+   "cache_write_tokens": 86212,
+   "cache_read_tokens": 1236318,
+   "cache_pct": 91,
+   "cost_usd": 1.523,
+   "cache_saved_usd": 4.698,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-16": {
+     "cost_usd": 1.523,
+     "tokens": 1351866,
+     "input_tokens": 44,
+     "output_tokens": 29292,
+     "cache_write_tokens": 86212,
+     "cache_read_tokens": 1236318,
+     "cache_saved_usd": 4.698,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "93e27386-8762-cb0b-62a2-70036790c97a",
+   "account": "lab",
+   "project": "infra",
+   "title": "flaky test triage",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T22:24:30.839Z",
+   "end": "2026-10-15T22:28:57.014Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 1385228,
+   "input_tokens": 46,
+   "output_tokens": 24479,
+   "cache_write_tokens": 77836,
+   "cache_read_tokens": 1282867,
+   "cache_pct": 93,
+   "cost_usd": 1.369,
+   "cache_saved_usd": 4.8749,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-16": {
+     "cost_usd": 1.369,
+     "tokens": 1385228,
+     "input_tokens": 46,
+     "output_tokens": 24479,
+     "cache_write_tokens": 77836,
+     "cache_read_tokens": 1282867,
+     "cache_saved_usd": 4.8749,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "55a3acd5-df32-c4f7-8cc2-0fcf9495389a",
+   "account": "lab",
+   "project": "notes-plugin",
+   "title": "webhook retry dedupe",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T22:17:02.679Z",
+   "end": "2026-10-15T22:20:53.970Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 1268838,
+   "input_tokens": 42,
+   "output_tokens": 19665,
+   "cache_write_tokens": 69246,
+   "cache_read_tokens": 1179885,
+   "cache_pct": 93,
+   "cost_usd": 1.1834,
+   "cache_saved_usd": 4.4836,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-16": {
+     "cost_usd": 1.1834,
+     "tokens": 1268838,
+     "input_tokens": 42,
+     "output_tokens": 19665,
+     "cache_write_tokens": 69246,
+     "cache_read_tokens": 1179885,
+     "cache_saved_usd": 4.4836,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "8d23d002-13cc-cc6a-889f-d90a530c6890",
+   "account": "lab",
+   "project": "terraform-tui",
+   "title": "login crash on resume",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-14T15:22:39.947Z",
+   "end": "2026-10-15T20:59:46.275Z",
+   "active": false,
+   "user_messages": 56,
+   "tokens": 169068800,
+   "input_tokens": 1438,
+   "output_tokens": 403032,
+   "cache_write_tokens": 1673390,
+   "cache_read_tokens": 166990940,
+   "cache_pct": 99,
+   "cost_usd": 53.8196,
+   "cache_saved_usd": 634.3684,
+   "routing_saved_usd": 0.0839,
+   "compactions": 1,
+   "by_day": {
+    "2026-10-14": {
+     "cost_usd": 5.9585,
+     "tokens": 15776588,
+     "input_tokens": 244,
+     "output_tokens": 66827,
+     "cache_write_tokens": 213237,
+     "cache_read_tokens": 15496280,
+     "cache_saved_usd": 58.6887,
+     "routing_saved_usd": 0.0839
+    },
+    "2026-10-15": {
+     "cost_usd": 47.8611,
+     "tokens": 153292212,
+     "input_tokens": 1194,
+     "output_tokens": 336205,
+     "cache_write_tokens": 1460153,
+     "cache_read_tokens": 151494660,
+     "cache_saved_usd": 575.6797,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 6.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "38ebbd19-cac3-cc17-dd93-259fffcb9ae7",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "morning brief",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T12:59:11.604Z",
+   "end": "2026-10-15T20:49:49.034Z",
+   "active": false,
+   "user_messages": 14,
+   "tokens": 66452422,
+   "input_tokens": 636,
+   "output_tokens": 204176,
+   "cache_write_tokens": 1721171,
+   "cache_read_tokens": 64526439,
+   "cache_pct": 97,
+   "cost_usd": 28.164,
+   "cache_saved_usd": 245.2005,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 28.164,
+     "tokens": 66452422,
+     "input_tokens": 636,
+     "output_tokens": 204176,
+     "cache_write_tokens": 1721171,
+     "cache_read_tokens": 64526439,
+     "cache_saved_usd": 245.2005,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 3.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "e49b5631-3c81-cf67-f0be-6facef365436",
+   "account": "lab",
+   "project": "hub",
+   "title": "fix broken anchors",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "<synthetic>",
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T14:18:53.679Z",
+   "end": "2026-10-15T16:06:37.788Z",
+   "active": false,
+   "user_messages": 16,
+   "tokens": 5154491,
+   "input_tokens": 120,
+   "output_tokens": 51915,
+   "cache_write_tokens": 101288,
+   "cache_read_tokens": 5001168,
+   "cache_pct": 97,
+   "cost_usd": 2.8493,
+   "cache_saved_usd": 19.0044,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 2.8493,
+     "tokens": 5154491,
+     "input_tokens": 120,
+     "output_tokens": 51915,
+     "cache_write_tokens": 101288,
+     "cache_read_tokens": 5001168,
+     "cache_saved_usd": 19.0044,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "9c3ead7c-28b0-ceb7-8254-c708bbf92c12",
+   "account": "lab",
+   "project": "hub",
+   "title": "pattern gate dry run",
+   "branch": "main",
+   "kind": "run",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T16:00:47.848Z",
+   "end": "2026-10-15T16:00:54.123Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 21961,
+   "input_tokens": 2,
+   "output_tokens": 4,
+   "cache_write_tokens": 21955,
+   "cache_read_tokens": 0,
+   "cache_pct": 0,
+   "cost_usd": 0.1757,
+   "cache_saved_usd": 0.0,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 0.1757,
+     "tokens": 21961,
+     "input_tokens": 2,
+     "output_tokens": 4,
+     "cache_write_tokens": 21955,
+     "cache_read_tokens": 0,
+     "cache_saved_usd": 0.0,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "0ba39357-dafa-c786-de49-2c97321d9260",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "session retro",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T13:01:17.324Z",
+   "end": "2026-10-15T13:09:19.298Z",
+   "active": false,
+   "user_messages": 4,
+   "tokens": 1312469,
+   "input_tokens": 42,
+   "output_tokens": 15105,
+   "cache_write_tokens": 48679,
+   "cache_read_tokens": 1248643,
+   "cache_pct": 95,
+   "cost_usd": 0.9414,
+   "cache_saved_usd": 4.7448,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 0.9414,
+     "tokens": 1312469,
+     "input_tokens": 42,
+     "output_tokens": 15105,
+     "cache_write_tokens": 48679,
+     "cache_read_tokens": 1248643,
+     "cache_saved_usd": 4.7448,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "737266ee-4d8f-c6de-61bb-ced2e9eb54f3",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "release notes draft",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T12:16:29.277Z",
+   "end": "2026-10-15T12:16:51.052Z",
+   "active": false,
+   "user_messages": 1,
+   "tokens": 194391,
+   "input_tokens": 8,
+   "output_tokens": 1180,
+   "cache_write_tokens": 23688,
+   "cache_read_tokens": 169515,
+   "cache_pct": 87,
+   "cost_usd": 0.247,
+   "cache_saved_usd": 0.6442,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 0.247,
+     "tokens": 194391,
+     "input_tokens": 8,
+     "output_tokens": 1180,
+     "cache_write_tokens": 23688,
+     "cache_read_tokens": 169515,
+     "cache_saved_usd": 0.6442,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "4d4ac4e6-9c72-c962-60f4-468bf622f84d",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "api pagination",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-15T10:02:20.615Z",
+   "end": "2026-10-15T10:23:19.068Z",
+   "active": false,
+   "user_messages": 3,
+   "tokens": 1502713,
+   "input_tokens": 40,
+   "output_tokens": 15677,
+   "cache_write_tokens": 66919,
+   "cache_read_tokens": 1420077,
+   "cache_pct": 95,
+   "cost_usd": 1.1331,
+   "cache_saved_usd": 5.3963,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-15": {
+     "cost_usd": 1.1331,
+     "tokens": 1502713,
+     "input_tokens": 40,
+     "output_tokens": 15677,
+     "cache_write_tokens": 66919,
+     "cache_read_tokens": 1420077,
+     "cache_saved_usd": 5.3963,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.1
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "ef27cad4-9904-c021-d62f-b531d261e2c5",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "infra plan review",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-14T08:52:12.110Z",
+   "end": "2026-10-15T08:35:01.894Z",
+   "active": false,
+   "user_messages": 11,
+   "tokens": 9377978,
+   "input_tokens": 156,
+   "output_tokens": 34877,
+   "cache_write_tokens": 249182,
+   "cache_read_tokens": 9093763,
+   "cache_pct": 97,
+   "cost_usd": 4.5104,
+   "cache_saved_usd": 34.5563,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-14": {
+     "cost_usd": 2.7533,
+     "tokens": 6667838,
+     "input_tokens": 122,
+     "output_tokens": 28219,
+     "cache_write_tokens": 110326,
+     "cache_read_tokens": 6529171,
+     "cache_saved_usd": 24.8108,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-15": {
+     "cost_usd": 1.7571,
+     "tokens": 2710140,
+     "input_tokens": 34,
+     "output_tokens": 6658,
+     "cache_write_tokens": 138856,
+     "cache_read_tokens": 2564592,
+     "cache_saved_usd": 9.7454,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.5
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "5bc5768f-c945-cffc-f9a5-dcb88110c4c4",
+   "account": "lab",
+   "project": "widgets",
+   "title": "usage pill for the bar",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-14T13:59:43.653Z",
+   "end": "2026-10-14T15:54:12.100Z",
+   "active": false,
+   "user_messages": 12,
+   "tokens": 4629313,
+   "input_tokens": 84,
+   "output_tokens": 33753,
+   "cache_write_tokens": 109289,
+   "cache_read_tokens": 4486187,
+   "cache_pct": 97,
+   "cost_usd": 2.4469,
+   "cache_saved_usd": 17.0475,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-14": {
+     "cost_usd": 2.4469,
+     "tokens": 4629313,
+     "input_tokens": 84,
+     "output_tokens": 33753,
+     "cache_write_tokens": 109289,
+     "cache_read_tokens": 4486187,
+     "cache_saved_usd": 17.0475,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "060f0229-8bb5-c3c2-6810-2bbd0d79a803",
+   "account": "lab",
+   "project": "terraform-tui",
+   "title": "MR review threads",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5"
+   ],
+   "start": "2026-10-12T15:04:27.066Z",
+   "end": "2026-10-14T15:22:30.080Z",
+   "active": false,
+   "user_messages": 18,
+   "tokens": 74094657,
+   "input_tokens": 958,
+   "output_tokens": 221814,
+   "cache_write_tokens": 1394642,
+   "cache_read_tokens": 72477243,
+   "cache_pct": 98,
+   "cost_usd": 27.4521,
+   "cache_saved_usd": 273.0406,
+   "routing_saved_usd": 0.4937,
+   "compactions": 1,
+   "by_day": {
+    "2026-10-12": {
+     "cost_usd": 4.1517,
+     "tokens": 10060557,
+     "input_tokens": 194,
+     "output_tokens": 49469,
+     "cache_write_tokens": 178865,
+     "cache_read_tokens": 9832029,
+     "cache_saved_usd": 36.9826,
+     "routing_saved_usd": 0.1074
+    },
+    "2026-10-13": {
+     "cost_usd": 10.0897,
+     "tokens": 29013256,
+     "input_tokens": 248,
+     "output_tokens": 88907,
+     "cache_write_tokens": 378795,
+     "cache_read_tokens": 28545306,
+     "cache_saved_usd": 107.1223,
+     "routing_saved_usd": 0.1961
+    },
+    "2026-10-14": {
+     "cost_usd": 13.2106,
+     "tokens": 35020844,
+     "input_tokens": 516,
+     "output_tokens": 83438,
+     "cache_write_tokens": 836982,
+     "cache_read_tokens": 34099908,
+     "cache_saved_usd": 128.9358,
+     "routing_saved_usd": 0.1902
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 3.2
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "5b9a981d-043d-c580-80fb-465c5d314af8",
+   "account": "lab",
+   "project": "widgets",
+   "title": "flaky test triage",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-14T09:33:33.109Z",
+   "end": "2026-10-14T09:36:15.244Z",
+   "active": false,
+   "user_messages": 4,
+   "tokens": 178231,
+   "input_tokens": 8,
+   "output_tokens": 1866,
+   "cache_write_tokens": 18903,
+   "cache_read_tokens": 157454,
+   "cache_pct": 88,
+   "cost_usd": 0.2201,
+   "cache_saved_usd": 0.5983,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-14": {
+     "cost_usd": 0.2201,
+     "tokens": 178231,
+     "input_tokens": 8,
+     "output_tokens": 1866,
+     "cache_write_tokens": 18903,
+     "cache_read_tokens": 157454,
+     "cache_saved_usd": 0.5983,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.0
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "234aa00a-3af0-cb7b-6f04-76eb7f08c2e6",
+   "account": "lab",
+   "project": "mobile-app",
+   "title": "webhook retry dedupe",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-13T12:11:30.508Z",
+   "end": "2026-10-14T08:49:30.319Z",
+   "active": false,
+   "user_messages": 12,
+   "tokens": 4726109,
+   "input_tokens": 100,
+   "output_tokens": 32672,
+   "cache_write_tokens": 150913,
+   "cache_read_tokens": 4542424,
+   "cache_pct": 96,
+   "cost_usd": 2.7696,
+   "cache_saved_usd": 17.2612,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-13": {
+     "cost_usd": 0.6617,
+     "tokens": 730350,
+     "input_tokens": 24,
+     "output_tokens": 7137,
+     "cache_write_tokens": 47980,
+     "cache_read_tokens": 675209,
+     "cache_saved_usd": 2.5658,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-14": {
+     "cost_usd": 2.1079,
+     "tokens": 3995759,
+     "input_tokens": 76,
+     "output_tokens": 25535,
+     "cache_write_tokens": 102933,
+     "cache_read_tokens": 3867215,
+     "cache_saved_usd": 14.6954,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "4988c239-1656-cab3-f568-e4559fc80c78",
+   "account": "lab",
+   "project": "widgets",
+   "title": "login crash on resume",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-13T09:56:16.063Z",
+   "end": "2026-10-14T08:16:51.041Z",
+   "active": false,
+   "user_messages": 37,
+   "tokens": 6546409,
+   "input_tokens": 146,
+   "output_tokens": 44835,
+   "cache_write_tokens": 340084,
+   "cache_read_tokens": 6161344,
+   "cache_pct": 94,
+   "cost_usd": 4.8502,
+   "cache_saved_usd": 23.4131,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-13": {
+     "cost_usd": 3.6471,
+     "tokens": 5253310,
+     "input_tokens": 126,
+     "output_tokens": 38499,
+     "cache_write_tokens": 235093,
+     "cache_read_tokens": 4979592,
+     "cache_saved_usd": 18.9224,
+     "routing_saved_usd": 0.0
+    },
+    "2026-10-14": {
+     "cost_usd": 1.2031,
+     "tokens": 1293099,
+     "input_tokens": 20,
+     "output_tokens": 6336,
+     "cache_write_tokens": 104991,
+     "cache_read_tokens": 1181752,
+     "cache_saved_usd": 4.4907,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.6
+   },
+   "provider": "claude"
+  },
+  {
+   "id": "5ba10755-2902-c0c6-f404-b5afc8e01fb1",
+   "account": "lab",
+   "project": "widgets",
+   "title": "morning brief",
+   "branch": "main",
+   "kind": "interactive",
+   "models": [
+    "claude-opus-5-5"
+   ],
+   "start": "2026-10-13T09:56:16.063Z",
+   "end": "2026-10-13T12:22:30.790Z",
+   "active": false,
+   "user_messages": 24,
+   "tokens": 4290415,
+   "input_tokens": 110,
+   "output_tokens": 32925,
+   "cache_write_tokens": 137769,
+   "cache_read_tokens": 4119611,
+   "cache_pct": 96,
+   "cost_usd": 2.585,
+   "cache_saved_usd": 15.6545,
+   "routing_saved_usd": 0.0,
+   "compactions": 0,
+   "by_day": {
+    "2026-10-13": {
+     "cost_usd": 2.585,
+     "tokens": 4290415,
+     "input_tokens": 110,
+     "output_tokens": 32925,
+     "cache_write_tokens": 137769,
+     "cache_read_tokens": 4119611,
+     "cache_saved_usd": 15.6545,
+     "routing_saved_usd": 0.0
+    }
+   },
+   "activity": {},
+   "today": null,
+   "limit_share": {
+    "five_hour_pct": 0.0,
+    "week_pct": 0.3
+   },
+   "provider": "claude"
+  }
+ ],
+ "rtk": {
+  "saved_tokens": 2312056,
+  "input_tokens": 8612115,
+  "commands": 6623,
+  "time_ms": 4717121,
+  "today_saved_tokens": 117225,
+  "today_input_tokens": 305669,
+  "today_commands": 476,
+  "databases": 3,
+  "saved_pct": 26.8,
+  "today_saved_pct": 38.4,
+  "failures": 954
+ },
+ "retros": {
+  "today": 3,
+  "pending_proposals": 1,
+  "week": 3
+ },
+ "schema_version": 2
+}

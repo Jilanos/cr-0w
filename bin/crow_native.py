@@ -12,6 +12,7 @@ PARSER_VERSION = {"claude": 1, "codex": 1}
 RECENT_N = 30
 CODEX_EXE = re.compile(r"(^|/)codex$")
 CLAUDE_EXE = re.compile(r"(^|/)claude$|/claude/versions/")
+CODE_CMD = re.compile(r'\b(?:cmd|command)\s*:\s*"((?:[^"\\]|\\.)*)"')
 LIMIT_TEXT = re.compile(r"usage limit|rate limit|hit your .*limit|quota", re.I)
 # Prompts crow itself sends for automatic jobs (titles, retros, briefs), on either provider.
 AUTO_PROMPT = re.compile(r"^(/retro\b|/brief|/daily|/weekly|You name coding sessions\b)"
@@ -119,6 +120,13 @@ def _codex_text(content):
     return ""
 
 
+def _unquote(s):
+    try:
+        return json.loads(f'"{s}"')
+    except ValueError:
+        return s
+
+
 def codex_action(p):
     """One line for a Codex response_item, like crow's Claude summaries; None when not an action."""
     t = p.get("type")
@@ -131,7 +139,9 @@ def codex_action(p):
                 if isinstance(a, dict):
                     detail = next((str(a[k]) for k in ("cmd", "command", "path", "query", "description") if a.get(k)), "")
             except ValueError:
-                detail = args
+                # code-mode tools wrap the call in JS: show the command, not the wrapper
+                m = CODE_CMD.search(args)
+                detail = _unquote(m[1]) if m else args
         return f"{p.get('name') or t}: {first_line(detail)}".rstrip(": ") if detail else (p.get("name") or t)
     if t == "local_shell_call":
         cmd = (p.get("action") or {}).get("command")
@@ -260,10 +270,11 @@ def codex_agent_info(st):
     """The crow-runs agent fields from a Codex reader state."""
     if not st:
         return {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": None,
-                "recent": [], "last_prompt": None, "waiting_evidence": False}
+                "recent": [], "last_prompt": None, "waiting_evidence": False, "context_window": None}
     return {"last_action": st["last_action"], "ends_on_text": st["ends_on_text"],
             "context_tokens": st["context_tokens"], "subagents_active": None, "recent": list(st["recent"]),
-            "last_prompt": st["last_prompt"], "waiting_evidence": bool(st["turn_done"])}
+            "last_prompt": st["last_prompt"], "waiting_evidence": bool(st["turn_done"]),
+            "context_window": st["context_window"]}
 
 
 def load_cache(path):

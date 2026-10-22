@@ -31,7 +31,9 @@ type event struct {
 type agent struct {
 	Kind            string   `json:"kind"`
 	PID             int      `json:"pid"`
+	Provider        string   `json:"provider"`
 	Account         string   `json:"account"`
+	ContextWindow   int      `json:"context_window"`
 	Project         string   `json:"project"`
 	Cwd             string   `json:"cwd"`
 	SessionID       string   `json:"session_id"`
@@ -51,6 +53,8 @@ type agent struct {
 
 type finished struct {
 	RunID       string   `json:"run_id"`
+	Provider    string   `json:"provider"`
+	Account     string   `json:"account"`
 	Project     string   `json:"project"`
 	Label       string   `json:"label"`
 	Status      string   `json:"status"`
@@ -63,6 +67,7 @@ type finished struct {
 // interrupted: a session cut off by a usage limit (mirrors crow-sessions list --json).
 type interrupted struct {
 	ID          string   `json:"conversation_id"`
+	Provider    string   `json:"provider"`
 	Account     string   `json:"account"`
 	Project     string   `json:"project"`
 	Cwd         string   `json:"cwd"`
@@ -314,6 +319,35 @@ func copyID(id string) string {
 	return "copied " + short(id)
 }
 
+// who: an account as the views show it. Claude-only payloads keep the bare account name;
+// once another provider is in the payload every account carries its provider ("codex:work").
+// A record without a provider shows no guess.
+func who(mixed bool, provider, account string) string {
+	if !mixed {
+		return account
+	}
+	if provider == "" {
+		provider = "?"
+	}
+	return provider + ":" + account
+}
+
+// relaunchArgs: the shared, guarded recovery command for a stopped session. `auto` lets
+// crow relaunch pick the recommended allowed account; it prints the exact target and mode
+// (native resume or transfer) and asks before anything moves, as on the command line.
+func relaunchArgs(s interrupted) []string {
+	return []string{"setsid", "-f", "kitty", "--title", "crow · relaunch " + short(s.ID),
+		crowBin("crow"), "relaunch", s.ID, "auto", "--source", s.Account, "--here"}
+}
+
+func relaunch(s interrupted) string {
+	a := relaunchArgs(s)
+	if err := exec.Command(a[0], a[1:]...).Start(); err != nil {
+		return "crow relaunch failed: " + err.Error()
+	}
+	return "relaunch " + short(s.ID) + " opens in kitty (it asks first)"
+}
+
 // openProject opens a new kitty window on the project (crow term, safe from inside Claude).
 func openProject(project string) string {
 	name := strings.TrimSuffix(project, " (hub)")
@@ -389,6 +423,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.usageLoading {
 				m.usageLoading = true
 				return m, fetchUsage
+			}
+		case "R":
+			if it := m.selected(); m.view == vAgents && it != nil && it.intr != nil {
+				m.notice = relaunch(*it.intr)
 			}
 		case "c":
 			if m.view == vAgents {
@@ -521,7 +559,7 @@ func (m model) statusRight() line {
 	if u := m.usage; u != nil {
 		if c := u.current(); c != nil && c.Remaining5hPct != nil {
 			p := *c.Remaining5hPct
-			l = append(l, seg{c.Account + " ", sSub})
+			l = append(l, seg{who(u.mixed, c.Provider, c.Account) + " ", sSub})
 			l = append(l, lineBar(float64(p), 8, levelStyle(p))...)
 			l = append(l, seg{fmt.Sprintf(" %d%%", p), levelStyle(p)})
 			if c.EmptyAt != "" { // runs out before its reset: the one headroom fact to see from every view
@@ -566,7 +604,7 @@ func (m model) helpView(h int) block {
 	rows := [][2]string{
 		{"1 2", "Agents · Usage"}, {"Tab / Shift+Tab", "next / previous view"}, {"u", "toggle Agents ↔ Usage"},
 		{"↑↓  j k", "select an agent or a session"}, {"PgUp PgDn", "scroll the details"}, {"o  Enter", "open the project in a new kitty window"},
-		{"c", "copy the run or session id"}, {"d w m", "period: today, 7 days, 30 days (Usage)"}, {"r", "refresh now"},
+		{"c", "copy the run or session id"}, {"R", "relaunch a stopped session (asks first)"}, {"d w m", "period: today, 7 days, 30 days (Usage)"}, {"r", "refresh now"},
 		{"Enter  Space", "Usage: fold or unfold the day under the cursor"}, {"t", "Usage: context weight by tool instead of project and model"},
 		{"?", "this help (any key closes)"}, {"q", "quit"},
 	}

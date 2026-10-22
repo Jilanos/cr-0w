@@ -351,7 +351,7 @@ def collect(since="today", include_unledgered=False):
             "native_id": sid, "identity": f"{p['provider']}:{account}:{sid}",
             "project": project_name(p["cwd"]), "cwd": p["cwd"], "session_id": sid, "state": state,
             "started_at": datetime.fromtimestamp(p["started"], timezone.utc).isoformat(timespec="seconds"),
-            "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt")},
+            "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt", "context_window")},
             "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
         }
         if kind == "run":
@@ -420,7 +420,7 @@ def collect(since="today", include_unledgered=False):
         split = pu["sessions"].get(a["session_id"])
         a["multi_project"] = bool(split)
         a["projects"] = split["projects"] if split else []
-    return {"usage_by_project": pu["today"], "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    return {"schema_version": 2, "usage_by_project": pu["today"], "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "slots": {"busy": busy, "max": MAX_PARALLEL}, "agents": agents, "finished": past}
 
 

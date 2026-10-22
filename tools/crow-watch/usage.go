@@ -18,6 +18,9 @@ import (
 
 type limit struct {
 	Account          string   `json:"account"`
+	Provider         string   `json:"provider"`
+	Source           string   `json:"source"`
+	AgeS             *int     `json:"age_s"`
 	Remaining5hPct   *int     `json:"remaining_5h_pct"`
 	Reset5hAt        string   `json:"reset_5h_at"`
 	RemainingWeekPct *int     `json:"remaining_week_pct"`
@@ -56,6 +59,38 @@ type rollup struct {
 	ByProject   []named `json:"by_project"`
 	ByModel     []named `json:"by_model"`
 	Tools       []named `json:"tools"`
+	ByProvider  []named `json:"by_provider"`
+	// CostKnown: false when cost_usd is null (nothing in it is priced): shown as $?, never $0.
+	CostKnown bool `json:"-"`
+}
+
+// UnmarshalJSON keeps a null cost apart from a measured zero.
+func (r *rollup) UnmarshalJSON(b []byte) error {
+	type plain rollup
+	var raw struct {
+		plain
+		Cost *float64 `json:"cost_usd"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	*r = rollup(raw.plain)
+	r.CostKnown = raw.Cost != nil
+	if raw.Cost != nil {
+		r.CostUSD = *raw.Cost
+	}
+	return nil
+}
+
+// cost: the rollup's money, "$?" when unknown, with a "+" when part of it is unpriced.
+func (r rollup) cost() string {
+	if !r.CostKnown {
+		return "$?"
+	}
+	if r.Unpriced > 0 {
+		return money(r.CostUSD) + "+"
+	}
+	return money(r.CostUSD)
 }
 
 type slice struct {
@@ -65,6 +100,7 @@ type slice struct {
 
 type usageSession struct {
 	ID       string           `json:"id"`
+	Provider string           `json:"provider"`
 	Account  string           `json:"account"`
 	Project  string           `json:"project"`
 	Title    string           `json:"title"`
@@ -112,7 +148,8 @@ type usage struct {
 	rows   []sessRow // sessions list: today, then earlier days (newest first)
 	byID   map[string]*usageSession
 	nToday int
-	acctW  int // widest account name
+	acctW  int  // widest account name
+	mixed  bool // more than Claude in the payload: accounts show their provider
 }
 
 // sessRow is one line of the sessions list: a day divider or a session's slice of that day.
@@ -169,8 +206,14 @@ func parseUsage(b []byte) (*usage, error) {
 			r.first, seen[r.s.ID] = true, true
 		}
 	}
+	for _, l := range u.Limits {
+		u.mixed = u.mixed || (l.Provider != "" && l.Provider != "claude")
+	}
 	for _, s := range u.Sessions {
-		u.acctW = max(u.acctW, len(s.Account))
+		u.mixed = u.mixed || (s.Provider != "" && s.Provider != "claude")
+	}
+	for _, s := range u.Sessions {
+		u.acctW = max(u.acctW, len(who(u.mixed, s.Provider, s.Account)))
 	}
 	return &u, nil
 }
@@ -281,7 +324,7 @@ func hhmm(iso string) string {
 func (u *usage) limitLines(width int) []line {
 	nameW := 7
 	for _, l := range u.Limits {
-		nameW = max(nameW, len(l.Account)+1)
+		nameW = max(nameW, len(who(u.mixed, l.Provider, l.Account))+1)
 	}
 	tail := 5 + 2 + 20 // pct, "resets Oct 26 17:00"
 	gw := min(24, (width-2-nameW-tail*2-6)/2)
@@ -305,9 +348,10 @@ func (u *usage) limitLines(width int) []line {
 	ls := append([]limit(nil), u.Limits...)
 	sort.SliceStable(ls, func(i, j int) bool { return ls[i].Active && !ls[j].Active })
 	for _, l := range ls {
-		mark, name := seg{"  ", sPlain}, seg{pad(l.Account, nameW), sPlain}
+		acct := who(u.mixed, l.Provider, l.Account)
+		mark, name := seg{"  ", sPlain}, seg{pad(acct, nameW), sPlain}
 		if l.Active {
-			mark, name = seg{"● ", st("working").style}, seg{pad(l.Account, nameW), sBold}
+			mark, name = seg{"● ", st("working").style}, seg{pad(acct, nameW), sBold}
 		}
 		five := append(line{mark, name}, cell(l.Remaining5hPct, l.Reset5hAt)...)
 		week := cell(l.RemainingWeekPct, l.ResetWeekAt)
@@ -337,8 +381,8 @@ func (u *usage) limitLines(width int) []line {
 // spendHead: the three spend figures, then the period's tokens and its split
 // (new input, output, cache), each line cut back to what fits the width.
 func (u *usage) spendHead(width int, p rollup) []line {
-	figs := line{{money(u.Today.CostUSD), sBold.Foreground(cWhite)}, {" today   ", sSub}, {money(u.Week.CostUSD), sBold}, {" last 7 days   ", sSub},
-		{money(u.Month.CostUSD), sBold}, {" 30 days", sSub}}
+	figs := line{{u.Today.cost(), sBold.Foreground(cWhite)}, {" today   ", sSub}, {u.Week.cost(), sBold}, {" last 7 days   ", sSub},
+		{u.Month.cost(), sBold}, {" 30 days", sSub}}
 	tok := line{{human(p.Tokens), sCyan}, {fmt.Sprintf(" tokens · %d %s", p.Sessions, plural(p.Sessions, "session", "sessions")), sSub}}
 	if p.Unpriced > 0 {
 		tok = append(tok, seg{fmt.Sprintf(" · %d unpriced", p.Unpriced), sYellow})
@@ -425,11 +469,11 @@ func chart(days []rollup, width, height int, tok bool) []line {
 		if i == len(days)-1 {
 			style, ns, ts = sAcc, sMagenta, sCyan.Bold(true)
 		}
-		v := money(d.CostUSD)
+		v := d.cost()
 		if tok {
 			v = human(d.Tokens)
 		}
-		if d.CostUSD >= 10 && !tok {
+		if d.CostKnown && d.Unpriced == 0 && d.CostUSD >= 10 && !tok {
 			v = fmt.Sprintf("$%.0f", d.CostUSD)
 		}
 		name := d.Date
@@ -547,7 +591,7 @@ func (u *usage) rowLine(r sessRow, width int, open bool) line {
 		if r.first {
 			five, week = sharePct(s.LimitShare.FiveHour), sharePct(s.LimitShare.Week)
 		}
-		l = append(l, seg{pad(s.Account, c.account), sSub}, seg{padL(five, c.share), sSub}, seg{padL(week, c.share), sSub})
+		l = append(l, seg{pad(who(u.mixed, s.Provider, s.Account), c.account), sSub}, seg{padL(five, c.share), sSub}, seg{padL(week, c.share), sSub})
 	}
 	cost := money(r.cost)
 	if !r.priced {
@@ -559,7 +603,7 @@ func (u *usage) rowLine(r sessRow, width int, open bool) line {
 func (u *usage) totalLine(width int) line {
 	t := u.Today
 	return line{{pad(fmt.Sprintf("  %d %s today", u.nToday, plural(u.nToday, "session", "sessions")), width-17), sSub},
-		{padL(human(t.Tokens), 8), sCyan.Bold(true)}, {padL(money(t.CostUSD), 9), sYellow.Bold(true)}}
+		{padL(human(t.Tokens), 8), sCyan.Bold(true)}, {padL(t.cost(), 9), sYellow.Bold(true)}}
 }
 
 // sessionBody: header, today's rows, total, then the earlier days' headers (their

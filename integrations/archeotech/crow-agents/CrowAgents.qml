@@ -159,7 +159,7 @@ Item {
                 var what = a.state === "waiting" ? "waiting for your reply"
                          : ((a.label || a.title) ? (a.label || a.title) + ": " : "") + (a.last_action || "")
                 if (what.length > 72) what = what.slice(0, 71) + "…"
-                lines.push(root.st(a.state).glyph + " " + a.project + "  " + what)
+                lines.push(root.st(a.state).glyph + " " + a.project + (CrowStore.mixed ? " (" + CrowStore.who(a) + ")" : "") + "  " + what)
             })
             var head = CrowStore.busy + "/" + CrowStore.maxSlots + " runs busy"
             if (CrowStore.waiting > 0) head += " · " + CrowStore.waiting + " waiting on you"
@@ -410,16 +410,18 @@ Item {
                     if (isIntr) {
                         const lim = d.limit === "five_hour" ? "5h limit" : d.limit === "seven_day" ? "weekly limit" : "usage limit"
                         const back = d.resets_at ? ", back " + Qt.formatTime(new Date(d.resets_at * 1000), "HH:mm") : ""
-                        return d.account + " " + lim + back
+                        return CrowStore.who(d) + " " + lim + back
                     }
                     if (isFin) {
                         const n = (d.commits || []).length
                         const parts = [d.status === "limit" ? "usage limit" : row.s.label]
                         if (n) parts.push(n + (n === 1 ? " commit" : " commits"))
                         if ((d.resumed_from || []).length) parts.push("resumed " + d.resumed_from.length + "×")
+                        if (CrowStore.mixed) parts.push(CrowStore.who(d))
                         return parts.join(" · ")
                     }
-                    return d.state === "waiting" ? "waiting for your reply" : String(d.last_action || "").split("\n")[0]
+                    const on = CrowStore.mixed ? CrowStore.who(d) + " · " : ""
+                    return on + (d.state === "waiting" ? "waiting for your reply" : String(d.last_action || "").split("\n")[0])
                 }
                 readonly property color doingColor: copied ? root.cAccent
                     : isIntr ? root.cWarn
@@ -434,7 +436,7 @@ Item {
                     }
                     return CrowStore.age(isFin ? CrowStore.since(d.ended_at) : d.last_activity_s) + (isFin ? " ago" : "")
                 }
-                readonly property int ctxPct: d && !isFin && !isIntr ? CrowStore.contextPct(d.context_tokens || 0) : 0
+                readonly property int ctxPct: d && !isFin && !isIntr ? CrowStore.contextPct(d.context_tokens || 0, d.context_window || 0) : 0
 
                 height: root.fBase + 10
                 radius: root.rXs
@@ -483,10 +485,11 @@ Item {
                     hoverEnabled: true
                     cursorShape: row.rowId ? Qt.PointingHandCursor : Qt.ArrowCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    // Left: open the session (a headless run or a stopped session has no window: copy its id).
-                    // Right: copy the id.
+                    // Left: open the session; on a stopped session, relaunch it through crow relaunch
+                    // (it asks first); a headless run has no window: copy its id. Right: copy the id.
                     onClicked: mouse => {
-                        if (mouse.button === Qt.RightButton || !row.d || row.isFin || row.isIntr || row.d.kind === "run") CrowStore.copy(row.rowId)
+                        if (mouse.button !== Qt.RightButton && row.isIntr && row.d) CrowStore.relaunch(row.d)
+                        else if (mouse.button === Qt.RightButton || !row.d || row.isFin || row.isIntr || row.d.kind === "run") CrowStore.copy(row.rowId)
                         else CrowStore.openSession(row.d)
                     }
                 }

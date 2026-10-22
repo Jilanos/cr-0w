@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """crow-relaunch: continue one interrupted conversation, exactly, on an allowed cdx account.
 
-  crow-relaunch <conversation-id> <target> [--source ACCOUNT] [--dry-run] [--yes] [--here]
+  crow-relaunch <conversation-id> <target|auto> [--source ACCOUNT] [--dry-run] [--yes] [--here]
+                                    auto: the account `status` recommends (shown before it asks)
   crow-relaunch status [--json]     allowed accounts, which are blocked, the recommended target
 
 The id may be a unique prefix of a session in the interrupted registry (crow-sessions), or a
@@ -251,6 +252,10 @@ def parse(argv):
 def relaunch(argv):
     (ref, target_name), flags, source = parse(argv)
     accts = accounts()
+    if target_name == "auto":  # the recommended allowed account (crow watch, the widget)
+        src_acct = source or resolve(ref, source)["account"]
+        target_name = account_status(src_acct)["recommended"] or die("no allowed account is usable right now")
+        print(f"auto: recommended target {target_name}")
     if accts.get(target_name, {}).get("policy", "never") == "never":
         die(f"account '{target_name}' is not allowed (policy never)")
     src = resolve(ref, source)
