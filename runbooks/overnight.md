@@ -36,7 +36,7 @@ Unattended work while the owner is away. The hub session is the orchestrator; ru
 ## Report
 - Append to `local/state/night/log.md` as things happen, with the clock time (`date +%H:%M`); report times are copied from it, never estimated.
 - Each run's final message is saved to `local/state/night/reports/<id>.md`.
-- After **every** finished run, regenerate the morning page with `bin/crow-night-page --date <morning date>` (writes `local/state/night/report-<date>.html`): one card per project with what it was about, before → after in plain words, roadmap progress, screenshots from `shots/`, commits behind a fold, and a "needs you" box. Each decision in that box is self-contained: context, options, a recommendation, so the morning session can ask it with AskUserQuestion as is.
+- After **every** finished run, add its line to `local/state/night/summary-<morning date>.json` (`projects[].runs[]`: id, what, result in one plain sentence, where it landed) and any decision it left (`decisions[]`: question, context, options with a note each, `recommend`; for a visual choice, `rows` (scenarios) and per option the image path for each row, same framing), then rebuild the page with `bin/crow-night-page --date <morning date>`. Keep `tldr` (one line per area), `todo` (checks only the owner can do) and `decided` current. The page is single column: TL;DR, numbered decisions with their options side by side, checks by hand, then one row per run that unfolds into its before/after, screenshots and report.
 - Runs end with the preamble's headings plus a `Card:` block (one-line goal, before, after, screenshots, decisions) that the page is built from.
 
 ## Morning (hub session)
