@@ -1,4 +1,4 @@
-// Usage, Savings and History views, fed by `crow-usage --json` every 30 seconds.
+// Usage and History views, fed by `crow-usage --json` every 30 seconds.
 package main
 
 import (
@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // ---------- data (mirrors crow-usage build()) ----------
@@ -76,6 +77,11 @@ type usageSession struct {
 	CostUSD  *float64         `json:"cost_usd"`
 	ByDay    map[string]slice `json:"by_day"`
 	Activity map[string][]int `json:"activity"`
+	// Points of the account's current 5h and weekly windows this session used.
+	LimitShare struct {
+		FiveHour *float64 `json:"five_hour_pct"`
+		Week     *float64 `json:"week_pct"`
+	} `json:"limit_share"`
 }
 
 type usage struct {
@@ -106,15 +112,19 @@ type usage struct {
 	rows   []sessRow // sessions list: today, then earlier days (newest first)
 	byID   map[string]*usageSession
 	nToday int
+	acctW  int // widest account name
 }
 
-// sessRow is one line of the sessions list: a day heading or a session's slice of that day.
+// sessRow is one line of the sessions list: a day divider or a session's slice of that day.
+// first: the session's newest row, the one that carries its limit shares.
 type sessRow struct {
-	day  string
-	head bool
-	s    *usageSession
-	cost float64
-	tok  int
+	day    string
+	head   bool
+	s      *usageSession
+	cost   float64
+	tok    int
+	priced bool
+	first  bool
 }
 
 func parseUsage(b []byte) (*usage, error) {
@@ -134,7 +144,7 @@ func parseUsage(b []byte) (*usage, error) {
 			if x.CostUSD != nil {
 				c = *x.CostUSD
 			}
-			days[d] = append(days[d], sessRow{day: d, s: s, cost: c, tok: x.Tokens})
+			days[d] = append(days[d], sessRow{day: d, s: s, cost: c, tok: x.Tokens, priced: x.CostUSD != nil})
 		}
 	}
 	var keys []string
@@ -152,6 +162,15 @@ func parseUsage(b []byte) (*usage, error) {
 			u.nToday = len(rs)
 		}
 		u.rows = append(u.rows, rs...)
+	}
+	seen := map[string]bool{}
+	for i := range u.rows {
+		if r := &u.rows[i]; !r.head && !seen[r.s.ID] {
+			r.first, seen[r.s.ID] = true, true
+		}
+	}
+	for _, s := range u.Sessions {
+		u.acctW = max(u.acctW, len(s.Account))
 	}
 	return &u, nil
 }
@@ -277,7 +296,11 @@ func (u *usage) limitLines(width int) []line {
 		if l.Active && l.Burn5h != nil && *l.Burn5h > 0.5 {
 			b := line{{strings.Repeat(" ", 2+nameW), sPlain}, {fmt.Sprintf("▼ %.0f%% per hour", *l.Burn5h), sYellow}}
 			if l.EmptyAt != "" {
-				b = append(b, seg{" · runs out ~" + hhmm(l.EmptyAt) + ", before the reset", lipgloss.NewStyle().Foreground(cYellow).Bold(true)})
+				out := " · runs out ~" + hhmm(l.EmptyAt) + ", before the reset"
+				if b.width()+runewidth.StringWidth(out) > width {
+					out = " · runs out ~" + hhmm(l.EmptyAt)
+				}
+				b = append(b, seg{out, lipgloss.NewStyle().Foreground(cYellow).Bold(true)})
 			}
 			out = append(out, b)
 		}
@@ -288,18 +311,20 @@ func (u *usage) limitLines(width int) []line {
 	return out
 }
 
-// spendHead: the spend figures; sessions adds today's session count when there is room.
-func (u *usage) spendHead(sessions bool) line {
+// spendHead: the spend figures, today's session count and unpriced sessions;
+// on two lines when one does not fit the width.
+func (u *usage) spendHead(width int) []line {
 	t, w := u.Today, u.Week
 	l := line{{money(t.CostUSD), sBold.Foreground(cWhite)}, {" today   ", sSub}, {money(w.CostUSD), sBold}, {" last 7 days   ", sSub},
 		{money(u.Month.CostUSD), sBold}, {" 30 days", sSub}}
-	if sessions {
-		l = append(l, seg{fmt.Sprintf("   ·   %d sessions today", t.Sessions), sSub})
-	}
+	extra := line{{fmt.Sprintf("%d sessions today", t.Sessions), sSub}}
 	if t.Unpriced > 0 {
-		l = append(l, seg{fmt.Sprintf("   %d unpriced", t.Unpriced), sYellow})
+		extra = append(extra, seg{fmt.Sprintf("   %d unpriced", t.Unpriced), sYellow})
 	}
-	return l
+	if l.width()+7+extra.width() <= width {
+		return []line{append(append(l, seg{"   ·   ", sSub}), extra...)}
+	}
+	return []line{l, extra}
 }
 
 func (u *usage) splitLine() line {
@@ -317,7 +342,7 @@ func chart(days []rollup, width, height int, tok bool) []line {
 	if len(days) == 0 || height < 1 {
 		return nil
 	}
-	colW := max(3, min(10, width/len(days)))
+	colW := max(3, min(14, width/len(days)))
 	if n := width / colW; len(days) > n {
 		days = days[len(days)-n:]
 	}
@@ -361,11 +386,11 @@ func chart(days []rollup, width, height int, tok bool) []line {
 		}
 		out = append(out, l)
 	}
-	var vals, names line
+	var vals, toks, names line
 	for i, d := range days {
-		style, ns := sSub, sSub
+		style, ns, ts := sSub, sSub, sCyan
 		if i == len(days)-1 {
-			style, ns = sAcc, sMagenta
+			style, ns, ts = sAcc, sMagenta, sCyan.Bold(true)
 		}
 		v := money(d.CostUSD)
 		if tok {
@@ -386,41 +411,63 @@ func chart(days []rollup, width, height int, tok bool) []line {
 			}
 		}
 		vals = append(vals, seg{pad(v, colW), style})
+		toks = append(toks, seg{pad(human(d.Tokens), colW), ts})
 		names = append(names, seg{pad(name, colW), ns})
 	}
 	if colW < 6 { // values don't fit under narrow bars: names only
 		return append(out, names)
 	}
-	return append(out, vals, names)
+	if tok {
+		return append(out, vals, names)
+	}
+	return append(out, vals, toks, names)
 }
 
 // sessionCols: fixed columns around a title column that takes the rest.
-type sessionCols struct{ project, title, models int }
+// account and the two limit shares show from 70 columns.
+type sessionCols struct{ project, title, models, account, share int }
 
-func sessCols(width int) sessionCols {
-	c := sessionCols{project: 17, models: 13}
+func (u *usage) sessCols(width int) sessionCols {
+	c := sessionCols{project: 17, models: 13, account: max(8, u.acctW+2), share: 6}
 	if width < 180 { // model names are detail: shown only when the list has room to spare
 		c.models = 0
+	}
+	if width < 70 {
+		c.account, c.share = 0, 0
 	}
 	if width < 60 {
 		c.project = 12
 	}
-	c.title = max(10, width-2-c.project-c.models-8-9)
+	c.title = max(10, width-2-c.project-c.models-c.account-2*c.share-8-9)
 	return c
 }
 
 func (u *usage) sessionHeader(width int) []line {
-	c := sessCols(width)
+	c := u.sessCols(width)
 	h := "  " + pad("project", c.project) + pad("session", c.title)
 	if c.models > 0 {
 		h += pad("models", c.models)
 	}
+	if c.account > 0 {
+		h += pad("account", c.account) + padL("5h", c.share) + padL("week", c.share)
+	}
 	return []line{{{h + padL("tokens", 8) + padL("cost", 9), sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
 }
 
+// sharePct: a session's points of a limit window; blank when none or unknown.
+func sharePct(p *float64) string {
+	switch {
+	case p == nil || *p <= 0:
+		return ""
+	case *p < 1:
+		return "<1%"
+	}
+	return fmt.Sprintf("%.0f%%", *p)
+}
+
 func (u *usage) rowLine(r sessRow, width int) line {
-	c := sessCols(width)
-	if r.head {
+	c := u.sessCols(width)
+	if r.head { // a quiet divider: rule in slot 8, the day and its totals in slot 7
 		cost, tok := 0.0, 0
 		for _, x := range u.rows {
 			if !x.head && x.day == r.day {
@@ -432,7 +479,8 @@ func (u *usage) rowLine(r sessRow, width int) line {
 		if t, err := time.Parse("2006-01-02", r.day); err == nil {
 			name = t.Format("Monday 02 January")
 		}
-		return line{{pad(name, width-17), sAcc}, {padL(human(tok), 8), sCyan}, {padL(money(cost), 9), sYellow.Bold(true)}}
+		rule := max(1, width-17-4-len(name)-1)
+		return line{{"── ", sDim}, {name, sSub}, {" " + strings.Repeat("─", rule) + " ", sDim}, {padL(human(tok), 8), sSub}, {padL(money(cost), 9), sSub}}
 	}
 	s := r.s
 	today := r.day == u.todayKey()
@@ -455,7 +503,18 @@ func (u *usage) rowLine(r sessRow, width int) line {
 	if c.models > 0 {
 		l = append(l, seg{pad(models(s.Models), c.models-1) + " ", sSub})
 	}
-	return append(l, seg{padL(human(r.tok), 8), sCyan}, seg{padL(money(r.cost), 9), sYellow})
+	if c.account > 0 {
+		five, week := "", ""
+		if r.first {
+			five, week = sharePct(s.LimitShare.FiveHour), sharePct(s.LimitShare.Week)
+		}
+		l = append(l, seg{pad(s.Account, c.account), sSub}, seg{padL(five, c.share), sSub}, seg{padL(week, c.share), sSub})
+	}
+	cost := money(r.cost)
+	if !r.priced {
+		cost = "?"
+	}
+	return append(l, seg{padL(human(r.tok), 8), sCyan}, seg{padL(cost, 9), sYellow})
 }
 
 func (u *usage) totalLine(width int) line {
@@ -486,22 +545,26 @@ func (u *usage) sessionBody(width, rows int) ([]line, []int) {
 }
 
 type saving struct {
-	name, value, rate, what string
-	style                   lipgloss.Style
+	name, value, rate, what, brief string
+	style                          lipgloss.Style
 }
 
 func (u *usage) savingRows(p rollup, label string) []saving {
 	r := u.Rtk
 	rtk := saving{"rtk", human(r.TodaySavedTokens) + " tok", fmt.Sprintf("%.0f%%", r.TodaySavedPct),
-		fmt.Sprintf("trimmed from %d commands' output · %s all time", r.TodayCommands, human(r.SavedTokens)), sOK}
+		fmt.Sprintf("trimmed from %d commands' output · %s all time", r.TodayCommands, human(r.SavedTokens)), "", sOK}
 	if label != "today" {
-		rtk = saving{"rtk", human(r.SavedTokens) + " tok", fmt.Sprintf("%.0f%%", r.SavedPct), "trimmed from command output, all time", sOK}
+		rtk = saving{"rtk", human(r.SavedTokens) + " tok", fmt.Sprintf("%.0f%%", r.SavedPct), "trimmed from command output, all time", "", sOK}
 	}
 	overhead := ""
 	if r.Commands > 0 {
 		overhead = fmt.Sprintf(" · %.1f s avg overhead · %d raw fallbacks", float64(r.TimeMs)/float64(r.Commands)/1000, r.Failures)
 	}
 	rtk.what += overhead
+	rtk.brief = fmt.Sprintf("%d commands", r.TodayCommands)
+	if label != "today" {
+		rtk.brief = fmt.Sprintf("%d commands", r.Commands)
+	}
 	comp := sOK
 	if p.Compactions > 0 {
 		comp = sYellow
@@ -516,27 +579,36 @@ func (u *usage) savingRows(p rollup, label string) []saving {
 	}
 	return []saving{
 		rtk,
-		{"prompt cache", money(p.CacheSaved), fmt.Sprintf("%d%%", p.CachePct), fmt.Sprintf("saved vs paying full input price for %s cache reads", human(p.CacheRead)), sOK},
-		{"model routing", money(p.RouteSaved), "", fmt.Sprintf("%d of %d background runs on a cheaper model, priced at Opus", p.RoutedRuns, p.Runs), sOK},
-		{"compactions", fmt.Sprint(p.Compactions), "", "sessions that filled their context window", comp},
+		{"prompt cache", money(p.CacheSaved), fmt.Sprintf("%d%%", p.CachePct), fmt.Sprintf("saved vs paying full input price for %s cache reads", human(p.CacheRead)),
+			human(p.CacheRead) + " read", sOK},
+		{"model routing", money(p.RouteSaved), "", fmt.Sprintf("%d of %d background runs on a cheaper model, priced at Opus", p.RoutedRuns, p.Runs),
+			fmt.Sprintf("%d of %d runs", p.RoutedRuns, p.Runs), sOK},
+		{"compactions", fmt.Sprint(p.Compactions), "", "sessions that filled their context window", "context filled", comp},
 		{"retros", fmt.Sprint(reviewed), "", fmt.Sprintf("sessions reviewed · %d %s waiting for your OK", u.Retros.PendingProposals,
-			plural(u.Retros.PendingProposals, "suggested change", "suggested changes")), pending},
+			plural(u.Retros.PendingProposals, "suggested change", "suggested changes")), fmt.Sprintf("%d to approve", u.Retros.PendingProposals), pending},
 	}
 }
 
 func (u *usage) savingsLines(width int, p rollup, label string) []line {
 	out := []line{{{"  " + pad("tool", 15) + padL(label, 10) + padL("rate", 6) + "   what it means", sHead}}, {{"  " + strings.Repeat("─", width-2), sDim}}}
+	whatW := max(20, width-36)
 	for _, s := range u.savingRows(p, label) {
-		out = append(out, line{{"  " + pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style}, {"   " + s.what, sSub}})
+		// The explanation wraps under itself instead of losing its figures to a cut.
+		what := strings.Split(lipgloss.NewStyle().Width(whatW).Render(s.what), "\n")
+		out = append(out, line{{"  " + pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style},
+			{"   " + strings.TrimRight(what[0], " "), sSub}})
+		for _, w := range what[1:] {
+			out = append(out, line{{strings.Repeat(" ", 36), sPlain}, {strings.TrimRight(w, " "), sSub}})
+		}
 	}
 	return out
 }
 
-// savingsCompact: one line per tool without explanations, for narrow columns.
+// savingsCompact: one line per tool with a short note instead of the explanation, for narrow columns.
 func (u *usage) savingsCompact(p rollup, label string) []line {
 	var out []line
 	for _, s := range u.savingRows(p, label) {
-		out = append(out, line{{pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style}})
+		out = append(out, line{{pad(s.name, 15), sBold}, {padL(s.value, 10), s.style.Bold(true)}, {padL(s.rate, 6), s.style}, {"   " + s.brief, sSub}})
 	}
 	return out
 }
@@ -640,24 +712,56 @@ func (m model) sessionsBox(w, h int) block {
 	return box(title("Sessions", fmt.Sprintf("today %d · then earlier days", u.nToday)), line{{"o open · c copy id", sSub}}, body, w, h, off, sel, true)
 }
 
-// usageView: headroom first. Limits, a one-line spend, the sessions, a
-// one-line savings summary. The token split, per-model and per-tool breakdowns
-// live in Savings and History (keys 3 and 4).
+// usageView: two columns from 140 wide. Left: limits, spend (the 7-day bars
+// take the leftover height) and savings; right: the sessions, full height.
+// Narrower terminals stack the same boxes, sessions before savings.
 func (m model) usageView(h int) block {
 	u := m.usage
-	if m.w >= 170 {
-		return m.usageGrid(h)
+	if m.w < 140 {
+		return m.usageStacked(h)
 	}
+	lw := max(56, min(92, m.w*38/100))
+	rw := m.w - lw
+	limits := box(title("Limits", ""), line{{"remaining", sSub}}, u.limitLines(lw-4), lw, 0, 0, -1, false)
+	sav := box(title("Savings", "today"), line{{"3 history", sSub}}, u.savingsCompact(u.Today, "today"), lw, 0, 0, -1, false)
+	left := append(block{}, limits...)
+	if rest := h - len(limits) - len(sav); rest >= 6 {
+		head := u.spendHead(lw - 4)
+		fixed := 2 + len(head) + 1 + 3 // borders, figures, gap, the three label rows
+		spend := func(boxH, chartH int) block {
+			body := append([]line{}, head...)
+			if chartH >= 3 {
+				body = append(append(body, line{}), chart(u.Days, lw-4, chartH, false)...)
+			}
+			return box(title("Spend", "7 days"), nil, body, lw, boxH, 0, -1, false)
+		}
+		// Bars from 12 rows; a tall column adds the week's projects, the bars take what they leave.
+		if left2 := rest - fixed - 12; left2 >= 8 {
+			proj := box(title("By project", "7 days"), nil, barRows(u.Week.ByProject, lw-4, left2-2, sBlueFg, false), lw, 0, 0, -1, false)
+			left = append(left, spend(0, 12+left2-len(proj))...)
+			left = append(left, proj...)
+		} else {
+			left = append(left, spend(rest, rest-fixed)...)
+		}
+	}
+	left = append(left, sav...)
+	return hcat([]int{lw, rw}, left, m.sessionsBox(rw, h))
+}
+
+// usageStacked: narrow terminals. Limits, spend (bars only when the sessions
+// still fit), sessions, one savings line.
+func (m model) usageStacked(h int) block {
+	u := m.usage
 	w := m.w
 	limits := box(title("Limits", ""), line{{"remaining", sSub}}, u.limitLines(w-4), w, 0, 0, -1, false)
-	spendBody := []line{u.spendHead(true)}
+	spendBody := u.spendHead(w - 4)
 	minSess := min(u.nToday, 12) + 6
-	if chartH := 5; h-len(limits)-(chartH+6)-3-minSess >= 0 { // the week's bars only when the sessions still fit
+	if chartH := 5; h-len(limits)-(chartH+7+len(spendBody))-3-minSess >= 0 {
 		spendBody = append(spendBody, line{})
 		spendBody = append(spendBody, chart(u.Days, w-4, chartH, false)...)
 	}
 	spend := box(title("Spend", ""), nil, spendBody, w, 0, 0, -1, false)
-	sav := box(title("Savings", "today"), line{{"3 for details", sSub}}, []line{u.savingsOneLine()}, w, 0, 0, -1, false)
+	sav := box(title("Savings", "today"), line{{"3 history", sSub}}, []line{u.savingsOneLine()}, w, 0, 0, -1, false)
 	sess := m.sessionsBox(w, max(5, h-len(limits)-len(spend)-len(sav)))
 	out := append(append(append(block{}, limits...), spend...), sess...)
 	return append(out, sav...)
@@ -667,28 +771,6 @@ func (u *usage) savingsOneLine() line {
 	t := u.Today
 	return line{{"rtk ", sSub}, {human(u.Rtk.TodaySavedTokens) + " tok", sOK}, {" · cache ", sSub}, {money(t.CacheSaved), sOK},
 		{" · routing ", sSub}, {money(t.RouteSaved), sOK}, {fmt.Sprintf(" · %d retros", u.Retros.Today), sSub}}
-}
-
-// usageGrid: wide terminals. Row 1: limits | spend | savings at one height; row 2: sessions | history.
-func (m model) usageGrid(h int) block {
-	u := m.usage
-	c1 := min(96, m.w*36/100)
-	c2 := min(84, m.w*28/100)
-	c3 := m.w - c1 - c2
-	lim := u.limitLines(c1 - 4)
-	sav := u.savingsCompact(u.Today, "today")
-	r1 := max(len(lim), len(sav), 8) + 2
-	spend := append([]line{u.spendHead(false), {}}, chart(u.Days, c2-4, max(3, r1-2-2-2), false)...)
-	row1 := hcat([]int{c1, c2, c3},
-		box(title("Limits", ""), line{{"remaining", sSub}}, lim, c1, r1, 0, -1, false),
-		box(title("Spend", ""), nil, spend, c2, r1, 0, -1, false),
-		box(title("Savings", "today"), line{{"3 for details", sSub}}, sav, c3, r1, 0, -1, false))
-	r2 := h - len(row1)
-	sw := m.w * 62 / 100
-	hw := m.w - sw
-	row2 := hcat([]int{sw, hw}, m.sessionsBox(sw, r2),
-		box(title("By project", "7 days"), line{{"4 for history", sSub}}, barRows(u.Week.ByProject, hw-4, r2-2, sBlueFg, false), hw, r2, 0, -1, false))
-	return append(row1, row2...)
 }
 
 func (m model) periodRollup() (rollup, string) {
@@ -713,44 +795,37 @@ func periodTabs(cur string) line {
 	return l
 }
 
-func (m model) savingsView(h int) block {
-	u := m.usage
-	p, label := m.periodRollup()
-	w := m.w
-	sav := box(title("Savings", label), periodTabs(m.period), u.savingsLines(w-4, p, label), w, 0, 0, -1, false)
-	expl := []line{
-		{{"rtk", sBold}, {" rewrites shell commands to compact their output before Claude reads it. Tokens are estimated (bytes ÷ 4);", sSub}},
-		{{"   ", sPlain}, {"the rate is the share of command output removed. Raw fallbacks are commands it could not filter.", sSub}},
-		{{"prompt cache", sBold}, {" re-reads earlier context at a tenth of the input price;", sSub}},
-		{{"   ", sPlain}, {"the saving is what those reads would cost uncached.", sSub}},
-		{{"model routing", sBold}, {" prices the tokens of runs on Sonnet/Haiku at Opus rates; the difference is the saving.", sSub}},
-		{{"compactions", sBold}, {" happen when a session fills its window: a sign to split work or delegate.", sSub}},
-	}
-	how := box(title("How these are measured", ""), nil, expl, w, 0, 0, -1, false)
-	rest := h - len(sav) - len(how)
-	trows := toolRows(p.Tools, w-4, max(3, rest-3-12))
-	tools := box(title("Context weight by tool", label), line{{"tokens each tool returned into the context", sSub}}, trows, w, min(len(trows)+2, rest), 0, -1, false)
-	out := append(sav, tools...)
-	if left := rest - len(tools); left >= 8 {
-		// What caching and routing saved per day: a capped chart, then one row per day as space allows.
-		per := make([]rollup, len(u.History))
-		for i, d := range u.History {
-			per[i] = rollup{Date: d.Date, CostUSD: d.CacheSaved + d.RouteSaved}
-		}
-		ch := box(title("Saved per day", "prompt cache + model routing, 30 days"), nil, chart(per, w-4, min(8, left-6), false), w, 0, 0, -1, false)
-		out = append(out, ch...)
-		if left -= len(ch); left >= 5 {
-			out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2, true), w, 0, 0, -1, false)...)
-		}
-	}
-	return append(out, how...)
+// dayCol: one column of the day table; columns that do not fit the width are left out, last first.
+type dayCol struct {
+	name string
+	w    int
+	val  func(d rollup) (string, lipgloss.Style)
 }
 
-// dayTable: newest day first, one row per day with sessions, at most rows lines.
-func (u *usage) dayTable(width, rows int, savings bool) []line {
-	head := "  " + pad("day", 14) + padL("spend", 10) + padL("tokens", 9) + padL("sessions", 10) + padL("cache", 7)
-	if savings {
-		head = "  " + pad("day", 14) + padL("spend", 10) + padL("cache saved", 13) + padL("routing", 10) + padL("compactions", 13) + padL("sessions", 10)
+var dayCols = []dayCol{
+	{"spend", 10, func(d rollup) (string, lipgloss.Style) { return money(d.CostUSD), sYellow }},
+	{"tokens", 9, func(d rollup) (string, lipgloss.Style) { return human(d.Tokens), sCyan }},
+	{"cache saved", 13, func(d rollup) (string, lipgloss.Style) { return money(d.CacheSaved), sOK }},
+	{"routing", 10, func(d rollup) (string, lipgloss.Style) { return money(d.RouteSaved), sOK }},
+	{"sessions", 10, func(d rollup) (string, lipgloss.Style) { return fmt.Sprint(d.Sessions), sSub }},
+	{"compactions", 13, func(d rollup) (string, lipgloss.Style) { return fmt.Sprint(d.Compactions), sSub }},
+	{"cache", 7, func(d rollup) (string, lipgloss.Style) { return fmt.Sprintf("%d%%", d.CachePct), sSub }},
+}
+
+// dayTable: newest day first, one row per day with sessions, at most rows lines:
+// spend and tokens, then what caching and routing saved.
+func (u *usage) dayTable(width, rows int) []line {
+	used := 2 + 14
+	var cols []dayCol
+	for _, c := range dayCols {
+		if used+c.w > width {
+			break
+		}
+		cols, used = append(cols, c), used+c.w
+	}
+	head := "  " + pad("day", 14)
+	for _, c := range cols {
+		head += padL(c.name, c.w)
 	}
 	out := []line{{{head, sHead}}}
 	for i := len(u.History) - 1; i >= 0 && len(out) < rows; i-- {
@@ -766,30 +841,35 @@ func (u *usage) dayTable(width, rows int, savings bool) []line {
 		if d.Date == u.todayKey() {
 			ns = sAcc
 		}
-		if savings {
-			out = append(out, line{{"  " + pad(name, 14), ns}, {padL(money(d.CostUSD), 10), sYellow}, {padL(money(d.CacheSaved), 13), sOK},
-				{padL(money(d.RouteSaved), 10), sOK}, {padL(fmt.Sprint(d.Compactions), 13), sSub}, {padL(fmt.Sprint(d.Sessions), 10), sSub}})
-		} else {
-			out = append(out, line{{"  " + pad(name, 14), ns}, {padL(money(d.CostUSD), 10), sYellow}, {padL(human(d.Tokens), 9), sCyan},
-				{padL(fmt.Sprint(d.Sessions), 10), sSub}, {padL(fmt.Sprintf("%d%%", d.CachePct), 7), sSub}})
+		l := line{{"  " + pad(name, 14), ns}}
+		for _, c := range cols {
+			v, st := c.val(d)
+			l = append(l, seg{padL(v, c.w), st})
 		}
+		out = append(out, l)
 	}
 	return out
 }
 
+// historyView: cost per day on top; breakdowns by project, model and tool,
+// the savings for the period and the day table below.
 func (m model) historyView(h int) block {
 	u := m.usage
 	p, label := m.periodRollup()
 	w := m.w
 	chartH := max(4, min(10, h/5))
-	tok := false
 	body := append([]line{{{money(u.Month.CostUSD), sBold}, {" in 30 days · ", sSub}, {human(u.Month.Tokens), sCyan}, {" tokens · ", sSub},
-		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, append(line{{"today  ", sSub}}, u.splitLine()...), {}}, chart(u.History, w-4, chartH, tok)...)
+		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, append(line{{"today  ", sSub}}, u.splitLine()...), {}}, chart(u.History, w-4, chartH, false)...)
 	cost := box(title("Cost per day", "30 days"), nil, body, w, 0, 0, -1, false)
 	rest := h - len(cost)
 	if w >= 150 {
 		half := w / 2
-		left := box(title("By project", label), periodTabs(m.period), barRows(p.ByProject, half-4, rest-2, sBlueFg, false), half, rest, 0, -1, false)
+		proj := box(title("By project", label), periodTabs(m.period), barRows(p.ByProject, half-4, 6, sBlueFg, false), half, 0, 0, -1, false)
+		sav := box(title("Savings", label), nil, u.savingsLines(half-4, p, label), half, 0, 0, -1, false)
+		left := append(proj, sav...)
+		if r := rest - len(left); r >= 4 {
+			left = append(left, box(title("By day", ""), nil, u.dayTable(half-4, r-2), half, r, 0, -1, false)...)
+		}
 		right := box(title("By model", label), nil, append(barRows(p.ByModel, w-half-4, 6, sMagenta, false), append([]line{{}, {{"Context weight by tool", sHead}}}, toolRows(p.Tools, w-half-4, rest-12)...)...), w-half, rest, 0, -1, false)
 		return append(cost, hcat([]int{half, w - half}, left, right)...)
 	}
@@ -801,10 +881,14 @@ func (m model) historyView(h int) block {
 			days++
 		}
 	}
-	br := box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, max(min(rest-2, 26), rest-2-(days+3))), w, 0, 0, -1, false)
+	sav := box(title("Savings", label), nil, u.savingsLines(w-4, p, label), w, 0, 0, -1, false)
+	br := box(title("Breakdown", label), periodTabs(m.period), u.historyLines(w-4, p, label, max(min(rest-2-len(sav), 26), rest-2-len(sav)-(days+3))), w, 0, 0, -1, false)
 	out := append(cost, br...)
-	if left := rest - len(br); left >= 5 {
-		out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2, false), w, 0, 0, -1, false)...)
+	if rest-len(br) >= len(sav) {
+		out = append(out, sav...)
+	}
+	if left := h - len(out); left >= 5 {
+		out = append(out, box(title("By day", ""), nil, u.dayTable(w-4, left-2), w, 0, 0, -1, false)...)
 	}
 	return out
 }

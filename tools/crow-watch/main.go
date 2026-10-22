@@ -1,7 +1,7 @@
 // crow-watch: live board of crow's agents and Claude usage.
 //
-// Four views on keys 1-4: Agents (from `crow-runs json`, the same source as
-// `crow runs`), Usage, Savings and History (from `crow-usage --json`). Layouts
+// Three views on keys 1-3: Agents (from `crow-runs json`, the same source as
+// `crow runs`), Usage and History (from `crow-usage --json`). Layouts
 // adapt to the terminal: stacked on tall or narrow ones, a grid on wide ones;
 // boxes size to their content and leftover height goes to more content.
 // Colours are the terminal's 16 ANSI slots and no background is painted, so the
@@ -146,11 +146,10 @@ func tick() tea.Cmd {
 const (
 	vAgents = iota
 	vUsage
-	vSavings
 	vHistory
 )
 
-var viewNames = []string{"Agents", "Usage", "Savings", "History"}
+var viewNames = []string{"Agents", "Usage", "History"}
 
 // Agent groups, in the order the board lists them: what needs the owner, what
 // is working, what finished, then idle sessions.
@@ -190,7 +189,7 @@ type model struct {
 	intr         []interrupted // sessions stopped by a usage limit
 	usageLoading bool
 	uCursor      int
-	period       string // d | w | m (Savings, History)
+	period       string // d | w | m (History)
 	now          time.Time
 }
 
@@ -353,7 +352,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help = false
 		case "?":
 			m.help = true
-		case "1", "2", "3", "4":
+		case "1", "2", "3":
 			m.view = int(key[0] - '1')
 		case "tab":
 			m.view = (m.view + 1) % len(viewNames)
@@ -453,8 +452,6 @@ func (m model) View() string {
 		body = block{" " + msg.render(m.w-1, false)}
 	case m.view == vUsage:
 		body = m.usageView(bodyH)
-	case m.view == vSavings:
-		body = m.savingsView(bodyH)
 	default:
 		body = m.historyView(bodyH)
 	}
@@ -465,7 +462,7 @@ func (m model) View() string {
 	return strings.Join(append(out, foot), "\n")
 }
 
-// header: hub name, the four views (active one as an accent pill), live status on the right.
+// header: hub name, the three views (active one as an accent pill), live status on the right.
 func (m model) header() string {
 	l := line{{" crow ", sAcc}, {"│ ", sDim}}
 	for i, n := range viewNames {
@@ -518,10 +515,9 @@ func (m model) statusRight() line {
 }
 
 func (m model) footer() string {
-	keys := []string{"1-4", "views", "↑↓", "select", "o", "open", "c", "copy id"}
-	switch m.view {
-	case vSavings, vHistory:
-		keys = []string{"1-4", "views", "d w m", "period"}
+	keys := []string{"1-3", "views", "↑↓", "select", "o", "open", "c", "copy id"}
+	if m.view == vHistory {
+		keys = []string{"1-3", "views", "d w m", "period"}
 	}
 	keys = append(keys, "?", "all keys", "q", "quit")
 	l := line{{" ", sPlain}}
@@ -536,9 +532,9 @@ func (m model) footer() string {
 
 func (m model) helpView(h int) block {
 	rows := [][2]string{
-		{"1 2 3 4", "Agents · Usage · Savings · History"}, {"Tab / Shift+Tab", "next / previous view"}, {"u", "toggle Agents ↔ Usage"},
+		{"1 2 3", "Agents · Usage · History"}, {"Tab / Shift+Tab", "next / previous view"}, {"u", "toggle Agents ↔ Usage"},
 		{"↑↓  j k", "select an agent or a session"}, {"PgUp PgDn", "scroll the details"}, {"o  Enter", "open the project in a new kitty window"},
-		{"c", "copy the run or session id"}, {"d w m", "period: today, 7 days, 30 days (Savings, History)"}, {"r", "refresh now"},
+		{"c", "copy the run or session id"}, {"d w m", "period: today, 7 days, 30 days (History)"}, {"r", "refresh now"},
 		{"?", "this help (any key closes)"}, {"q", "quit"},
 	}
 	body := []line{{{"", sPlain}}}
@@ -546,7 +542,12 @@ func (m model) helpView(h int) block {
 		body = append(body, line{{"  " + pad(r[0], 18), sAcc}, {r[1], sPlain}})
 	}
 	body = append(body, line{}, line{{"  Glyphs  ", sHead}, {"● working  ◆ needs you  ○ idle  ✓ done  ✗ failed  ‖ stopped by a usage limit", sSub}},
-		line{{"  Context ", sHead}, {" ctx 82 %: the share of the context window a session fills, shown from 70 %; it compacts near 100 %", sSub}})
+		line{{"  Context ", sHead}, {" ctx 82 %: the share of the context window a session fills, shown from 70 %; it compacts near 100 %", sSub}},
+		line{{"  Limits  ", sHead}, {" 5h / week on a session: points of its account's window it used", sSub}},
+		line{}, line{{"  Savings ", sHead}, {" rtk: command output trimmed before Claude reads it (bytes ÷ 4)", sSub}},
+		line{{"          ", sPlain}, {" prompt cache: cache reads against their uncached input price", sSub}},
+		line{{"          ", sPlain}, {" model routing: Sonnet/Haiku runs priced at Opus rates, the gap", sSub}},
+		line{{"          ", sPlain}, {" compactions: a session filled its window; split or delegate", sSub}})
 	w := min(m.w, 90)
 	b := box(line{{"Keys", sAcc}}, nil, body, w, 0, 0, -1, true)
 	pad := strings.Repeat(" ", (m.w-w)/2)

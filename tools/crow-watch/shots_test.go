@@ -67,7 +67,7 @@ func TestShots(t *testing.T) {
 	sizes := map[string][2]int{"vertical": {118, 95}, "laptop": {160, 45}, "wide": {240, 62}, "small": {90, 30}}
 	os.MkdirAll(dir, 0o755)
 	for name, sz := range sizes {
-		for v, view := range []string{"agents", "usage", "savings", "history"} {
+		for v, view := range []string{"agents", "usage", "history"} {
 			m := model{w: sz[0], h: sz[1], snap: snap, intr: intr, usage: u, view: v, period: "w", now: now,
 				updated: now, reports: map[string]string{}}
 			m.rebuild()

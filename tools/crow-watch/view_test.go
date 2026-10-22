@@ -93,9 +93,36 @@ func TestUsageSections(t *testing.T) {
 	small := model{w: 90, h: 30, usage: u, view: vUsage, now: fixtureNow()}
 	contains(t, "small", small.View(), []string{"Limits", "Sessions"}, []string{"By project"})
 	wide := model{w: 240, h: 62, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "By project"}, []string{"Context weight"})
-	hist := model{w: 118, h: 95, usage: u, view: vHistory, period: "w", now: fixtureNow()}
-	contains(t, "history keeps the token split", hist.View(), []string{"cache read", "cache write"}, nil)
+	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "account", "5h", "week", "── Monday 19 October"},
+		[]string{"Context weight", "3 Savings"})
+	laptop := model{w: 160, h: 45, usage: u, view: vUsage, now: fixtureNow()}
+	contains(t, "laptop", laptop.View(), []string{"Limits", "Spend", "Savings", "Sessions", "prompt cache", "Mon", "3 History"}, nil)
+	for _, size := range [][2]int{{118, 95}, {160, 45}, {240, 62}} {
+		hist := model{w: size[0], h: size[1], usage: u, view: vHistory, period: "w", now: fixtureNow()}
+		contains(t, fmt.Sprintf("history %dx%d keeps the token split and the savings", size[0], size[1]), hist.View(),
+			[]string{"cache read", "Savings", "prompt cache", "model routing", "compactions", "retros", "cache saved"}, nil)
+	}
+}
+
+// A session's newest row carries its account and its share of the account's limit windows.
+func TestSessionLimitShares(t *testing.T) {
+	u := fixtureUsage(t)
+	var r sessRow
+	for _, x := range u.rows {
+		if !x.head && x.first && x.s.LimitShare.FiveHour != nil && *x.s.LimitShare.FiveHour >= 1 {
+			r = x
+			break
+		}
+	}
+	if r.s == nil {
+		t.Fatal("no session with a 5h share in the fixture")
+	}
+	l := u.rowLine(r, 140)
+	var b strings.Builder
+	for _, sg := range l {
+		b.WriteString(sg.text)
+	}
+	contains(t, "row", b.String(), []string{r.s.Account, sharePct(r.s.LimitShare.FiveHour), sharePct(r.s.LimitShare.Week)}, nil)
 }
 
 // sampleIntr: the registry as crow-sessions lists it: one recent stop, one
