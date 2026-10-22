@@ -3,7 +3,8 @@
 Use when the user wants work done in project repos without opening a session there.
 
 ## Before dispatching
-1. Check slots: `crow runs`. The default limit is 2 parallel runs (`CROW_MAX_RUNS`).
+1. Check slots: `crow runs`. The default limit is 2 parallel runs (`CROW_MAX_RUNS`), one budget for Claude and Codex together.
+   One writer per folder: a second job in the same repo needs its own worktree (`--cwd <repo>.wt/<name>`) or `--read-only`.
 2. For each repo: `git config user.email` must match the scope identity in the registry,
    and `git status --short` must be checked. Uncommitted owner files get named in the prompt
    as "do not stage, commit, revert or stash".
@@ -20,7 +21,9 @@ Use when the user wants work done in project repos without opening a session the
 - End with: report commits, what is left, open questions.
 
 ## Dispatch
-`crow dispatch <project> "<short label>" --prompt-file <file> [--power medium]`
+`crow [--account A | --provider claude|codex] dispatch <project> "<short label>" --prompt-file <file> [--power medium] [--model M] [--permission P] [--cwd <worktree>] [--read-only]`
+The account comes from `local/accounts.yaml` (see [claude-and-codex](claude-and-codex.md)); an `ask-first` one needs `--confirm-account <name>`.
+Models and permissions are checked per provider: Codex defaults to the cdx `default` sandbox (no network). Codex runs start with the hub's read-first references.
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.
 When relaunching an interrupted run, add `--resumes <run_id>` so the old run is folded into the new one.
 
@@ -32,9 +35,11 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
 - `crow runs`: the same view, printed once. `crow-runs json` gives the same data as JSON for widgets.
 - States: ● working / ◌ quiet (a run with no transcript writes for 20s or more) / ◆ waiting (a session whose last message is text, i.e. it is waiting on the user) / ○ idle.
   Finished: ✓ done / ✗ failed / ⏸ usage limit / ? lost.
-- Data sources: `<home>/.claude/sessions/<pid>.json` (current session id and busy/idle status; the id changes on /clear),
-  then the transcript at `<home>/.claude/projects/<cwd with non-alphanumerics replaced by ->/<session>.jsonl`, and the ledger `<state>/runs.jsonl`.
-- `cdx runs` lists finished runs only. A run's final report is the `result` field in its `stdout_path`.
+- Data sources: the provider processes (`CDX_SESSION_NAME` names the account). Claude: `<home>/.claude/sessions/<pid>.json` (current session id
+  and busy/idle status; the id changes on /clear), then `<home>/.claude/projects/<cwd slug>/<session>.jsonl`. Codex: the rollout file the
+  process holds open (`<profile>/sessions/YYYY/MM/DD/rollout-*.jsonl`). Then the ledger `<state>/runs.jsonl` and `cdx runs`.
+- A Codex session counts as waiting only when its rollout ends a turn (`task_complete`); a quiet file alone shows idle.
+- A run's final report comes from its cdx `stdout_path`: Claude's `result` envelope, or Codex's last `agent_message` event.
 
 ## Recover
 - **⏸ usage limit** (the stdout says "You've hit your session limit · resets HH:MM"): partial work stays

@@ -5,7 +5,7 @@
 ### Know what every agent is doing, what it costs, and what needs you. In one terminal.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Built on cdx](https://img.shields.io/badge/built%20on-cdx%20%2B%20Claude%20Code-d97757)
+![Built on cdx](https://img.shields.io/badge/built%20on-cdx%20%2B%20Claude%20Code%20%2B%20Codex-d97757)
 ![Terminal first](https://img.shields.io/badge/terminal-first-2f334d)
 
 <img src="docs/img/watch-agents.png" alt="crow watch, the live board" width="900">
@@ -16,7 +16,7 @@
 
 ---
 
-CR-0W (crow for short) is a chief of staff for developers who run several repos and several Claude accounts.
+CR-0W (crow for short) is a chief of staff for developers who run several repos and several Claude Code and Codex accounts.
 It watches every session, run and limit, briefs you in the morning, moves work to another account when you hit a usage cap,
 and turns each review comment and each correction into something the next session already knows.
 
@@ -60,6 +60,9 @@ The board uses your terminal's own colours, so it looks like it belongs there.
 
 ## What else it does
 
+**Runs Claude and Codex together.** Pick the provider or account per launch, run one of each at once in separate worktrees,
+see both on one board, and move an interrupted task from one to the other. See [`runbooks/claude-and-codex.md`](runbooks/claude-and-codex.md).
+
 **Delegates.** Start a tracked background run in any repo and check its progress and commits at any time.
 Before you leave for the night, an AFK routine asks every open question up front, queues the jobs and writes a report for the morning.
 
@@ -82,11 +85,12 @@ no merges, drafts before any mail. Edit them to match how you work. Everything y
 
 ## Get started
 
-1. Install [cdx](https://github.com/AlexAgo83/cdx-manager) and Claude Code.
+1. Install [cdx](https://github.com/AlexAgo83/cdx-manager) (0.21.4 or newer) and Claude Code, Codex, or both.
 2. Clone this repo and put `bin/` on your PATH.
 3. Create your private `local/` folder: `mkdir local && git -C local init`, then add `context.md`, `projects.yaml` and `accounts.yaml`
    (start from [`docs/accounts.example.yaml`](docs/accounts.example.yaml)).
-4. Run `crow brief`, then `crow watch`.
+4. Run `crow brief`, then `crow watch`. With Codex accounts, read [`runbooks/claude-and-codex.md`](runbooks/claude-and-codex.md)
+   and the capability matrix in [`docs/cdx-compatibility.md`](docs/cdx-compatibility.md).
 
 Everything outside `local/` is generic. Your people, accounts, projects, memory and state live in `local/`,
 which is ignored by this repo and meant to be its own private repo.
@@ -98,6 +102,7 @@ which is ignored by this repo and meant to be its own private repo.
 |---|---|
 | `bin/crow` | launcher: hub session, one-shot briefs, project sessions, run dispatch, `crow watch` |
 | `bin/crow-runs`, `bin/crow-usage`, `bin/crow-activity` | background runs, usage and cost across accounts, git/MR activity |
+| `bin/crow_cdx.py`, `bin/crow_native.py`, `bin/crow_prices.py` | the cdx boundary and account policy, read-only native transcript readers, crow's price table |
 | `bin/crow-accounts`, `bin/crow-memory` | account policy, and memory stored once in `local/memory` and linked into allowed profiles |
 | `bin/crow-sessions`, `bin/crow-relaunch` | registry of sessions cut off by a usage limit, and the guarded relaunch |
 | `bin/crow-retro`, `bin/crow-digest` | automatic retrospective after every session |
