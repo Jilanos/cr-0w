@@ -474,6 +474,13 @@ def dispatch(a):
                      f"(--cwd {os.path.realpath(p['path'])}.wt/<name>) or --read-only")
         slots.claim(pending, {"cwd": cwd, "writes": writes, "provider": t["provider"], "account": t["name"]})
     src = ["--prompt-file", a.prompt_file] if a.prompt_file else ["--prompt", a.prompt]
+    if t["provider"] == "codex":
+        # Codex does not load the hub's files: the job starts with the same references as a launch.
+        body = Path(a.prompt_file).read_text() if a.prompt_file else a.prompt
+        pf = STATE / "prompts" / f"{pending}.md"
+        pf.parent.mkdir(parents=True, exist_ok=True)
+        pf.write_text(crow_cdx.context_preamble(t["refs"], body))
+        src = ["--prompt-file", str(pf)]
     model = ["--model", a.model] if a.model else []
     try:
         res = crow_cdx.call("run", t["name"], "--cwd", cwd, *src, *model, "--power", a.power,

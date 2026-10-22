@@ -219,6 +219,11 @@ def test_mixed_jobs_share_one_slot_budget(env):
     r = dispatch(env, "beta", "c", "--account", "spare", "--read-only")
     assert r.returncode == 1 and "2 runs already running (max 2, all providers)" in r.stderr
     assert [(x["provider"], x["account"]) for x in ledger(env)] == [("claude", "main"), ("codex", "cx")]
+    runs = [c["argv"] for c in launches(env) if c["argv"][0] == "run"]
+    assert runs[0][runs[0].index("--prompt") + 1] == "work"                      # Claude: unchanged
+    pf = runs[1][runs[1].index("--prompt-file") + 1]                              # Codex: references first
+    text = open(pf).read()
+    assert "AGENTS.md" in text and text.endswith("work")
 
 
 def test_simultaneous_dispatches_cannot_overbook(env, tmp_path):
