@@ -49,7 +49,7 @@ def out(env, rc=0):
 def rows():
     st = fixture("status.json")
     for r in st["rows"]:
-        if r["session_name"] in os.environ.get("FAKE_CDX_BLOCKED", "").split(","):
+        if r["session_name"] in (os.environ.get("FAKE_CDX_BLOCKED") or os.environ.get("FAKE_BLOCKED") or "").split(","):
             r["remaining_5h_pct"] = 0
     return st
 
@@ -157,6 +157,8 @@ elif cmd == "can-resume":
     r = session(argv[1])
     env = fixture("can-resume.json")
     env.update(session=argv[1], provider=r["provider"], resumable=argv[1] != "stuck")
+    if os.environ.get("FAKE_CDX_RESUME_ID"):
+        env["identity"] = os.environ["FAKE_CDX_RESUME_ID"]
     out(env)
 elif cmd == "handoff" and "--json" in argv:
     src, tgt = [a for a in argv[1:3]]
@@ -165,11 +167,24 @@ elif cmd == "handoff" and "--json" in argv:
             "code": "handoff_source_unresolved", "message": "Conversation x has multiple native transcripts; "
             "select --source-native-transcript PATH.", "exit_code": 1}, "candidates": []}, 1)
     s, t = session(src), session(tgt)
-    entry = {"schema_version": 1, "workspace": os.path.realpath(os.getcwd()), "mode": "native",
+    native = flag("--source-native-transcript")
+    cid, size = flag("--source-conversation"), 10
+    if native:  # read the identity from the file, like cdx does
+        size = os.path.getsize(native)
+        for line in open(native):
+            e = json.loads(line)
+            cid = e.get("sessionId") or (e.get("payload") or {}).get("id") if e.get("type") in (
+                "user", "assistant", "session_meta") else None
+            if cid:
+                break
+    ws = os.path.realpath(os.getcwd())
+    if os.environ.get("FAKE_CDX_HANDOFF") == "mismatch":
+        ws = "/somewhere/else"
+    entry = {"schema_version": 1, "workspace": ws, "mode": "native",
              "source": {"name": src, "provider": s["provider"]}, "target": {"name": tgt, "provider": t["provider"]},
-             "transcript": {"conversation_id": flag("--source-conversation"), "provider": s["provider"],
-                            "path": flag("--source-native-transcript") or f"/profiles/{src}/x.jsonl",
-                            "workspace": os.path.realpath(os.getcwd()), "sha256": "0" * 64, "extent_bytes": 10}}
+             "transcript": {"conversation_id": cid, "provider": s["provider"],
+                            "path": native or f"/profiles/{src}/x.jsonl",
+                            "workspace": ws, "sha256": "0" * 64, "extent_bytes": size}}
     out({"schema_version": 1, "ok": True, "action": "handoff", "message": "Prepared native handoff",
          "context": {"target_path": f"/profiles/{tgt}/handoffs/e.json"}, "handoff": entry,
          "source_session": entry["source"], "target_session": entry["target"],

@@ -1,30 +1,43 @@
 #!/usr/bin/env python3
-"""crow-relaunch: continue a session on another allowed cdx account, always by conversation id.
+"""crow-relaunch: continue one interrupted conversation, exactly, on an allowed cdx account.
 
-  crow-relaunch <conversation-id> <target> [--dry-run] [--yes] [--here]
+  crow-relaunch <conversation-id> <target> [--source ACCOUNT] [--dry-run] [--yes] [--here]
   crow-relaunch status [--json]     allowed accounts, which are blocked, the recommended target
 
 The id may be a unique prefix of a session in the interrupted registry (crow-sessions), or a
-full id of any top-level transcript. The relaunch refuses when:
-  - no id is given, or it does not resolve to exactly one transcript;
-  - the target (or the profile holding the source) has policy never, or the target is the source;
-  - the transcript does not have exactly one workspace, or that directory is gone;
-  - `cdx can-resume <target>` says no, or `cdx status` shows the target blocked.
-Then it asks: a `use` account takes y (or --yes); an `ask-first` account needs a typed "yes"
-on a terminal every time, --yes does not count. --dry-run runs only the read-only checks
-(can-resume, status) and prints the handoff it would run; nothing is launched or prepared.
+full id of any top-level Claude transcript or Codex rollout. When the same id exists under
+several accounts or providers, --source names the one meant. Two modes:
 
-The handoff is `cdx handoff <source> <target> --source-conversation <id>`, run from the
-session's workspace in a new kitty window (detached, real HOME, no inherited Claude/cdx
-variables); --here runs it in the current terminal instead. Accounts with memory mode session get local/memory linked for the run.
+  native resume   the target is the source account: `cdx resume <account>` in the workspace,
+                  only when `cdx can-resume` names this exact conversation (no fallback to the
+                  account's last one).
+  transfer        another account, same provider or not: `cdx handoff <source> <target>
+                  --source-native-transcript <path> --json` prepares an entry in the verified
+                  workspace; crow checks it names this conversation, workspace and target, then
+                  launches the target on the entry's recovery prompt. Native ids stay separate:
+                  the target starts its own conversation, linked to the source in relaunches.jsonl.
+
+It refuses when: no id, or it does not resolve to exactly one conversation; the target or the
+source account has policy never; the transcript does not have exactly one workspace, or it is
+gone or changed since it was listed; the target is blocked or disabled; the handoff preparation
+does not match. Then it asks: a `use` account takes y (or --yes); an `ask-first` account needs a
+typed "yes" on a terminal every time, --yes does not count. --dry-run runs only read-only checks.
+
+The launch opens a new kitty window from the workspace (real HOME, no inherited Claude/cdx
+variables); --here runs it in this terminal. A relaunch is recorded as launched only when the
+target launch succeeded: a prepared or failed one leaves the session interrupted.
 """
-import json, os, pwd, re, subprocess, sys
+import json, os, pwd, re, subprocess, sys, uuid
+from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+import crow_native  # noqa: E402
+from crow_cdx import CdxError  # noqa: E402
 
 HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.path.join(HOME, "bin")
 REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
-PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
-CDX_VERSION_NOTE = "0.21"
 ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
@@ -39,26 +52,28 @@ def helper(*args):
     return r.stdout
 
 
-def cdx_json(*args):
+def cdx(*args, **kw):
     try:
-        r = subprocess.run(["cdx", *args, "--json"], capture_output=True, text=True, timeout=60)
-    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        die(f"cdx {' '.join(args)}: {e}")
+        return crow_cdx.call(*args, **kw)
+    except CdxError as e:
+        die(e.message)
+
+
+def policy():
     try:
-        return json.loads(r.stdout)
-    except json.JSONDecodeError:
-        die(f"cdx {' '.join(args)} gave no JSON: {(r.stderr or r.stdout).strip()[:200]}")
+        return crow_cdx.load_policy()
+    except CdxError as e:
+        die(e.message)
 
 
 def accounts():
-    return {a["name"]: a for a in json.loads(helper("crow-accounts", "json"))["accounts"]}
+    return {a["name"]: a for a in policy()["accounts"]}
 
 
 # ---------- block detection ----------
 
 def limits():
-    rows = cdx_json("status").get("rows") or []
-    return {r["session_name"]: r for r in rows if r.get("session_name")}
+    return {r["session_name"]: r for r in cdx("status", "--cached").get("rows") or [] if r.get("session_name")}
 
 
 def blocked_reason(row):
@@ -82,12 +97,12 @@ def account_status(current):
         if a["policy"] == "never":
             continue
         row = rows.get(name)
-        out.append({"name": name, "policy": a["policy"], "current": name == current,
-                    "blocked": blocked_reason(row),
+        out.append({"name": name, "policy": a["policy"], "provider": (row or {}).get("provider"),
+                    "current": name == current, "blocked": blocked_reason(row),
                     "remaining_5h_pct": (row or {}).get("remaining_5h_pct"),
                     "remaining_week_pct": (row or {}).get("remaining_week_pct"),
                     "reset_5h_at": (row or {}).get("reset_5h_at")})
-    usable = [a for a in out if not a["blocked"] and not a["current"]]
+    usable = [a for a in out if not a["blocked"] and not a["current"] and a["provider"] in crow_cdx.PROVIDERS]
     usable.sort(key=lambda a: (a["policy"] != "use", -min(a["remaining_5h_pct"] or 0, a["remaining_week_pct"] or 0)))
     cur = next((a for a in out if a["current"]), None)
     return {"current": current, "current_blocked": cur["blocked"] if cur else blocked_reason(rows.get(current)),
@@ -95,7 +110,7 @@ def account_status(current):
 
 
 def status(argv):
-    current = os.environ.get("CROW_ACCOUNT") or helper("crow-accounts", "default").strip()
+    current = os.environ.get("CROW_ACCOUNT") or policy()["default"]
     st = account_status(current)
     if "--json" in argv:
         print(json.dumps(st, indent=1))
@@ -103,7 +118,8 @@ def status(argv):
     for a in st["accounts"]:
         mark = "*" if a["current"] else " "
         state = f"blocked: {a['blocked']}" if a["blocked"] else "ok"
-        print(f"{mark} {a['name']:<10} {a['policy']:<9} 5h {a['remaining_5h_pct']}%  week {a['remaining_week_pct']}%  {state}")
+        print(f"{mark} {a['name']:<10} {a['provider'] or '?':<6} {a['policy']:<9} 5h {a['remaining_5h_pct']}%  "
+              f"week {a['remaining_week_pct']}%  {state}")
     if st["current_blocked"]:
         rec = st["recommended"]
         print(f"\n{current} is blocked ({st['current_blocked']}). " +
@@ -111,156 +127,266 @@ def status(argv):
                f"`crow relaunch <id> {rec}` (see `crow sessions`)." if rec else "No allowed account is usable."))
 
 
-# ---------- relaunch ----------
+# ---------- the source ----------
 
-def resolve(ref):
+def resolve(ref, source=None):
+    """The one conversation ref names: {provider, account, conversation_id, transcript, size?}."""
     if not ref or not ID_RE.fullmatch(ref):
         die("a conversation id is required (see `crow sessions`); never relaunch without one")
     reg = json.loads(helper("crow-sessions", "scan", "--json"))
-    hits = [s for s in reg["sessions"] if s["conversation_id"].startswith(ref)]
+    hits = [s for s in reg["sessions"] if s["conversation_id"].startswith(ref)
+            and (source is None or s["account"] == source)]
     if len(hits) > 1:
-        die(f"{len(hits)} interrupted sessions start with '{ref}'; give more of the id")
+        die(f"{len(hits)} interrupted sessions start with '{ref}'; give more of the id"
+            + ("" if source else " or --source ACCOUNT"))
     if hits:
-        return hits[0]["conversation_id"], hits[0]["transcript"]
-    paths = []
-    for acct in sorted(os.listdir(PROFILES)) if os.path.isdir(PROFILES) else []:
-        base = os.path.join(PROFILES, acct, "claude-home", ".claude", "projects")
-        for slug in sorted(os.listdir(base)) if os.path.isdir(base) else []:
-            if os.path.isfile(os.path.join(base, slug, ref + ".jsonl")):
-                paths.append(os.path.join(base, slug, ref + ".jsonl"))
-    if len(paths) != 1:
-        die(f"conversation '{ref}' matches {len(paths)} transcripts; use a full id from `crow sessions`")
-    return ref, paths[0]
+        s = hits[0]
+        if not s.get("provider"):  # a record from before providers were tracked: ask cdx
+            s["provider"] = (crow_cdx.inventory().get(s["account"]) or {}).get("provider")
+        if s["provider"] not in crow_cdx.PROVIDERS:
+            die(f"cannot tell which provider '{s['account']}' is; the session stays unlaunchable")
+        return s
+    found = []
+    try:
+        profs = crow_cdx.profiles()
+    except CdxError as e:
+        die(e.message)
+    for prof in profs:
+        if source and prof["name"] != source:
+            continue
+        if prof["provider"] == "claude":
+            base = crow_cdx.claude_projects_dir(prof["root"])
+            for slug in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+                f = os.path.join(base, slug, ref + ".jsonl")
+                if os.path.isfile(f):
+                    found.append({"provider": "claude", "account": prof["name"], "conversation_id": ref, "transcript": f})
+        elif prof["provider"] == "codex":
+            for f in crow_native.codex_rollouts(prof["root"]):
+                if f.endswith(f"-{ref}.jsonl"):
+                    found.append({"provider": "codex", "account": prof["name"], "conversation_id": ref, "transcript": f})
+    if len(found) != 1:
+        die(f"conversation '{ref}' matches {len(found)} transcripts; use a full id from `crow sessions`"
+            + ("" if source else " (or --source ACCOUNT)"))
+    return found[0]
 
 
-def source_account(path):
-    rel = os.path.relpath(os.path.realpath(path), os.path.realpath(PROFILES))
-    if rel.startswith(".."):
-        die(f"{path} is not inside a cdx profile")
-    return rel.split(os.sep, 1)[0]
-
-
-def workspace(path, cid):
-    """The one workspace cdx will accept for this transcript (it checks the same thing)."""
+def workspace(src):
+    """The one workspace the conversation ran in (cdx checks the same thing)."""
+    path, cid = src["transcript"], src["conversation_id"]
     ids, cwds = set(), set()
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for raw in fh:
-            try:
-                ev = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(ev, dict) or ev.get("isSidechain"):
-                continue
-            if ev.get("sessionId"):
-                ids.add(ev["sessionId"])
-            if isinstance(ev.get("cwd"), str):
-                cwds.add(os.path.realpath(ev["cwd"]))
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for ev in crow_native.events(fh):
+                if src["provider"] == "codex":
+                    p = ev.get("payload") or {}
+                    if ev.get("type") == "session_meta" and p.get("id"):
+                        ids.add(p["id"])
+                    if ev.get("type") in ("session_meta", "turn_context") and isinstance(p.get("cwd"), str):
+                        cwds.add(os.path.realpath(p["cwd"]))
+                    continue
+                if ev.get("isSidechain"):
+                    continue
+                if ev.get("sessionId"):
+                    ids.add(ev["sessionId"])
+                if isinstance(ev.get("cwd"), str):
+                    cwds.add(os.path.realpath(ev["cwd"]))
+    except OSError:
+        die(f"transcript {path} is gone")
     if ids != {cid}:
         die(f"transcript holds conversation ids {sorted(ids)}, expected only {cid}")
     if len(cwds) != 1:
-        die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx {CDX_VERSION_NOTE} "
-            "needs exactly one (patch: local/state/afk/shots/*/cdx-handoff-multi-workspace.patch)")
+        die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx needs exactly one")
     ws = cwds.pop()
     if not os.path.isdir(ws):
         die(f"workspace {ws} no longer exists")
     return ws
 
 
-def confirm(policy, yes):
-    if policy == "ask-first":
+def unchanged(src):
+    try:
+        size = os.path.getsize(src["transcript"])
+    except OSError:
+        die(f"transcript {src['transcript']} is gone")
+    if src.get("size") is not None and size != src["size"]:
+        die("the conversation changed since it was listed (it may be running again); rescan with `crow sessions`")
+    return size
+
+
+# ---------- relaunch ----------
+
+def confirm(target, verb, yes):
+    if target["policy"] == "ask-first":
         if not sys.stdin.isatty():
             die("an ask-first account needs a typed yes on a terminal (--yes does not count)")
-        return input('This is an ask-first account. Type "yes" to hand off: ').strip() == "yes"
-    if yes:
-        return True
-    if not sys.stdin.isatty():
+        ok = input(f'This is an ask-first account ({target["provider"]}). Type "yes" to {verb}: ').strip() == "yes"
+    elif yes:
+        ok = True
+    elif not sys.stdin.isatty():
         die("no terminal to confirm on; pass --yes to confirm")
-    return input("Hand off? [y/N] ").strip().lower() in ("y", "yes")
+    else:
+        ok = input(f"{verb.capitalize()}? [y/N] ").strip().lower() in ("y", "yes")
+    if not ok:
+        die("cancelled")
+    crow_cdx._log_consent(target, "relaunch", "typed" if target["policy"] == "ask-first" else "confirmed", None)
+
+
+def parse(argv):
+    flags, args, source = set(), [], None
+    it = iter(argv)
+    for a in it:
+        if a == "--source":
+            source = next(it, None) or die("--source needs an account")
+        elif a.startswith("--"):
+            flags.add(a)
+        else:
+            args.append(a)
+    unknown = flags - {"--dry-run", "--yes", "--here"}
+    if unknown:
+        die(f"unknown option {sorted(unknown)[0]}")
+    if len(args) != 2:
+        die("usage: crow-relaunch <conversation-id> <target> [--source ACCOUNT] [--dry-run] [--yes]  (an id is required)")
+    return args, flags, source
 
 
 def relaunch(argv):
-    flags = {a for a in argv if a.startswith("--")}
-    args = [a for a in argv if not a.startswith("--")]
-    known = {"--dry-run", "--yes", "--here"}
-    if flags - known:
-        die(f"unknown option {sorted(flags - known)[0]}")
-    if len(args) != 2:
-        die("usage: crow-relaunch <conversation-id> <target> [--dry-run] [--yes]  (an id is required)")
-    ref, target = args
+    (ref, target_name), flags, source = parse(argv)
     accts = accounts()
-    tpol = accts.get(target, {}).get("policy", "never")
-    if tpol == "never":
-        die(f"account '{target}' is not allowed (policy never)")
-    cid, path = resolve(ref)
-    source = source_account(path)
-    if accts.get(source, {}).get("policy", "never") == "never":
-        die(f"the transcript sits in '{source}', an account crow never uses")
-    if source == target:
-        die(f"the session already belongs to '{target}'; pick another account")
-    ws = workspace(path, cid)
-
-    cap = cdx_json("can-resume", target)
-    if not cap.get("ok") or not cap.get("resumable"):
-        die(f"cdx can-resume {target}: {cap.get('reason') or cap.get('message') or 'not resumable'}")
-    why = blocked_reason(limits().get(target))
-    if why:
-        die(f"target '{target}' is blocked: {why}")
-
-    cmd = ["cdx", "handoff", source, target, "--source-conversation", cid]
-    print(f"session   {cid}\n  from    {source}  ({path})\n  to      {target}  (policy {tpol})\n"
-          f"  in      {ws}\n  run     {' '.join(cmd)}")
-    if "--dry-run" in flags:
-        print("dry run: checks passed, nothing launched")
-        return 0
-    if not confirm(tpol, "--yes" in flags):
-        die("cancelled")
-
-    record(cid, source, target, ws)
-    if "--here" in flags:
-        return run_handoff(cmd, ws, target, accts[target].get("memory") == "session")
-    return open_window(cid, source, target, ws)
-
-
-def run_handoff(cmd, ws, target, session_memory):
-    if session_memory:
-        helper("crow-memory", "link", target)
+    if accts.get(target_name, {}).get("policy", "never") == "never":
+        die(f"account '{target_name}' is not allowed (policy never)")
+    src = resolve(ref, source)
+    if accts.get(src["account"], {}).get("policy", "never") == "never":
+        die(f"the transcript sits in '{src['account']}', an account crow never uses")
+    ws = workspace(src)
+    size = unchanged(src)
     try:
-        return subprocess.run(cmd, cwd=ws, env={**os.environ, "CROW_ACCOUNT": target}).returncode
+        crow_cdx.capabilities()
+        target = crow_cdx.resolve(target_name, cfg=policy(), env={})
+    except CdxError as e:
+        die(e.message)
+    cid = src["conversation_id"]
+    plan = {"conversation_id": cid, "source": src["account"], "source_provider": src["provider"],
+            "target": target["name"], "target_provider": target["provider"], "cwd": ws,
+            "transcript": src["transcript"], "size": size, "memory": target["memory"]}
+    if target["name"] == src["account"]:
+        cap = cdx("can-resume", target["name"])
+        if not cap.get("resumable") or cap.get("identity") != cid:
+            die(f"cannot resume {cid} exactly on '{target['name']}': cdx would resume "
+                f"{cap.get('identity') or 'nothing'} ({cap.get('provenance') or cap.get('reason')}); "
+                "pick another account to transfer it")
+        plan.update(mode="native-resume", cmd=["cdx", "resume", target["name"], "--dir", ws])
+        verb = "resume"
+    else:
+        same = target["provider"] == src["provider"]
+        plan["mode"] = "account-transfer" if same else "cross-provider-transfer"
+        plan["prepare"] = ["cdx", "handoff", src["account"], target["name"], "--source-native-transcript",
+                           src["transcript"], "--json"]
+        verb = "hand off"
+    why = blocked_reason(limits().get(target["name"]))
+    if why:
+        die(f"target '{target['name']}' is blocked: {why}")
+
+    kind = {"native-resume": "native resume (same conversation)",
+            "account-transfer": f"transfer to another {target['provider']} account (new conversation, linked)",
+            "cross-provider-transfer": f"cross-provider transfer {src['provider']} → {target['provider']} "
+                                       "(new conversation, linked)"}[plan["mode"]]
+    print(f"session   {src['provider']}:{src['account']}:{cid}\n  from    {src['transcript']}\n"
+          f"  to      {target['provider']}:{target['name']}  (policy {target['policy']})\n  in      {ws}\n"
+          f"  mode    {kind}\n  run     {' '.join(plan.get('prepare') or plan['cmd'])}")
+    if "--dry-run" in flags:
+        print("dry run: checks passed, nothing launched or prepared")
+        return 0
+    confirm(target, verb, "--yes" in flags)
+    if plan["mode"] != "native-resume":
+        prepare(plan)
+    record(plan, "prepared")
+    if "--here" in flags:
+        return run_target(plan)
+    return open_window(plan)
+
+
+def prepare(plan):
+    """Prepare the cdx handoff entry and check it is exactly the confirmed transfer."""
+    env = cdx(*plan["prepare"][1:-1], cwd=plan["cwd"], allow_fail=True)
+    if not env.get("ok"):
+        err = env.get("error") or {}
+        die(f"cdx could not prepare the handoff: {err.get('message') if isinstance(err, dict) else err} "
+            "(nothing launched)")
+    entry, tr = env.get("handoff") or {}, (env.get("handoff") or {}).get("transcript") or {}
+    problems = []
+    if entry.get("mode") != "native":
+        problems.append(f"mode {entry.get('mode')!r} instead of native")
+    if tr.get("conversation_id") not in (None, plan["conversation_id"]):
+        problems.append(f"conversation {tr.get('conversation_id')}")
+    if os.path.realpath(entry.get("workspace") or "") != plan["cwd"]:
+        problems.append(f"workspace {entry.get('workspace')}")
+    if (env.get("target_session") or {}).get("name") != plan["target"]:
+        problems.append(f"target {(env.get('target_session') or {}).get('name')}")
+    if (env.get("source_session") or {}).get("name") != plan["source"]:
+        problems.append(f"source {(env.get('source_session') or {}).get('name')}")
+    if tr.get("extent_bytes") not in (None, plan["size"]):
+        problems.append("the transcript changed while preparing")
+    if problems or not env.get("launch_prompt"):
+        die("the prepared handoff does not match what was confirmed (" + ", ".join(problems or ["no launch prompt"])
+            + "); nothing launched")
+    plan.update(entry=(env.get("context") or {}).get("target_path"), sha256=tr.get("sha256"),
+                extent_bytes=tr.get("extent_bytes"),
+                cmd=["cdx", plan["target"], "--dir", plan["cwd"], "--prompt", env["launch_prompt"]])
+
+
+def run_target(plan):
+    lease = plan["memory"] == "session" and plan["target_provider"] == "claude"
+    if lease:
+        helper("crow-memory", "acquire", plan["target"], str(os.getpid()))
+    try:
+        rc = subprocess.run(plan["cmd"], cwd=plan["cwd"], env={**os.environ, "CROW_ACCOUNT": plan["target"]}).returncode
+    except OSError as e:
+        print(f"crow-relaunch: launch failed: {e}", file=sys.stderr)
+        rc = 127
     finally:
-        if session_memory:
-            helper("crow-memory", "unlink", target)
-            helper("crow-memory", "commit")
+        if lease:
+            helper("crow-memory", "release", plan["target"], str(os.getpid()))
+    record(plan, "launched" if rc == 0 else "failed", exit_code=rc)
+    return rc
 
 
-def open_window(cid, source, target, ws):
+def open_window(plan):
     """Detach like `crow term`: real HOME (kitty config), no inherited Claude/cdx variables."""
+    d = os.path.join(crow_cdx.state_dir(), "relaunch-plans")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, f"{uuid.uuid4().hex}.json")
+    with open(path, "w") as fh:
+        json.dump(plan, fh)
     env = {k: v for k, v in os.environ.items() if not re.match(r"(CLAUDE|CLAUDECODE|ANTHROPIC_|CDX_)", k)}
     env["HOME"] = REAL_HOME
-    cmd = ["setsid", "-f", "kitty", "--title", f"crow · relaunch {target}", "--directory", ws,
-           os.path.join(BIN, "crow-relaunch"), "_run", cid, source, target, ws]
+    cmd = ["setsid", "-f", "kitty", "--title", f"crow · relaunch {plan['target']}", "--directory", plan["cwd"],
+           os.path.join(BIN, "crow-relaunch"), "_run", path]
     try:
         subprocess.run(cmd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError) as e:
         die(f"could not open a kitty window ({e}); rerun with --here")
-    print(f"opened a kitty window on {target}")
+    print(f"opened a kitty window on {plan['target']}")
     return 0
 
 
 def run_in_window(argv):
-    """Inside the new window: the handoff itself (already confirmed and recorded)."""
-    if len(argv) != 4:
-        die("_run is internal: <id> <source> <target> <workspace>")
-    cid, source, target, ws = argv
-    rc = run_handoff(["cdx", "handoff", source, target, "--source-conversation", cid], ws, target,
-                     accounts().get(target, {}).get("memory") == "session")
+    """Inside the new window: the launch itself (already confirmed, prepared and recorded)."""
+    if len(argv) != 1:
+        die("_run is internal: <plan file>")
+    with open(argv[0]) as fh:
+        plan = json.load(fh)
+    rc = run_target(plan)
     if rc:
-        input(f"handoff exited {rc}; press Enter to close ")
+        input(f"launch exited {rc}; press Enter to close ")
     return rc
 
 
-def record(cid, source, target, ws):
-    helper("crow-sessions", "mark-relaunched", cid, source, target, ws)
+def record(plan, status, **extra):
+    keep = ("conversation_id", "source", "source_provider", "target", "target_provider", "cwd", "mode",
+            "transcript", "sha256", "extent_bytes", "entry")
+    crow_cdx.append_jsonl(os.path.join(crow_cdx.state_dir(), "relaunches.jsonl"),
+                          {**{k: plan.get(k) for k in keep}, "status": status, "target_conversation_id": None,
+                           "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **extra})
 
 
 def main(argv):
