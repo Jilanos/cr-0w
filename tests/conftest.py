@@ -1,7 +1,9 @@
 """Shared fixtures: run bin/ scripts against a throwaway hub home and cdx profiles dir."""
 import json
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,22 @@ accounts:
 """
 
 
+def _python_with_yaml():
+    """First interpreter that has PyYAML: the running one, then the system ones."""
+    for cand in (sys.executable, shutil.which("python3"), "/usr/bin/python3"):
+        if cand and subprocess.run([cand, "-c", "import yaml"], capture_output=True).returncode == 0:
+            return cand
+    return None
+
+
+PYTHON = _python_with_yaml()
+
+
+def _is_python_script(path):
+    with open(path, "rb") as f:
+        return b"python" in f.readline()
+
+
 @pytest.fixture
 def hub(tmp_path):
     """A hub home with local/accounts.yaml and an empty cdx profiles dir."""
@@ -36,7 +54,12 @@ def run(hub, script, *args, input=None, env=None):
     home, profiles = hub
     e = {k: v for k, v in os.environ.items() if k != "CROW_ACCOUNT"}
     e.update(CROW_HOME=str(home), CDX_PROFILES=str(profiles), **(env or {}))
-    return subprocess.run([str(BIN / script), *args], capture_output=True, text=True,
+    cmd = [str(BIN / script), *args]
+    if _is_python_script(BIN / script):
+        if PYTHON is None:
+            pytest.skip("no python with PyYAML found (pip install pyyaml)")
+        cmd = [PYTHON, *cmd]
+    return subprocess.run(cmd, capture_output=True, text=True,
                           input=input, env=e)
 
 

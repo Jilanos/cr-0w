@@ -7,13 +7,15 @@
 #   crow weekly          build the weekly rollup + slide outline (one-shot run)
 #   crow open <project> [prompt]  open a session in a registered project, optionally on a first message
 #   crow term <project> [prompt]  same, in a new kitty window (safe to call from inside a Claude session)
+#   crow work <project>  index of a repo's own tools (skills, CLAUDE.md, hooks) for hub work on it
+#   crow handoff <project> --task T --end-state E [--context C]   hand the work to a repo session (crow term)
 #   crow ls              list registered projects
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
 #   crow watch           live board: 1 agents · 2 usage · 3 savings · 4 history (? for keys)
 #   crow sessions [...] sessions cut off by a usage limit (see crow-sessions)
-#   crow relaunch <id> <account> [--dry-run]   continue one on another allowed account; crow relaunch status
+#   crow relaunch <id> <account> [--dry-run] [--here]   continue one on another allowed account; crow relaunch status
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)
 #   crow activity [...]  raw activity (see crow-activity --help)
 #   crow releases [...]  release tracks: roadmap progress toward public releases
@@ -88,6 +90,9 @@ case "$cmd" in
             strip=(); for v in $(compgen -e | grep -E '^(CLAUDE|CLAUDECODE|ANTHROPIC_|CDX_)'); do strip+=(-u "$v"); done
             env "${strip[@]}" HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" \
               setsid -f kitty --title "crow · $1" "$CROW_HOME/bin/crow" open "$@" >/dev/null 2>&1 ;;
+  work)     exec "$CROW_HOME/bin/crow-project" work "$@" ;;
+  handoff)  prompt="$("$CROW_HOME/bin/crow-project" handoff "$@")"
+            exec "$CROW_HOME/bin/crow" term "$1" "$prompt" ;;
   ls)       python3 -c "
 import yaml
 for p in yaml.safe_load(open('$REGISTRY'))['projects']:
@@ -107,6 +112,6 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
   usage)    exec "$CROW_HOME/bin/crow-usage" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac

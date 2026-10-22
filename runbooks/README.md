@@ -13,6 +13,7 @@ want to trigger it by name.
 - [dispatch-background-runs](dispatch-background-runs.md): start, track and recover cdx background runs in project repos
 - [archeotech-crow-agents](archeotech-crow-agents.md): test the crow agents bar/panel module with fixtures and headless renders
 - [archeotech-crow-usage](archeotech-crow-usage.md): test the crow usage bar/panel module (fixtures, render script, sandbox gotchas)
+- [sub-project-work](sub-project-work.md): hand repo work off with `crow handoff`, or `crow work` for lookups; the hub guard hook
 - [open-project-session](open-project-session.md): open a project session in a new kitty window from the hub (HOME + inherited Claude markers)
 - [session-retros](session-retros.md): automatic retrospective after every session (SessionEnd hook → queue → /retro on Sonnet)
 - [agent-tooling](agent-tooling.md): third-party agent tools installed (code graph, graphify, ast-grep, claude-hud), pinned versions, verdicts, undo
@@ -20,4 +21,4 @@ want to trigger it by name.
 - [interrupted-sessions](interrupted-sessions.md): list sessions cut off by a usage limit and relaunch them on another allowed account (always by id)
 - [memory](memory.md): memory lives in local/memory, linked into allowed cdx profiles (never copied)
 - [tui-render](tui-render.md): render a TUI (or ANSI mockup) to PNG in the kitty theme at real monitor sizes; fallback-glyph and contrast checks
-- [overnight](overnight.md): unattended night runs: queue, guardrails, pre-push denylist, morning report
+- [afk-runs](afk-runs.md): unattended AFK runs (night or day): queue, guardrails, pre-push denylist, return report

@@ -1,9 +1,16 @@
 ---
 name: weekly
 description: Friday rollup. Turns the week's activity into a weekly summary (vault/state), rolls up the daily logs, and drafts the company weekly demo slides. Use when the user says "weekly", "rollup", "prep the slides", or on Friday morning.
+context: fork
+model: sonnet
+effort: medium
+background: false
+allowed-tools: Bash(bin/crow-activity:*)
 ---
 
 # Weekly
+
+Runs in its own context (no conversation history): write the rollup file, then return a short summary of it and the slide outline. The offer to build the deck goes in that summary; the main session asks.
 
 ## Gather
 1. Week = Monday to today (ISO week `YYYY-Www`).

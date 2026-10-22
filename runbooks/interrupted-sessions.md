@@ -19,14 +19,19 @@ message. They can continue on another allowed account through a cdx handoff.
    (`can-resume`, `status`) and prints the exact handoff. Nothing is prepared or launched.
 2. `crow relaunch <id> <account>`: asks first. A `use` account takes `y` (or `--yes`); an `ask-first`
    account needs a typed `yes` on a terminal every time, and `--yes` does not count for it.
-3. It runs `cdx handoff <source> <target> --source-conversation <id>` from the session's workspace.
+3. After the confirmation it opens a new kitty window (detached, real HOME, no inherited Claude/cdx
+   variables) that runs `cdx handoff <source> <target> --source-conversation <id>` from the session's
+   workspace. `--here` runs it in the current terminal instead.
    Never call `cdx handoff` without `--source-conversation`: cdx then offers its own candidates, which
    once included an automatic retro instead of the real session.
 
 ## Gotchas
 - cdx only hands off a transcript with exactly one workspace (cwd). A session that changed
   directory (worktrees, subfolders) is flagged `[N workspaces: cdx cannot hand off]` in the list,
-  and the relaunch refuses it.
+  and the relaunch refuses it. No folder trick works: cdx counts every cwd in the transcript, so
+  relaunching from the last folder or the worktree root is still refused. The fix is a cdx change
+  (accept the launch folder when it is one of the transcript's workspaces), prepared as a local
+  patch and PR text under `local/state/afk/shots/`; nothing is posted upstream.
 - Check `crow runs` before relaunching a background run: a later run may already have resumed it.
 - Accounts with memory mode `session` get `local/memory` linked for the relaunched session, then
   unlinked and committed when it ends.

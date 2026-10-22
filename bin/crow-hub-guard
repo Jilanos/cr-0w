@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""crow-hub-guard: hub-session hook that keeps repo-owned work in repo sessions.
+
+Wired in the hub's .claude/settings.json; reads the hook event on stdin.
+
+  UserPromptSubmit  the prompt names a registered project (name, alias or folder):
+                    add a one-time note per project and session pointing to
+                    `crow work` (lookups, small fixes) and `crow handoff` (the rest).
+  PreToolUse Bash   commit, push, rebase, merge or MR/PR creation in a registered
+                    project, or a git worktree under /tmp: ask the owner first.
+
+CROW_HUB_GUARD=off disables it (unattended hub runs that nobody can answer).
+"""
+import json, os, re, shlex, sys
+from pathlib import Path
+
+import yaml
+
+HOME = Path(os.environ.get("CROW_HOME") or Path(__file__).resolve().parent.parent)
+
+WRITE = re.compile(
+    r"\bgit\b[^|;&\n]*?\s(commit|push|rebase|merge|cherry-pick|am)\b"
+    r"|\bgh\s+pr\s+(create|merge)\b|\bglab\s+mr\s+(create|merge)\b"
+)
+TMP_WORKTREE = re.compile(r"\bgit\b[^|;&\n]*\sworktree\s+add\s[^|;&\n]*")
+
+
+def load():
+    reg = yaml.safe_load(open(HOME / "local/projects.yaml"))
+    hub = HOME.resolve()
+    # Repos with a forge only: forge-less entries (vault folders, sketches) are edited from the hub.
+    projs = [p for p in reg["projects"] if Path(p["path"]).resolve() != hub
+             and p.get("status", "active") == "active" and p.get("forge", "none") != "none"]
+    return reg, projs
+
+
+def owner_of(path, projs):
+    path = path.rstrip("/") + "/"
+    best = None
+    for p in projs:
+        root = p["path"].rstrip("/")
+        if any(path.startswith(root + s) for s in ("/", ".wt/", ".live/")):
+            if not best or len(root) > len(best["path"].rstrip("/")):
+                best = p
+    return best
+
+
+def targets(command, cwd, projs):
+    """Registered projects a shell command acts on: absolute paths, `~/...`, forge remotes."""
+    found = {}
+    try:
+        words = shlex.split(command, comments=False, posix=True)
+    except ValueError:
+        words = command.split()
+    for w in words + [cwd or ""]:
+        for part in re.split(r"[=:]", w):
+            if part.startswith("/"):
+                p = owner_of(part, projs)
+                if p:
+                    found[p["name"]] = p
+    for p in projs:
+        remote = p.get("remote")
+        if remote and re.search(rf"(?<![\w/-]){re.escape(remote)}(?![\w-])", command):
+            found[p["name"]] = p
+    return list(found.values())
+
+
+def pre_tool(event, projs):
+    if event.get("tool_name") != "Bash":
+        return None
+    cmd = (event.get("tool_input") or {}).get("command", "")
+    adds = [w for m in TMP_WORKTREE.finditer(cmd) for w in m.group(0).split()]
+    if any(w.startswith(("/tmp/", "/var/tmp/")) and not owner_of(w, projs) for w in adds):
+        return ("Worktrees in /tmp are lost on reboot and hide the work from the repo. "
+                "Use <repo>.wt/<name>, or hand the work to a repo session: crow handoff <project>.")
+    if not WRITE.search(cmd):
+        return None
+    hit = targets(cmd, event.get("cwd", ""), projs)
+    if not hit:
+        return None
+    names = ", ".join(p["name"] for p in hit)
+    work = any(p.get("scope") == "work" for p in hit)
+    reason = (f"Hub session about to commit/push/rebase/open an MR in {names}. That repo's hooks, "
+              f"permission rules and skills are not loaded here (crow work {hit[0]['name']}). "
+              f"Prefer: crow handoff {hit[0]['name']} --task ... --end-state ...")
+    if work:
+        reason += " Work repo: every push needs the owner's OK."
+    return reason
+
+
+def mentioned(prompt, projs):
+    out = []
+    low = prompt.lower()
+    for p in projs:
+        keys = {p["name"], Path(p["path"]).name, *p.get("aliases", [])}
+        if any(re.search(rf"(?<![\w-]){re.escape(k.lower())}(?![\w-])", low) for k in keys if k):
+            out.append(p)
+    return out
+
+
+def prompt_note(event, projs, state):
+    hits = mentioned(event.get("prompt", ""), projs)
+    sid = re.sub(r"[^\w-]", "", event.get("session_id") or "nosession")
+    seen_file = state / "hub-guard" / f"{sid}.json"
+    try:
+        seen = set(json.loads(seen_file.read_text()))
+    except (OSError, ValueError):
+        seen = set()
+    new = [p for p in hits if p["name"] not in seen]
+    if not new:
+        return None
+    seen_file.parent.mkdir(parents=True, exist_ok=True)
+    seen_file.write_text(json.dumps(sorted(seen | {p["name"] for p in new})))
+    lines = []
+    for p in new:
+        lines.append(
+            f"Registered project {p['name']} ({p['path']}). If the request is mostly work in that repo "
+            f"(code beyond a small fix, design, MR/push, review threads), hand it off: "
+            f"`crow handoff {p['name']} --task \"...\" --end-state \"...\"`, then keep only the hub part. "
+            f"For a lookup or small fix here, run `crow work {p['name']}` first and follow its index.")
+    return "\n".join(lines)
+
+
+def main():
+    if os.environ.get("CROW_HUB_GUARD", "").lower() in ("off", "0", "no"):
+        return
+    try:
+        event = json.load(sys.stdin)
+        reg, projs = load()
+    except (ValueError, OSError):
+        return
+    kind = event.get("hook_event_name")
+    if kind == "PreToolUse":
+        reason = pre_tool(event, projs)
+        if reason:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": reason}}))
+    elif kind == "UserPromptSubmit":
+        state = Path(reg.get("vault", {}).get("crow_dir") or HOME / "local/state")
+        note = prompt_note(event, projs, state)
+        if note:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": note}}))
+
+
+if __name__ == "__main__":
+    main()

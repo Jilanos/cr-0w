@@ -21,6 +21,12 @@ Same structure and test approach as [archeotech-crow-agents](archeotech-crow-age
 - Session titles: `local/state/session-titles.json` (source `dispatch`, `haiku` or
   `prompt` placeholder). `crow usage --titles` runs the titler in the foreground;
   it needs Claude auth, so it fails inside a sandboxed Claude session ("not logged in").
+  Titles describe the whole session: the model sees project, branch, most edited files,
+  the opening prompt (flagged as maybe a side errand) and the last 4 prompts. It retitles
+  after 4+ new prompts and x1.5, or when the session moves project; dispatch labels and
+  `/rename` titles win and are never regenerated. At most `CROW_TITLES_PER_DAY` model
+  calls (default 40, about 0.001 USD each on Haiku, so under 0.05 USD a day). Without a
+  model the placeholder is "project: most edited files" (else the first prompt).
   Override the model call with `CROW_TITLE_CMD`; disable spawning with `CROW_TITLES_OFF=1`.
 - A real-data render (`command` = the hub's `bin/crow-usage --json`) runs inside
   shot.sh's fake HOME: cdx and rtk can't see their state there, so costs, limits

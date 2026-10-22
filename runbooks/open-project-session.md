@@ -12,6 +12,7 @@ A process spawned from a Claude session inherits two things that break the new w
 `crow term` restores the real HOME (from `getent passwd`) and unsets `CLAUDE*`, `ANTHROPIC_*` and `CDX_*`.
 
 ## Starting prompt
+`crow handoff <project> --task ... --end-state ...` builds this prompt from the registry (see `sub-project-work.md`).
 `crow open|term <project> "<prompt>"` passes a first message (cdx ≥ 0.21.4, `--prompt`).
 
 Writing the handoff prompt:
@@ -19,3 +20,5 @@ Writing the handoff prompt:
 - State the end state the user's approval unlocks (e.g. "once I approve an MR: commit, push, post replies, resolve threads").
   A bare "show me before committing" made a session stop after the commit and wait for a push it could have done.
 - Keep the task list; drop instructions the skill already covers.
+- Start with "Read local/owner-prefs.md in the hub" (absolute path from `local/context.md`): repo sessions don't load hub memory.
+- Name the worktree to use (`<repo>.wt/<topic>`), never /tmp.
