@@ -139,6 +139,10 @@ elif cmd == "config":
     out({"schema_version": 1, "ok": True, "action": "config", "session": {
         "name": argv[1], "provider": r["provider"], "enabled": r["enabled"], "sessionRoot": root,
         "authHome": os.path.join(root, "claude-home") if r["provider"] == "claude" else root}})
+elif cmd == "configs":
+    out({"schema_version": 1, "ok": True, "action": "configs", "sessions": [
+        {"name": r["session_name"], "provider": r["provider"], "enabled": r["enabled"],
+         "sessionRoot": os.path.join(PROFILES, r["session_name"])} for r in rows()["rows"]]})
 elif cmd == "run":
     run()
 elif cmd == "runs":

@@ -28,6 +28,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import crow_cdx  # noqa: E402
+import crow_native  # noqa: E402
 from crow_cdx import CdxError  # noqa: E402
 
 HOME = Path(os.environ.get("CROW_HOME") or Path(__file__).resolve().parent.parent)
@@ -134,14 +135,21 @@ def report(run_id, since="7d"):
             sid = json.loads(Path(path).read_text().splitlines()[-1]).get("session_id")
         except (OSError, ValueError, IndexError):
             sid = None
-        full = report_from_transcript(sid) if sid else None
+        full = report_from_transcript(sid, r.get("session")) if sid else None
         if full:
             return full
     return result
 
 
-def report_from_transcript(session_id):
-    pats = [Path.home() / ".claude/projects", *Path("/home").glob("*/.cdx/profiles/*/claude-home/.claude/projects")]
+def report_from_transcript(session_id, account=None):
+    pats = [Path.home() / ".claude/projects"]
+    if account:
+        try:
+            auth = crow_cdx.call("config", account).get("session", {}).get("authHome")
+            if auth:
+                pats.insert(0, Path(auth) / ".claude/projects")
+        except CdxError:
+            pass
     for base in pats:
         for t in base.glob(f"*/{session_id}.jsonl"):
             texts = []
@@ -172,26 +180,6 @@ def fmt_age(s):
 
 
 # ---------- live agents (Claude processes) ----------
-
-def claude_procs():
-    out = []
-    for d in Path("/proc").iterdir():
-        if not d.name.isdigit():
-            continue
-        try:
-            argv = (d / "cmdline").read_bytes().split(b"\0")
-            if not argv or not (argv[0].endswith(b"claude") or b"/claude/versions/" in os.readlink(d / "exe").encode()):
-                continue
-            argv = [a.decode(errors="replace") for a in argv if a]
-            env = dict(l.split("=", 1) for l in (d / "environ").read_bytes().decode(errors="replace").split("\0") if "=" in l)
-            out.append({
-                "pid": int(d.name), "argv": argv, "cwd": os.readlink(d / "cwd"),
-                "home": env.get("HOME", ""), "started": (d / "cmdline").stat().st_mtime,
-            })
-        except (OSError, ValueError):
-            continue
-    return out
-
 
 def arg(argv, flag):
     return argv[argv.index(flag) + 1] if flag in argv and argv.index(flag) + 1 < len(argv) else None
@@ -295,6 +283,17 @@ def project_usage():
     return view
 
 
+def slots_busy():
+    """Global background slots in use: crow's held slots plus any run cdx reports running."""
+    running = running_runs()
+    try:
+        held = json.loads((STATE / "slots.json").read_text()).get("held", {})
+    except (OSError, ValueError):
+        held = {}
+    alive = slot_alive(running)
+    return len({k for k, v in held.items() if alive(k, v)} | set(running or {}))
+
+
 def collect(since="today", include_unledgered=False):
     now = time.time()
     done = finished(since)
@@ -303,42 +302,70 @@ def collect(since="today", include_unledgered=False):
     agents, claimed = [], set()
     titles = session_titles()
 
-    for p in claude_procs():
-        # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
-        meta = {}
-        try:
-            meta = json.loads((Path(p["home"]) / ".claude/sessions" / f"{p['pid']}.json").read_text())
-        except (OSError, ValueError):
-            pass
-        sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
-        if not sid:
-            continue  # short-lived helper process, not an agent
-        kind = "run" if "--print" in p["argv"] or "-p" in p["argv"] else "session"
-        account = (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
-        tpath = transcript_path(p["home"], p["cwd"], sid) if sid else None
+    cache_path = STATE / "activity-cache.json"
+    codex_cache = crow_native.load_cache(str(cache_path))
+    seen = set()
+    for p in crow_native.procs():
+        if p["provider"] == "claude":
+            # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
+            meta = {}
+            try:
+                meta = json.loads((Path(p["home"]) / ".claude/sessions" / f"{p['pid']}.json").read_text())
+            except (OSError, ValueError):
+                pass
+            sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
+            if not sid:
+                continue  # short-lived helper process, not an agent
+            tpath = transcript_path(p["home"], p["cwd"], sid)
+            t = read_transcript(tpath)
+            busy = meta.get("status") == "busy"
+            evidence = t.get("ends_on_text")
+            account = p["account"] or (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
+        else:
+            rollout = crow_native.open_rollout(p)
+            if not rollout:
+                continue  # a codex helper process (code-mode host, app server), not an agent
+            st = crow_native.read_codex(rollout, codex_cache)
+            sid = (st or {}).get("native_id")
+            if not sid:
+                continue
+            tpath = Path(rollout)
+            t = crow_native.codex_agent_info(st)
+            busy, evidence = False, t["waiting_evidence"]
+            account = p["account"] or (re.search(r"/profiles/([^/]+)", p["codex_home"] or "") or [None, None])[1]
+        ident = (p["provider"], account, sid)
+        if ident in seen:
+            continue  # wrapper and child of one agent, or two views of one conversation
+        seen.add(ident)
+        kind = "run" if crow_native.is_run(p) else "session"
         mtime = tpath.stat().st_mtime if tpath and tpath.exists() else p["started"]
-        t = read_transcript(tpath) if tpath else {}
         idle = now - mtime
-        if meta.get("status") == "busy" or idle < WORKING_S:
+        if busy or idle < WORKING_S:
             state = "working"
-        elif kind == "session" and t.get("ends_on_text"):
-            state = "waiting"
+        elif kind == "session" and evidence:
+            state = "waiting"  # the transcript shows the turn ended: the agent waits on the user
         else:
             state = "idle" if kind == "session" else "quiet"
         a = {
-            "kind": kind, "pid": p["pid"], "account": account, "project": project_name(p["cwd"]),
-            "cwd": p["cwd"], "session_id": sid, "state": state,
+            "kind": kind, "pid": p["pid"], "provider": p["provider"], "account": account or "unknown",
+            "native_id": sid, "identity": f"{p['provider']}:{account}:{sid}",
+            "project": project_name(p["cwd"]), "cwd": p["cwd"], "session_id": sid, "state": state,
             "started_at": datetime.fromtimestamp(p["started"], timezone.utc).isoformat(timespec="seconds"),
             "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt")},
             "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
         }
         if kind == "run":
             for rec in reversed(recs):
-                if rec["cwd"] == p["cwd"] and rec["run_id"] not in done and rec["run_id"] not in claimed:
+                if rec["cwd"] == p["cwd"] and rec.get("provider", "claude") == p["provider"] \
+                        and rec["run_id"] not in done and rec["run_id"] not in claimed:
                     claimed.add(rec["run_id"])
                     a.update(run_id=rec["run_id"], label=rec["label"], commits=commits_since(rec["cwd"], rec.get("start_sha")))
                     break
         agents.append(a)
+    try:
+        crow_native.save_cache(str(cache_path), codex_cache)
+    except OSError:
+        pass
 
     superseded = {}
     for i, rec in enumerate(recs):
@@ -355,8 +382,11 @@ def collect(since="today", include_unledgered=False):
         if cutoff and datetime.fromisoformat(rec["started_at"]).astimezone().date() < cutoff:
             continue
         r = done.get(rec["run_id"])
-        if r:
-            if r.get("exit_code") == 0:
+        out = crow_cdx.run_outcome(r) if r else None
+        if r and out in ("cancelled", "timeout"):
+            st = out
+        elif r:
+            if out == "succeeded":
                 st = "done"
             else:
                 tail = ""
@@ -368,6 +398,8 @@ def collect(since="today", include_unledgered=False):
             st = "lost"
         past.append({
             "run_id": rec["run_id"], "project": rec["project"], "label": rec["label"], "status": st,
+            "provider": rec.get("provider") or (r or {}).get("provider") or "claude",
+            "account": rec.get("account") or (r or {}).get("session"),
             "duration_s": int(r["duration_seconds"]) if r and r.get("duration_seconds") else None,
             "ended_at": r.get("ended_at") if r else None,
             "resumed_from": [k for k, v in superseded.items() if v == rec["run_id"]],
@@ -378,10 +410,11 @@ def collect(since="today", include_unledgered=False):
         for rid, r in done.items():
             if rid not in known:
                 past.append({"run_id": rid, "project": project_name(r["cwd"]), "label": "(not dispatched by crow)",
+                             "provider": r.get("provider"), "account": r.get("session"),
                              "status": "done" if r.get("exit_code") == 0 else "failed",
                              "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": []})
 
-    busy = sum(1 for a in agents if a["kind"] == "run")
+    busy = slots_busy()
     pu = project_usage()
     for a in agents:
         split = pu["sessions"].get(a["session_id"])
@@ -496,8 +529,10 @@ def oneshot(a):
 
 
 C = {"dim": "\033[2m", "b": "\033[1m", "g": "\033[32m", "y": "\033[33m", "r": "\033[31m", "c": "\033[36m", "m": "\033[35m", "0": "\033[0m"}
-STATE_STYLE = {"working": ("●", "g"), "quiet": ("◌", "y"), "waiting": ("◆", "m"), "idle": ("○", "dim")}
-PAST_STYLE = {"done": ("✓", "g"), "failed": ("✗", "r"), "limit": ("⏸", "y"), "lost": ("?", "dim")}
+STATE_STYLE = {"working": ("●", "g"), "quiet": ("◌", "y"), "waiting": ("◆", "m"), "idle": ("○", "dim"),
+               "unknown": ("?", "dim")}
+PAST_STYLE = {"done": ("✓", "g"), "failed": ("✗", "r"), "limit": ("⏸", "y"), "lost": ("?", "dim"),
+              "cancelled": ("⊘", "dim"), "timeout": ("✗", "r")}
 
 
 def render(data, color=True, width=None):
@@ -519,7 +554,8 @@ def render(data, color=True, width=None):
         sym, col = STATE_STYLE[a["state"]]
         ctx = f" · context {a['context_tokens'] // 1000}k tokens" if a.get("context_tokens") else ""
         subs = f" · {a['subagents_active']} subagents" if a.get("subagents_active") else ""
-        meta = f"{a['state']} {fmt_age(a['last_activity_s'])} ago · up {fmt_age(iso_age(a['started_at']))}{ctx}{subs} · {a['account']}"
+        meta = (f"{a['state']} {fmt_age(a['last_activity_s'])} ago · up {fmt_age(iso_age(a['started_at']))}{ctx}{subs}"
+                f" · {a.get('provider', 'claude')}:{a['account']}")
         out.append(clip(f"{c[col]}{sym}{c['0']} {c['b']}{a['project']:<20}{c['0']} {title}") )
         out.append(clip(f"    {c['dim']}{meta}{c['0']}", 0))
         if a.get("last_action"):
@@ -552,7 +588,8 @@ def render(data, color=True, width=None):
             ended = f" · ended {fmt_age(iso_age(f['ended_at']))} ago" if f.get("ended_at") else ""
             resumed = f" · resumed {len(f['resumed_from'])}×" if f.get("resumed_from") else ""
             out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['label']}"))
-            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended} · {len(f['commits'])} commits{resumed} · {f['run_id'][:8]}{c['0']}"))
+            prov = f" · {f['provider']}:{f.get('account') or '?'}" if f.get("provider") else ""
+            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended} · {len(f['commits'])} commits{resumed}{prov} · {f['run_id'][:8]}{c['0']}"))
         if len(data["finished"]) > FINISHED_SHOWN:
             out.append(f"  {c['dim']}… {len(data['finished']) - FINISHED_SHOWN} older (crow runs --all){c['0']}")
     return out

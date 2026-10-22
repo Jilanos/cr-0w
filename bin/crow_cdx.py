@@ -136,6 +136,29 @@ def inventory():
     return {r["session_name"]: r for r in rows if isinstance(r, dict) and r.get("session_name")}
 
 
+def profiles():
+    """Each cdx profile as {name, provider, root}: from `cdx configs`, or, when CDX_PROFILES is
+    set (tests, a relocated cdx home), from that directory (claude-home/ = Claude, else Codex)."""
+    override = os.environ.get("CDX_PROFILES")
+    if override:
+        out = []
+        for name in sorted(os.listdir(override)) if os.path.isdir(override) else []:
+            root = os.path.join(override, name)
+            if name.startswith(".") or not os.path.isdir(root):
+                continue
+            prov = "claude" if os.path.isdir(os.path.join(root, "claude-home")) else \
+                "codex" if os.path.isdir(os.path.join(root, "sessions")) else None
+            out.append({"name": name, "provider": prov, "root": root})
+        return out
+    rows = call("configs").get("sessions") or []
+    return [{"name": r["name"], "provider": r.get("provider"), "root": r.get("sessionRoot")}
+            for r in rows if isinstance(r, dict) and r.get("name") and r.get("sessionRoot")]
+
+
+def claude_projects_dir(root):
+    return os.path.join(root, "claude-home", ".claude", "projects")
+
+
 # ---------- account policy ----------
 
 def accounts_path(home=None):

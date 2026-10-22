@@ -6,8 +6,11 @@
   crow-sessions show <id>         one entry as JSON (id or a unique prefix)
   crow-sessions mark-relaunched <id> <source> <target> <cwd>   record a handoff (crow-relaunch)
 
-A session is interrupted when its last user/assistant turn is a usage-limit error.
-Retros and automatic one-shot jobs (/retro, /brief, /daily, /weekly) are left out.
+A session is interrupted when its last turn is a usage-limit error: a Claude transcript's
+last user/assistant event, or a Codex rollout's last limit error after its last prompt.
+Every entry carries its provider, account and native conversation id; profiles come from
+`cdx configs` (or CDX_PROFILES). Retros and automatic jobs crow starts (/retro, /brief,
+/daily, /weekly, session titles, on either provider) are left out.
 Each transcript is read once per (mtime, size): unchanged files come from the cache.
 A session that ran in more than one workspace is flagged: cdx refuses to hand those off.
 
@@ -21,12 +24,16 @@ from datetime import datetime, timezone
 
 import yaml
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+import crow_native  # noqa: E402
+
 HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir
 PROFILES = os.environ.get("CDX_PROFILES", os.path.join(REAL_HOME, ".cdx", "profiles"))
 AUTO_PREFIXES = ("/retro ", "/retro\n", "/brief", "/daily", "/weekly")
 TAIL_BYTES = 256_000
-CACHE_VERSION = 2
+CACHE_VERSION = 3  # 3: provider-qualified entries and Codex rollouts
 
 
 def registry():
@@ -51,12 +58,19 @@ def project_of(cwd, projects):
 
 
 def transcripts():
-    """(account, path) for every top-level Claude transcript in every profile."""
-    if not os.path.isdir(PROFILES):
+    """(account, provider, path) for every top-level conversation file in every profile."""
+    try:
+        profs = crow_cdx.profiles()
+    except crow_cdx.CdxError as e:
+        print(f"crow-sessions: {e.message}", file=sys.stderr)
         return
-    for acct in sorted(os.listdir(PROFILES)):
-        base = os.path.join(PROFILES, acct, "claude-home", ".claude", "projects")
-        if acct.startswith(".") or not os.path.isdir(base):
+    for prof in profs:
+        if prof["provider"] == "codex":
+            for path in sorted(crow_native.codex_rollouts(prof["root"])):
+                yield prof["name"], "codex", path
+            continue
+        base = crow_cdx.claude_projects_dir(prof["root"])
+        if prof["provider"] != "claude" or not os.path.isdir(base):
             continue
         for slug in sorted(os.listdir(base)):
             d = os.path.join(base, slug)
@@ -64,7 +78,7 @@ def transcripts():
                 continue
             for f in sorted(os.listdir(d)):
                 if f.endswith(".jsonl"):
-                    yield acct, os.path.join(d, f)
+                    yield prof["name"], "claude", os.path.join(d, f)
 
 
 def events(lines):
@@ -133,17 +147,36 @@ def workspaces(path):
     return sorted(cwds)
 
 
-def scan_one(acct, path, size):
+def scan_codex(acct, path, size):
+    st = crow_native.read_codex(path)
+    if not st or not st["limit_error"] or not st["native_id"]:
+        return None
+    if crow_native.AUTO_PROMPT.search(st["first_prompt"] or ""):
+        return None
+    cwd = os.path.realpath(st["cwd"]) if st["cwd"] else ""
+    return {
+        "conversation_id": st["native_id"], "provider": "codex", "account": acct, "cwd": cwd, "branch": None,
+        "last_event": st["limit_error"]["ts"] or st["last_ts"], "limit": None, "resets_at": None,
+        "message": st["limit_error"]["message"], "first_prompt": st["first_prompt"],
+        "last_prompt": st["last_prompt"], "transcript": path, "size": size,
+        "workspaces": [cwd] if cwd else [],
+    }
+
+
+def scan_one(acct, path, size, provider="claude"):
+    if provider == "codex":
+        return scan_codex(acct, path, size)
     last, last_prompt = last_turn(path, size)
     if not last or not is_limit(last):
         return None
     first = first_prompt(path)
-    if first and first.lstrip().startswith(AUTO_PREFIXES):
+    if first and (first.lstrip().startswith(AUTO_PREFIXES) or crow_native.AUTO_PROMPT.search(first)):
         return None
     limit = last.get("quotaLimits") or (last.get("apiErrorParams") or {}).get("rate_limit_info") or {}
     cwd = last.get("cwd") or ""
     return {
         "conversation_id": last.get("sessionId") or os.path.basename(path)[:-6],
+        "provider": "claude",
         "account": acct,
         "cwd": cwd,
         "branch": last.get("gitBranch"),
@@ -168,11 +201,17 @@ def load_json(path, default):
 
 
 def relaunched(state):
+    """Successful relaunches by source identity (provider:account:id), and by bare id for
+    records written before providers were tracked. A prepared or failed launch is not one."""
     out = {}
     try:
         with open(os.path.join(state, "relaunches.jsonl")) as fh:
             for ev in events(fh):
-                if ev.get("conversation_id"):
+                if not ev.get("conversation_id") or ev.get("status", "launched") != "launched":
+                    continue
+                if ev.get("source_provider"):
+                    out[f"{ev['source_provider']}:{ev.get('source')}:{ev['conversation_id']}"] = ev
+                else:
                     out[ev["conversation_id"]] = ev
     except FileNotFoundError:
         pass
@@ -187,7 +226,7 @@ def scan():
     if cache.get("version") != CACHE_VERSION:
         cache = {"version": CACHE_VERSION, "files": {}}
     old, new, read = cache["files"], {}, 0
-    for acct, path in transcripts():
+    for acct, provider, path in transcripts():
         try:
             st = os.stat(path)
         except FileNotFoundError:
@@ -198,7 +237,7 @@ def scan():
             new[path] = hit
             continue
         read += 1
-        new[path] = {"key": key, "entry": scan_one(acct, path, st.st_size)}
+        new[path] = {"key": key, "entry": scan_one(acct, path, st.st_size, provider)}
     cache["files"] = new
     write_json(cache_path, cache)
 
@@ -208,8 +247,10 @@ def scan():
                       key=lambda e: e.get("last_event") or "")
     for s in sessions:
         s["project"] = project_of(s["cwd"], projects)
-        r = done.get(s["conversation_id"])
-        s["relaunched"] = {"target": r.get("target"), "at": r.get("at")} if r else None
+        s["identity"] = f"{s['provider']}:{s['account']}:{s['conversation_id']}"
+        r = done.get(s["identity"]) or done.get(s["conversation_id"])
+        s["relaunched"] = {"target": r.get("target"), "target_provider": r.get("target_provider"),
+                           "mode": r.get("mode"), "at": r.get("at")} if r else None
     reg = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "transcripts": len(new), "read": read, "sessions": sessions}
     write_json(os.path.join(state, "interrupted-sessions.json"), reg)
@@ -239,17 +280,16 @@ def print_list(reg):
           + f"  ({reg['transcripts']} transcripts, {reg['read']} read)")
     for s in rows:
         when = (s["last_event"] or "")[:16].replace("T", " ")
-        print(f"{when}  {s['account']:<8} {one_line(s['project'], 22):<22} {s['conversation_id']}  "
+        print(f"{when}  {s.get('provider', 'claude'):<6} {s['account']:<8} {one_line(s['project'], 22):<22} {s['conversation_id']}  "
               f"{human_size(s['size']):>8}  {one_line(s['first_prompt'] or '(no opening prompt)', 60)}"
               + ("" if len(s["workspaces"]) == 1 else f"  [{len(s['workspaces'])} workspaces: cdx cannot hand off]"))
 
 
-def mark_relaunched(cid, source, target, cwd):
-    state = state_dir()
-    os.makedirs(state, exist_ok=True)
-    with open(os.path.join(state, "relaunches.jsonl"), "a") as fh:
-        fh.write(json.dumps({"conversation_id": cid, "source": source, "target": target, "cwd": cwd,
-                             "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
+def mark_relaunched(cid, source, target, cwd, **extra):
+    """Append a relaunch record. extra: source_provider, target_provider, mode, status, ..."""
+    crow_cdx.append_jsonl(os.path.join(state_dir(), "relaunches.jsonl"),
+                          {"conversation_id": cid, "source": source, "target": target, "cwd": cwd,
+                           "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **extra})
 
 
 def find(reg, ref):
