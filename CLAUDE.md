@@ -62,6 +62,8 @@ prod launch > reviews (unblock devs) > sprint tickets > roadmap/management > R&D
 - `bin/crow-hub-guard` asks before any commit, push, rebase or MR in a registered repo and before a worktree in /tmp. Prefer handing off over approving it; an OK covers that one command only.
 
 ## Session hygiene
+- Pick the model at session start (hub default Sonnet; Opus for design, reviews, hard debugging) and never switch mid-session: a switch re-reads the whole context uncached.
+- At a natural break (a topic closed, before a long idle), suggest `/wrap` then `/clear`. Don't resume a large session after an hour idle; start fresh from the open threads.
 - On start: read the open threads and mention any that are stale or due.
 - Before closing: `/wrap` saves progress, decisions and open threads so the next session can start fresh.
 

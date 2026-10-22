@@ -1,9 +1,16 @@
 ---
 name: daily
 description: Draft the user's update for the team daily (French) from activity since the last daily (commits, MRs, reviews, Jira, activity log), then post it to Confluence after explicit approval. Use when the user says "daily", "prep my daily", or before the 11:30 meeting.
+context: fork
+model: sonnet
+effort: low
+background: false
+allowed-tools: Bash(bin/crow-activity:*)
 ---
 
 # Daily
+
+Runs in its own context (no conversation history) and only drafts: gather, write the draft, and return it with this last line: `POST: show this draft to the owner; after an explicit OK, follow "Post" in .claude/skills/daily/SKILL.md`. The main session handles the approval and the posting.
 
 The daily is a short flat list under the user's name. One line per topic, a few words each. No ticket keys, no MR numbers, no explanations. The only section is **Blocages**, and it's the most important part.
 
@@ -36,7 +43,7 @@ vendor form - fill the documentation they asked for
 
 Show only the list, then at most one line of questions if something is genuinely unclear. No commentary on period covered or choices made.
 
-## Post (📝 approval required)
+## Post (📝 approval required, main session only)
 1. Show the draft and wait for an explicit OK or edits.
 2. Confluence location: `local/context.md` → "Confluence daily page". If it's TBD, ask the user for the page, then record it there.
 3. The page has one block per date, then one list per person. Edit **only** the user's list for today. Never touch other people's content. If the structure is unclear, give the text to paste instead.
