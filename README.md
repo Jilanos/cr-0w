@@ -1,13 +1,12 @@
 <div align="center">
 
-<img src="docs/img/logo.svg" alt="crow, your chief of staff in the terminal" width="560">
+<img src="docs/img/logo.svg" alt="CR-0W, Central Repository Orchestration Workspace" width="560">
 
-### Run your repos, your agents and your Claude budget from one terminal.
+### Know what every agent is doing, what it costs, and what needs you. In one terminal.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Go](https://img.shields.io/badge/board-Go%20%2B%20Bubble%20Tea-00ADD8)
-![Python](https://img.shields.io/badge/helpers-Python%203-3776AB)
 ![Built on cdx](https://img.shields.io/badge/built%20on-cdx%20%2B%20Claude%20Code-d97757)
+![Terminal first](https://img.shields.io/badge/terminal-first-2f334d)
 
 <img src="docs/img/watch-agents.png" alt="crow watch, the live board" width="900">
 
@@ -17,107 +16,77 @@
 
 ---
 
-Crow sits above your projects. It briefs you every morning, runs background agents,
-watches every token and limit across your accounts, rescues sessions that hit a usage cap,
-and learns from each review comment and each correction you make.
+CR-0W (crow for short) is a chief of staff for developers who run several repos and several Claude accounts.
+It watches every session, run and limit, briefs you in the morning, moves work to another account when you hit a usage cap,
+and turns each review comment and each correction into something the next session already knows.
 
-```sh
-git clone https://github.com/Nicolas-Rigaudy/cr-0w && cd cr-0w
-export PATH="$PWD/bin:$PATH"
-crow brief      # one screen: what needs you today
-crow watch      # the live board (builds itself on first run)
-```
+You stay in charge. Crow drafts, flags and queues. You approve.
+
+## A day with crow
+
+- **Morning.** `crow brief` shows what needs you first: reviews waiting, MRs with open threads, runs that failed overnight, and a suggested top three.
+- **Midday.** `crow watch` shows every agent at a glance. One is waiting for your reply, another is deep in a long task. You jump straight to the right window.
+- **Afternoon.** An account hits its 5-hour limit. CR-0W shows when it resets and relaunches the session on another account you allowed.
+- **Evening.** You hand a few jobs to background runs and leave. The next morning's brief tells you how the night ended.
+- **Always.** Every review comment and every correction you make becomes a check or a note, so you say it once.
 
 ## Why you want it
 
 | You have | Crow gives you |
 |---|---|
-| Five repos and three agents running | **One board.** What needs your reply, what is working, what failed, what finished |
-| A usage cap at the worst moment | **A rescue.** The cut-off session is registered and relaunched on another allowed account |
-| A bill you only see at month end | **Live burn rate.** "Runs out ~18:40", cost per session, per project, per model |
-| The same review comment every week | **A ledger.** Each comment becomes a pattern that is checked on every future diff |
-| The same correction every session | **A memory.** Retros turn it into a runbook, a skill or a note, once |
-| Rules you hope the agent follows | **Hooks.** Commit format, push approval and no-merge are enforced, not requested |
+| Five repos and three agents running | **One board** of what needs your reply, what is working, what failed |
+| A usage cap at the worst moment | **A rescue** onto another account, in one command |
+| A bill you only see at month end | **A live burn rate** and a cost per session, project and model |
+| The same review comment every week | **A ledger** that checks every future diff for it |
+| The same correction every session | **A memory** that keeps it |
+| Rules you hope the agent follows | **Limits you set**, enforced by hooks |
 
-## The tour
+## See it
 
-### See everything: `crow watch`
-Two tabs on keys `1` and `2`. The board uses your terminal's 16 colours, so it follows your theme.
+### Agents: what needs me right now?
+Waiting replies, failed runs and sessions cut off by a limit come first. Then what is working, what finished,
+and the selected agent's latest prompt and context use. One key jumps to its terminal window.
+Below, a timeline shows who worked when today.
 
-**Usage.** Headroom per account and window with a burn-rate forecast, spend over today, 7 or 30 days (`d` `w` `m`),
-what your savings tools saved, and cost by project and by model.
-Today's sessions are listed with their share of the limit. Earlier days are folded under a header; Enter opens one.
+<img src="docs/img/watch-timeline.png" alt="crow watch, details panel and the timeline of the day" width="900">
+
+### Usage: where is the budget going?
+Headroom per account with a forecast of when it runs out, spend for today, the week or the month,
+what your savings tools saved, and cost per project and model. Earlier days fold away until you want them.
 
 <img src="docs/img/watch-usage.png" alt="crow watch, usage tab" width="900">
 
-### Start the day: `crow brief`
-Reviews waiting on you first, then sprint, open MRs and PRs, open threads, background runs and repos left dirty.
-It ends with a suggested top three.
+The board uses your terminal's own colours, so it looks like it belongs there.
 
-### Your own routines
-The hub is the orchestrator. The rituals around it are yours. `examples/skills/` has a stand-up (`daily`) and a
-week rollup (`weekly`) to copy into `local/hub-skills/` and bend to your team: format, language, where it posts.
-A routine drafts, you approve, then it posts. See [`runbooks/own-routines.md`](runbooks/own-routines.md).
+## What else it does
 
-### Delegate without babysitting
-`crow dispatch` starts a tracked background run in a repo. `crow runs` shows its status, task and commits so far.
-The `afk` skill prepares an unattended run: it checks the machine, asks every open question up front,
-queues jobs in worktrees, and writes a return report. A pre-push denylist keeps the night safe.
+**Delegates.** Start a tracked background run in any repo and check its progress and commits at any time.
+Before you leave for the night, an AFK routine asks every open question up front, queues the jobs and writes a report for the morning.
 
-### Never lose a session to a limit
-```sh
-crow sessions                 # sessions cut off by a usage limit
-crow relaunch <id> <account>  # continue on another allowed account (dry run first)
-```
+**Learns from reviews.** Reviewer comments on your MRs become patterns. Every future diff, yours or a colleague's, is checked against them before it goes out.
 
-### Get better with every review
-`review-threads` turns each reviewer comment on your MR into a pattern in a ledger.
-The `review` skill applies that ledger to every diff: peer review, self review, and a gate before any MR opens.
-Reviewers stop repeating themselves.
+**Learns from you.** After each session a retro spots where you corrected the work and writes the lesson into a runbook, a skill or a memory.
 
-### Learn from you
-After every session an automatic retro finds where you corrected or redirected the work, then writes the lesson
-into a runbook, a skill or a memory. Memory is stored once and linked into each allowed account, never copied.
+**Keeps repos clean.** The brief reports uncommitted work, unpushed branches and forgotten worktrees, and tidies the safe ones.
 
-## How it fits together
+**Fits your routines.** The hub is the orchestrator. Stand-ups, weekly rollups and the like are yours to shape.
+[`examples/skills/`](examples/skills) has starting points, and [`runbooks/own-routines.md`](runbooks/own-routines.md) shows how.
 
-```mermaid
-flowchart LR
-    you([you]) --> hub[crow hub]
-    hub -->|brief and your routines| out[drafts for your approval]
-    hub -->|dispatch| runs[background runs]
-    hub -->|handoff| repo[repo sessions]
-    runs --> watch[crow watch]
-    repo --> watch
-    watch --> usage[usage and limits]
-    usage -->|cut off| relaunch[relaunch on another account]
-    repo -->|review comments| ledger[(pattern ledgers)]
-    ledger --> review[review gate before every MR]
-    hub -->|every session| retro[retro]
-    retro --> lib[(runbooks, skills, memory)]
-    lib --> hub
-```
+## Your rules
 
-The hub never runs a repo's own hooks. Deep work is handed to a session inside that repo with a hand-off note
-(`crow handoff`), and a guard asks before any commit, push, rebase or MR on a registered repo.
+CR-0W does not impose a workflow. You decide which accounts it may use, which projects it manages, what it may do alone
+and what needs your OK, and hooks enforce it: no commit, push or MR in a registered repo without asking, no forbidden words in a commit.
 
-## Safe by default
+The repo ships with the author's rules as an example set: branch-only commits on work repos, a push only after an explicit OK,
+no merges, drafts before any mail. Edit them to match how you work. Everything you can configure, and where, is in [`docs/rules.md`](docs/rules.md).
 
-| Action | Work repos | Personal repos |
-|---|---|---|
-| Commit | branch only, never main | yes |
-| Push | explicit OK each time | yes |
-| Merge | never | yes |
-| Send mail, post to chat | draft first, wait for OK | draft first, wait for OK |
-| Background runs | max 2, allowed accounts only | same |
+## Get started
 
-Commit subjects are `type[SCOPE]: message`, checked by a commit-msg hook. The full rule set is in [`CLAUDE.md`](CLAUDE.md).
-
-## Setup
-
-1. Install [cdx](https://github.com/AlexAgo83/cdx-manager) and Claude Code, then clone this repo.
-2. `mkdir local && git -C local init`, then add `local/context.md`, `local/projects.yaml` (project registry) and `local/accounts.yaml` (start from [`docs/accounts.example.yaml`](docs/accounts.example.yaml)).
-3. Put `bin/` on your PATH and run `crow`.
+1. Install [cdx](https://github.com/AlexAgo83/cdx-manager) and Claude Code.
+2. Clone this repo and put `bin/` on your PATH.
+3. Create your private `local/` folder: `mkdir local && git -C local init`, then add `context.md`, `projects.yaml` and `accounts.yaml`
+   (start from [`docs/accounts.example.yaml`](docs/accounts.example.yaml)).
+4. Run `crow brief`, then `crow watch`.
 
 Everything outside `local/` is generic. Your people, accounts, projects, memory and state live in `local/`,
 which is ignored by this repo and meant to be its own private repo.
