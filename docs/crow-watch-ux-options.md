@@ -3,7 +3,7 @@
 What the board is for, in priority order (see task_001 notes): who needs me, what is
 working, what finished while I was away, how much account headroom is left. Cost is a
 figure to glance at, not a section. Token splits, model names, tool weights, savings prose
-and the timeline are analysis: they belong on the History tab or in the selected row's
+and the timeline are analysis: they belong in the Usage tab or in the selected row's
 details.
 
 Renders (fixtures, 160x45 for the TUI, 1920x1080 for the shell) are in
@@ -27,7 +27,7 @@ terminal size, and it removes rows and columns instead of adding a box.
 
 | Option | What changes | Good | Costs |
 |---|---|---|---|
-| **A, headroom first** (built) | Limits as before (one row per account, burn and run-out line). Spend on one line with today's session count; the 7-day bars only when the session list still fits. Sessions without the models column (back from 180 columns). Savings as one line. The History box leaves Usage (it has its own tab); the in/out/cache split moves to History. | The sessions list gets the height back; every figure on the old first screen is still on some tab. | The model per session is only on very wide terminals. |
+| **A, headroom first** (built) | Limits as before (one row per account, burn and run-out line). Spend on one line with today's session count; the 7-day bars only when the session list still fits. Sessions without the models column (back from 180 columns). Savings as one line. The History box leaves Usage; the in/out/cache split is in the spend header. | The sessions list gets the height back; every figure on the old first screen is still on some tab. | The model per session is only on very wide terminals. |
 | B, account cards + recommendation | Wide 5h and week gauges per account and a line "next run goes best on spare", then spend and sessions. | Turns headroom into a decision. | The recommendation rule is a product choice (tightest window? policy?). Wide gauges cost a column of text. |
 | C, two columns | Limits, spend and savings on the left; sessions on the right. | Everything on one laptop screen, no scrolling. | Session titles truncate; the split repeats crow watch's wide grid on a laptop. |
 
@@ -43,9 +43,10 @@ recommendation line is worth adding later if the owner wants it (decision below)
   weekly windows it used (`crow-usage` `sessions[].limit_share`: its cost in the window over
   the account's, times the share used; hour granularity). Shown on the session's newest row.
 - Day dividers in Sessions are a quiet rule (slot 8) with the day and totals in slot 7.
-- The Savings tab is gone (tabs: 1 Agents, 2 Usage, 3 History). History carries the full
-  savings table for the period, with the explanations wrapped, and the day table gains
-  cache saved, routing and compactions. The "how measured" prose moved to `?`.
+- Two tabs: 1 Agents, 2 Usage. History is merged into Usage: one spend chart with a d/w/m
+  period toggle, one Savings panel, and By project / By model bars for that period. Context
+  weight by tool is behind `t`. Earlier days in Sessions are folded under a day header with
+  totals; Enter or Space unfolds. The "how measured" prose lives in `?`.
 - Gauges draw `━` on a `━` track in slot 8.
 
 ## Agents view, revised 2026-10-22

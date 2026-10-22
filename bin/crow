@@ -14,7 +14,7 @@
 #   crow dispatch <project> <label> --prompt-file F   start a tracked background run
 #   crow focus --pid P --account A --cwd D   focus a session's kitty window, or resume it
 #   crow json            agents as JSON (for widgets); crow report <run_id> prints a run's final report
-#   crow watch           live board: 1 agents · 2 usage · 3 history (? for keys)
+#   crow watch           live board: 1 agents · 2 usage (? for keys)
 #   crow sessions [...] sessions cut off by a usage limit (see crow-sessions)
 #   crow relaunch <id> <account> [--dry-run] [--here]   continue one on another allowed account; crow relaunch status
 #   crow usage [--json]  token usage, cost and limits across cdx accounts (see crow-usage)

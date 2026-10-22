@@ -146,10 +146,9 @@ func tick() tea.Cmd {
 const (
 	vAgents = iota
 	vUsage
-	vHistory
 )
 
-var viewNames = []string{"Agents", "Usage", "History"}
+var viewNames = []string{"Agents", "Usage"}
 
 // Agent groups, in the order the board lists them: what needs the owner, what
 // is working, what finished, then idle sessions.
@@ -189,7 +188,9 @@ type model struct {
 	intr         []interrupted // sessions stopped by a usage limit
 	usageLoading bool
 	uCursor      int
-	period       string // d | w | m (History)
+	period       string          // d | w | m: today, 7 days, 30 days (Usage)
+	expanded     map[string]bool // earlier days whose sessions are unfolded
+	tools        bool            // Usage shows the context weight by tool
 	now          time.Time
 }
 
@@ -275,6 +276,21 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(fetch, tick(), fetchUsage, fetchInterrupted, usageTick())
 }
 
+// toggleDay folds or unfolds the earlier day under the Usage cursor (a day header).
+func (m *model) toggleDay() {
+	if m.view != vUsage {
+		return
+	}
+	if r := m.usage.pick(m.expanded, m.uCursor); r != nil && r.head {
+		next := map[string]bool{}
+		for d, v := range m.expanded {
+			next[d] = v
+		}
+		next[r.day] = !next[r.day]
+		m.expanded = next
+	}
+}
+
 func (m model) selected() *item {
 	if m.cursor < len(m.items) {
 		return &m.items[m.cursor]
@@ -331,7 +347,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.usageLoading, m.usageErr = false, msg.err
 		if msg.u != nil {
 			m.usage = msg.u
-			m.uCursor = max(0, min(m.uCursor, len(m.usage.rows)-1))
+			m.uCursor = max(0, min(m.uCursor, len(m.usage.visible(m.expanded))-1))
 		}
 	case sessionsMsg:
 		m.intr = msg.list
@@ -352,7 +368,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help = false
 		case "?":
 			m.help = true
-		case "1", "2", "3":
+		case "1", "2":
 			m.view = int(key[0] - '1')
 		case "tab":
 			m.view = (m.view + 1) % len(viewNames)
@@ -362,6 +378,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.view = map[bool]int{true: vAgents, false: vUsage}[m.view == vUsage]
 		case "d", "w", "m":
 			m.period = key
+		case "t":
+			m.tools = !m.tools
+		case " ":
+			m.toggleDay()
 		case "r":
 			if m.view == vAgents {
 				return m, fetch
@@ -375,8 +395,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if it := m.selected(); it != nil {
 					m.notice = copyID(it.key)
 				}
-			} else if s := m.usage.selected(m.uCursor); s != nil {
-				m.notice = copyID(s.ID)
+			} else if r := m.usage.pick(m.expanded, m.uCursor); r != nil && !r.head {
+				m.notice = copyID(r.s.ID)
 			}
 		case "enter", "o":
 			if m.view == vAgents {
@@ -390,8 +410,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.notice = openProject(it.intr.Project)
 					}
 				}
-			} else if s := m.usage.selected(m.uCursor); s != nil {
-				m.notice = openProject(s.Project)
+			} else if r := m.usage.pick(m.expanded, m.uCursor); r != nil {
+				if r.head {
+					if key == "enter" {
+						m.toggleDay()
+					}
+				} else {
+					m.notice = openProject(r.s.Project)
+				}
 			}
 		case "up", "k":
 			if m.view == vAgents {
@@ -411,7 +437,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.maybeReport()
 				}
 			} else if m.usage != nil {
-				m.uCursor = max(0, min(m.uCursor+1, len(m.usage.rows)-1))
+				m.uCursor = max(0, min(m.uCursor+1, len(m.usage.visible(m.expanded))-1))
 			}
 		case "pgup":
 			m.detailOff = max(0, m.detailOff-10)
@@ -450,10 +476,8 @@ func (m model) View() string {
 			msg = line{{"crow-usage failed: " + m.usageErr.Error(), sErr}}
 		}
 		body = block{" " + msg.render(m.w-1, false)}
-	case m.view == vUsage:
-		body = m.usageView(bodyH)
 	default:
-		body = m.historyView(bodyH)
+		body = m.usageView(bodyH)
 	}
 	for len(body) < bodyH {
 		body = append(body, strings.Repeat(" ", m.w))
@@ -462,7 +486,7 @@ func (m model) View() string {
 	return strings.Join(append(out, foot), "\n")
 }
 
-// header: hub name, the three views (active one as an accent pill), live status on the right.
+// header: hub name, the views (active one as an accent pill), live status on the right.
 func (m model) header() string {
 	l := line{{" crow ", sAcc}, {"│ ", sDim}}
 	for i, n := range viewNames {
@@ -515,15 +539,23 @@ func (m model) statusRight() line {
 }
 
 func (m model) footer() string {
-	keys := []string{"1-3", "views", "↑↓", "select", "o", "open", "c", "copy id"}
-	if m.view == vHistory {
-		keys = []string{"1-3", "views", "d w m", "period"}
+	keys := []string{"1-2", "views", "↑↓", "select", "o", "open", "c", "copy id"}
+	if m.view == vUsage {
+		keys = []string{"1-2", "views", "↑↓", "select", "⏎", "fold day", "d w m", "period", "t", "tools", "o", "open"}
 	}
-	keys = append(keys, "?", "all keys", "q", "quit")
-	l := line{{" ", sPlain}}
-	for i := 0; i < len(keys); i += 2 {
-		l = append(l, seg{keys[i], sAcc}, seg{" " + keys[i+1] + "   ", sSub})
+	tail := []string{"?", "all keys", "q", "quit"}
+	build := func(keys []string) line {
+		l := line{{" ", sPlain}}
+		for i := 0; i < len(keys); i += 2 {
+			l = append(l, seg{keys[i], sAcc}, seg{" " + keys[i+1] + "   ", sSub})
+		}
+		return l
 	}
+	// narrow terminals drop the hints from the end of the list, never ? and q
+	for len(keys) > 2 && build(append(append([]string{}, keys...), tail...)).width() > m.w-1 {
+		keys = keys[:len(keys)-2]
+	}
+	l := build(append(keys, tail...))
 	if m.notice != "" {
 		l = append(l, seg{m.notice, sYellow})
 	}
@@ -532,9 +564,10 @@ func (m model) footer() string {
 
 func (m model) helpView(h int) block {
 	rows := [][2]string{
-		{"1 2 3", "Agents · Usage · History"}, {"Tab / Shift+Tab", "next / previous view"}, {"u", "toggle Agents ↔ Usage"},
+		{"1 2", "Agents · Usage"}, {"Tab / Shift+Tab", "next / previous view"}, {"u", "toggle Agents ↔ Usage"},
 		{"↑↓  j k", "select an agent or a session"}, {"PgUp PgDn", "scroll the details"}, {"o  Enter", "open the project in a new kitty window"},
-		{"c", "copy the run or session id"}, {"d w m", "period: today, 7 days, 30 days (History)"}, {"r", "refresh now"},
+		{"c", "copy the run or session id"}, {"d w m", "period: today, 7 days, 30 days (Usage)"}, {"r", "refresh now"},
+		{"Enter  Space", "Usage: fold or unfold the day under the cursor"}, {"t", "Usage: context weight by tool instead of project and model"},
 		{"?", "this help (any key closes)"}, {"q", "quit"},
 	}
 	body := []line{{{"", sPlain}}}

@@ -67,11 +67,25 @@ func TestShots(t *testing.T) {
 	sizes := map[string][2]int{"vertical": {118, 95}, "laptop": {160, 45}, "wide": {240, 62}, "small": {90, 30}}
 	os.MkdirAll(dir, 0o755)
 	for name, sz := range sizes {
-		for v, view := range []string{"agents", "usage", "history"} {
-			m := model{w: sz[0], h: sz[1], snap: snap, intr: intr, usage: u, view: v, period: "w", now: now,
-				updated: now, reports: map[string]string{}}
+		shots := []struct {
+			name     string
+			view     int
+			expanded map[string]bool
+			tools    bool
+		}{{"agents", vAgents, nil, false}, {"usage", vUsage, nil, false}, {"usage-expanded", vUsage, map[string]bool{}, false}, {"usage-tools", vUsage, nil, true}}
+		for _, x := range shots {
+			if x.name == "usage-expanded" { // the newest earlier day unfolded
+				for _, r := range u.rows {
+					if r.head {
+						x.expanded[r.day] = true
+						break
+					}
+				}
+			}
+			m := model{w: sz[0], h: sz[1], snap: snap, intr: intr, usage: u, view: x.view, period: "w", now: now,
+				updated: now, reports: map[string]string{}, expanded: x.expanded, tools: x.tools}
 			m.rebuild()
-			f := filepath.Join(dir, fmt.Sprintf("%s-%s.ans", view, name))
+			f := filepath.Join(dir, fmt.Sprintf("%s-%s.ans", x.name, name))
 			if err := os.WriteFile(f, []byte(m.View()), 0o644); err != nil {
 				t.Fatal(err)
 			}

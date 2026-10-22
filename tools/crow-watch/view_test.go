@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -87,21 +88,89 @@ func contains(t *testing.T, what, out string, want, not []string) {
 // Tall terminals show every usage section; small ones keep limits and sessions.
 func TestUsageSections(t *testing.T) {
 	u := fixtureUsage(t)
-	tall := model{w: 118, h: 95, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "tall", tall.View(), []string{"Limits", "Spend", "Sessions", "Savings", "rtk", "cache", "runs out ~", "today"},
-		[]string{"<synthetic>", "claude-", "cache read", "─ History", "opus-5-5"})
-	small := model{w: 90, h: 30, usage: u, view: vUsage, now: fixtureNow()}
+	tall := model{w: 118, h: 95, usage: u, view: vUsage, period: "w", now: fixtureNow()}
+	contains(t, "tall", tall.View(), []string{"Limits", "Spend", "Sessions", "Savings", "rtk", "cache", "runs out ~", "today", "By project", "By model", "cache read"},
+		[]string{"<synthetic>", "claude-", "Context weight", "By day", "History"})
+	small := model{w: 90, h: 30, usage: u, view: vUsage, period: "w", now: fixtureNow()}
 	contains(t, "small", small.View(), []string{"Limits", "Sessions"}, []string{"By project"})
-	wide := model{w: 240, h: 62, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "account", "5h", "week", "── Monday 19 October"},
-		[]string{"Context weight", "3 Savings"})
-	laptop := model{w: 160, h: 45, usage: u, view: vUsage, now: fixtureNow()}
-	contains(t, "laptop", laptop.View(), []string{"Limits", "Spend", "Savings", "Sessions", "prompt cache", "Mon", "3 History"}, nil)
+	wide := model{w: 240, h: 62, usage: u, view: vUsage, period: "w", now: fixtureNow()}
+	contains(t, "wide", wide.View(), []string{"Limits", "Spend", "Savings", "Sessions", "account", "5h", "week", "Monday 19 October", "By project", "By model"},
+		[]string{"Context weight", "By day", "3 Savings"})
+	laptop := model{w: 160, h: 45, usage: u, view: vUsage, period: "w", now: fixtureNow()}
+	contains(t, "laptop", laptop.View(), []string{"Limits", "Spend", "Savings", "Sessions", "prompt cache", "Mon", "7 days"}, []string{"3 History", "By day"})
 	for _, size := range [][2]int{{118, 95}, {160, 45}, {240, 62}} {
-		hist := model{w: size[0], h: size[1], usage: u, view: vHistory, period: "w", now: fixtureNow()}
-		contains(t, fmt.Sprintf("history %dx%d keeps the token split and the savings", size[0], size[1]), hist.View(),
-			[]string{"cache read", "Savings", "prompt cache", "model routing", "compactions", "retros", "cache saved"}, nil)
+		for _, p := range []string{"d", "w", "m"} {
+			m := model{w: size[0], h: size[1], usage: u, view: vUsage, period: p, now: fixtureNow()}
+			contains(t, fmt.Sprintf("usage %dx%d period %s keeps the token split and the savings", size[0], size[1], p), m.View(),
+				[]string{"cache read", "Savings", "prompt cache", "model routing", "compactions", "retros"}, nil)
+		}
 	}
+}
+
+// Earlier days are folded to their header; Enter or Space unfolds the day under the cursor.
+func TestFoldedDays(t *testing.T) {
+	u := fixtureUsage(t)
+	m := model{w: 160, h: 62, usage: u, view: vUsage, period: "w", now: fixtureNow(), reports: map[string]string{}}
+	out := m.View()
+	contains(t, "folded", out, []string{"+ Monday 19 October", "15 sessions today"}, []string{"- Monday 19 October"})
+	var day string
+	for i := range u.rows {
+		if r := &u.rows[i]; r.head {
+			day = r.day
+			break
+		}
+	}
+	m.uCursor = m.cursorOfDay(day)
+	for _, key := range []string{"enter", " "} {
+		next, _ := m.Update(keyMsg(key))
+		m = next.(model)
+		want := key == "enter"
+		if m.expanded[day] != want {
+			t.Fatalf("after %q expanded[%s] = %v, want %v", key, day, m.expanded[day], want)
+		}
+		if want {
+			contains(t, "unfolded", m.View(), []string{"- Monday 19 October"}, []string{"+ Monday 19 October"})
+		}
+	}
+	// the cursor can reach the unfolded rows and o/c act on a session, not on a header
+	m.expanded = map[string]bool{day: true}
+	if got := len(u.visible(m.expanded)); got <= len(u.visible(nil)) {
+		t.Errorf("unfolding a day shows %d rows, folded shows %d", got, len(u.visible(nil)))
+	}
+	if r := u.pick(nil, u.nToday); r == nil || !r.head {
+		t.Errorf("the row after today's sessions should be a day header")
+	}
+}
+
+func TestToolsToggle(t *testing.T) {
+	u := fixtureUsage(t)
+	for _, size := range [][2]int{{118, 95}, {160, 45}, {240, 62}} {
+		m := model{w: size[0], h: size[1], usage: u, view: vUsage, period: "w", now: fixtureNow(), reports: map[string]string{}}
+		contains(t, "tools off", m.View(), nil, []string{"Context weight"})
+		next, _ := m.Update(keyMsg("t"))
+		m = next.(model)
+		contains(t, fmt.Sprintf("tools on %dx%d", size[0], size[1]), m.View(), []string{"Context weight by tool", "per call"}, []string{"By model"})
+	}
+}
+
+func keyMsg(k string) tea.KeyMsg {
+	switch k {
+	case "enter":
+		return tea.KeyMsg{Type: tea.KeyEnter}
+	case " ":
+		return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
+	}
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+}
+
+// cursorOfDay: the visible index of a day's header.
+func (m model) cursorOfDay(day string) int {
+	for i, ri := range m.usage.visible(m.expanded) {
+		if r := m.usage.rows[ri]; r.head && r.day == day {
+			return i
+		}
+	}
+	return -1
 }
 
 // A session's newest row carries its account and its share of the account's limit windows.
@@ -117,7 +186,7 @@ func TestSessionLimitShares(t *testing.T) {
 	if r.s == nil {
 		t.Fatal("no session with a 5h share in the fixture")
 	}
-	l := u.rowLine(r, 140)
+	l := u.rowLine(r, 140, false)
 	var b strings.Builder
 	for _, sg := range l {
 		b.WriteString(sg.text)
@@ -224,12 +293,12 @@ func TestHHMMWithoutSeconds(t *testing.T) {
 	}
 }
 
-// A tall terminal shows every Usage section; the breakdowns stay on the History tab.
+// A tall terminal shows every Usage section.
 func TestTallUsageShowsEverySection(t *testing.T) {
 	m := model{w: 118, h: 95, snap: sample(), usage: fixtureUsage(t), view: 1, period: "w", now: fixtureNow(), reports: map[string]string{}}
 	m.rebuild()
 	out := m.View()
-	for _, s := range []string{"Limits", "Spend", "Sessions", "Savings"} {
+	for _, s := range []string{"Limits", "Spend", "Sessions", "Savings", "By project", "By model"} {
 		if !strings.Contains(out, "─ "+s) {
 			t.Errorf("tall usage view is missing the %s box", s)
 		}
