@@ -1,0 +1,12 @@
+{
+ "schema_version": 1,
+ "ok": false,
+ "action": "run-status",
+ "warnings": [],
+ "error": {
+  "source": "cdx",
+  "code": "run_not_found",
+  "message": "Unknown run: nope",
+  "exit_code": 1
+ }
+}

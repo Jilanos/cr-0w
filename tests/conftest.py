@@ -21,6 +21,15 @@ accounts:
   - {name: spare,  policy: use,       memory: permanent}
 """
 
+# Claude-only accounts above plus Codex ones (names match tests/fixtures/cdx-0.21.5/status.json).
+MIXED_ACCOUNTS = ACCOUNTS + """\
+  - {name: cx,       policy: use,       provider: codex}
+  - {name: cxshared, policy: ask-first, provider: codex}
+  - {name: cxoff,    policy: use}
+  - {name: ag,       policy: use}
+  - {name: liar,     policy: use,       provider: codex}
+"""
+
 
 def _python_with_yaml():
     """First interpreter that has PyYAML: the running one, then the system ones."""
@@ -66,3 +75,26 @@ def run(hub, script, *args, input=None, env=None):
 def write_jsonl(path, events):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(json.dumps(e) + "\n" for e in events))
+
+
+FAKE_CDX = REPO / "tests" / "fakecdx"
+
+
+@pytest.fixture
+def fake_cdx(hub, tmp_path):
+    """A fake cdx first on PATH (tests/fakecdx). Returns (env, calls, state dir)."""
+    d = tmp_path / "fakebin"
+    d.mkdir()
+    (d / "cdx").symlink_to(FAKE_CDX)
+    state = tmp_path / "fakecdx"
+    env = {"PATH": f"{d}:{os.environ['PATH']}", "FAKE_CDX_STATE": str(state),
+           "FAKE_CDX_PROFILES": str(hub[1])}
+
+    def calls():
+        f = state / "calls.jsonl"
+        return [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
+    return env, calls, state
+
+
+def mixed(hub):
+    (hub[0] / "local" / "accounts.yaml").write_text(MIXED_ACCOUNTS)

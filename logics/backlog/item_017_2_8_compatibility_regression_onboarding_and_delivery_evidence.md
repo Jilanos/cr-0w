@@ -1,14 +1,14 @@
 ## item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence - 2.8 Compatibility regression onboarding and delivery evidence
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:47
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 A dual-provider fork needs a reproducible migration and proof that Claude-only users remain supported. Priority rationale: final integration after 2.1 through 2.7, with offline tests authored alongside each slice.

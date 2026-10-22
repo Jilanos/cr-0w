@@ -1,14 +1,14 @@
 ## item_013_2_4_mixed_provider_activity_and_session_registry - 2.4 Mixed-provider activity and session registry
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:47
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 Live discovery scans only Claude processes and session identity is not qualified by provider. Priority rationale: establish trustworthy common data before usage and UI; depends on 2.1 and 2.3.

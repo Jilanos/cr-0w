@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""A fake cdx 0.21.5 for offline tests: public JSON envelopes only, no provider is ever started.
+
+Environment:
+  FAKE_CDX_STATE      dir for the call log (calls.jsonl), runs (runs.json) and run artifacts
+  FAKE_CDX_FIXTURES   dir with schema.json / status.json / can-resume.json (default: fixtures/cdx-0.21.5)
+  FAKE_CDX_PROFILES   root of the fake profiles (config sessionRoot)
+  FAKE_CDX_MODE       notjson | oldschema | fail | sleep    (break every --json answer)
+  FAKE_CDX_VERSION    printed by --version (default 0.21.5)
+  FAKE_CDX_BLOCKED    comma list of sessions at 0% of their 5h window
+  FAKE_CDX_RUN        finish (default) | running | fail | spawnfail    (outcome of `cdx run`)
+  FAKE_CDX_REPLY      final message a run writes (default "done")
+  FAKE_CDX_LAUNCH_RC  exit code of interactive launches and plain `cdx handoff` (default 0)
+  FAKE_CDX_HANDOFF    ok (default) | unresolved
+"""
+import json, os, sys, time, uuid
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+STATE = os.environ.get("FAKE_CDX_STATE") or "/tmp/fakecdx"
+FIX = os.environ.get("FAKE_CDX_FIXTURES") or os.path.join(HERE, "fixtures", "cdx-0.21.5")
+PROFILES = os.environ.get("FAKE_CDX_PROFILES") or os.path.join(STATE, "profiles")
+MODE = os.environ.get("FAKE_CDX_MODE", "")
+os.makedirs(STATE, exist_ok=True)
+argv = sys.argv[1:]
+with open(os.path.join(STATE, "calls.jsonl"), "a") as fh:
+    fh.write(json.dumps({"argv": argv, "cwd": os.getcwd(), "account": os.environ.get("CROW_ACCOUNT")}) + "\n")
+
+
+def fixture(name):
+    return json.load(open(os.path.join(FIX, name)))
+
+
+def out(env, rc=0):
+    if MODE == "notjson":
+        print("Traceback (most recent call last): boom")
+        sys.exit(1)
+    if MODE == "oldschema":
+        env["schema_version"] = 0
+    if MODE == "fail":
+        env = {"schema_version": 1, "ok": False, "action": argv[0] if argv else "",
+               "error": {"source": "cdx", "code": "cdx_error", "message": "broken on purpose", "exit_code": 1}}
+        rc = 1
+    if MODE == "sleep":
+        time.sleep(30)
+    print(json.dumps(env))
+    sys.exit(rc)
+
+
+def rows():
+    st = fixture("status.json")
+    for r in st["rows"]:
+        if r["session_name"] in os.environ.get("FAKE_CDX_BLOCKED", "").split(","):
+            r["remaining_5h_pct"] = 0
+    return st
+
+
+def session(name):
+    r = next((r for r in rows()["rows"] if r["session_name"] == name), None)
+    if not r:
+        out({"schema_version": 1, "ok": False, "error": {"code": "unknown_session",
+             "message": f"Unknown session: {name}.", "exit_code": 1}}, 1)
+    return r
+
+
+def runs_db():
+    try:
+        return json.load(open(os.path.join(STATE, "runs.json")))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_runs(db):
+    json.dump(db, open(os.path.join(STATE, "runs.json"), "w"))
+
+
+def flag(name, default=None):
+    return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else default
+
+
+def run():
+    names = [a for a in argv[1:] if not a.startswith("--") and argv[argv.index(a) - 1] in ("run",)]
+    provider = flag("--provider")
+    name = names[0] if names else None
+    if name and provider:
+        out({"schema_version": 1, "ok": False, "action": "run", "error": {"code": "mutually_exclusive_arguments",
+             "message": "session and --provider", "exit_code": 2}}, 2)
+    row = session(name) if name else next(r for r in rows()["rows"] if r["provider"] == provider)
+    provider = row["provider"]
+    rid = uuid.uuid4().hex
+    reply = os.environ.get("FAKE_CDX_REPLY", "done")
+    stdout = os.path.join(STATE, f"cdx-run-{rid}.stdout.log")
+    with open(stdout, "w") as fh:
+        if provider == "claude":
+            fh.write(json.dumps({"type": "result", "result": reply, "session_id": f"claude-{rid[:8]}"}) + "\n")
+        else:
+            fh.write(json.dumps({"type": "thread.started", "thread_id": f"codex-{rid[:8]}"}) + "\n")
+            fh.write(json.dumps({"type": "item.completed", "item": {"id": "i0", "type": "agent_message", "text": reply}}) + "\n")
+            fh.write(json.dumps({"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 40,
+                                 "output_tokens": 10, "reasoning_output_tokens": 3}}) + "\n")
+    outcome = os.environ.get("FAKE_CDX_RUN", "finish")
+    if outcome == "spawnfail":
+        out({"schema_version": 1, "ok": False, "action": "run", "error": {"code": "provider_cli_not_found",
+             "message": f"{provider} not found", "exit_code": 1}}, 1)
+    usage = ({"cache_creation_tokens": 5, "cache_read_tokens": 20, "cached_input_tokens": 25, "input_tokens": 3,
+              "output_tokens": 10, "reasoning_tokens": None, "total_tokens": 38} if provider == "claude" else
+             {"input_tokens": 100, "output_tokens": 10, "reasoning_tokens": 3, "total_tokens": 110})
+    detach = "--detach" in argv
+    status = "running" if (detach and outcome == "running") else ("failed" if outcome == "fail" else "succeeded")
+    rec = {"run_id": rid, "provider": provider, "session": row["session_name"], "cwd": flag("--cwd"),
+           "model": flag("--model"), "permission": flag("--permission"), "status": status,
+           "exit_code": None if status == "running" else (1 if status == "failed" else 0),
+           "provider_session_id": None, "provider_agent_id": None,
+           "started_at": "2026-10-22T10:00:00Z", "ended_at": None if status == "running" else "2026-10-22T10:05:00Z",
+           "duration_seconds": None if status == "running" else 300.0,
+           "artifacts": {"stdout_path": stdout, "stderr_path": stdout + ".err", "transcript_path": None},
+           "usage": None if status == "running" else usage, "error": None if status != "failed" else "provider_failed"}
+    db = runs_db()
+    db[rid] = rec
+    save_runs(db)
+    env = {"schema_version": 1, "ok": status != "failed", "action": "run", "provider": provider,
+           "session": row["session_name"], "run_id": rid, "exit_code": rec["exit_code"], "stdout_path": stdout,
+           "transcript_path": None, "usage": rec["usage"], "duration_seconds": rec["duration_seconds"] or 0,
+           "status": status}
+    if status == "failed":
+        env["error"] = "provider_failed"
+    out(env, 0 if status != "failed" else 1)
+
+
+cmd = argv[0] if argv else ""
+if cmd == "--version":
+    print(os.environ.get("FAKE_CDX_VERSION", "0.21.5"))
+elif cmd == "schema":
+    out(fixture("schema.json"))
+elif cmd == "status":
+    out(rows())
+elif cmd == "config":
+    r = session(argv[1])
+    root = os.path.join(PROFILES, argv[1])
+    out({"schema_version": 1, "ok": True, "action": "config", "session": {
+        "name": argv[1], "provider": r["provider"], "enabled": r["enabled"], "sessionRoot": root,
+        "authHome": os.path.join(root, "claude-home") if r["provider"] == "claude" else root}})
+elif cmd == "run":
+    run()
+elif cmd == "runs":
+    out({"schema_version": 1, "ok": True, "action": "runs", "runs": list(runs_db().values())})
+elif cmd in ("run-status", "run-report"):
+    db = runs_db()
+    rid = next((k for k in db if k.startswith(argv[1])), None)
+    if not rid:
+        out(fixture("error-run-not-found.json"), 1)
+    out({"schema_version": 1, "ok": True, "action": cmd, "run": db[rid]})
+elif cmd == "can-resume":
+    r = session(argv[1])
+    env = fixture("can-resume.json")
+    env.update(session=argv[1], provider=r["provider"], resumable=argv[1] != "stuck")
+    out(env)
+elif cmd == "handoff" and "--json" in argv:
+    src, tgt = [a for a in argv[1:3]]
+    if os.environ.get("FAKE_CDX_HANDOFF") == "unresolved":
+        out({"schema_version": 1, "ok": False, "action": "handoff", "error": {
+            "code": "handoff_source_unresolved", "message": "Conversation x has multiple native transcripts; "
+            "select --source-native-transcript PATH.", "exit_code": 1}, "candidates": []}, 1)
+    s, t = session(src), session(tgt)
+    entry = {"schema_version": 1, "workspace": os.path.realpath(os.getcwd()), "mode": "native",
+             "source": {"name": src, "provider": s["provider"]}, "target": {"name": tgt, "provider": t["provider"]},
+             "transcript": {"conversation_id": flag("--source-conversation"), "provider": s["provider"],
+                            "path": flag("--source-native-transcript") or f"/profiles/{src}/x.jsonl",
+                            "workspace": os.path.realpath(os.getcwd()), "sha256": "0" * 64, "extent_bytes": 10}}
+    out({"schema_version": 1, "ok": True, "action": "handoff", "message": "Prepared native handoff",
+         "context": {"target_path": f"/profiles/{tgt}/handoffs/e.json"}, "handoff": entry,
+         "source_session": entry["source"], "target_session": entry["target"],
+         "source_transcript": entry["transcript"]["path"],
+         "launch_prompt": f"Recover work in workspace {json.dumps(entry['workspace'])}. Read handoff entry."})
+else:
+    # interactive launch (`cdx <name> --dir D ...`) or a launching `cdx handoff`
+    print(f"fake cdx launched: {' '.join(argv)}")
+    sys.exit(int(os.environ.get("FAKE_CDX_LAUNCH_RC", "0")))

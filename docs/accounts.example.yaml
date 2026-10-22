@@ -1,9 +1,19 @@
 # cdx accounts crow may use. policy: use | ask-first | never.
+#   use       crow may launch on it.
+#   ask-first crow asks before every launch (typed "yes", or --confirm-account <name>);
+#             it is never picked implicitly by --provider.
+#   never     crow never launches on it, links no memory and passes no context to it.
+# An account missing from this file counts as never, whatever cdx lists.
+# provider: claude | codex. Optional: cdx knows each account's provider; when given here
+#           it is checked and a mismatch stops the launch.
 # memory: permanent = the profile's memory dirs stay symlinked into local/memory;
-#         session   = linked when a crow session starts, unlinked when it ends (shared accounts).
+#         session   = linked while crow sessions run on it, unlinked after the last one (shared accounts).
+#         Claude accounts only; Codex launches get the same files as read-first references.
 default: main
 accounts:
-  - {name: main, policy: use,       memory: permanent}
-  - {name: shared,   policy: ask-first, memory: session}
+  - {name: main,       provider: claude, policy: use,       memory: permanent}
+  - {name: shared,     provider: claude, policy: ask-first, memory: session}
+  - {name: codex-main, provider: codex,  policy: use}
+  - {name: codex-team, provider: codex,  policy: ask-first}
   - {name: teammate-a, policy: never}
   - {name: teammate-b, policy: never}

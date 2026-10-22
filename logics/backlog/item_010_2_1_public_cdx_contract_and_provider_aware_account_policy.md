@@ -1,14 +1,14 @@
 ## item_010_2_1_public_cdx_contract_and_provider_aware_account_policy - 2.1 Public cdx contract and provider-aware account policy
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:46
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 Crow assumes a Python cdx installation and accounts without provider identity. Priority rationale: every subsequent slice depends on reliable provider resolution and one policy boundary.

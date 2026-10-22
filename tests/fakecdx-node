@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+// Node entrypoint like the real cdx-manager package: crow must not assume a Python cdx.
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+const r = spawnSync("python3", [path.join(__dirname, "fakecdx"), ...process.argv.slice(2)], { stdio: "inherit" });
+process.exit(r.status === null ? 1 : r.status);

@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "ok": true,
+  "action": "schema",
+  "message": "Schema loaded.",
+  "warnings": [],
+  "enums": {
+    "permission": {
+      "accepted": [
+        "review",
+        "default",
+        "auto",
+        "full",
+        "workspace-write",
+        "read-only",
+        "danger-full-access"
+      ],
+      "canonical": [
+        "review",
+        "default",
+        "auto",
+        "full"
+      ],
+      "aliases": {
+        "workspace-write": "default",
+        "read-only": "review",
+        "danger-full-access": "full"
+      }
+    },
+    "reasoning_effort": {
+      "accepted": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "power": {
+      "accepted": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "kind": {
+      "accepted": [
+        "assistant",
+        "code-review"
+      ]
+    },
+    "provider": {
+      "accepted": [
+        "codex",
+        "claude",
+        "antigravity",
+        "ollama"
+      ]
+    }
+  },
+  "unvalidated": {
+    "extra_args": {
+      "reason": "Passed to the provider CLI unchanged; cdx neither parses nor verifies these arguments.",
+      "not_checked_by": [
+        "cdx schema",
+        "cdx doctor --check-provider-flags"
+      ]
+    }
+  },
+  "mutually_exclusive": [
+    {
+      "command": "run",
+      "arguments": [
+        "session",
+        "--provider"
+      ],
+      "reason": "A session already fixes its provider; pass one or the other."
+    },
+    {
+      "command": "run",
+      "arguments": [
+        "--prompt-file",
+        "--prompt"
+      ],
+      "reason": "Exactly one prompt source."
+    },
+    {
+      "command": "run",
+      "arguments": [
+        "--detach",
+        "--failover"
+      ],
+      "reason": "Failover has to watch the run to react to a rate limit; --detach stops watching."
+    }
+  ],
+  "must_match": [
+    {
+      "command": "run",
+      "arguments": [
+        "--reasoning-effort",
+        "--power"
+      ],
+      "reason": "Aliases of one setting; supplying both with different values fails."
+    }
+  ],
+  "error_codes": {
+    "arguments": [
+      "missing_required_argument",
+      "mutually_exclusive_arguments",
+      "invalid_argument_value",
+      "argument_value_out_of_range",
+      "unknown_argument",
+      "invalid_reasoning_effort"
+    ],
+    "run": [
+      "invalid_cwd",
+      "session_disabled",
+      "no_suitable_session",
+      "provider_cli_not_found",
+      "provider_start_failed",
+      "provider_failed",
+      "provider_timeout",
+      "cdx_error"
+    ],
+    "run_lookup": [
+      "run_not_found",
+      "run_output_unavailable",
+      "run_output_unreadable"
+    ]
+  },
+  "warning_codes": [
+    "network_disabled_by_permission",
+    "session_selected_without_status",
+    "limit_ignored_with_since"
+  ]
+}

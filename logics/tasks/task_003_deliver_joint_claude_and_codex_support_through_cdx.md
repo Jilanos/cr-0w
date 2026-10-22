@@ -1,14 +1,15 @@
 ## task_003_deliver_joint_claude_and_codex_support_through_cdx - Deliver joint Claude and Codex support through cdx
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
 > Progress: 0%
 > Complexity: High
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:46
+> Indicators reviewed: 2026-10-22 16:51:43
+> Owner: crow
 
 # AI Context
 Implement in dependency order over the current Claude helpers. Corpus creation is complete; implementation has not started. Each wave must preserve Claude-only behavior and test its Codex path offline.

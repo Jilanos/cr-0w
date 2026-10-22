@@ -1,14 +1,14 @@
 ## item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs - 2.3 Provider-aware launch dispatch and helper jobs
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:47
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 Launcher output and helper jobs still assume a Claude result envelope or invoke Claude directly. Priority rationale: deliver usable Codex execution after 2.1 and 2.2, before observability surfaces.

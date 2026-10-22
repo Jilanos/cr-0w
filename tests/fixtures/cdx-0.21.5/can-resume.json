@@ -1,0 +1,18 @@
+{
+ "schema_version": 1,
+ "ok": true,
+ "session": "cx",
+ "provider": "codex",
+ "resumable": true,
+ "strategy": "provider_conversation_id",
+ "identity": "01a1631c-0000-7bc0-93f3-000000000001",
+ "provenance": "observed",
+ "reason": "supported",
+ "command_preview": [
+  "codex",
+  "resume",
+  "01a1631c-0000-7bc0-93f3-000000000001",
+  "--cd",
+  "/work/hub"
+ ]
+}

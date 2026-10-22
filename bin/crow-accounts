@@ -6,63 +6,83 @@
   crow-accounts memory <name>      permanent | session | none
   crow-accounts allowed            names crow may target (policy use or ask-first)
   crow-accounts require <name>     exit 1 unless crow may target the account
-  crow-accounts json               every account with its policy and memory mode
+  crow-accounts json               every account with its policy, memory mode and declared provider
+  crow-accounts resolve [--account A] [--provider claude|codex] [--action WHAT]
+                        [--confirm-account A] [--shell]
+                                   the launch target, checked against cdx (provider, enabled) and
+                                   the policy; asks consent for an ask-first account. Prints JSON,
+                                   or NAME PROVIDER with --shell. Exit 1 with a diagnostic otherwise.
+  crow-accounts providers          every cdx account with its provider and crow policy (JSON)
 
 An unknown account, or a policy that is not one of use / ask-first / never, counts as never.
+The first six commands read only the file; resolve and providers also read `cdx status --cached`.
 """
 import json, os, sys
-import yaml
 
-HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-PATH = os.path.join(HOME, "local", "accounts.yaml")
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+from crow_cdx import CdxError  # noqa: E402
 
 
 def load():
     try:
-        return yaml.safe_load(open(PATH)) or {}
-    except FileNotFoundError:
-        sys.exit(f"crow-accounts: {PATH} is missing (copy docs/accounts.example.yaml there)")
+        return crow_cdx.load_policy()
+    except CdxError as e:
+        sys.exit(f"crow-accounts: {e.message}")
 
 
-POLICIES = ("use", "ask-first", "never")
-
-
-def accounts(cfg):
-    out = []
-    for a in cfg.get("accounts") or []:
-        pol = a.get("policy")
-        out.append({"name": a["name"], "policy": pol if pol in POLICIES else "never",
-                    "memory": a.get("memory", "none")})
-    return out
-
-
-def find(cfg, name):
-    return next((a for a in accounts(cfg) if a["name"] == name), None)
+def opt(argv, name):
+    return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else None
 
 
 def main(argv):
-    cfg = load()
     cmd = argv[0] if argv else ""
+    if cmd in ("resolve", "providers"):
+        try:
+            return extended(cmd, argv[1:])
+        except CdxError as e:
+            sys.exit(f"crow: {e.message}")
+    cfg = load()
     if cmd == "default":
         print(cfg["default"])
     elif cmd == "policy":
-        a = find(cfg, argv[1])
+        a = crow_cdx.find(cfg, argv[1])
         print(a["policy"] if a else "never")
     elif cmd == "memory":
-        a = find(cfg, argv[1])
+        a = crow_cdx.find(cfg, argv[1])
         print(a["memory"] if a else "none")
     elif cmd == "allowed":
-        for a in accounts(cfg):
+        for a in cfg["accounts"]:
             if a["policy"] != "never":
                 print(a["name"])
     elif cmd == "require" and len(argv) == 2:
-        a = find(cfg, argv[1])
+        a = crow_cdx.find(cfg, argv[1])
         if not a or a["policy"] == "never":
             sys.exit(f"crow: account '{argv[1]}' is not allowed (policy never, see local/accounts.yaml)")
     elif cmd == "json":
-        print(json.dumps({"default": cfg.get("default"), "accounts": accounts(cfg)}))
+        print(json.dumps(cfg))
     else:
         sys.exit(__doc__)
+
+
+def extended(cmd, argv):
+    cfg = crow_cdx.load_policy()
+    if cmd == "providers":
+        inv = crow_cdx.inventory()
+        out = []
+        for name, row in inv.items():
+            a = crow_cdx.find(cfg, name)
+            out.append({"name": name, "provider": row.get("provider"), "enabled": row.get("enabled"),
+                        "policy": a["policy"] if a else "never", "supported": row.get("provider") in crow_cdx.PROVIDERS})
+        print(json.dumps({"accounts": out}))
+        return
+    crow_cdx.capabilities()
+    target = crow_cdx.resolve(opt(argv, "--account"), opt(argv, "--provider"), cfg=cfg)
+    crow_cdx.consent(target, opt(argv, "--action") or "launch", assume=opt(argv, "--confirm-account"))
+    if "--shell" in argv:
+        print(target["name"], target["provider"], target["memory"])
+    else:
+        print(json.dumps(target))
 
 
 if __name__ == "__main__":

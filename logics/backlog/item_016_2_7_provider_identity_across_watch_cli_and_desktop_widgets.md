@@ -1,14 +1,14 @@
 ## item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets - 2.7 Provider identity across watch CLI and desktop widgets
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:47
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 Current views hide provider identity and can render absent metrics as ordinary values. Priority rationale: depends on 2.4 and 2.5; recovery action wiring follows 2.6.

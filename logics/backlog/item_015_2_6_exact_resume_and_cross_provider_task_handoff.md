@@ -1,14 +1,14 @@
 ## item_015_2_6_exact_resume_and_cross_provider_task_handoff - 2.6 Exact resume and cross-provider task handoff
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-10-22 16:46:47
+> Indicators reviewed: 2026-10-22 16:51:43
 
 # AI Context
 The relaunch path assumes Claude native files and does not distinguish native resume from task transfer. Priority rationale: depends on 2.1, 2.2, 2.3 and 2.4; extends existing task_002 recovery without replacing it.
