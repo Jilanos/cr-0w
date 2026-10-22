@@ -59,10 +59,24 @@ def hub(tmp_path):
     return home, profiles
 
 
+def _default_fake_bin():
+    """Every script run gets the fake cdx unless a test brings its own PATH: no test reads the
+    machine's real cdx accounts."""
+    import tempfile
+    d = Path(tempfile.mkdtemp(prefix="crow-fakebin-"))
+    (d / "cdx").symlink_to(REPO / "tests" / "fakecdx")
+    return d
+
+
+DEFAULT_FAKE_BIN = _default_fake_bin()
+
+
 def run(hub, script, *args, input=None, env=None):
     home, profiles = hub
     e = {k: v for k, v in os.environ.items() if k != "CROW_ACCOUNT"}
-    e.update(CROW_HOME=str(home), CDX_PROFILES=str(profiles), **(env or {}))
+    e.update({"CROW_HOME": str(home), "CDX_PROFILES": str(profiles), "PATH": f"{DEFAULT_FAKE_BIN}:{os.environ['PATH']}",
+              "FAKE_CDX_STATE": str(home.parent / "fakecdx-default"), "FAKE_CDX_PROFILES": str(profiles)})
+    e.update(env or {})
     cmd = [str(BIN / script), *args]
     if _is_python_script(BIN / script):
         if PYTHON is None:

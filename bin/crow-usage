@@ -48,44 +48,18 @@ import sys
 import yaml
 
 
-def _cdx_python():
-    cdx = shutil.which("cdx")
-    if not cdx:
-        return None
-    with open(os.path.realpath(cdx), encoding="utf-8", errors="replace") as fh:
-        first = fh.readline()
-    return first[2:].strip() if first.startswith("#!") else None
-
-
-def _cdx_site():
-    """cdx's own site-packages (pipx venv), borrowed instead of re-exec'ing into an interpreter without yaml."""
-    interp = _cdx_python()
-    if not interp or interp == sys.executable:
-        return None
-    try:
-        return subprocess.run([interp, "-c", "import cdx_manager, os; print(os.path.dirname(os.path.dirname(cdx_manager.__file__)))"],
-                              capture_output=True, text=True, timeout=10).stdout.strip() or None
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-
-
-try:
-    from cdx_manager.run_usage import estimate_cost, token_prices
-except ImportError:
-    site = _cdx_site()
-    if site:
-        sys.path.append(site)
-    try:
-        from cdx_manager.run_usage import estimate_cost, token_prices
-    except ImportError:
-        estimate_cost = token_prices = None
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+import crow_native  # noqa: E402
+import crow_prices  # noqa: E402
 
 CROW_HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 9
+CACHE_VERSION = 10  # 10: provider-qualified sessions, Codex rollouts, crow-owned prices
+USAGE_SCHEMA = 2     # 2: provider fields, nullable cost, limit provenance (all additive over 1)
 TITLES_PER_RUN = 12
 TITLES_PER_DAY = int(os.environ.get("CROW_TITLES_PER_DAY") or 40)  # model calls; ~0.001 USD each on Haiku
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
@@ -98,6 +72,14 @@ TITLE_INSTRUCTIONS = ("You name coding sessions. Reply with a 3-6 word title for
                       "obvious, Title Case not required, no quotes, no trailing punctuation. Reply with the title only.")
 TITLE_MODELS = {"claude": os.environ.get("CROW_TITLE_MODEL", "haiku"), "codex": os.environ.get("CROW_TITLE_CODEX_MODEL")}
 PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".cdx/profiles")))
+
+
+def profiles():
+    """cdx profiles {name, provider, root}; empty when cdx cannot be read (usage then shows none)."""
+    try:
+        return crow_cdx.profiles()
+    except crow_cdx.CdxError:
+        return []
 ACTIVE_SECONDS = 120
 
 
@@ -109,15 +91,13 @@ def run_json(cmd):
         return None
 
 
-CACHE_1H_MULTIPLIER = 2.0  # cdx prices every cache write at the 5-minute rate (1.25x input)
-# Models cdx's table lacks (USD per million tokens, Anthropic list prices); cdx's own entries win.
-# Haiku 5.5: the rate for prompts up to 100K tokens; longer prompts list at 5x and are not split out.
-EXTRA_PRICES = {"claude-haiku-5-5": {"input": 0.10, "output": 0.50}}
+CACHE_1H_MULTIPLIER = 2.0  # the table prices every cache write at the 5-minute rate (1.25x input)
+estimate_cost = crow_prices.estimate_cost
 
 
 @functools.lru_cache(maxsize=1)
 def all_prices():
-    return {**EXTRA_PRICES, **(token_prices()[0] if token_prices else {})}
+    return crow_prices.table()
 
 
 def pseudo_model(model):
@@ -128,11 +108,9 @@ def pseudo_model(model):
 def price(usage, model):
     if pseudo_model(model):
         return 0.0
-    if not estimate_cost:
-        return None
     prices = all_prices()
-    base = {k: v for k, v in usage.items() if k != "cache_1h_tokens"}
-    cost = estimate_cost(base, model, prices)
+    base = {k: v for k, v in usage.items() if k not in ("cache_1h_tokens", "reasoning_tokens")}
+    cost = estimate_cost(base, model)
     if cost is None or not usage.get("cache_1h_tokens"):
         return cost
     extra = prices[model]["input"] * (CACHE_1H_MULTIPLIER - 1.25) * usage["cache_1h_tokens"] / 1_000_000
@@ -168,6 +146,15 @@ def typed_prompt(ev):
 
 def _zero_usage():
     return {"input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0, "cache_1h_tokens": 0}
+
+
+def add_norm(models, model, u):
+    """Add usage already in crow's categories (input excludes cached reads)."""
+    m = models.setdefault(model or "unknown", _zero_usage())
+    for k in ("input_tokens", "cache_read_tokens", "cache_creation_tokens", "output_tokens"):
+        m[k] += u.get(k) or 0
+    if u.get("reasoning_tokens"):
+        m["reasoning_tokens"] = m.get("reasoning_tokens", 0) + u["reasoning_tokens"]  # part of output, not added
 
 
 @functools.lru_cache(maxsize=4096)
@@ -377,6 +364,95 @@ def scan_transcript(path, registry=None):
             "compactions": compactions, "active": {d: sorted(b) for d, b in active.items()}}
 
 
+def scan_rollout(path, registry=None):
+    """Usage of one Codex rollout, in the shape of scan_transcript. Tokens come from the cumulative
+    token_count snapshots: each one adds only its growth over the previous one, so repeated or
+    resumed snapshots never count twice. Tool-output sizes and compactions are not measured
+    (absent, not zero)."""
+    registry = load_registry() if registry is None else registry
+    per_day, per_hour, active, per_proj = {}, {}, {}, {}
+    meta = {"title": None, "entrypoint": None, "start": None, "end": None, "cwd": None, "user_messages": 0,
+            "prompts": [], "last_prompt": None, "branch": None, "recent": [], "files": {}, "last_cwd": None,
+            "native_id": None, "source": None}
+    prev, model = None, None
+    try:
+        fh = open(path, "rb")
+    except OSError:
+        return None
+    with fh:
+        lines, _ = crow_native.complete_lines(fh.read())
+    sticky = None
+    for ev in crow_native.events(lines):
+        ts = ev.get("timestamp")
+        p = ev.get("payload") or {}
+        if ts:
+            meta["start"] = meta["start"] or ts
+            meta["end"] = ts
+        if ev.get("type") == "session_meta":
+            meta["native_id"] = meta["native_id"] or p.get("id")
+            meta["cwd"] = meta["cwd"] or p.get("cwd")
+            meta["source"] = meta["source"] or p.get("source")
+            meta["entrypoint"] = "exec" if p.get("source") == "exec" else "cli"
+            sticky = project_of(meta["cwd"], registry) or os.path.basename(meta["cwd"] or "") or "?"
+            continue
+        if ev.get("type") == "turn_context":
+            model = p.get("model") or model
+            meta["last_cwd"] = p.get("cwd") or meta["last_cwd"]
+            continue
+        text = crow_native.codex_user_prompt(ev)
+        if text and text.strip():
+            text = " ".join(text.split())
+            meta["user_messages"] += 1
+            meta["last_prompt"] = text[:300]
+            meta["recent"] = (meta["recent"] + [text[:200]])[-4:]
+            if len(meta["prompts"]) < 3:
+                meta["prompts"].append(text[:300])
+            continue
+        if ev.get("type") == "response_item" and p.get("type") in ("function_call", "custom_tool_call"):
+            args = p.get("arguments") or p.get("input") or ""
+            for path_ in crow_native_paths(args):
+                proj = project_of(path_, registry)
+                if proj:
+                    sticky = proj
+                    break
+            continue
+        if ev.get("type") != "event_msg" or p.get("type") != "token_count" or not ts:
+            continue
+        total = (p.get("info") or {}).get("total_token_usage")
+        if not total:
+            continue
+        delta = crow_prices.codex_delta(prev, total)
+        prev = total
+        u = crow_prices.codex_usage(delta)
+        if not any(u.values()):
+            continue
+        day, hour = _local_hour(ts[:13])
+        active.setdefault(day, set()).add(hour * 6 + int(ts[14:16]) // 10)
+        add_norm(per_day.setdefault(day, {}), model, u)
+        add_norm(per_hour.setdefault(ts[:13], {}), model, u)
+        add_norm(per_proj.setdefault(sticky or "?", {}).setdefault(day, {}), model, u)
+    per_model = {}
+    for models in per_day.values():
+        for m, u in models.items():
+            tot = per_model.setdefault(m, _zero_usage())
+            for k, v in u.items():
+                tot[k] = tot.get(k, 0) + v
+    return {"v": CACHE_VERSION, "provider": "codex", "meta": meta, "per_model": per_model, "per_day": per_day,
+            "per_proj": per_proj, "per_hour": per_hour, "reg": registry_sig(registry), "tools": {},
+            "compactions": None, "active": {d: sorted(b) for d, b in active.items()}}
+
+
+def crow_native_paths(args):
+    if not isinstance(args, str):
+        return []
+    try:
+        a = json.loads(args)
+        args = " ".join(str(v) for v in a.values()) if isinstance(a, dict) else args
+    except ValueError:
+        pass
+    return ABS_PATH.findall(args)
+
+
 # ---------- session titles ----------
 
 def load_titles():
@@ -566,19 +642,27 @@ def dispatch_titles(titles):
     except (OSError, json.JSONDecodeError):
         return False
     changed = False
-    for rec in recs:
-        rid = rec.get("run_id")
-        if not rid or rid in mapped:
-            continue
-        logs = glob.glob(os.path.join(PROFILES, "*", "claude-home", "log", f"cdx-run-{rid}.stdout.log"))
+    todo = [r for r in recs if r.get("run_id") and r["run_id"] not in mapped]
+    if not todo:
+        return False
+    try:
+        rows = {r["run_id"]: r for r in crow_cdx.call("runs", "--since", "7d", "--limit", "500").get("runs") or []}
+    except crow_cdx.CdxError:
+        return False
+    for rec in todo:
+        rid = rec["run_id"]
+        log = ((rows.get(rid) or {}).get("artifacts") or {}).get("stdout_path")
         sid = None
-        for log in logs:
-            with open(log, encoding="utf-8", errors="replace") as fh:
+        try:
+            with open(log or "/nonexistent", encoding="utf-8", errors="replace") as fh:
                 for line in fh:
-                    m = re.search(r'"session_id":\s*"([0-9a-f-]{36})"', line)
+                    # Claude's result carries session_id; Codex's exec events open with thread_id
+                    m = re.search(r'"(?:session_id|thread_id)":\s*"([0-9a-f-]{36})"', line)
                     if m:
                         sid = m[1]
                         break
+        except OSError:
+            pass
         if not sid:
             continue  # still running, or no log: try again on a later poll
         titles[sid] = {"title": rec.get("label"), "source": "dispatch", "prompts": 10 ** 6}
@@ -598,8 +682,15 @@ def save_titles(titles):
 
 
 def live_session_ids():
-    """Session ids of running Claude processes (same source as crow-runs), or None if unknown."""
+    """Session ids of running Claude and Codex processes (same source as crow-runs), or None if unknown."""
     ids, seen_any = set(), False
+    for p in crow_native.procs():
+        if p["provider"] == "codex":
+            seen_any = True
+            r = crow_native.open_rollout(p)
+            m = re.search(r"([0-9a-f]{8}-[0-9a-f-]{27})\.jsonl$", r or "")
+            if m:
+                ids.add(m[1])
     for f in glob.glob(os.path.join(PROFILES, "*", "claude-home", ".claude", "sessions", "*.json")):
         seen_any = True
         try:
@@ -615,6 +706,8 @@ def live_session_ids():
 
 
 TOP_MODEL = os.environ.get("CROW_TOP_MODEL", "claude-opus-5-5")
+# Routing savings compare a run with its own provider's top model only (prices across vendors are not comparable).
+TOP_MODELS = {"claude": TOP_MODEL, "codex": os.environ.get("CROW_TOP_MODEL_CODEX")}
 RECENT_DAY = (dt.date.today() - dt.timedelta(days=1)).isoformat()  # activity buckets kept for today + yesterday
 HOUR_CUTOFF = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=8)).strftime("%Y-%m-%dT%H")  # covers a weekly window
 
@@ -641,8 +734,9 @@ def figures(per_model):
             continue
         # Cache reads billed at the cache price instead of full input price.
         cache_saved += usage.get("cache_read_tokens", 0) * (prices[model]["input"] - cache_read_price(prices, model)) / 1e6
-        if model != TOP_MODEL and TOP_MODEL in prices:
-            top = price(usage, TOP_MODEL)
+        top_model = TOP_MODELS.get(crow_prices.provider_of(model))
+        if top_model and model != top_model and top_model in prices:
+            top = price(usage, top_model)
             if top is not None:
                 routing_saved += max(0.0, top - c)
     return {"totals": totals, "cost_usd": cost, "priced": priced, "cache_saved_usd": cache_saved,
@@ -672,18 +766,30 @@ def collect_sessions(days):
     dispatch_titles(titles)
     live = live_session_ids()
     due = False
-    for path in glob.glob(os.path.join(PROFILES, "*", "claude-home", ".claude", "projects", "*", "*.jsonl")):
-        st = os.stat(path)
+    files = []
+    for prof in profiles():
+        if prof["provider"] == "claude":
+            files += [(prof["name"], "claude", f) for f in
+                      glob.glob(os.path.join(crow_cdx.claude_projects_dir(prof["root"]), "*", "*.jsonl"))]
+        elif prof["provider"] == "codex":
+            files += [(prof["name"], "codex", f) for f in crow_native.codex_rollouts(prof["root"])]
+    for account, provider, path in files:
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
         if st.st_mtime < cutoff:
             continue
         key = f"{st.st_mtime}:{st.st_size}"
         hit = cache.get(path)
         fresh_hit = hit and hit["key"] == key and hit["data"].get("v") == CACHE_VERSION and hit["data"].get("reg") == sig
-        data = hit["data"] if fresh_hit else scan_transcript(path, registry)
+        data = hit["data"] if fresh_hit else (scan_rollout(path, registry) if provider == "codex"
+                                              else scan_transcript(path, registry))
+        if not data:
+            continue
         fresh[path] = {"key": key, "data": data}
         if not data["per_model"]:
             continue
-        account = path.split(os.sep + "profiles" + os.sep, 1)[1].split(os.sep, 1)[0]
         f = figures(data["per_model"])
         totals, cost, priced = f["totals"], f["cost_usd"], f["priced"]
         by_day = {d: figures(models) for d, models in (data.get("per_day") or {}).items()}
@@ -703,17 +809,21 @@ def collect_sessions(days):
                             "tokens": t["tokens"], "share_pct": round(100 * t["tokens"] / whole)}
                            for n, t in proj_tot.items()), key=lambda e: -e["tokens"])
         tokens = sum(totals.values())
-        sid = os.path.basename(path)[:-6]
+        sid = (meta.get("native_id") or os.path.basename(path)[:-6]) if provider == "codex" else os.path.basename(path)[:-6]
+        if provider == "codex" and crow_native.AUTO_PROMPT.search((meta.get("prompts") or [""])[0]):
+            meta["entrypoint"] = "exec"  # crow's own helper job (title, retro): a run, not an interactive session
         if not real_title(meta, account) and title_due({"id": sid, "user_messages": meta["user_messages"],
                                                                "project": dir_project({"cwd": meta.get("last_cwd")}) if meta.get("last_cwd") else None}, titles):
             due = True
         sessions.append({
             "id": sid,
+            "provider": provider,
+            "identity": f"{provider}:{account}:{sid}",
             "account": account,
             "project": os.path.basename(meta["cwd"] or "") or "?",
             "title": session_title(sid, meta, account, titles),
             "branch": meta["branch"],
-            "kind": "run" if meta["entrypoint"] == "sdk-cli" else "interactive",
+            "kind": "run" if meta["entrypoint"] in ("sdk-cli", "exec") else "interactive",
             "models": sorted(data["per_model"]),
             "start": meta["start"],
             "end": meta["end"],
@@ -724,11 +834,13 @@ def collect_sessions(days):
             "output_tokens": totals["output_tokens"],
             "cache_write_tokens": totals["cache_creation_tokens"],
             "cache_read_tokens": totals["cache_read_tokens"],
+            "reasoning_tokens": sum(u.get("reasoning_tokens", 0) for u in data["per_model"].values())
+            if provider == "codex" else None,  # a subset of output_tokens, shown apart, never added
             "cache_pct": round(100 * totals["cache_read_tokens"] / tokens) if tokens else 0,
             "cost_usd": round(cost, 4) if priced else None,
             "cache_saved_usd": round(f["cache_saved_usd"], 4),
             "routing_saved_usd": round(f["routing_saved_usd"], 4),
-            "compactions": data.get("compactions") or 0,
+            "compactions": data.get("compactions"),
             "tools": data.get("tools") or {},
             "by_day": {d: slim(x) for d, x in by_day.items()},
             "projects": projects,
@@ -808,8 +920,14 @@ def rollup(slices):
     """Sum day slices [(session, slice)] into one figure set with breakdowns."""
     r = {k: 0 for k in ROLL_KEYS}
     r.update(cost_usd=0.0, sessions=0, unpriced=0, runs=0, routed_runs=0, compactions=0)
-    by_project, by_model, tools = {}, {}, {}
+    by_project, by_model, by_provider, tools = {}, {}, {}, {}
     for s, x in slices:
+        pv = by_provider.setdefault(s.get("provider", "claude"),
+                                    {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "unpriced": 0})
+        pv["cost_usd"] += x.get("cost_usd") or 0
+        pv["tokens"] += x.get("tokens") or 0
+        pv["sessions"] += 1
+        pv["unpriced"] += x.get("cost_usd") is None
         for k in ROLL_KEYS:
             r[k] += x.get(k) or 0
         r["sessions"] += 1
@@ -829,7 +947,7 @@ def rollup(slices):
         m["tokens"] += x.get("tokens") or 0
         m["sessions"] += 1
         if x.get("_last"):  # whole-session counters land on the session's last day
-            r["compactions"] += s.get("compactions") or 0
+            r["compactions"] += s.get("compactions") or 0  # Codex: not measured (None) adds nothing
             for name, (calls, tok, img) in (s.get("tools") or {}).items():
                 t = tools.setdefault(name, [0, 0, 0])
                 t[0] += calls
@@ -841,9 +959,22 @@ def rollup(slices):
     order = lambda d: sorted(({"name": k, **{kk: (round(vv, 2) if isinstance(vv, float) else vv) for kk, vv in v.items()}}
                               for k, v in d.items()), key=lambda e: -e["cost_usd"])
     r["by_project"], r["by_model"] = order(by_project), order(by_model)
+    r["by_provider"] = sorted(({"name": k, **{kk: round(vv, 2) if isinstance(vv, float) else vv for kk, vv in v.items()},
+                                "cost_usd": round(v["cost_usd"], 2) if v["unpriced"] < v["sessions"] else None}
+                               for k, v in by_provider.items()), key=lambda e: e["name"])
+    nullable_cost(r)
     r["attribution"] = "touched"
     r["tools"] = sorted(({"name": k, "calls": c, "tokens": t + i * IMAGE_TOKENS, "text_tokens": t, "images": i}
                          for k, (c, t, i) in tools.items()), key=lambda e: -e["tokens"])
+    return r
+
+
+def nullable_cost(r):
+    """Cost stays the sum of what is priced; when nothing in it is priced it is unknown (None), not 0.
+    cost_complete says whether every session in it was priced."""
+    r["cost_complete"] = not r.get("unpriced")
+    if r.get("sessions") and r.get("unpriced") == r.get("sessions"):
+        r["cost_usd"] = None
     return r
 
 
@@ -852,10 +983,17 @@ def merge(rollups):
     r = {k: 0 for k in ROLL_KEYS}
     r.update(cost_usd=0.0, sessions=0, unpriced=0, runs=0, routed_runs=0, compactions=0)
     groups = {"by_project": {}, "by_model": {}}
+    providers, legacy = {}, 0
     tools = {}
     for d in rollups:
         for k in r:
             r[k] += d.get(k) or 0
+        if d.get("sessions") and "by_provider" not in d:
+            legacy += 1  # a day frozen before providers were tracked: Claude-only, not relabelled
+        for e in d.get("by_provider") or []:
+            x = providers.setdefault(e["name"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "unpriced": 0})
+            for k in x:
+                x[k] += e.get(k) or 0
         for g in groups:
             for e in d.get(g) or []:
                 x = groups[g].setdefault(e["name"], {"cost_usd": 0.0, "tokens": 0, "sessions": 0, "shared_sessions": 0})
@@ -872,7 +1010,11 @@ def merge(rollups):
         r[g] = sorted(({"name": k, **{kk: round(vv, 2) if isinstance(vv, float) else vv for kk, vv in v.items()}}
                        for k, v in d.items()), key=lambda e: -e["cost_usd"])
     r["tools"] = sorted(({"name": k, **v} for k, v in tools.items()), key=lambda e: -e["tokens"])
-    return r
+    r["by_provider"] = sorted(({"name": k, **{kk: round(vv, 2) if isinstance(vv, float) else vv for kk, vv in v.items()},
+                                "cost_usd": round(v["cost_usd"], 2) if v["unpriced"] < v["sessions"] else None}
+                               for k, v in providers.items()), key=lambda e: e["name"])
+    r["legacy_days"] = legacy
+    return nullable_cost(r)
 
 
 def load_store():
@@ -1058,15 +1200,25 @@ def build(days):
         save_store(store)
     hist_dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(HISTORY_DAYS))]
     history = [{"date": d, **(days.get(d) or store.get(d) or rollup([]))} for d in hist_dates]
-    status = run_json(["cdx", "status", "--json"]) or {}
+    try:  # cached status only: polling never logs in or refreshes an account
+        status = crow_cdx.call("status", "--cached")
+    except crow_cdx.CdxError:
+        status = {}
+    now_ts = dt.datetime.now().astimezone()
     limits = burn_rates([{
         "account": r.get("session_name"),
+        "provider": r.get("provider"),
         "remaining_5h_pct": r.get("remaining_5h_pct"),
         "reset_5h_at": r.get("reset_5h_at"),
         "remaining_week_pct": r.get("remaining_week_pct"),
         "reset_week_at": r.get("reset_week_at"),
         "active": r.get("active"),
-    } for r in status.get("rows", []) if r.get("provider") == "claude"])
+        # each provider's own windows; percentages are never compared across providers
+        "windows": {"five_hour": f"{r.get('provider')} 5h", "week": f"{r.get('provider')} week"},
+        "source": "cdx status --cached",
+        "updated_at": r.get("updated_at"),
+        "age_s": age_s(r.get("updated_at"), now_ts),
+    } for r in status.get("rows", []) if r.get("provider") in crow_cdx.PROVIDERS])
     retro_dir = os.path.join(STATE, "retros")
     proposals = os.path.join(retro_dir, "proposals.md")
     pending = 0
@@ -1085,6 +1237,9 @@ def build(days):
         s.pop("by_day_project", None)
         s.pop("hours", None)
     out = {
+        "schema_version": USAGE_SCHEMA,
+        "prices": {"version": crow_prices.PRICES_VERSION, "reviewed": crow_prices.PRICES_REVIEWED,
+                   "source": crow_prices.PRICES_SOURCE, "kind": "list-price estimate, not a subscription charge"},
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "limits": limits,
         "today": live[today],
@@ -1099,6 +1254,13 @@ def build(days):
     }
     write_project_view(out)
     return out
+
+
+def age_s(iso, now):
+    try:
+        return int((now - dt.datetime.fromisoformat(iso)).total_seconds())
+    except (TypeError, ValueError):
+        return None
 
 
 def human(n):
@@ -1128,14 +1290,18 @@ def main():
         sys.stdout.write("\n")
         return 0
     for lim in data["limits"]:
-        print(f"{lim['account']:<8} 5h {lim['remaining_5h_pct']}% left (↻ {lim['reset_5h_at']})  "
+        print(f"{lim['account']:<8} {lim.get('provider') or '':<6} 5h {lim['remaining_5h_pct']}% left (↻ {lim['reset_5h_at']})  "
               f"week {lim['remaining_week_pct']}% left (↻ {lim['reset_week_at']})")
     t = data["today"]
-    print(f"today    ${t['cost_usd']:.2f} · {human(t['tokens'])} tok ({t['cache_pct']}% cache reads) · {t['sessions']} sessions")
+    usd = lambda v, f=".2f": "$?" if v is None else f"${v:{f}}"
+    partial = "" if t.get("cost_complete", True) else f" ({t['unpriced']} unpriced)"
+    print(f"today    {usd(t['cost_usd'])}{partial} · {human(t['tokens'])} tok ({t['cache_pct']}% cache reads) · {t['sessions']} sessions")
+    for pv in t.get("by_provider") or []:
+        print(f"  {pv['name']:<7} {usd(pv['cost_usd'])} · {human(pv['tokens'])} tok · {pv['sessions']} sessions")
     spark = "▁▂▃▄▅▆▇█"
-    peak = max((d["cost_usd"] for d in data["days"]), default=0) or 1
-    print("7 days   " + "".join(spark[min(7, int(d["cost_usd"] / peak * 7))] for d in data["days"])
-          + "  " + " ".join(f"${d['cost_usd']:.0f}" for d in data["days"]))
+    peak = max((d["cost_usd"] or 0 for d in data["days"]), default=0) or 1
+    print("7 days   " + "".join(spark[min(7, int((d["cost_usd"] or 0) / peak * 7))] for d in data["days"])
+          + "  " + " ".join(usd(d["cost_usd"], ".0f") for d in data["days"]))
     bp = data["today"]["by_project"]
     if bp:
         print("by project today (turns that worked there; * = sessions shared with another project)")

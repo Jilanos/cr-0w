@@ -105,6 +105,8 @@ def test_capabilities_through_a_node_entrypoint(hub, cdx_env, monkeypatch, tmp_p
     caps = crow_cdx.capabilities()
     assert caps["version"] == "0.21.5" and {"claude", "codex"} <= set(caps["providers"])
     assert "cdx_manager" not in sys.modules
+    for script in ("crow_cdx.py", "crow-usage", "crow-runs", "crow-retro", "crow-relaunch"):
+        assert "import cdx_manager" not in (BIN / script).read_text() and "from cdx_manager" not in (BIN / script).read_text()
 
 
 def test_ask_first_consent_names_the_exact_account_and_is_never_reused(hub, cdx_env, tmp_path):
