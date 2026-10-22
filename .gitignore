@@ -5,3 +5,5 @@ local/
 tools/crow-watch/crow-watch
 __pycache__/
 .pytest_cache/
+.claude/skills/daily
+.claude/skills/weekly

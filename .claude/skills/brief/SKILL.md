@@ -28,10 +28,10 @@ Read-only except for one activity-log line. Target: **one screen, ≤ 40 lines**
 0. **Last AFK run first**: if `local/state/afk/log.md` has entries since yesterday evening, read it and the AFK report before anything else. Never state how the night ended without it; if the report is missing, say which jobs never finished and offer to compile it (see `runbooks/afk-runs.md`, Morning).
 1. **Open threads + status**: state dir `open-threads.md` and `status.md` (state dir = `vault.crow_dir` or `local/state/`).
 2. **Forge activity**: already above (Pre-gathered). Don't explore repos further. "My open MRs" lists every open MR with its unresolved thread count.
-3. **Jira** (Atlassian MCP): `searchJiraIssuesUsingJql` with
+3. **Tracker** (optional, e.g. Jira through the Atlassian MCP; skip if none is connected): `searchJiraIssuesUsingJql` with
    `assignee = currentUser() AND sprint in openSprints() AND statusCategory != Done ORDER BY priority DESC`
    Ask only for key, summary, status and priority fields.
-4. **Vault tasks**: `rg -n "^\s*- \[ \]" "<vault>/00 Inbox" "<vault>/10 Work" "<vault>/20 Personal"` and keep only tasks with a due date (📅 YYYY-MM-DD or `due:`) on or before today. Also count the files in `00 Inbox`. Don't read notes further.
+4. **Vault tasks** (only if a vault is configured): `rg -n "^\s*- \[ \]" "<vault>/00 Inbox" "<vault>/10 Work" "<vault>/20 Personal"` and keep only tasks with a due date (📅 YYYY-MM-DD or `due:`) on or before today. Also count the files in `00 Inbox`. Don't read notes further.
 5. **Release tracks**: already above (Pre-gathered).
 6. **Background runs**: `cdx runs --since today --json`. Keep only running or failed ones.
 7. **Retros**: report files in `local/state/retros/` dated since the last brief (one line each: project, what was applied), unchecked `- [ ]` lines in `local/state/retros/proposals.md`, and `bin/crow-retro status` for failures.
@@ -47,7 +47,7 @@ Skip any source that errors and note it in one line at the bottom.
 - review feedback on my MRs (unresolved threads, always first: fixing it gets them merged), reviews waiting on me (they unblock devs), approvals pending, failed runs, overdue tasks
 
 ## 📅 Today
-- meetings (11:30 daily on weekdays; Friday 12:00 company weekly), deadlines
+- meetings and recurring rituals (listed in `local/context.md`), deadlines
 
 ## 🏃 Sprint
 - KEY status: summary   (mine, in priority order)
