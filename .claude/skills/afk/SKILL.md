@@ -30,7 +30,7 @@ Use AskUserQuestion (self-contained questions with context and a recommendation,
 Record the answers in `local/state/afk/decisions-<today>.md`.
 
 ## 5. Write the jobs
-- One `job-<project>-<topic>.md` per job: the matching preamble (`preamble-personal.md` pushes, `preamble-work.md` local only) followed by the repo path, the worktree to create (`<repo>.wt/<topic>`), the expected commit identity from `local/projects.yaml`, the owner's decisions that apply, files to leave alone ("Protected"), the task, and when to stop.
+- One `job-<project>-<topic>.md` per job: the matching preamble with `{RETURN}` replaced by the owner's return time, (`preamble-personal.md` pushes, `preamble-work.md` local only) followed by the repo path, the worktree to create (`<repo>.wt/<topic>`), the expected commit identity from `local/projects.yaml`, the owner's decisions that apply, files to leave alone ("Protected"), the task, and when to stop.
 - Add one fallback job per active project: "next eligible roadmap item, same rules".
 - `queue.md`: priority order, the account for each job, the numeric floors (5-hour and weekly) under which no new run starts on each account, and the "needs env" list. The queue is the only source of order.
 - Create each worktree now and check its hooks (`commit-msg`, `pre-push`) resolve.
