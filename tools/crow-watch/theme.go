@@ -135,11 +135,10 @@ func padL(s string, w int) string {
 
 // ---------- gauges ----------
 
-// gaugeGlyph draws every bar gauge: a lower half block, twice as thick as a
-// line, on a solid track of the same glyph. Block elements are drawn by the
-// terminal itself, edge to edge, so filled and empty cells join into one bar
-// while stacked rows keep a gap. "▆" is the chunkier alternative.
-var gaugeGlyph = "▄"
+// gaugeGlyph draws every bar gauge: a heavy horizontal line, centred on the
+// text, filled in colour on a track of the same glyph in slot 8. Box drawing
+// joins edge to edge, so filled and empty cells read as one line.
+var gaugeGlyph = "━"
 
 // lineBar: a bar gauge (limits, context, slots, token bars).
 func lineBar(pct float64, cells int, style lipgloss.Style) []seg {
