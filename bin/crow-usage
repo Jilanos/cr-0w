@@ -54,14 +54,28 @@ def _cdx_python():
     return first[2:].strip() if first.startswith("#!") else None
 
 
+def _cdx_site():
+    """cdx's own site-packages (pipx venv), borrowed instead of re-exec'ing into an interpreter without yaml."""
+    interp = _cdx_python()
+    if not interp or interp == sys.executable:
+        return None
+    try:
+        return subprocess.run([interp, "-c", "import cdx_manager, os; print(os.path.dirname(os.path.dirname(cdx_manager.__file__)))"],
+                              capture_output=True, text=True, timeout=10).stdout.strip() or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 try:
     from cdx_manager.run_usage import estimate_cost, token_prices
 except ImportError:
-    interp = _cdx_python()
-    if interp and interp != sys.executable and not os.environ.get("CROW_USAGE_REEXEC"):
-        os.environ["CROW_USAGE_REEXEC"] = "1"
-        os.execv(interp, [interp, os.path.realpath(__file__), *sys.argv[1:]])
-    estimate_cost = token_prices = None
+    site = _cdx_site()
+    if site:
+        sys.path.append(site)
+    try:
+        from cdx_manager.run_usage import estimate_cost, token_prices
+    except ImportError:
+        estimate_cost = token_prices = None
 
 CROW_HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STATE = os.path.join(CROW_HOME, "local", "state")
