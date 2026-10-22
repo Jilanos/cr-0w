@@ -8,7 +8,7 @@ description: Morning briefing. One screen covering reviews waiting, sprint, open
 Read-only except for one activity-log line. Target: **one screen, ≤ 40 lines**. Gather cheaply, in this order.
 
 ## Gather
-0. **Last night first**: if `local/state/night/log.md` has entries since yesterday evening, read it and the night report before anything else. Never state how the night ended without it; if the report is missing, say which jobs never finished and offer to compile it (see `runbooks/overnight.md`, Morning).
+0. **Last AFK run first**: if `local/state/afk/log.md` has entries since yesterday evening, read it and the AFK report before anything else. Never state how the night ended without it; if the report is missing, say which jobs never finished and offer to compile it (see `runbooks/afk-runs.md`, Morning).
 1. **Open threads + status**: state dir `open-threads.md` and `status.md` (state dir = `vault.crow_dir` or `local/state/`).
 2. **Forge activity**: `bin/crow-activity --since yesterday`. Don't explore repos further. "My open MRs" lists every open MR with its unresolved thread count.
 3. **Jira** (Atlassian MCP): `searchJiraIssuesUsingJql` with

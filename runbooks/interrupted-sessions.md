@@ -31,7 +31,7 @@ message. They can continue on another allowed account through a cdx handoff.
   and the relaunch refuses it. No folder trick works: cdx counts every cwd in the transcript, so
   relaunching from the last folder or the worktree root is still refused. The fix is a cdx change
   (accept the launch folder when it is one of the transcript's workspaces), prepared as a local
-  patch and PR text under `local/state/night/shots/`; nothing is posted upstream.
+  patch and PR text under `local/state/afk/shots/`; nothing is posted upstream.
 - Check `crow runs` before relaunching a background run: a later run may already have resumed it.
 - Accounts with memory mode `session` get `local/memory` linked for the relaunched session, then
   unlinked and committed when it ends.

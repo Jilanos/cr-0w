@@ -12,7 +12,7 @@ def _repo(path):
 
 def _preflight(home, repo):
     env = dict(os.environ, CROW_HOME=str(home))
-    return subprocess.run([str(BIN / "crow-night-preflight"), str(repo)],
+    return subprocess.run([str(BIN / "crow-afk-preflight"), str(repo)],
                           capture_output=True, text=True, env=env).stdout
 
 

@@ -21,4 +21,4 @@ want to trigger it by name.
 - [interrupted-sessions](interrupted-sessions.md): list sessions cut off by a usage limit and relaunch them on another allowed account (always by id)
 - [memory](memory.md): memory lives in local/memory, linked into allowed cdx profiles (never copied)
 - [tui-render](tui-render.md): render a TUI (or ANSI mockup) to PNG in the kitty theme at real monitor sizes; fallback-glyph and contrast checks
-- [overnight](overnight.md): unattended night runs: queue, guardrails, pre-push denylist, morning report
+- [afk-runs](afk-runs.md): unattended AFK runs (night or day): queue, guardrails, pre-push denylist, return report

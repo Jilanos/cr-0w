@@ -159,7 +159,7 @@ def workspace(path, cid):
         die(f"transcript holds conversation ids {sorted(ids)}, expected only {cid}")
     if len(cwds) != 1:
         die(f"transcript spans {len(cwds)} workspaces ({', '.join(sorted(cwds))}); cdx {CDX_VERSION_NOTE} "
-            "needs exactly one (patch: local/state/night/shots/*/cdx-handoff-multi-workspace.patch)")
+            "needs exactly one (patch: local/state/afk/shots/*/cdx-handoff-multi-workspace.patch)")
     ws = cwds.pop()
     if not os.path.isdir(ws):
         die(f"workspace {ws} no longer exists")

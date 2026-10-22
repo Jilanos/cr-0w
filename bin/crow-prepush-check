@@ -2,8 +2,8 @@
 # crow-prepush-check: git pre-push hook that refuses a push whose new commits mention a denied pattern.
 # Patterns (extended regex, one per line, # comments) come from local/prepush-deny.txt plus
 # local/prepush-deny.<repo-dir-name>.txt. Messages and added lines are checked, not removed ones.
-# --history audits everything already pushed (run by crow-night-preflight).
-# Install: ln -s <crow>/bin/crow-prepush-check <repo>/.git/hooks/pre-push   (see runbooks/overnight.md)
+# --history audits everything already pushed (run by crow-afk-preflight).
+# Install: ln -s <crow>/bin/crow-prepush-check <repo>/.git/hooks/pre-push   (see runbooks/afk-runs.md)
 set -u
 CROW_HOME="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 # name of the main checkout, so a linked worktree uses its repo's deny list

@@ -31,4 +31,4 @@ and listed hooks as checks to run by hand (lint, gates). Git hooks still run.
 - Commit, push, rebase, merge, cherry-pick, `gh pr create|merge`, `glab mr create|merge` on a path or
   remote of such a repo, or `git worktree add` under /tmp: the owner is asked.
 - Markers live in `<state>/hub-guard/<session>.json`; delete them to re-arm the notes.
-- `CROW_HUB_GUARD=off` for hub runs nobody can answer (night orchestration only touches `.wt/` worktrees, which pass).
+- `CROW_HUB_GUARD=off` for hub runs nobody can answer (AFK orchestration only touches `.wt/` worktrees, which pass).
