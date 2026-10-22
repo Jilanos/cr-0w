@@ -288,10 +288,14 @@ func (u *usage) limitLines(width int) []line {
 	return out
 }
 
-func (u *usage) spendHead() line {
+// spendHead: the spend figures; sessions adds today's session count when there is room.
+func (u *usage) spendHead(sessions bool) line {
 	t, w := u.Today, u.Week
 	l := line{{money(t.CostUSD), sBold.Foreground(cWhite)}, {" today   ", sSub}, {money(w.CostUSD), sBold}, {" last 7 days   ", sSub},
 		{money(u.Month.CostUSD), sBold}, {" 30 days", sSub}}
+	if sessions {
+		l = append(l, seg{fmt.Sprintf("   ·   %d sessions today", t.Sessions), sSub})
+	}
 	if t.Unpriced > 0 {
 		l = append(l, seg{fmt.Sprintf("   %d unpriced", t.Unpriced), sYellow})
 	}
@@ -395,7 +399,7 @@ type sessionCols struct{ project, title, models int }
 
 func sessCols(width int) sessionCols {
 	c := sessionCols{project: 17, models: 13}
-	if width < 90 {
+	if width < 180 { // model names are detail: shown only when the list has room to spare
 		c.models = 0
 	}
 	if width < 60 {
@@ -636,6 +640,9 @@ func (m model) sessionsBox(w, h int) block {
 	return box(title("Sessions", fmt.Sprintf("today %d · then earlier days", u.nToday)), line{{"o open · c copy id", sSub}}, body, w, h, off, sel, true)
 }
 
+// usageView: headroom first. Limits, a one-line spend, the sessions, a
+// one-line savings summary. The token split, per-model and per-tool breakdowns
+// live in Savings and History (keys 3 and 4).
 func (m model) usageView(h int) block {
 	u := m.usage
 	if m.w >= 170 {
@@ -643,39 +650,17 @@ func (m model) usageView(h int) block {
 	}
 	w := m.w
 	limits := box(title("Limits", ""), line{{"remaining", sSub}}, u.limitLines(w-4), w, 0, 0, -1, false)
-	chartH := 5
-	if h >= 70 {
-		chartH = 7
-	}
-	spendBody := append([]line{u.spendHead(), u.splitLine(), {}}, chart(u.Days, w-4, chartH, false)...)
-	spend := box(title("Spend", ""), nil, spendBody, w, 0, 0, -1, false)
-	var sav block
-	if w >= 100 {
-		sav = box(title("Savings", "today"), line{{"3 for details", sSub}}, u.savingsLines(w-4, u.Today, "today"), w, 0, 0, -1, false)
-	} else {
-		sav = box(title("Savings", "today"), nil, u.savingsCompact(u.Today, "today"), w, 0, 0, -1, false)
-	}
-	hist := box(title("History", "7 days"), line{{"4 for 30 days", sSub}}, u.historyLines(w-4, u.Week, "7 days", 0), w, 0, 0, -1, false)
+	spendBody := []line{u.spendHead(true)}
 	minSess := min(u.nToday, 12) + 6
-	// Drop order when short: history, then the chart, then savings shrink to one line each.
-	fixed := len(limits) + len(spend) + len(sav)
-	if h-fixed-len(hist) >= minSess {
-		fixed += len(hist)
-	} else {
-		hist = nil
+	if chartH := 5; h-len(limits)-(chartH+6)-3-minSess >= 0 { // the week's bars only when the sessions still fit
+		spendBody = append(spendBody, line{})
+		spendBody = append(spendBody, chart(u.Days, w-4, chartH, false)...)
 	}
-	if h-fixed < minSess {
-		spend = box(title("Spend", ""), nil, []line{u.spendHead(), u.splitLine()}, w, 0, 0, -1, false)
-		fixed = len(limits) + len(spend) + len(sav)
-	}
-	if h-fixed < minSess {
-		sav = box(title("Savings", "today"), nil, []line{u.savingsOneLine()}, w, 0, 0, -1, false)
-		fixed = len(limits) + len(spend) + len(sav)
-	}
-	sess := m.sessionsBox(w, max(5, h-fixed))
+	spend := box(title("Spend", ""), nil, spendBody, w, 0, 0, -1, false)
+	sav := box(title("Savings", "today"), line{{"3 for details", sSub}}, []line{u.savingsOneLine()}, w, 0, 0, -1, false)
+	sess := m.sessionsBox(w, max(5, h-len(limits)-len(spend)-len(sav)))
 	out := append(append(append(block{}, limits...), spend...), sess...)
-	out = append(out, sav...)
-	return append(out, hist...)
+	return append(out, sav...)
 }
 
 func (u *usage) savingsOneLine() line {
@@ -691,21 +676,18 @@ func (m model) usageGrid(h int) block {
 	c2 := min(84, m.w*28/100)
 	c3 := m.w - c1 - c2
 	lim := u.limitLines(c1 - 4)
-	sav := u.savingsLines(c3-4, u.Today, "today")
-	r1 := max(len(lim), len(sav), 10) + 2
-	spend := append([]line{u.spendHead(), u.splitLine(), {}}, chart(u.Days, c2-4, max(3, r1-2-3-2), false)...)
-	if c2 < 70 {
-		spend[1] = line{{human(u.Today.Tokens), sCyan}, {fmt.Sprintf(" tok · %d sessions · %d%% cache", u.Today.Sessions, u.Today.CachePct), sSub}}
-	}
+	sav := u.savingsCompact(u.Today, "today")
+	r1 := max(len(lim), len(sav), 8) + 2
+	spend := append([]line{u.spendHead(false), {}}, chart(u.Days, c2-4, max(3, r1-2-2-2), false)...)
 	row1 := hcat([]int{c1, c2, c3},
 		box(title("Limits", ""), line{{"remaining", sSub}}, lim, c1, r1, 0, -1, false),
 		box(title("Spend", ""), nil, spend, c2, r1, 0, -1, false),
-		box(title("Savings", "today"), nil, sav, c3, r1, 0, -1, false))
+		box(title("Savings", "today"), line{{"3 for details", sSub}}, sav, c3, r1, 0, -1, false))
 	r2 := h - len(row1)
 	sw := m.w * 62 / 100
 	hw := m.w - sw
 	row2 := hcat([]int{sw, hw}, m.sessionsBox(sw, r2),
-		box(title("History", "7 days"), line{{"4 for 30 days", sSub}}, u.historyLines(hw-4, u.Week, "7 days", r2-2), hw, r2, 0, -1, false))
+		box(title("By project", "7 days"), line{{"4 for history", sSub}}, barRows(u.Week.ByProject, hw-4, r2-2, sBlueFg, false), hw, r2, 0, -1, false))
 	return append(row1, row2...)
 }
 
@@ -802,7 +784,7 @@ func (m model) historyView(h int) block {
 	chartH := max(4, min(10, h/5))
 	tok := false
 	body := append([]line{{{money(u.Month.CostUSD), sBold}, {" in 30 days · ", sSub}, {human(u.Month.Tokens), sCyan}, {" tokens · ", sSub},
-		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, {}}, chart(u.History, w-4, chartH, tok)...)
+		{fmt.Sprint(u.Month.Sessions), sCyan}, {" sessions", sSub}}, append(line{{"today  ", sSub}}, u.splitLine()...), {}}, chart(u.History, w-4, chartH, tok)...)
 	cost := box(title("Cost per day", "30 days"), nil, body, w, 0, 0, -1, false)
 	rest := h - len(cost)
 	if w >= 150 {

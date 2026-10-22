@@ -15,7 +15,7 @@ import (
 // TestShots writes each view as ANSI at several terminal sizes, for bin/ansi-shot:
 //
 //	SHOTS=out/ go test -run TestShots .                       # fixtures
-//	SHOTS=out/ RUNS=runs.json USAGE=usage.json go test ...    # live payloads
+//	SHOTS=out/ RUNS=runs.json USAGE=usage.json INTR=sessions.json go test ...    # live payloads
 //
 // Sizes approximate real monitors: a vertical 1080p, a laptop, a wide 1440p, a small split.
 func TestShots(t *testing.T) {
@@ -29,6 +29,19 @@ func TestShots(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.ANSI)
 	defer lipgloss.SetColorProfile(termenv.Ascii)
 	snap := sample()
+	snap.Finished = append(snap.Finished, finished{RunID: "fa11ed00", Project: "billing-api", Label: "pagination", Status: "failed",
+		DurationS: 300, EndedAt: "2026-10-20T09:07:00+00:00"})
+	intr := sampleIntr()
+	if p := os.Getenv("INTR"); p != "" { // crow-sessions list --json
+		var reg struct {
+			Sessions []interrupted `json:"sessions"`
+		}
+		b, err := os.ReadFile(p)
+		if err != nil || json.Unmarshal(b, &reg) != nil {
+			t.Fatal("bad INTR file")
+		}
+		intr = reg.Sessions
+	}
 	if p := os.Getenv("RUNS"); p != "" {
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -55,7 +68,7 @@ func TestShots(t *testing.T) {
 	os.MkdirAll(dir, 0o755)
 	for name, sz := range sizes {
 		for v, view := range []string{"agents", "usage", "savings", "history"} {
-			m := model{w: sz[0], h: sz[1], snap: snap, usage: u, view: v, period: "w", now: now,
+			m := model{w: sz[0], h: sz[1], snap: snap, intr: intr, usage: u, view: v, period: "w", now: now,
 				updated: now, reports: map[string]string{}}
 			m.rebuild()
 			f := filepath.Join(dir, fmt.Sprintf("%s-%s.ans", view, name))

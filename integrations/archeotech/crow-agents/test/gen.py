@@ -53,6 +53,21 @@ for k, v in fx.items():
     with open(os.path.join(out, "fx", f"{k}.json"), "w") as fh:
         json.dump(v, fh, indent=1)
 
+# crow sessions list --json: one session stopped by the 5h limit an hour ago
+# (shown under NEEDS YOU), one already relaunched (hidden).
+stops = {"sessions": [
+    {"conversation_id": "5ab51b0c-0000-4000-8000-000000000001", "account": "work", "project": "notes-plugin",
+     "cwd": "/srv/notes-plugin", "branch": "night/books-flow", "last_event": iso(60), "limit": "five_hour",
+     "resets_at": int(dt.datetime.now(dt.timezone.utc).timestamp()) + 3 * 3600,
+     "first_prompt": "0.2 books flow correctness", "workspaces": ["/srv/notes-plugin"], "relaunched": None},
+    {"conversation_id": "5ab51b0c-0000-4000-8000-000000000002", "account": "work", "project": "hub",
+     "cwd": "/srv/hub", "last_event": iso(30), "limit": "five_hour", "resets_at": 0,
+     "first_prompt": "already moved", "workspaces": ["/srv/hub"], "relaunched": {"target": "spare"}},
+]}
+with open(os.path.join(out, "fx", "sessions.json"), "w") as fh:
+    json.dump(stops, fh, indent=1)
+sessions_cmd = f"cat {os.path.abspath(out)}/fx/sessions.json"
+
 cmds = {k: f"cat {os.path.abspath(out)}/fx/{k}.json" for k in fx}
 cmds["error"] = "echo 'crow: not found' >&2; exit 1"
 for k, cmd in cmds.items():
@@ -60,7 +75,8 @@ for k, cmd in cmds.items():
         "top": {"type": "bar", "size": 30, "content": [
             {"id": "workspaces", "config": {}, "align": "left"},
             {"id": "clock", "config": {}, "align": "center"},
-            {"id": "plugin:crow-agents", "config": {"command": cmd}, "align": "right"},
+            {"id": "plugin:crow-agents", "config": {"command": cmd, "sessionsCommand": sessions_cmd if k == "busy" else ""},
+             "align": "right"},
             {"id": "battery", "config": {}, "align": "right"},
             {"id": "power", "config": {}, "align": "right"}]},
         "right": {"type": "strip", "size": 10, "expanded": 240, "content": [

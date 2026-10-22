@@ -222,9 +222,6 @@ Item {
         readonly property int wTok: 64
         readonly property int wCost: 68
         readonly property int wTitle: width - wMark - wProject - wTok - wCost
-        // savings: name | value | detail (flex)
-        readonly property int wSavName: 120
-        readonly property int wSavVal: 92
 
         readonly property bool hasData: CrowUsageStore.snap !== null
         readonly property var days: CrowUsageStore.days
@@ -389,19 +386,6 @@ Item {
                         font.family: root.fFamily; font.pixelSize: root.fBase
                     }
                 }
-                // Where the tokens went: cache reads dominate the count but cost a tenth of input.
-                Cell {
-                    visible: panel.hasData
-                    x: panel.wMark
-                    width: parent.width - panel.wMark
-                    font.pixelSize: root.fSm
-                    text: "in " + CrowUsageStore.human(panel.t.input_tokens)
-                          + " · out " + CrowUsageStore.human(panel.t.output_tokens)
-                          + " · cache read " + CrowUsageStore.human(panel.t.cache_read_tokens)
-                          + " (" + (panel.t.cache_pct ?? "–") + "%)"
-                          + " · write " + CrowUsageStore.human(panel.t.cache_write_tokens)
-                }
-
                 // ── 7-day cost bars ──
                 Item {
                     visible: panel.hasData
@@ -522,53 +506,27 @@ Item {
                     }
                 }
 
-                // ── savings today: name | value | what it means ──
+                // ── savings today: one line; the explanations live in crow watch (Savings tab) ──
                 Head { text: "SAVINGS TODAY"; visible: panel.hasData }
-                Repeater {
-                    model: !panel.hasData ? [] : [
-                        { name: "rtk",
-                          value: CrowUsageStore.human(CrowUsageStore.rtk.today_saved_tokens) + " tok",
-                          detail: (CrowUsageStore.rtk.today_saved_pct !== null && CrowUsageStore.rtk.today_saved_pct !== undefined
-                                   ? Math.round(CrowUsageStore.rtk.today_saved_pct) + "% of command output trimmed"
-                                   : "command output trimmed"),
-                          good: (CrowUsageStore.rtk.today_saved_tokens || 0) > 0 },
-                        { name: "prompt cache",
-                          value: CrowUsageStore.moneyShort(panel.t.cache_saved_usd || 0),
-                          detail: "vs paying full input price",
-                          good: (panel.t.cache_saved_usd || 0) > 0 },
-                        { name: "model routing",
-                          value: CrowUsageStore.moneyShort(panel.t.routing_saved_usd || 0),
-                          detail: (panel.t.routed_runs || 0) + ((panel.t.routed_runs || 0) === 1 ? " run" : " runs") + " on cheaper models",
-                          good: (panel.t.routing_saved_usd || 0) > 0 },
-                        { name: "compactions",
-                          value: String(panel.t.compactions || 0),
-                          detail: "context compactions today",
-                          good: false },
-                        { name: "retros",
-                          value: (CrowUsageStore.retros.today || 0) + " reviewed",
-                          detail: (CrowUsageStore.retros.pending_proposals || 0)
-                                  + ((CrowUsageStore.retros.pending_proposals || 0) === 1 ? " suggestion" : " suggestions") + " to approve",
-                          good: false,
-                          ask: (CrowUsageStore.retros.pending_proposals || 0) > 0 }
-                    ]
-                    delegate: Row {
-                        id: sav
-                        required property var modelData
-                        x: panel.wMark
-                        Cell { width: panel.wSavName; text: sav.modelData.name; elide: Text.ElideNone }
-                        Cell {
-                            width: panel.wSavVal; horizontalAlignment: Text.AlignRight; elide: Text.ElideNone
-                            text: sav.modelData.value
-                            color: sav.modelData.good ? root.cOk : root.cText; font.bold: true
-                        }
-                        Cell {
-                            width: body.width - panel.wMark - panel.wSavName - panel.wSavVal
-                            leftPadding: root.s3
-                            text: sav.modelData.detail
-                            color: sav.modelData.ask ? root.cAccent : root.cSub
-                            font.bold: !!sav.modelData.ask
-                        }
-                    }
+                Row {
+                    visible: panel.hasData
+                    x: panel.wMark
+                    spacing: root.s2
+                    Cell { text: "rtk"; elide: Text.ElideNone }
+                    Cell { text: CrowUsageStore.human(CrowUsageStore.rtk.today_saved_tokens) + " tok"; color: root.cOk; font.bold: true; elide: Text.ElideNone }
+                    Cell { text: "·  cache"; elide: Text.ElideNone }
+                    Cell { text: CrowUsageStore.moneyShort(panel.t.cache_saved_usd || 0); color: root.cOk; font.bold: true; elide: Text.ElideNone }
+                    Cell { text: "·  routing"; elide: Text.ElideNone }
+                    Cell { text: CrowUsageStore.moneyShort(panel.t.routing_saved_usd || 0); color: root.cOk; font.bold: true; elide: Text.ElideNone }
+                    Cell { text: "·  " + (CrowUsageStore.retros.today || 0) + " retros"; elide: Text.ElideNone }
+                }
+                // A retro suggestion waiting for an OK is something to act on: its own line, in the accent.
+                Cell {
+                    visible: panel.hasData && (CrowUsageStore.retros.pending_proposals || 0) > 0
+                    x: panel.wMark
+                    text: "◆ " + (CrowUsageStore.retros.pending_proposals || 0)
+                          + ((CrowUsageStore.retros.pending_proposals || 0) === 1 ? " retro suggestion" : " retro suggestions") + " waiting for your OK"
+                    color: root.cAccent; font.bold: true
                 }
             }
         }

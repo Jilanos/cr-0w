@@ -14,16 +14,17 @@ limit is left, what today cost, and where the tokens went.
 - **Panel** (`panel-content`):
   - LIMITS: one row per account (● = current) with 5h and week gauges, % left
     and reset time (time only when the reset is today).
-  - TODAY: cost, tokens, sessions; then where the tokens went (new input,
-    output, cache read with hit %, cache written).
+  - TODAY: cost, tokens, sessions, and the 7-day total on one line (where the
+    tokens went, new input / output / cache, is on crow watch's History tab).
   - LAST 7 DAYS: cost per day as bars (today highlighted), cost and tokens total, max.
   - TOP SESSIONS TODAY: the 5 costliest sessions touched today: state
     (● live, ⚙ background run, ✓ interactive), project, title, tokens, cost;
     then a total over all of today's sessions. Titles come from crow-usage
     (dispatch label, else a Haiku-generated title, else the first prompt).
-  - SAVINGS TODAY: tokens rtk trimmed from command output (and all-time total);
-    sessions the automatic retros reviewed, and their suggestions waiting for
-    your approval (`local/state/retros/proposals.md`).
+  - SAVINGS TODAY: one line, rtk tokens trimmed, prompt cache and model routing
+    savings, retros run today; retro suggestions waiting for your approval
+    (`local/state/retros/proposals.md`) get their own accent line. What each one
+    means is on crow watch's Savings tab.
   When a poll fails the title says so and the last good data stays (marked
   stale); with no data at all, only the error (last stderr line) is shown.
 

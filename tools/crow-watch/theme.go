@@ -143,7 +143,19 @@ var gaugeGlyph = "▄"
 
 // lineBar: a bar gauge (limits, context, slots, token bars).
 func lineBar(pct float64, cells int, style lipgloss.Style) []seg {
-	on := int(max(0, min(100, pct))*float64(cells)/100 + 0.5)
+	pct = max(0, min(100, pct))
+	on := int(pct*float64(cells)/100 + 0.5)
+	if cells > 1 {
+		// Short bars: a non-zero value always shows one filled cell and a
+		// non-full one always keeps one empty cell, so 3% and 97% never read
+		// as empty or full.
+		if pct > 0 {
+			on = max(on, 1)
+		}
+		if pct < 100 {
+			on = min(on, cells-1)
+		}
+	}
 	return []seg{{strings.Repeat(gaugeGlyph, on), style}, {strings.Repeat(gaugeGlyph, cells-on), sDim}}
 }
 

@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 85%
+> Understanding: 95%
+> Confidence: 90%
+> Progress: 100%
 > Complexity: High
 > Theme: Hub observability
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -29,11 +29,11 @@
 
 # Acceptance criteria
 - AC10: Savings tab lists rtk, prompt cache, model routing, compactions and tokens per tool/MCP for the selected period.
-- AC11: past days are read from the rollup store, only today is recomputed, and history extends past the transcript window.
+- AC11: finished days are read from the saved daily file (frozen once the day is over); only today and yesterday are recomputed from transcripts, and history extends past the transcript window.
 
 # AC Traceability
 - request-AC10 -> This backlog slice. Proof: AC10: Savings tab lists rtk, prompt cache, model routing, compactions and tokens per tool/MCP for the selected period.
-- request-AC11 -> This backlog slice. Proof: AC11: past days are read from the rollup store, only today is recomputed, and history extends past the transcript window.
+- request-AC11 -> This backlog slice. Proof: AC11: finished days are read from the saved daily file (frozen once the day is over); only today and yesterday are recomputed from transcripts, and history extends past the transcript window.
 
 # Decision framing
 - Product framing: Not needed
