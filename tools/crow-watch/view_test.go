@@ -140,7 +140,7 @@ func TestAgentsView(t *testing.T) {
 	contains(t, "agents", out,
 		[]string{"Needs you", "Working", "1 of 2 run slots busy", "Finished", "Idle", "waiting for your reply", "ctx 82%",
 			"main 5h limit", "failed", "1 commit", "Today"},
-		[]string{"ctx 12%", "ctx 6%", "context used", "1/2", "old00000", "dotfiles"})
+		[]string{"ctx 12%", "ctx 6%", "context used", "1/2", "old00000", "dotfiles", "so far", " a…"})
 	m.selKey = "5ab51b0c-0000"
 	m.rebuild()
 	contains(t, "interrupted details", m.View(), []string{"stopped by the 5h limit", "crow relaunch 5ab51b0c", "commit the books flow fix"}, nil)

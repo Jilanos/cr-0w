@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // contextWindow: the model window the context % is measured against.
@@ -62,27 +63,21 @@ func clockOf(iso string) string {
 	return t.Local().Format("15:04")
 }
 
-// agentCost: what the agent's session has cost so far, from the usage data.
-func (m model) agentCost(sid string) string {
-	if m.usage == nil {
-		return ""
-	}
-	if s := m.usage.byID[sid]; s != nil && s.CostUSD != nil {
-		return money(*s.CostUSD)
-	}
-	return ""
-}
+// rowCols: one line per agent. Project, age and context columns sized to the
+// rows' content, around a task and a "what is happening" column that share the rest.
+type rowCols struct{ project, task, detail, age, ctx int }
 
-// rowCols: one line per agent. Fixed project, age, context and cost columns
-// around a task and a "what is happening" column that share the rest.
-type rowCols struct{ project, task, detail, age, ctx, cost int }
-
-func agCols(width int) rowCols {
-	c := rowCols{project: 16, age: 9, ctx: 9, cost: 8}
-	if width < 100 {
-		c.project, c.cost = 13, 0
+func agCols(width int, rows []agentRow) rowCols {
+	c := rowCols{project: 8}
+	for _, r := range rows {
+		c.project = max(c.project, runewidth.StringWidth(r.project)+1)
+		c.age = max(c.age, runewidth.StringWidth(r.when)+1)
+		if r.ctx.text != "" {
+			c.ctx = max(c.ctx, runewidth.StringWidth(r.ctx.text)+2)
+		}
 	}
-	flex := max(20, width-2-c.project-c.age-c.ctx-c.cost)
+	c.project = min(c.project, map[bool]int{true: 13, false: 18}[width < 100])
+	flex := max(20, width-2-c.project-c.age-c.ctx)
 	c.task = max(12, flex*45/100)
 	c.detail = flex - c.task
 	return c
@@ -148,11 +143,17 @@ func resetClock(unix int64) string {
 	return time.Unix(unix, 0).Local().Format("15:04")
 }
 
-// itemLine: one row. glyph · project · task · what is happening · age · context · cost.
-func (m model) itemLine(it item, width int) line {
-	c := agCols(width)
+// agentRow: the fields of one row before they are laid out in columns.
+type agentRow struct {
+	glyph, detail, ctx  seg
+	project, task, when string
+	ps, ts              lipgloss.Style
+}
+
+// itemRow: one row. glyph · project · task · what is happening · age · context.
+func (m model) itemRow(it item) agentRow {
 	var glyph seg
-	var project, task, when, cost string
+	var project, task, when string
 	var detail seg
 	ctx := seg{"", sPlain}
 	ps, ts := sBold, sPlain
@@ -177,7 +178,6 @@ func (m model) itemLine(it item, width int) line {
 		}
 		when = age(float64(a.LastActivityS))
 		ctx = ctxTag(a.ContextTokens)
-		cost = m.agentCost(a.SessionID)
 	case it.fin != nil:
 		f := it.fin
 		s := st(f.Status)
@@ -207,12 +207,15 @@ func (m model) itemLine(it item, width int) line {
 		}
 		detail = seg{what, sYellow}
 		when = "at " + clockOf(s.LastEvent)
-		cost = m.agentCost(s.ID)
 	}
-	l := line{glyph, {pad(project, c.project-1) + " ", ps}, {pad(task, c.task-1) + " ", ts},
-		{pad(detail.text, c.detail-1) + " ", detail.style}, {padL(when, c.age-1) + " ", sSub}, {padL(ctx.text, c.ctx-1) + " ", ctx.style}}
-	if c.cost > 0 {
-		l = append(l, seg{padL(cost, c.cost), sYellow})
+	return agentRow{glyph: glyph, detail: detail, ctx: ctx, project: project, task: task, when: when, ps: ps, ts: ts}
+}
+
+func (r agentRow) line(c rowCols) line {
+	l := line{r.glyph, {pad(r.project, c.project-1) + " ", r.ps}, {pad(r.task, c.task-1) + " ", r.ts},
+		{pad(r.detail.text, c.detail-1) + " ", r.detail.style}, {padL(r.when, c.age), sSub}}
+	if c.ctx > 0 {
+		l = append(l, seg{padL(r.ctx.text, c.ctx), r.ctx.style})
 	}
 	return l
 }
@@ -247,14 +250,19 @@ func (m model) agentList(width int) ([]line, listMap) {
 	if m.snap != nil {
 		heading(gNeed) // always shown: "nothing waiting on you" is an answer too
 	}
+	rows := make([]agentRow, len(m.items))
+	for i, it := range m.items {
+		rows[i] = m.itemRow(it)
+	}
+	c := agCols(width, rows)
 	group := gNeed
-	for _, it := range m.items {
+	for i, it := range m.items {
 		if it.group != group {
 			group = it.group
 			heading(group)
 		}
 		lm.start = append(lm.start, len(lines))
-		lines = append(lines, m.itemLine(it, width))
+		lines = append(lines, rows[i].line(c))
 		lm.end = append(lm.end, len(lines))
 	}
 	if len(m.items) == 0 {
@@ -301,9 +309,6 @@ func (m model) detailLines(width int) []line {
 		if r := resetClock(s.ResetsAt); r != "" {
 			meta += " · resets " + r
 		}
-		if c := m.agentCost(s.ID); c != "" {
-			meta += " · " + c + " so far"
-		}
 		out = append(out, line{{meta, sSub}}, line{{joinDot(s.Cwd, s.Branch), sSub}})
 		if len(s.Workspaces) > 1 {
 			out = append(out, line{{fmt.Sprintf("ran in %d folders: cdx cannot hand it to another account as is", len(s.Workspaces)), sYellow}})
@@ -329,9 +334,6 @@ func (m model) detailLines(width int) []line {
 		}
 		if a.ContextTokens > 0 {
 			meta += fmt.Sprintf(" · context %.0f%% used", float64(a.ContextTokens)*100/float64(contextWindow()))
-		}
-		if c := m.agentCost(a.SessionID); c != "" {
-			meta += " · " + c + " so far"
 		}
 		if a.SubagentsActive > 0 {
 			meta += fmt.Sprintf(" · %d subagents", a.SubagentsActive)
