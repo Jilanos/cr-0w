@@ -171,11 +171,22 @@ def transcript_path(home, cwd, sid):
     return Path(home) / ".claude/projects" / re.sub(r"[^A-Za-z0-9]", "-", cwd) / f"{sid}.jsonl"
 
 
+CD_PREFIX = re.compile(r"^(?:cd\s+(?:\"[^\"]*\"|'[^']*'|\S+)\s*(?:&&|;)\s*)+")
+LONG_PATH = re.compile(r"(?<![\w.~-])/(?:[\w.@+-]+/)+([\w.@+-]+/?)")
+
+
+def short_command(cmd):
+    """A shell command without its leading `cd` and with absolute paths cut to their last part."""
+    cmd = CD_PREFIX.sub("", " ".join(cmd.split()))
+    return LONG_PATH.sub(lambda m: "…/" + m[1] if m[0].count("/") > 2 else m[0], cmd)
+
+
 def summarize_tool(name, inp):
-    for k in ("command", "description", "file_path", "pattern", "query", "url", "prompt", "skill"):
+    """One line for a tool call: its own description (Bash, Agent) before the raw input."""
+    for k in ("description", "command", "file_path", "pattern", "query", "url", "prompt", "skill"):
         if inp.get(k):
             v = str(inp[k]).strip().splitlines()[0]
-            return f"{name}: {v}"
+            return f"{name}: {short_command(v) if k == 'command' else v}"
     return name
 
 
