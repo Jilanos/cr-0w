@@ -41,4 +41,5 @@ Unattended work while the owner is away. The hub session is the orchestrator; ru
 
 ## Morning (hub session)
 - Before saying anything about the night, read `local/state/night/log.md` and check that the report exists. If the orchestrator died, the report is compiled from `reports/*.md` and `git log`, and the owner is told which jobs never finished.
-- Publish the page, then ask the pending decisions with AskUserQuestion.
+- Open the page, then build a comparison page for every visual decision (`bin/crow-compare <spec.json>`: options as columns, scenarios as rows, flip viewer with zoom) and open it before asking. Then ask the pending decisions with AskUserQuestion.
+- Runs that leave a visual decision list, per option, the exact image paths for each scenario (same framing across options), so the spec can be written without searching.
