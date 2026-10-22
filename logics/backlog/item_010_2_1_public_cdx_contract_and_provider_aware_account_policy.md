@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 10%
+> Understanding: 95%
+> Confidence: 90%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -20,7 +20,7 @@ Crow assumes a Python cdx installation and accounts without provider identity. P
 - In:
   - Priority rationale: every subsequent slice depends on reliable provider resolution and one policy boundary.
   - Introduce a shared subprocess boundary with argv arrays, timeouts, exit/ok/schema checks, bounded errors and cached capability discovery. Keep providers as claude/codex internal enums; tolerate unrelated providers in inventory but refuse them as targets.
-  - Read public cdx inventory/schema/config/status contracts using sanitized 0.21.4 fixtures. Preserve CROW_ACCOUNT and old default/name/policy/memory configuration; explicit account overrides default, optional --provider constrains the resolved account. When only provider is supplied, select only within allowed enabled profiles; never let cdx select an unrestricted account.
+  - Read public cdx inventory/schema/config/status contracts using sanitized 0.21.4 fixtures. Preserve CROW_ACCOUNT and old default/name/policy/memory configuration; explicit account overrides default, optional --provider constrains the resolved account (checked by crow; cdx run receives the account only, since it refuses an account with --provider). When only provider is supplied, select only within allowed enabled profiles; never let cdx select an unrestricted account.
   - Extend docs/accounts.example.yaml with invented Claude/Codex profiles, provider mismatch validation and documented unknown-profile policy. Inventory reads must not log into, refresh auth or alter profiles.
 - Out:
   - Changing cdx or provider authentication internals.

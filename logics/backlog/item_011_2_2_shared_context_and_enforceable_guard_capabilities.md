@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 10%
+> Understanding: 95%
+> Confidence: 90%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -34,7 +34,7 @@ Claude memory paths and hooks do not establish equivalent instructions or permis
 
 # AC Traceability
 - request-AC8 -> This backlog slice. Proof: AC1: Synthetic Claude and Codex launches receive the same required repo/task references while retaining their native instruction semantics.
-- request-AC9 -> This backlog slice. Proof: AC2: Never profiles receive no memory links or context; concurrent shared sessions retain access until the last closes and cleanup is idempotent.
+- request-AC9 -> This backlog slice. Proof: AC3: A missing enforcement capability blocks the affected operation before provider launch; fixtures prove no permission downgrade or full-access substitution.
 
 # Decision framing
 - Product framing: Not needed

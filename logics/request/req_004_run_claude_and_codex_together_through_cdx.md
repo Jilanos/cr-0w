@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 90%
-> Confidence: 85%
+> Understanding: 95%
+> Confidence: 90%
 > Complexity: High
 > Theme: Claude and Codex orchestration
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
@@ -20,7 +20,8 @@ Extends the existing account-switching and observability work. cdx owns provider
 
 # Context
 - Repository inspection on 2026-10-22: interactive launches already call cdx, but crow-runs detects only Claude processes and parses Claude messages; crow-usage scans Claude profile paths, imports private cdx_manager.run_usage helpers and defaults to a direct Claude title command; crow-sessions, crow-memory and retros also assume Claude layouts.
-- The installed cdx-manager 0.21.4 exposes both providers, cdx --json, schema --json, select --provider --require-ready --json, status --cached --json, run, run-status, run-report, runs, history, stats, can-resume and handoff. This is an inspected compatibility baseline, not an assertion about earlier releases. Capture sanitized fixtures and gate required capabilities before advertising support.
+- The installed cdx-manager 0.21.4 exposes both providers, cdx --json, schema --json, select --provider --require-ready --json, status --cached --json, run, run-status, run-report, runs, history, stats, can-resume and handoff. This is an inspected compatibility baseline, not an assertion about earlier releases. Capture sanitized fixtures and gate required capabilities before advertising support. Review 2026-10-22: the machine runs 0.21.5; fixtures are captured from 0.21.5 and 0.21.4 stays the minimum accepted version.
+- cdx run refuses a session together with --provider (cdx schema mutually_exclusive). Crow resolves the account itself and passes cdx only the account.
 - cdx run publishes schema_version, ok, provider, session, run_id, exit_code, stdout_path, transcript_path and nullable token usage. Consume its public JSON boundary; no import of cdx Python internals or assumption that the executable is a Python script.
 - Installed cdx handoff supports Claude and Codex native transcripts. SOURCE TARGET --source-conversation ID --json prepares an entry without launching; --source-native-transcript PATH disambiguates duplicate native IDs. Native resume remains provider-specific. Cross-provider handoff starts a target conversation and links it to the source.
 - OpenAI official non-interactive and CLI documentation was checked on 2026-10-22 for exec JSON events and resume. Crow delegates execution to cdx; native event parsing is a bounded read-only fallback for activity details missing from cdx, versioned with synthetic fixtures. No Codex API key is required for corpus creation.
