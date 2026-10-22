@@ -14,13 +14,18 @@ Every MR/PR you open for the user follows this flow. Never skip a step to save t
 - Reference the ticket the way recent MRs do (e.g. `Closes KEY-123`).
 - Title: match recent merged MRs (same convention as commits, one ticket key, short).
 
-## 1b. Self-review gate (before showing anything)
-Run the `review` skill in **self mode** on the branch diff: repo checklist + every ledger row, for real.
-Fix the hits on the branch (commit them before the MR), then report its first line
-(`Patterns: N checked, K hits, M n/a`) and what was fixed. Hits that need a decision become questions.
+## 1b. Gate (before showing anything, and before every push of new commits)
+Runs on its own: the user never has to ask for it. Same gate for a new MR, review fixes (`review-threads`) and any later push.
+1. **Repo context**: read the repo's `CLAUDE.md` and its skills. Untracked `.claude/` dirs exist only in the main checkout, not in worktrees: read `<repo path>/.claude/skills/` and `<hub>/local/skills/<project>/` from there.
+2. **Bug hunt**: start the `code-review` skill on the branch diff against the target (it runs in the background).
+3. **Patterns**: meanwhile run the `review` skill in **self mode**: repo checklist + every ledger row, for real.
+4. **Triage** every `code-review` finding: valid → fix on the branch; otherwise one line on why not (pre-existing, out of scope, wrong). If the code changed, re-check the new diff.
+5. A finding neither the ledgers nor the checklist would have caught gets a ledger row (`self-review` source).
+
+Report: `Patterns: N checked, K hits, M n/a`, the code-review findings with their verdict, and what was fixed. Hits that need a decision become questions.
 
 ## 2. Validate with the user
-Show the **self-review** result, then the **title** and the **description**, and wait for an explicit OK. Adjust and show again if asked.
+Show the **gate** result, then the **title** and the **description**, and wait for an explicit OK. Adjust and show again if asked.
 
 ## 3. Ask for the reviewer
 Read the project's `reviewers` list in the hub registry (`<hub>/local/projects.yaml`; hub path from `$CROW_HOME`, else ask). Ask which one with AskUserQuestion. Personal repos with no reviewers: skip.

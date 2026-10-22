@@ -41,6 +41,9 @@ and every comment must make the next MR better: each one is matched against the 
 
 **Ledger changes**: rows added, counts bumped, rules sharpened, and any pattern promoted to `common.md` or to the repo skill's checklist (at 2 occurrences).
 
+**Gate**: run the `mr` skill's gate (step 1b: repo context, `code-review` + `review` self mode, triage) on the fix diff, unasked, and include its result.
+A red pipeline on the MR is part of the job: read the failed jobs and the env's logs, find the cause before calling it flaky.
+
 Then the diff, test/lint results, the commit message, and what gets posted.
 
 ## 4. On approval ("go", "yes", "ok")
