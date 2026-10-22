@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """crow-runs: dispatch background runs and see what every agent is doing.
 
-  crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--power P]
+  crow-runs dispatch [--account A] [--provider P] [--confirm-account A] <project> <label>
+                     (--prompt-file F | --prompt T) [--power P] [--model M] [--permission P]
+                     [--cwd DIR] [--read-only] [--force]
+  crow-runs oneshot [--account A] [--provider P] [--confirm-account A] --prompt T
+                                                     blocking run in the hub, prints its final message
   crow-runs [list] [--since today|7d|DATE] [--all]   one-shot listing
   crow-runs json                                     same data as JSON (for widgets)
   crow-runs report <run_id>                          final report of a finished run
   crow-runs wait <run_id>...                         block until the runs finish (run in background to get notified)
   (live view: tools/crow-watch, via `crow watch`)
 
-Every dispatch is recorded in <state>/runs.jsonl (run id, project, label, start
-commit). Live agents come from the Claude processes themselves: their cwd, cdx
-account and session transcript (what they are doing right now).
+Every dispatch is recorded in <state>/runs.jsonl (run id, provider, account, project, label,
+start commit). Runs are started and read through the public cdx JSON contract (crow_cdx).
+Background slots: CROW_MAX_RUNS (default 2) is one budget for every provider, held under a
+lock in <state>/slots.json, so two dispatches at once cannot both take the last slot. One
+writer per workspace: a second job in the same directory needs its own worktree
+(--cwd <repo>.wt/<name>) or --read-only. Live agents come from the provider processes
+themselves: their cwd, cdx account and session transcript (what they are doing right now).
 """
 import argparse, json, os, re, shutil, subprocess, sys, time
 from datetime import datetime, timezone
@@ -18,10 +26,17 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+from crow_cdx import CdxError  # noqa: E402
+
 HOME = Path(os.environ.get("CROW_HOME") or Path(__file__).resolve().parent.parent)
-ACCOUNT = os.environ.get("CROW_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
-REG = yaml.safe_load(open(HOME / "local/projects.yaml"))
-STATE = Path(REG.get("vault", {}).get("crow_dir") or HOME / "local/state")
+try:
+    REG = yaml.safe_load(open(HOME / "local/projects.yaml")) or {}
+except FileNotFoundError:
+    REG = {}
+REG.setdefault("projects", [])
+STATE = Path((REG.get("vault") or {}).get("crow_dir") or HOME / "local/state")
 LEDGER = STATE / "runs.jsonl"
 MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
 WORKING_S = 20      # transcript touched this recently = working
@@ -65,10 +80,22 @@ def finished(since, ttl=8):
     hit = _finished_cache.get(since)
     if hit and time.time() - hit[0] < ttl:
         return hit[1]
-    out = sh("cdx", "runs", "--since", since, "--limit", "200", "--json")
-    runs = {r["run_id"]: r for r in (json.loads(out).get("runs", []) if out else [])}
+    try:
+        rows = crow_cdx.call("runs", "--since", since, "--limit", "200").get("runs") or []
+    except CdxError:
+        rows = []
+    runs = {r["run_id"]: r for r in rows if crow_cdx.run_outcome(r) not in ("running",)}
     _finished_cache[since] = (time.time(), runs)
     return runs
+
+
+def running_runs():
+    """Run ids cdx reports as still running, any provider (detached runs included)."""
+    try:
+        rows = crow_cdx.call("runs", "--since", "7d", "--limit", "200").get("runs") or []
+    except CdxError:
+        return None
+    return {r["run_id"]: r for r in rows if crow_cdx.run_outcome(r) == "running"}
 
 
 def wait(run_ids, poll=20):
@@ -82,7 +109,8 @@ def wait(run_ids, poll=20):
             r = done.get(rid)
             if r:
                 label = recs.get(rid, {}).get("label", "")
-                status = "done" if r.get("exit_code") == 0 else "failed"
+                out = crow_cdx.run_outcome(r)
+                status = "done" if out == "succeeded" else out
                 print(f"{status} {rid[:8]} {recs.get(rid, {}).get('project', '')}  {label}", flush=True)
                 pending.discard(rid)
         if pending:
@@ -90,21 +118,23 @@ def wait(run_ids, poll=20):
 
 
 def report(run_id, since="7d"):
-    """Final report text of a finished run (the `result` of its stdout JSON)."""
+    """Final report text of a finished run: its last message, from the cdx stdout artifact."""
     r = next((v for k, v in finished(since).items() if k.startswith(run_id)), None)
     if not r:
         return None
-    f = Path(r.get("artifacts", {}).get("stdout_path") or "/nonexistent")
-    if not f.exists():
-        return None
-    try:
-        out = json.loads(f.read_text())
-    except ValueError:
-        return f.read_text(errors="replace")[-4000:]
-    result = out.get("result") or ""
-    # A run can end on a short postscript after its report: then take the last report-shaped message
-    if "Shipped" not in result and out.get("session_id"):
-        full = report_from_transcript(out["session_id"])
+    path = (r.get("artifacts") or {}).get("stdout_path")
+    provider = r.get("provider") or "claude"
+    result = crow_cdx.final_text(path, provider)
+    if result is None:
+        f = Path(path or "/nonexistent")
+        return f.read_text(errors="replace")[-4000:] if f.exists() else None
+    # A Claude run can end on a short postscript after its report: then take the last report-shaped message
+    if provider == "claude" and "Shipped" not in result:
+        try:
+            sid = json.loads(Path(path).read_text().splitlines()[-1]).get("session_id")
+        except (OSError, ValueError, IndexError):
+            sid = None
+        full = report_from_transcript(sid) if sid else None
         if full:
             return full
     return result
@@ -363,35 +393,106 @@ def collect(since="today", include_unledgered=False):
 
 # ---------- commands ----------
 
+def job_cwd(p, cwd):
+    """The project's path, or one of its worktrees (<path>.wt/<name>, <path>.live/...)."""
+    if not cwd:
+        return p["path"]
+    real, root = os.path.realpath(cwd), os.path.realpath(p["path"])
+    if not os.path.isdir(real):
+        sys.exit(f"crow: {cwd} does not exist (create the worktree first: git worktree add {root}.wt/<name>)")
+    if not any(real == root or real.startswith(root + s) for s in ("/", ".wt/", ".live/")):
+        sys.exit(f"crow: {cwd} is not {p['name']} or one of its worktrees ({root}.wt/<name>)")
+    return real
+
+
+PENDING_S = 300  # a claim whose cdx run never showed up is freed after this
+
+
+def slot_alive(running):
+    def alive(key, rec):
+        if key.startswith("pending-"):
+            return time.time() - rec.get("claimed_at", 0) < PENDING_S
+        if running is None:
+            return True  # cdx unreadable: keep the slot rather than overbook
+        return key in running or time.time() - rec.get("claimed_at", 0) < 30
+    return alive
+
+
 def dispatch(a):
-    if subprocess.run([str(HOME / "bin/crow-accounts"), "require", ACCOUNT]).returncode:
-        sys.exit(1)
     p = project(a.project)
-    cwd = p["path"]
-    runs = [x for x in claude_procs() if "--print" in x["argv"]]
-    if len(runs) >= MAX_PARALLEL and not a.force:
-        sys.exit(f"crow: {len(runs)} runs already running (max {MAX_PARALLEL}); --force to override")
-    if any(x["cwd"] == cwd for x in runs) and not a.force:
-        sys.exit(f"crow: a run is already working in {cwd}; --force to override")
+    cwd = job_cwd(p, a.cwd)
+    try:
+        t = crow_cdx.plan("project-run", cwd, a.account, a.provider, a.confirm_account)
+        crow_cdx.check_model(t["provider"], a.model)
+        permission = "review" if a.read_only else crow_cdx.check_permission(t["provider"], a.permission)
+    except CdxError as e:
+        crow_cdx.fail(e)
+    writes = not a.read_only
+    pending = f"pending-{os.getpid()}-{time.time_ns()}"
+    running = running_runs()
+    with crow_cdx.Slots(str(STATE), MAX_PARALLEL) as slots:
+        slots.prune(slot_alive(running))
+        busy = len(set(slots.data["held"]) | set(running or {}))
+        if busy >= MAX_PARALLEL and not a.force:
+            sys.exit(f"crow: {busy} runs already running (max {MAX_PARALLEL}, all providers); --force to override")
+        other = slots.cwd_writer(cwd)
+        if writes and other and not a.force:
+            sys.exit(f"crow: run {other[:8]} already writes in {cwd}; give this one its own worktree "
+                     f"(--cwd {os.path.realpath(p['path'])}.wt/<name>) or --read-only")
+        slots.claim(pending, {"cwd": cwd, "writes": writes, "provider": t["provider"], "account": t["name"]})
     src = ["--prompt-file", a.prompt_file] if a.prompt_file else ["--prompt", a.prompt]
-    out = sh("cdx", "run", ACCOUNT, "--cwd", cwd, *src, "--power", a.power,
-             "--permission", "auto", "--detach", "--json")
-    res = json.loads(out) if out else {"ok": False}
-    if not res.get("ok"):
-        sys.exit(f"crow: dispatch failed: {res.get('error')}")
+    model = ["--model", a.model] if a.model else []
+    try:
+        res = crow_cdx.call("run", t["name"], "--cwd", cwd, *src, *model, "--power", a.power,
+                            "--permission", permission, "--detach", allow_fail=True)
+    except CdxError as e:
+        res = {"ok": False, "error": {"code": e.code, "message": e.message}}
+    if not res.get("ok") or not res.get("run_id"):
+        with crow_cdx.Slots(str(STATE), MAX_PARALLEL) as slots:
+            slots.release(pending)
+        err = res.get("error")
+        sys.exit(f"crow: dispatch failed on {t['name']} ({t['provider']}): "
+                 f"{err.get('message') if isinstance(err, dict) else err or 'no run id'}")
+    with crow_cdx.Slots(str(STATE), MAX_PARALLEL) as slots:
+        slots.rename(pending, res["run_id"])
     rec = {
         "run_id": res["run_id"], "project": p["name"], "label": a.label, "cwd": cwd,
+        "provider": t["provider"], "account": t["name"], "native_id": crow_cdx.run_identity(res)["native_id"],
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "start_sha": sh("git", "rev-parse", "HEAD", cwd=cwd),
         "branch": sh("git", "branch", "--show-current", cwd=cwd),
-        "prompt_file": a.prompt_file, "power": a.power,
+        "prompt_file": a.prompt_file, "power": a.power, "model": a.model, "permission": permission,
     }
     if a.resumes:
         rec["resumes"] = next((r["run_id"] for r in ledger() if r["run_id"].startswith(a.resumes)), a.resumes)
     STATE.mkdir(parents=True, exist_ok=True)
-    with LEDGER.open("a") as f:
-        f.write(json.dumps(rec) + "\n")
-    print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}")
+    crow_cdx.append_jsonl(str(LEDGER), rec)
+    print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}  ({t['provider']}:{t['name']})")
+
+
+def oneshot(a):
+    """A blocking run in the hub (brief, daily, weekly); prints the final message."""
+    try:
+        t = crow_cdx.plan("hub-oneshot", str(HOME), a.account, a.provider, a.confirm_account, a.prompt)
+        permission = t["permission"] or crow_cdx.DEFAULT_PERMISSION[t["provider"]]
+        res = crow_cdx.call("run", t["name"], "--cwd", str(HOME), "--prompt", t["prompt"],
+                            "--permission", permission, allow_fail=True)
+    except CdxError as e:
+        crow_cdx.fail(e)
+    if not res.get("ok"):
+        err = res.get("error")
+        sys.exit(f"crow: run failed on {t['name']} ({t['provider']}): "
+                 f"{err.get('message') if isinstance(err, dict) else err or 'exit ' + str(res.get('exit_code'))}")
+    text = crow_cdx.final_text(res.get("stdout_path"), t["provider"])
+    if text is None:
+        try:
+            text = Path(res.get("stdout_path") or "/nonexistent").read_text(errors="replace")
+        except OSError:
+            text = ""
+    print(text)
+    tokens = (res.get("usage") or {}).get("total_tokens")
+    print(f"\n— {tokens if tokens is not None else '?'} tokens · {int(res.get('duration_seconds') or 0)}s · "
+          f"{t['provider']}:{t['name']} · run {res.get('run_id')}", file=sys.stderr)
 
 
 C = {"dim": "\033[2m", "b": "\033[1m", "g": "\033[32m", "y": "\033[33m", "r": "\033[31m", "c": "\033[36m", "m": "\033[35m", "0": "\033[0m"}
@@ -469,7 +570,16 @@ def main():
     g = d.add_mutually_exclusive_group(required=True)
     g.add_argument("--prompt-file"); g.add_argument("--prompt")
     d.add_argument("--power", default="medium")
+    d.add_argument("--model")
+    d.add_argument("--permission", help="cdx permission (default: auto on Claude, default on Codex)")
+    d.add_argument("--cwd", help="run in this worktree of the project instead of its main path")
+    d.add_argument("--read-only", action="store_true", help="review permission; may share a workspace")
     d.add_argument("--force", action="store_true")
+    o = sub.add_parser("oneshot")
+    o.add_argument("--prompt", required=True)
+    for sp in (d, o):
+        sp.add_argument("--account"); sp.add_argument("--provider", choices=crow_cdx.PROVIDERS)
+        sp.add_argument("--confirm-account")
     d.add_argument("--resumes", metavar="RUN_ID", help="this run continues an interrupted one (hides it from the listing)")
     sub.add_parser("report").add_argument("run_id")
     sub.add_parser("wait").add_argument("run_ids", nargs="+")
@@ -481,6 +591,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "dispatch":
         dispatch(a)
+    elif a.cmd == "oneshot":
+        oneshot(a)
     elif a.cmd == "wait":
         wait(a.run_ids)
     elif a.cmd == "report":

@@ -7,10 +7,16 @@
   crow-memory link <account>         symlink local/memory/* into the profile where no memory exists
   crow-memory unlink <account>       remove those symlinks (never touches real directories)
   crow-memory commit                 commit pending changes in the local/ repo
+  crow-memory acquire <account> <pid>   lease for a session: link on the first lease
+  crow-memory release <account> <pid>   end that lease: unlink and commit after the last one
 
 Memory is never copied into a profile: a link is a symlink into local/memory.
+Leases (local/state/memory-leases/<account>.json, under a lock) let concurrent sessions share
+one account: a session ending never unlinks memory another live session still uses. Leases
+of dead pids are dropped. Codex accounts have no Claude memory dir: acquire/release do nothing
+there (crow passes local/memory as a read-first reference instead).
 """
-import os, pwd, shutil, subprocess, sys
+import fcntl, json, os, pwd, shutil, subprocess, sys
 
 HOME = os.environ.get("CROW_HOME") or os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STORE = os.path.join(HOME, "local", "memory")
@@ -103,6 +109,42 @@ def unlink(account):
             os.unlink(m)
 
 
+def is_claude(account):
+    """Codex profiles have no claude-home: memory links do not apply to them."""
+    return os.path.isdir(os.path.join(PROFILES, account, "claude-home"))
+
+
+def alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def lease(account, pid, add):
+    """Add or drop pid in the account's lease file; returns the live holders after the change."""
+    d = os.path.join(HOME, "local", "state", "memory-leases")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, account + ".json")
+    with open(path + ".lock", "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            held = json.load(open(path))
+        except (OSError, ValueError):
+            held = []
+        held = [p for p in held if str(p) != str(pid) and alive(p)]
+        if add:
+            held.append(int(pid))
+            if is_claude(account):
+                link(account)  # idempotent: existing links and real dirs are left alone
+        json.dump(held, open(path, "w"))
+        if not add and not held and is_claude(account):
+            unlink(account)
+            commit()
+    return held
+
+
 def commit():
     git("add", "memory")
     if git("diff", "--cached", "--quiet", "--", "memory").returncode:
@@ -118,4 +160,6 @@ if __name__ == "__main__":
     elif cmd == "link" and len(a) == 2: link(a[1])
     elif cmd == "unlink" and len(a) == 2: unlink(a[1])
     elif cmd == "commit": commit()
+    elif cmd == "acquire" and len(a) == 3: need_allowed(a[1]); lease(a[1], a[2], True)
+    elif cmd == "release" and len(a) == 3: lease(a[1], a[2], False)
     else: sys.exit(__doc__)

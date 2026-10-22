@@ -21,7 +21,8 @@ table, so they match `cdx stats` (EXTRA_PRICES fills models it lacks). Per-file 
 by (mtime, size).
 
 Session titles: cdx names every session after its account, so crow asks a small
-model (CROW_TITLE_CMD, default Haiku via `claude -p`) for a 3-6 word title from the
+model (through cdx on an allowed account: Haiku on Claude, the account's model on Codex;
+CROW_TITLE_CMD overrides with a shell command) for a 3-6 word title from the
 whole session (most edited files and recent prompts weigh more than the opening one),
 caches it by session id in local/state/session-titles.json and retitles when the session
 grew (4+ prompts and x1.5) or moved project. Dispatch labels and /rename win and are kept.
@@ -88,10 +89,14 @@ CACHE_VERSION = 9
 TITLES_PER_RUN = 12
 TITLES_PER_DAY = int(os.environ.get("CROW_TITLES_PER_DAY") or 40)  # model calls; ~0.001 USD each on Haiku
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-TITLE_CMD = os.environ.get("CROW_TITLE_CMD") or (
-    "claude -p --model haiku --no-session-persistence --tools '' --strict-mcp-config "
-    "--system-prompt 'You name coding sessions. Reply with a 3-6 word title for the main work of the whole session, not its opening prompt, in the language of the prompts, naming the project when it is not obvious, "
-    "Title Case not required, no quotes, no trailing punctuation.'")
+# Operator-owned escape hatch: a shell command reading the session context on stdin. Without it,
+# titles go through cdx on an allowed `use` account (CROW_TITLE_ACCOUNT, CROW_ACCOUNT, default),
+# read-only, on that provider's small model; no eligible account means no model call.
+TITLE_CMD = os.environ.get("CROW_TITLE_CMD")
+TITLE_INSTRUCTIONS = ("You name coding sessions. Reply with a 3-6 word title for the main work of the whole session, "
+                      "not its opening prompt, in the language of the prompts, naming the project when it is not "
+                      "obvious, Title Case not required, no quotes, no trailing punctuation. Reply with the title only.")
+TITLE_MODELS = {"claude": os.environ.get("CROW_TITLE_MODEL", "haiku"), "codex": os.environ.get("CROW_TITLE_CODEX_MODEL")}
 PROFILES = os.path.expanduser(os.environ.get("CDX_PROFILES", os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".cdx/profiles")))
 ACTIVE_SECONDS = 120
 
@@ -484,15 +489,27 @@ def spawn_titler():
 
 def ask_title(meta):
     lines = title_context(meta)
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDECODE")}
-    env["CROW_RETRO"] = "1"
-    try:
-        out = subprocess.run(["bash", "-c", TITLE_CMD], input="\n".join(lines), capture_output=True, text=True,
-                             timeout=60, env=env, cwd=STATE)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    title = " ".join(out.stdout.strip().strip("\"'").split())
-    if out.returncode != 0 or not title or len(title) > 60 or "log in" in title.lower():
+    if TITLE_CMD:
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDECODE")}
+        env["CROW_RETRO"] = "1"
+        try:
+            out = subprocess.run(["bash", "-c", TITLE_CMD], input="\n".join(lines), capture_output=True, text=True,
+                                 timeout=60, env=env, cwd=STATE)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        raw, rc = out.stdout, out.returncode
+    else:
+        sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+        import crow_cdx
+        try:
+            res, target = crow_cdx.helper_run("title", TITLE_INSTRUCTIONS + "\n\n" + "\n".join(lines), TITLE_MODELS,
+                                              account_env="CROW_TITLE_ACCOUNT", cwd=STATE, timeout=120)
+        except crow_cdx.CdxError:
+            return None
+        raw = crow_cdx.final_text(res.get("stdout_path"), target["provider"]) if res.get("ok") else None
+        rc = 0 if raw else 1
+    title = " ".join((raw or "").strip().strip("\"'").split())
+    if rc != 0 or not title or len(title) > 60 or "log in" in title.lower():
         return None
     return title.rstrip(".")
 

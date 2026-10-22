@@ -173,8 +173,10 @@ def resolve(account=None, provider=None, cfg=None, inv=None, env=None):
     env = os.environ if env is None else env
     check_provider(provider)
     cfg = cfg or load_policy()
-    inv = inventory() if inv is None else inv
     explicit = account or env.get("CROW_ACCOUNT")
+    if explicit:
+        _check_policy(cfg, explicit)  # refuse a never account before asking cdx anything
+    inv = inventory() if inv is None else inv
     if explicit:
         name = explicit
     elif provider:
@@ -198,12 +200,17 @@ def _pick_for_provider(cfg, inv, provider):
                    "(ask-first accounts are only used when named)")
 
 
-def check_target(name, provider, cfg, inv):
+def _check_policy(cfg, name):
     a = find(cfg, name)
     if not a:
         raise CdxError("account_unknown", f"account '{name}' is not in local/accounts.yaml; crow never targets it")
     if a["policy"] == "never":
         raise CdxError("account_never", f"account '{name}' is not allowed (policy never, see local/accounts.yaml)")
+    return a
+
+
+def check_target(name, provider, cfg, inv):
+    a = _check_policy(cfg, name)
     row = inv.get(name)
     if not row:
         raise CdxError("account_not_in_cdx", f"account '{name}' is not a cdx session (see `cdx`)")
@@ -384,6 +391,71 @@ def context_preamble(refs, task=None):
     lines += [f"- {r}" for r in refs]
     lines.append(task if task else "Then wait for the user's instructions.")
     return "\n".join(lines)
+
+
+def plan(operation, cwd, account=None, provider=None, confirm=None, prompt=None, required=(), cfg=None, ask=None):
+    """Everything one launch needs, checked in order: policy, cdx target, guard, consent, context.
+    Returns {name, provider, policy, memory, permission, prompt, refs, operation}."""
+    if operation not in GUARD_NEEDS:
+        raise CdxError("operation_unknown", f"unknown operation {operation!r}")
+    cfg = cfg or load_policy()
+    explicit = account or os.environ.get("CROW_ACCOUNT")
+    if explicit:
+        _check_policy(cfg, explicit)  # a never account is refused without running cdx
+    capabilities()
+    target = resolve(account, provider, cfg=cfg)
+    permission = guard(target["provider"], operation)
+    consent(target, operation, assume=confirm, ask=ask)
+    refs = context_refs(target, cwd, required)
+    prompt = skill_prompt(target["provider"], prompt)
+    # Claude loads CLAUDE.md and its linked memory natively; Codex gets the same files as references.
+    if target["provider"] == "codex" or required:
+        prompt = context_preamble(refs if target["provider"] == "codex" else [os.path.abspath(r) for r in required],
+                                  prompt)
+    return {**target, "permission": permission, "prompt": prompt, "refs": refs, "operation": operation}
+
+
+def skill_prompt(provider, prompt, home=None):
+    """Claude runs `/skill args` natively; Codex is told to read the skill file and follow it."""
+    if provider == "claude" or not prompt or not prompt.startswith("/"):
+        return prompt
+    name, _, args = prompt[1:].partition(" ")
+    path = os.path.join(home or HOME, ".claude", "skills", name, "SKILL.md")
+    if not re.fullmatch(r"[\w-]+", name) or not os.path.isfile(path):
+        return prompt
+    return f"Read {path} and follow it as the `{name}` skill" + (f", with arguments: {args}" if args.strip() else ".")
+
+
+def helper_run(kind, prompt, models, operation="helper-readonly", account_env=None, cwd=None, timeout=None):
+    """A short unattended job (title, retro): an allowed account without asking anyone, the
+    provider's own model, recorded in <state>/helper-runs.jsonl so session views leave it out.
+    Returns (envelope, target); raises CdxError when no account may run it."""
+    cfg = load_policy()
+    account = os.environ.get(account_env) if account_env else None
+    target = plan(operation, cwd or HOME, account=account, cfg=cfg,
+                  ask=lambda _: None)  # nobody to ask: an ask-first account is refused
+    model = models.get(target["provider"])
+    perm = target["permission"] or DEFAULT_PERMISSION[target["provider"]]
+    text = skill_prompt(target["provider"], prompt)
+    if target["provider"] == "codex" and operation != "helper-readonly":
+        text = context_preamble(target["refs"], text)  # read-only helpers get their whole input inline
+    args = ["run", target["name"], "--cwd", cwd or HOME, "--prompt", text, "--permission", perm]
+    if model:
+        args += ["--model", model]
+    env = call(*args, timeout=timeout or 900, allow_fail=True)
+    if env.get("run_id"):
+        append_jsonl(os.path.join(state_dir(), "helper-runs.jsonl"),
+                     {"run_id": env["run_id"], "kind": kind, "provider": target["provider"], "account": target["name"],
+                      "at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+    return env, target
+
+
+def helper_run_ids(state=None):
+    try:
+        with open(os.path.join(state or state_dir(), "helper-runs.jsonl")) as fh:
+            return {json.loads(l).get("run_id") for l in fh if l.strip()}
+    except (OSError, ValueError):
+        return set()
 
 
 # ---------- run envelopes ----------

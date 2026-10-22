@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # crow: launcher for the CR-0W hub, built on cdx.
 #
-#   crow                 open the hub session
+#   crow [--account A] [--provider claude|codex] [--confirm-account A] <command> ...
+#                        pick the cdx account for this launch (default: CROW_ACCOUNT, then the
+#                        default in local/accounts.yaml); --provider alone picks an allowed account
+#                        of that provider; --confirm-account answers an ask-first account's question
+#   crow                 open the hub session (Claude only: the hub guard is a Claude hook)
 #   crow brief           print the morning brief (one-shot run)
 #   crow daily           draft today's daily into the state dir (one-shot run; post it from the hub)
 #   crow weekly          build the weekly rollup + slide outline (one-shot run)
@@ -23,9 +27,17 @@
 set -euo pipefail
 
 CROW_HOME="${CROW_HOME:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
-CROW_ACCOUNT="${CROW_ACCOUNT:-$("$CROW_HOME/bin/crow-accounts" default)}"
 REGISTRY="$CROW_HOME/local/projects.yaml"
 export CROW_HOME
+
+# Account selection, passed to every launch (crow-accounts plan / crow-runs).
+SEL=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --account|--provider|--confirm-account) SEL+=("$1" "${2:?$1 needs a value}"); shift 2 ;;
+    *) break ;;
+  esac
+done
 
 project_path() {
   python3 - "$REGISTRY" "$1" <<'EOF'
@@ -39,67 +51,66 @@ else:
 EOF
 }
 
-# Start an interactive cdx session. On a shared account the memory is linked from local/memory
-# for the session only (no copy stays in the profile), then unlinked and committed.
+# Start an interactive cdx session: <operation> <dir> [prompt]. crow-accounts plan resolves the
+# account, asks an ask-first account's consent, refuses what the provider cannot guard and adds
+# read-first references for providers that do not load crow's files natively (Codex).
+# Shared Claude memory is leased from local/memory for the session's lifetime: the last session
+# on the account to end unlinks it, on exit, failed launch or signal.
 launch() {
-  local dir="$1"; shift
-  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
-  if [[ "$("$CROW_HOME/bin/crow-accounts" memory "$CROW_ACCOUNT")" == session ]]; then
-    "$CROW_HOME/bin/crow-memory" link "$CROW_ACCOUNT"
-    trap '"$CROW_HOME/bin/crow-memory" unlink "$CROW_ACCOUNT"; "$CROW_HOME/bin/crow-memory" commit' EXIT
-    cdx "$CROW_ACCOUNT" --dir "$dir" "$@"
+  local op="$1" dir="$2" prompt="${3:-}" plan name provider memory
+  plan=$("$CROW_HOME/bin/crow-accounts" plan "${SEL[@]}" --operation "$op" --cwd "$dir" ${prompt:+--prompt "$prompt"} --shell) || exit 1
+  { read -r name; read -r provider; read -r memory; prompt=$(cat); } <<<"$plan"
+  local args=("$name" --dir "$dir")
+  [[ -n "$prompt" ]] && args+=(--prompt "$prompt")
+  if [[ "$memory" == session && "$provider" == claude ]]; then
+    "$CROW_HOME/bin/crow-memory" acquire "$name" $$
+    trap "$(printf '%q ' "$CROW_HOME/bin/crow-memory" release "$name" $$)" EXIT
+    trap 'exit 130' INT TERM HUP
+    CROW_ACCOUNT="$name" cdx "${args[@]}"
   else
-    exec cdx "$CROW_ACCOUNT" --dir "$dir" "$@"
+    CROW_ACCOUNT="$name" exec cdx "${args[@]}"
   fi
 }
 
+# A one-shot run in the hub, its final message printed as Markdown (crow-runs oneshot).
 oneshot() {
-  local prompt="$1" out
-  "$CROW_HOME/bin/crow-accounts" require "$CROW_ACCOUNT"
-  out=$(cdx run "$CROW_ACCOUNT" --cwd "$CROW_HOME" --prompt "$prompt" --permission auto --json)
-  local ok stdout_path
-  ok=$(jq -r '.ok' <<<"$out")
-  stdout_path=$(jq -r '.stdout_path' <<<"$out")
-  if [[ "$ok" != "true" ]]; then
-    jq -r '.error // "run failed"' <<<"$out" >&2
-    exit 1
-  fi
-  # cdx stores Claude's JSON result envelope; print only the Markdown result.
   local text
-  text=$(jq -rs 'map(select(type == "object" and .type == "result")) | last | .result // empty' "$stdout_path" 2>/dev/null)
-  [[ -z "$text" ]] && text=$(cat "$stdout_path")
+  text=$("$CROW_HOME/bin/crow-runs" oneshot "${SEL[@]}" --prompt "$1") || exit 1
   if [[ -t 1 ]] && command -v bat >/dev/null; then
     bat --language md --style plain --paging never <<<"$text"
   else
     printf '%s\n' "$text"
   fi
-  jq -r '"\n— \(.usage.total_tokens) tokens · \(.duration_seconds|floor)s · run \(.run_id)"' <<<"$out" >&2
 }
 
 cmd="${1:-hub}"
 shift || true
 case "$cmd" in
-  hub)      launch "$CROW_HOME" ;;
+  hub)      launch hub-session "$CROW_HOME" ;;
   brief)    oneshot "/brief" ;;
   daily)    oneshot "/daily Draft only: save the draft to the state dir as drafts/daily-$(date +%F).md and print it. Do not post anything." ;;
   weekly)   oneshot "/weekly" ;;
   open)     dir="$(project_path "${1:?usage: crow open <project> [prompt]}")"
-            launch "$dir" ${2:+--prompt "$2"} ;;
+            launch project-session "$dir" "${2:-}" ;;
   term)     # Detach from the calling session: real HOME (kitty config) and no inherited
             # Claude/cdx variables (session markers, ANTHROPIC_PROFILE, CDX_SESSION_NAME).
             dir="$(project_path "${1:?usage: crow term <project> [prompt]}")"
             strip=(); for v in $(compgen -e | grep -E '^(CLAUDE|CLAUDECODE|ANTHROPIC_|CDX_)'); do strip+=(-u "$v"); done
+            # Resolve and confirm here, on this terminal; the window gets the confirmed account.
+            plan=$("$CROW_HOME/bin/crow-accounts" plan "${SEL[@]}" --operation project-session --cwd "$dir" --shell) || exit 1
+            acct=$(head -n1 <<<"$plan")
             env "${strip[@]}" HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" \
-              setsid -f kitty --title "crow · $1" "$CROW_HOME/bin/crow" open "$@" >/dev/null 2>&1 ;;
+              setsid -f kitty --title "crow · $1 · $acct" "$CROW_HOME/bin/crow" \
+              --account "$acct" --confirm-account "$acct" open "$@" >/dev/null 2>&1 ;;
   work)     exec "$CROW_HOME/bin/crow-project" work "$@" ;;
   handoff)  prompt="$("$CROW_HOME/bin/crow-project" handoff "$@")"
-            exec "$CROW_HOME/bin/crow" term "$1" "$prompt" ;;
+            exec "$CROW_HOME/bin/crow" "${SEL[@]}" term "$1" "$prompt" ;;
   ls)       python3 -c "
 import yaml
 for p in yaml.safe_load(open('$REGISTRY'))['projects']:
     print(f\"{p['name']:<30} {p['scope']:<9} {p['status']:<9} {p['path']}\")" ;;
   runs)     exec "$CROW_HOME/bin/crow-runs" list "$@" ;;
-  dispatch) exec "$CROW_HOME/bin/crow-runs" dispatch "$@" ;;
+  dispatch) exec "$CROW_HOME/bin/crow-runs" dispatch "${SEL[@]}" "$@" ;;
   json)     exec "$CROW_HOME/bin/crow-runs" json "$@" ;;
   report)   exec "$CROW_HOME/bin/crow-runs" report "$@" ;;
   watch)    # rebuild the Go board when its source is newer than the binary
@@ -114,6 +125,6 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
   usage)    exec "$CROW_HOME/bin/crow-usage" "$@" ;;
   activity) exec "$CROW_HOME/bin/crow-activity" "$@" ;;
   releases) exec "$CROW_HOME/bin/crow-releases" "$@" ;;
-  -h|--help|help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)        echo "crow: unknown command '$cmd' (crow help)" >&2; exit 1 ;;
 esac

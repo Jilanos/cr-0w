@@ -8,7 +8,7 @@
   crow-retro status          queue, running worker, last reports
 
 Each queued session is condensed with crow-digest, then analyzed by a headless
-cdx run of the /retro skill. Runs started here carry CROW_RETRO=1 so their own
+cdx run of the /retro skill (on Codex: told to read .claude/skills/retro/SKILL.md). Runs started here carry CROW_RETRO=1 so their own
 SessionEnd never queues another retro.
 """
 import datetime as dt
@@ -24,8 +24,11 @@ STATE = os.path.join(CROW_HOME, "local", "state", "retros")
 QUEUE = os.path.join(STATE, "queue")
 LOCK = os.path.join(STATE, ".worker.lock")
 LOG = os.path.join(STATE, "worker.log")
-ACCOUNT = os.environ.get("CROW_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
-MODEL = os.environ.get("CROW_RETRO_MODEL", "sonnet")
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_cdx  # noqa: E402
+# The account comes from crow's policy when the retro runs (CROW_RETRO_ACCOUNT, CROW_ACCOUNT, default);
+# an ask-first account is never used unattended. The model is per provider: Codex keeps its account default.
+MODELS = {"claude": os.environ.get("CROW_RETRO_MODEL", "sonnet"), "codex": os.environ.get("CROW_RETRO_CODEX_MODEL")}
 MIN_USER_MESSAGES = 2
 
 
@@ -116,13 +119,20 @@ def analyze(entry):
                        stdout=fh, check=True)
     prompt = (f"/retro digest={digest} transcript={entry['transcript']} "
               f"cwd={entry.get('cwd') or 'unknown'} session={sid}")
-    out = subprocess.run(["cdx", "run", ACCOUNT, "--cwd", CROW_HOME, "--model", MODEL,
-                          "--permission", "auto", "--prompt", prompt, "--json"],
-                         capture_output=True, text=True)
     try:
-        result = json.loads(out.stdout)
-    except json.JSONDecodeError:
-        result = {"ok": False, "error": (out.stderr or out.stdout)[-400:]}
+        result, _ = crow_cdx.helper_run("retro", prompt, MODELS, operation="hub-oneshot",
+                                        account_env="CROW_RETRO_ACCOUNT", cwd=CROW_HOME)
+    except crow_cdx.CdxError as e:
+        return {"ok": False, "error": e.message}
+    if not result.get("ok"):
+        err = result.get("error")
+        tail = ""
+        for k in ("stdout_path", "stderr_path"):
+            try:
+                tail += open(result.get(k) or "/nonexistent", errors="replace").read()[-400:]
+            except OSError:
+                pass
+        result["error"] = f"{err.get('message') if isinstance(err, dict) else err} {tail}".strip()
     return result
 
 

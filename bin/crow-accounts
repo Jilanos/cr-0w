@@ -13,6 +13,13 @@
                                    the policy; asks consent for an ask-first account. Prints JSON,
                                    or NAME PROVIDER with --shell. Exit 1 with a diagnostic otherwise.
   crow-accounts providers          every cdx account with its provider and crow policy (JSON)
+  crow-accounts plan --operation OP --cwd DIR [--account A] [--provider P] [--confirm-account A]
+                     [--prompt TEXT] [--context FILE]... [--shell]
+                                   resolve + consent + guard + context for one launch, as JSON:
+                                   name, provider, memory, permission (null = caller's default),
+                                   prompt (with read-first references where the provider needs
+                                   them), refs. OP: hub-session | hub-oneshot | helper-readonly |
+                                   project-session | project-run.
 
 An unknown account, or a policy that is not one of use / ask-first / never, counts as never.
 The first six commands read only the file; resolve and providers also read `cdx status --cached`.
@@ -37,7 +44,7 @@ def opt(argv, name):
 
 def main(argv):
     cmd = argv[0] if argv else ""
-    if cmd in ("resolve", "providers"):
+    if cmd in ("resolve", "providers", "plan"):
         try:
             return extended(cmd, argv[1:])
         except CdxError as e:
@@ -76,6 +83,16 @@ def extended(cmd, argv):
                         "policy": a["policy"] if a else "never", "supported": row.get("provider") in crow_cdx.PROVIDERS})
         print(json.dumps({"accounts": out}))
         return
+    if cmd == "plan":
+        out = plan(argv, cfg)
+        if "--shell" in argv:  # name, provider, memory on their own lines, then the prompt (may span lines)
+            print(out["name"], out["provider"], out["memory"], out["prompt"] or "", sep="\n")
+        else:
+            print(json.dumps(out))
+        return
+    explicit = opt(argv, "--account") or os.environ.get("CROW_ACCOUNT")
+    if explicit:
+        crow_cdx._check_policy(cfg, explicit)  # a never account is refused without running cdx
     crow_cdx.capabilities()
     target = crow_cdx.resolve(opt(argv, "--account"), opt(argv, "--provider"), cfg=cfg)
     crow_cdx.consent(target, opt(argv, "--action") or "launch", assume=opt(argv, "--confirm-account"))
@@ -83,6 +100,13 @@ def extended(cmd, argv):
         print(target["name"], target["provider"], target["memory"])
     else:
         print(json.dumps(target))
+
+
+def plan(argv, cfg):
+    required = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "--context"]
+    return crow_cdx.plan(opt(argv, "--operation"), opt(argv, "--cwd") or os.getcwd(), opt(argv, "--account"),
+                         opt(argv, "--provider"), opt(argv, "--confirm-account"), opt(argv, "--prompt"),
+                         required, cfg=cfg)
 
 
 if __name__ == "__main__":
