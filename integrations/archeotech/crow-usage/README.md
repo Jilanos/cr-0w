@@ -24,7 +24,7 @@ limit is left, what today cost, and where the tokens went.
   - SAVINGS TODAY: one line, rtk tokens trimmed, prompt cache and model routing
     savings, retros run today; retro suggestions waiting for your approval
     (`local/state/retros/proposals.md`) get their own accent line. What each one
-    means is on crow watch's Savings tab.
+    means is on crow watch's History tab.
   When a poll fails the title says so and the last good data stays (marked
   stale); with no data at all, only the error (last stderr line) is shown.
 

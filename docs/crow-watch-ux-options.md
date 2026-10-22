@@ -3,8 +3,8 @@
 What the board is for, in priority order (see task_001 notes): who needs me, what is
 working, what finished while I was away, how much account headroom is left. Cost is a
 figure to glance at, not a section. Token splits, model names, tool weights, savings prose
-and the timeline are analysis: they belong on the Savings and History tabs or in the
-selected row's details.
+and the timeline are analysis: they belong on the History tab or in the selected row's
+details.
 
 Renders (fixtures, 160x45 for the TUI, 1920x1080 for the shell) are in
 `local/state/night/shots/watch-ux-1021/`: `watch/<view>-<option>.png` for the options,
@@ -33,6 +33,27 @@ terminal size, and it removes rows and columns instead of adding a box.
 
 **Picked A**: same information order as the Agents view, and no new product rule. B's
 recommendation line is worth adding later if the owner wants it (decision below).
+
+**Revised 2026-10-22: picked C, extended** (built on `chg/watch-usage-c`):
+- Two columns from 140 wide. Left: Limits, Spend (the 7-day bars as the big figure, $ and
+  tokens under each day), Savings today (value, rate, a short note). Right: Sessions, full
+  height. A tall left column adds the week's projects under the bars. Narrower terminals
+  stack the same boxes.
+- Each session row shows its account and the points of that account's current 5h and
+  weekly windows it used (`crow-usage` `sessions[].limit_share`: its cost in the window over
+  the account's, times the share used; hour granularity). Shown on the session's newest row.
+- Day dividers in Sessions are a quiet rule (slot 8) with the day and totals in slot 7.
+- The Savings tab is gone (tabs: 1 Agents, 2 Usage, 3 History). History carries the full
+  savings table for the period, with the explanations wrapped, and the day table gains
+  cache saved, routing and compactions. The "how measured" prose moved to `?`.
+- Gauges draw `━` on a `━` track in slot 8.
+
+## Agents view, revised 2026-10-22
+
+- Cost leaves the Agents rows and details (Usage has it per session).
+- Project, age and context columns size to their content: "12h01 ago" shows in full.
+- "What is happening" and Recent activity show a tool call's own description (Bash
+  `description`, Agent `description`); a bare command loses its leading `cd` and long paths.
 
 ## Interrupted sessions (item_009)
 

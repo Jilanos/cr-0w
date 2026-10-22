@@ -506,7 +506,7 @@ Item {
                     }
                 }
 
-                // ── savings today: one line; the explanations live in crow watch (Savings tab) ──
+                // ── savings today: one line; the explanations live in crow watch (History tab) ──
                 Head { text: "SAVINGS TODAY"; visible: panel.hasData }
                 Row {
                     visible: panel.hasData
