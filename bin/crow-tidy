@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Repo hygiene across registered projects: what is dirty, unpushed, off the
+default branch, or left behind in worktrees, as Markdown.
+
+Report only by default. --apply does the safe moves, never anything else:
+  - fetch, then fast-forward the default branch when it is checked out and clean
+  - remove clean worktrees whose branch is merged into the default branch, delete
+    that branch, and delete merged branches with no worktree
+  - git worktree prune
+It never commits, pushes, merges, switches branches or touches a dirty tree.
+Work-scope projects are report only.
+
+Usage: crow-tidy [--apply] [--brief] [--scope work|personal|all] [--skip NAME ...]
+  --brief  only list projects that need attention (used by the brief skill)
+"""
+import argparse
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+REGISTRY = ROOT / "local" / "projects.yaml"
+
+
+def git(repo, *args, check=False):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    if check and r.returncode:
+        raise RuntimeError(r.stderr.strip())
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def default_branch(repo):
+    head = git(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if head:
+        return head.split("/", 1)[1]
+    for name in ("main", "master"):
+        if git(repo, "rev-parse", "--verify", "-q", name) is not None:
+            return name
+    return None
+
+
+def merged(repo, branch, base):
+    return subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", branch, base],
+                          capture_output=True).returncode == 0
+
+
+def worktrees(repo):
+    out, cur = [], {}
+    for line in (git(repo, "worktree", "list", "--porcelain") or "").splitlines():
+        if line.startswith("worktree "):
+            cur = {"path": line[9:]}
+            out.append(cur)
+        elif line.startswith("branch "):
+            cur["branch"] = line[7:].removeprefix("refs/heads/")
+        elif line == "detached":
+            cur["detached"] = True
+    return out
+
+
+def dirty(path):
+    return len((git(path, "status", "--porcelain") or "").splitlines())
+
+
+def age_days(repo, ref):
+    ts = git(repo, "log", "-1", "--format=%ct", ref)
+    return int((time.time() - int(ts)) / 86400) if ts else None
+
+
+def tidy(project, apply):
+    repo = Path(project["path"])
+    notes, done = [], []
+    if git(repo, "rev-parse", "--is-inside-work-tree") != "true":
+        return None
+    base = default_branch(repo)
+    can_apply = apply and project.get("scope") != "work"
+    if apply and git(repo, "remote") and git(repo, "fetch", "-q", "--prune") is None:
+        notes.append("fetch failed")
+
+    current = git(repo, "branch", "--show-current") or "(detached)"
+    n_dirty = dirty(repo)
+    if current != base:
+        notes.append(f"checkout on `{current}`, not `{base}`")
+    if n_dirty:
+        notes.append(f"{n_dirty} uncommitted file(s) in the main checkout")
+
+    upstream = git(repo, "rev-parse", "--abbrev-ref", f"{base}@{{u}}")
+    if upstream:
+        behind, ahead = map(int, git(repo, "rev-list", "--left-right", "--count", f"{upstream}...{base}").split())
+        if behind and not ahead and current == base and not n_dirty and can_apply:
+            if git(repo, "merge", "--ff-only", "-q", upstream) is not None:
+                done.append(f"fast-forwarded `{base}` by {behind}")
+                behind = 0
+        if ahead:
+            notes.append(f"`{base}` {ahead} commit(s) not pushed")
+        if behind:
+            notes.append(f"`{base}` {behind} behind origin")
+    elif git(repo, "remote"):
+        notes.append(f"`{base}` has no upstream")
+
+    stashes = len((git(repo, "stash", "list") or "").splitlines())
+    if stashes:
+        notes.append(f"{stashes} stash(es)")
+
+    wt_branches = set()
+    for wt in worktrees(repo)[1:]:
+        path, branch = wt["path"], wt.get("branch")
+        wt_branches.add(branch)
+        if path.endswith(".live"):
+            continue
+        if path.startswith("/tmp"):
+            notes.append(f"worktree in /tmp: {path}")
+        if not Path(path).exists():
+            continue  # pruned below
+        wd = dirty(path)
+        if branch and base and merged(repo, branch, base):
+            if wd:
+                notes.append(f"merged `{branch}` worktree still has {wd} uncommitted file(s)")
+            elif can_apply and branch != base:
+                if git(repo, "worktree", "remove", path) is not None:
+                    git(repo, "branch", "-d", branch)
+                    done.append(f"removed merged worktree + branch `{branch}`")
+                    continue
+            elif branch != base:
+                notes.append(f"merged worktree `{branch}` can go")
+            else:
+                notes.append(f"worktree holds `{base}`: {path}")
+            continue
+        ahead = git(repo, "rev-list", "--count", f"{base}..{branch}") if branch else "?"
+        age = age_days(repo, branch or "HEAD")
+        line = f"open `{branch or 'detached'}` +{ahead}, {age}d old"
+        if wd:
+            line += f", {wd} uncommitted"
+        notes.append(line)
+
+    if can_apply:
+        git(repo, "worktree", "prune")
+    for branch in (git(repo, "branch", "--format=%(refname:short)") or "").splitlines():
+        if branch in wt_branches or branch == base or branch == current:
+            continue
+        if merged(repo, branch, base):
+            if can_apply and git(repo, "branch", "-d", branch) is not None:
+                done.append(f"deleted merged branch `{branch}`")
+            else:
+                notes.append(f"merged branch `{branch}` can go")
+        else:
+            ahead = git(repo, "rev-list", "--count", f"{base}..{branch}")
+            notes.append(f"branch `{branch}` +{ahead} (no worktree), {age_days(repo, branch)}d old")
+    return notes, done
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--brief", action="store_true")
+    ap.add_argument("--scope", default="all", choices=["work", "personal", "all"])
+    ap.add_argument("--skip", nargs="*", default=[])
+    args = ap.parse_args()
+
+    projects = yaml.safe_load(REGISTRY.read_text()).get("projects", [])
+    seen, out = set(), []
+    for p in projects:
+        if p["name"] in args.skip or p.get("tidy") == "skip" or p["path"] in seen:
+            continue
+        if args.scope != "all" and p.get("scope") != args.scope:
+            continue
+        seen.add(p["path"])
+        res = tidy(p, args.apply)
+        if res is None:
+            continue
+        notes, done = res
+        if args.brief and not notes and not done:
+            continue
+        out.append(f"## {p['name']}" + ("" if notes or done else " ✓"))
+        out += [f"- ✔ {d}" for d in done] + [f"- {n}" for n in notes]
+    print("\n".join(out) if out else "All repos clean.")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

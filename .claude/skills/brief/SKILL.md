@@ -5,7 +5,7 @@ context: fork
 model: sonnet
 effort: low
 background: false
-allowed-tools: Bash(bin/crow-activity:*) Bash(bin/crow-releases:*) Bash(bin/crow-retro:*) Bash(cdx runs:*)
+allowed-tools: Bash(bin/crow-activity:*) Bash(bin/crow-releases:*) Bash(bin/crow-tidy:*) Bash(bin/crow-retro:*) Bash(cdx runs:*)
 ---
 
 # Brief
@@ -18,6 +18,9 @@ Forge activity since yesterday:
 
 Release tracks:
 !`"${CLAUDE_PROJECT_DIR}/bin/crow-releases" 2>&1 | head -40 || true`
+
+Repo hygiene (safe cleanups already applied, see `runbooks/repo-tidy.md`):
+!`"${CLAUDE_PROJECT_DIR}/bin/crow-tidy" --apply --brief 2>&1 | head -60 || true`
 
 Read-only except for one activity-log line. Target: **one screen, ≤ 40 lines**. Gather cheaply, in this order.
 
@@ -54,6 +57,9 @@ Skip any source that errors and note it in one line at the bottom.
 
 ## 🚀 Release tracks
 - one line per track: name → target, next milestone (or "no roadmap yet"); then one suggested next step for the most recently active personal project
+
+## 🧹 Repos
+- what crow-tidy cleaned (one line), then per project only: uncommitted work, unpushed main, branches older than 3 days (offer to merge/delete), worktrees in /tmp
 
 ## 🔁 Learned
 - one line per retro since the last brief (what changed); pending proposals to approve; failed retros
