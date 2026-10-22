@@ -1,0 +1,332 @@
+{
+  "title": "Run Claude and Codex together through cdx",
+  "references": [
+    "README.md",
+    "AGENTS.md",
+    "LOGICS.md",
+    "CLAUDE.md",
+    "bin/crow",
+    "bin/crow-accounts",
+    "bin/crow-runs",
+    "bin/crow-usage",
+    "bin/crow-project",
+    "bin/crow-sessions",
+    "bin/crow-relaunch",
+    "bin/crow-memory",
+    "bin/crow-retro",
+    "bin/crow-digest",
+    "bin/crow-afk-preflight",
+    "bin/crow-hub-guard",
+    "tools/crow-watch/main.go",
+    "tools/crow-watch/usage.go",
+    "integrations/archeotech/crow-agents/CrowStore.qml",
+    "integrations/archeotech/crow-usage/CrowUsageStore.qml",
+    "docs/accounts.example.yaml",
+    "tests/conftest.py",
+    "logics/request/req_001_crow_account_switching_and_session_resume.md",
+    "logics/tasks/task_002_deliver_account_switching_and_session_resume_in_three_steps.md",
+    "https://github.com/AlexAgo83/cdx-manager",
+    "https://learn.chatgpt.com/docs/non-interactive-mode",
+    "https://learn.chatgpt.com/docs/cli/reference"
+  ],
+  "request": {
+    "complexity": "High",
+    "theme": "Claude and Codex orchestration",
+    "needs": [
+      "Make the fork a hub for both Claude Code and Codex, with one cdx profile per account and simultaneous sessions across registered projects.",
+      "Choose a provider/account explicitly for interactive work, brief, project handoff and tracked background jobs; retain existing Claude-only configurations.",
+      "Observe activity, usage, quotas and interrupted work for both providers in existing CLI, terminal board and optional widgets.",
+      "Continue a chosen task across providers using verified context transfer, with account policy and workspace ownership preserved."
+    ],
+    "context": [
+      "Repository inspection on 2026-10-22: interactive launches already call cdx, but crow-runs detects only Claude processes and parses Claude messages; crow-usage scans Claude profile paths, imports private cdx_manager.run_usage helpers and defaults to a direct Claude title command; crow-sessions, crow-memory and retros also assume Claude layouts.",
+      "The installed cdx-manager 0.21.4 exposes both providers, cdx --json, schema --json, select --provider --require-ready --json, status --cached --json, run, run-status, run-report, runs, history, stats, can-resume and handoff. This is an inspected compatibility baseline, not an assertion about earlier releases. Capture sanitized fixtures and gate required capabilities before advertising support.",
+      "cdx run publishes schema_version, ok, provider, session, run_id, exit_code, stdout_path, transcript_path and nullable token usage. Consume its public JSON boundary; no import of cdx Python internals or assumption that the executable is a Python script.",
+      "Installed cdx handoff supports Claude and Codex native transcripts. SOURCE TARGET --source-conversation ID --json prepares an entry without launching; --source-native-transcript PATH disambiguates duplicate native IDs. Native resume remains provider-specific. Cross-provider handoff starts a target conversation and links it to the source.",
+      "OpenAI official non-interactive and CLI documentation was checked on 2026-10-22 for exec JSON events and resume. Crow delegates execution to cdx; native event parsing is a bounded read-only fallback for activity details missing from cdx, versioned with synthetic fixtures. No Codex API key is required for corpus creation.",
+      "Existing account-switching task_002 is In progress. Reuse its policy helper, interrupted registry and memory behavior; add provider-aware migrations without closing, resetting or duplicating that work. The earlier UI corpus owns layout improvements; this request adds provider identity and mixed data to those surfaces.",
+      "Scope decision: joint use means concurrent Claude/Codex tasks, explicit provider selection and guarded cross-provider task handoff. Autonomous agent-to-agent conversation, consensus loops and automatic cross-provider retries are excluded.",
+      "Architecture decision: add a small shared Python boundary under bin/ for cdx invocation, provider capabilities and normalized records; keep Bash launcher, Go TUI and QML consumers. cdx owns auth homes and launches; crow owns its allowed-account policy, task lineage and presentation.",
+      "Private config, raw transcripts, handoff entries, memory and run state stay under ignored local/ or cdx-managed private storage. Public fixtures use invented profiles and temporary directories. Never commit credentials, actual account lists or private project context."
+    ],
+    "acceptance_criteria": [
+      "AC1: A versioned cdx boundary discovers provider and capabilities, validates JSON/error envelopes, rejects unsupported contracts with actionable diagnostics and works with the installed Node launcher without importing private cdx modules.",
+      "AC2: Account configuration resolves provider from cdx and supports optional checked provider declarations, existing defaults, policy use/ask-first/never and per-job explicit account/provider selection; mismatches, disabled, unknown and forbidden targets fail before launch.",
+      "AC3: Interactive hub/project sessions, one-shot brief, dispatch, report, wait, AFK jobs, title generation and retros work through cdx for either provider; existing Claude commands keep their behavior and provider-specific model or permission flags cannot silently cross providers.",
+      "AC4: One Claude and one Codex job run concurrently with distinct provider/account/native-conversation identities, correct lifecycle/report/cancellation handling and a single global background-slot limit; conflicting writes in one workspace are refused or use explicit separate worktrees.",
+      "AC5: CLI snapshots, watch and both optional widgets distinguish providers, preserve existing fields and represent missing activity/context/quota data as unknown rather than idle, healthy or zero.",
+      "AC6: Usage aggregation separates provider, account, model, project and day, deduplicates live/history/run observations, normalizes cumulative versus delta tokens, avoids double-counting cached/reasoning subsets and keeps unknown prices/quotas null with provenance.",
+      "AC7: Interrupted-session records carry provider and exact source identity. Same-provider resume and Claude-to-Codex/Codex-to-Claude handoff verify workspace and policy, require confirmation and reject ambiguous/stale sources; failed launch never marks a source as resumed.",
+      "AC8: Both providers receive applicable repository instructions, allowed shared memory and task state through an explicit context mechanism; temporary shared-account access is removed on exit/failure and concurrent sessions cannot unlink each other or write credentials into shared context.",
+      "AC9: Common hub guard requirements are mapped to each provider capability. Unsupported enforcement fails closed for guarded actions with a diagnostic; no silent promise that Claude hooks protect a Codex session and no reduction in approval or permission settings.",
+      "AC10: Offline Python and Go regressions and mixed-provider rendering fixtures pass; onboarding, migration, capability matrix and manual opt-in smoke steps cover Claude-only, Codex-only and mixed setups without requiring live credentials in automated checks."
+    ]
+  },
+  "product": {
+    "title": "One crow hub for Claude and Codex",
+    "overview": "Run and observe Claude Code and Codex accounts together through cdx, choose the right provider for each task, and transfer interrupted work with its exact source context.",
+    "goals": [
+      "Keep one workflow for mixed-provider interactive work and background jobs.",
+      "Show trustworthy activity and usage without treating missing provider data as zero.",
+      "Preserve account consent, private memory and repository guard behavior during launches and transfers.",
+      "Deliver incrementally over the current account-switching and UI work."
+    ],
+    "non_goals": [
+      "Modifying or forking cdx itself.",
+      "Implementing a direct OpenAI or Anthropic API client or installing/logging into user accounts.",
+      "Merging provider-native conversation stores or converting Claude transcripts into Codex sessions.",
+      "Autonomous multi-agent debate, automatic provider fallback, automatic credit resets or a new dashboard layout.",
+      "Running two writers in the same working tree without isolation."
+    ]
+  },
+  "backlog_items": [
+    {
+      "title": "2.1 Public cdx contract and provider-aware account policy",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC1",
+        "AC2"
+      ],
+      "problem": [
+        "Crow assumes a Python cdx installation and accounts without provider identity."
+      ],
+      "scope_in": [
+        "Priority rationale: every subsequent slice depends on reliable provider resolution and one policy boundary.",
+        "Introduce a shared subprocess boundary with argv arrays, timeouts, exit/ok/schema checks, bounded errors and cached capability discovery. Keep providers as claude/codex internal enums; tolerate unrelated providers in inventory but refuse them as targets.",
+        "Read public cdx inventory/schema/config/status contracts using sanitized 0.21.4 fixtures. Preserve CROW_ACCOUNT and old default/name/policy/memory configuration; explicit account overrides default, optional --provider constrains the resolved account. When only provider is supplied, select only within allowed enabled profiles; never let cdx select an unrestricted account.",
+        "Extend docs/accounts.example.yaml with invented Claude/Codex profiles, provider mismatch validation and documented unknown-profile policy. Inventory reads must not log into, refresh auth or alter profiles."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Claude-only legacy fixtures resolve the same default; mixed fixtures resolve both providers and an explicit matching account wins over defaults.",
+        "AC2: Missing CLI, timeout, non-JSON, ok=false, unsupported schema, disabled/unknown profiles and provider mismatch produce actionable errors before any launch subprocess.",
+        "AC3: A never account is rejected in every path; ask-first consent records the exact target and action and cannot be reused for another account.",
+        "AC4: A Node entrypoint fixture works without importing cdx_manager or assuming a Python shebang."
+      ]
+    },
+    {
+      "title": "2.2 Shared context and enforceable guard capabilities",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC8",
+        "AC9"
+      ],
+      "problem": [
+        "Claude memory paths and hooks do not establish equivalent instructions or permissions for Codex."
+      ],
+      "scope_in": [
+        "Priority rationale: instructions and guard guarantees must exist before exposing Codex launch paths; depends on 2.1.",
+        "Inventory provider-independent instructions and memory references; preserve AGENTS.md -> LOGICS.md and existing Claude instructions. Do not overwrite AGENTS.md or generated Logics runtime artifacts with the full CLAUDE.md.",
+        "Reuse crow-memory private local/ source; choose supported cdx context/memory or bounded launch prompt references for Codex rather than writing a fake Claude memory directory. Include owner preferences and project instructions when available; explicit error for missing required references.",
+        "Map common crow-hub-guard requirements to tested provider enforcement capabilities. Codex support is enabled only for operations whose guard requirements can be enforced; expose unsupported guarded actions as unavailable until a verified mechanism exists.",
+        "Use per-launch context handles and locked/reference-counted temporary access for shared accounts, with cleanup on normal exit, signal and failed spawn; leave unrelated files untouched."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Synthetic Claude and Codex launches receive the same required repo/task references while retaining their native instruction semantics.",
+        "AC2: Never profiles receive no memory links or context; concurrent shared sessions retain access until the last closes and cleanup is idempotent.",
+        "AC3: A missing enforcement capability blocks the affected operation before provider launch; fixtures prove no permission downgrade or full-access substitution.",
+        "AC4: No private memory body, auth material or actual profile path appears in public diagnostics or committed fixtures."
+      ]
+    },
+    {
+      "title": "2.3 Provider-aware launch dispatch and helper jobs",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC3",
+        "AC4"
+      ],
+      "problem": [
+        "Launcher output and helper jobs still assume a Claude result envelope or invoke Claude directly."
+      ],
+      "scope_in": [
+        "Priority rationale: deliver usable Codex execution after 2.1 and 2.2, before observability surfaces.",
+        "Add consistent --account and --provider choices to hub, term, project handoff, dispatch and one-shot entry points; keep existing argument forms and CROW_ACCOUNT.",
+        "Use cdx run public envelopes and run-report for final text, artifact references and status; retain explicit provider-specific fallback parsing only where public data lacks a final message. Handle ok=false, failed spawn, nonzero exit, timeout and cancellation separately from successful completion.",
+        "Route briefs, digest/retro, AFK and generated titles through the same account policy and provider boundary. Remove implicit direct Claude execution; keep explicit CROW_TITLE_CMD override as a documented operator-owned legacy escape hatch, with no automatic invocation when no eligible account exists.",
+        "Maintain one atomic global CROW_MAX_RUNS budget across both providers including detached runs; add workspace writer ownership and require another worktree or explicit read-only capability for a conflicting job. Persist provider/account/native identity with run lineage.",
+        "Keep model identifiers and reasoning/permission capabilities provider-specific. Do not enable cdx --failover by default because its target ranking can exceed crow allowed-account consent."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Mocked interactive, brief, dispatch, AFK, title and retro paths target each provider with valid argv and return its final report; old Claude invocations still pass.",
+        "AC2: Two isolated mixed-provider jobs occupy two shared slots and a third is refused at capacity, including a simultaneous-dispatch race.",
+        "AC3: Same-workspace writers are rejected before spawn; separate worktrees preserve each job cwd and branch.",
+        "AC4: Provider-incompatible model/permission choices, denied policy and missing consent fail without a ledger success entry; failed/cancelled jobs release slots.",
+        "AC5: Detached run returns run_id immediately and wait/report resolve the correct run without Claude-only stdout assumptions."
+      ]
+    },
+    {
+      "title": "2.4 Mixed-provider activity and session registry",
+      "priority": "High",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC4",
+        "AC5"
+      ],
+      "problem": [
+        "Live discovery scans only Claude processes and session identity is not qualified by provider."
+      ],
+      "scope_in": [
+        "Priority rationale: establish trustworthy common data before usage and UI; depends on 2.1 and 2.3.",
+        "Define additive normalized session records with provider, account, native id, cwd, source, timestamps, nullable metrics and capability/availability information. Use (provider, account, native id) identity and separate run_id lineage.",
+        "Prefer cdx history/run-status/report identity and artifact metadata. Keep bounded read-only Claude/Codex native adapters for prompts/tool activity and interactive session discovery unavailable in public payloads; resolve profile paths from supported metadata, not a fixed /home glob.",
+        "Normalize working/waiting/finished/failed/interrupted/unknown states conservatively; a quiet file does not prove waiting for a human. Version parsers/cache by provider and tolerate partial final JSONL records and unknown event variants.",
+        "Deduplicate interactive process, transcript and dispatched-run observations; exclude automatic retro/title work from user interrupted sessions without hiding genuine user jobs."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Synthetic simultaneous sessions from both providers appear once each; identical native ids under different providers/accounts do not collide.",
+        "AC2: Claude message/tool events and Codex session_meta/response_item/event_msg fixtures yield comparable prompts, actions, identity and timestamps with unknown fields retained as null.",
+        "AC3: Unreadable/deleted files, partial trailing JSONL, unknown events and inaccessible processes do not crash a snapshot or turn an unknown session into a completed job.",
+        "AC4: Unchanged transcript fixtures reuse incremental caches; only newly appended content is parsed where supported."
+      ]
+    },
+    {
+      "title": "2.5 Provider-aware usage quota and cost accounting",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC6"
+      ],
+      "problem": [
+        "Claude token categories, private pricing imports and fixed quota assumptions cannot be applied to Codex."
+      ],
+      "scope_in": [
+        "Priority rationale: depends on 2.1 and 2.4; trustworthy measures precede presentation.",
+        "Consume public cdx stats/run usage and cached status with provenance and freshness; use versioned native fallback only for missing per-day/session detail. Remove private cdx_manager price-table imports.",
+        "Normalize Codex cumulative token updates versus per-turn deltas without summing cumulative snapshots; cached input and reasoning output are subsets, while Claude cache creation/read semantics stay distinct.",
+        "Version crow usage schema and cache; preserve old consumer fields additively, retain legacy frozen history without relabeling it as Codex, and invalidate/rebuild derived caches without modifying source transcripts.",
+        "Carry provider/account/model/project/day keys through rollups, quota windows, prices and savings. Use public price metadata when available or an explicit versioned crow-owned table; unknown model cost remains null with unpriced counts. Never infer Codex prices or quotas from Claude.",
+        "Separate list-price estimates from subscription charges; preserve time window/units/source, avoid cross-provider quota percentages or cache-saving calculations when incomparable."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Hand-calculated mixed fixtures match token/day/project totals across repeated collection and session/run overlap; cumulative Codex snapshots count only once.",
+        "AC2: Unknown cost/limits remain null throughout rollups rather than zero; partially priced totals identify incomplete coverage.",
+        "AC3: Provider-specific cache and reasoning fixtures prove subsets are not billed twice; frozen Claude history and existing usage regressions still pass.",
+        "AC4: Quota freshness/source and provider window labels remain visible in emitted JSON with no live auth refresh during normal polling."
+      ]
+    },
+    {
+      "title": "2.6 Exact resume and cross-provider task handoff",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC7"
+      ],
+      "problem": [
+        "The relaunch path assumes Claude native files and does not distinguish native resume from task transfer."
+      ],
+      "scope_in": [
+        "Priority rationale: depends on 2.1, 2.2, 2.3 and 2.4; extends existing task_002 recovery without replacing it.",
+        "Migrate interrupted registry additively with provider, account, native conversation id, verified workspace and recovery mode. Legacy records resolve provider through inventory; unresolved identity remains unlaunchable.",
+        "Keep native resume capability separate from handoff capability: can-resume describes the target native resume strategy and must not incorrectly disqualify a valid cross-provider handoff.",
+        "For account/provider transfer prepare cdx handoff SOURCE TARGET --source-conversation ID --json in the verified workspace, inspect the preparation envelope, then launch the confirmed target. Duplicate ids require explicit native transcript selection. Never choose latest transcript by mtime.",
+        "Record confirmed source and target, resulting run/conversation identity and task lineage; preparation alone does not mark resumed. Refuse mutated/missing source, workspace mismatch, forbidden target and non-interactive absent consent. No automatic fallback to notes-only or terminal captures."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Claude-to-Codex, Codex-to-Claude and same-provider fixtures recover the explicitly selected source with the intended cwd and target account.",
+        "AC2: Ambiguous/stale/deleted source, workspace mismatch and unsupported contract return a diagnostic and no launch; can-resume fallback-to-last cannot satisfy exact resume.",
+        "AC3: An ask-first target requires explicit consent for each transfer; blocked/never targets are refused and failed launch leaves the source interrupted.",
+        "AC4: Successful target launch records lineage while retaining separate native conversation ids and the original source evidence."
+      ]
+    },
+    {
+      "title": "2.7 Provider identity across watch CLI and desktop widgets",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC5"
+      ],
+      "problem": [
+        "Current views hide provider identity and can render absent metrics as ordinary values."
+      ],
+      "scope_in": [
+        "Priority rationale: depends on 2.4 and 2.5; recovery action wiring follows 2.6.",
+        "Extend Go and QML payload consumers for additive provider fields, nullable metrics, quota provenance and schema compatibility; legacy missing provider defaults only when legacy payload provenance guarantees Claude.",
+        "Show provider/account on agents, usage and interrupted rows plus selection details; filter by provider without losing cross-provider global slot totals. Keep existing keyboard navigation, responsive layout and provider-neutral model display.",
+        "Wire relaunch selection to the shared guarded recovery command, showing native-resume versus cross-provider-transfer wording and exact target before confirmation.",
+        "Add mixed/legacy/unknown-data fixtures to existing Go render tests and widget fixture generators; use existing screenshot procedure instead of introducing another UI."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Mixed snapshots display correct provider/account for agents, history, usage and interruptions in CLI, watch and both optional widgets.",
+        "AC2: Unknown context, price and quota render as unavailable with appropriate window/source labels; zero remains a distinguishable measured value.",
+        "AC3: Existing Claude-only fixtures and narrow-terminal navigation pass; mixed-provider renders are reviewable through existing screenshot commands.",
+        "AC4: Selecting recovery invokes the shared policy helper with exact source identity and receives the same denial/confirmation behavior as the CLI."
+      ]
+    },
+    {
+      "title": "2.8 Compatibility regression onboarding and delivery evidence",
+      "priority": "Medium",
+      "complexity": "Medium",
+      "theme": "Claude and Codex orchestration",
+      "request_acs": [
+        "AC10"
+      ],
+      "problem": [
+        "A dual-provider fork needs a reproducible migration and proof that Claude-only users remain supported."
+      ],
+      "scope_in": [
+        "Priority rationale: final integration after 2.1 through 2.7, with offline tests authored alongside each slice.",
+        "Update README installation and feature wording, account example and runbooks for dispatch, memory, interruptions, session retros and project work. Document Claude-only, Codex-only and mixed examples with invented profile names.",
+        "Publish the tested cdx version/capability matrix, guarded-operation limitations, supported provider flags, schema migration/rebuild behavior and rollback procedure. Preserve upstream history and MIT license attribution.",
+        "Run python3 -m pytest tests and go test ./... in tools/crow-watch; use fake cdx/native artifacts for success/error/race cases and generate mixed watch/widget renders.",
+        "Provide optional owner-run live smoke steps: one task per provider in separate worktrees, observe completion/usage, then an explicitly confirmed handoff. Record live validation as pending unless actually authorized and performed; no automated credentials or paid generation.",
+        "Record task-level AC evidence and refresh Logics indicators/index through the manager at delivery; settle linked product only after implementation acceptance."
+      ],
+      "scope_out": [
+        "Changing cdx or provider authentication internals."
+      ],
+      "acceptance_criteria": [
+        "AC1: Offline Python and Go suites pass with no live account or provider executable required; assertions cover both providers and legacy behavior.",
+        "AC2: Documentation contains copyable launch/dispatch/handoff examples, exact capability checks and a safe rollback that retains private source transcripts.",
+        "AC3: Acceptance evidence maps every request AC to a passing check or explicitly pending owner-run smoke; pending required proof prevents implementation closeout.",
+        "AC4: Public diff contains no local/ state, credentials, actual private profile inventory or unrelated upstream changes."
+      ]
+    }
+  ],
+  "orchestration_task": {
+    "title": "Deliver joint Claude and Codex support through cdx",
+    "plan": [
+      "Wave 1 (High, 2.1): capture sanitized cdx 0.21.4 contract fixtures, implement shared boundary and account/provider policy. Validate Claude-only migration and deny paths first.",
+      "Wave 2 (High, 2.2): implement shared context lifecycle and capability-based guard enforcement. Gate unsupported operations before enabling Codex launch.",
+      "Wave 3 (High, 2.3): enable interactive and tracked headless execution for each provider, helper jobs, atomic global slots and isolated workspaces; validate with fake cdx.",
+      "Wave 4 (High, 2.4): normalize activity/session identity and cached native adapters; verify simultaneous mixed sessions and report deduplication.",
+      "Wave 5 (Medium, 2.5 then 2.6): verify usage/token arithmetic and migrations; add exact native resume and confirmed cross-provider transfer over task_002 recovery helpers.",
+      "Wave 6 (Medium, 2.7): adapt CLI, Go TUI and both QML widgets, render mixed/legacy/unavailable cases using existing UI conventions.",
+      "Wave 7 (Medium, 2.8): run offline Python/Go suites, review onboarding and capability matrix, record acceptance evidence and optional live smoke separately. Use Logics lifecycle commands; do not mark implementation complete during corpus creation."
+    ]
+  },
+  "context_pack": {
+    "out": "logics/context-packs/crow_claude_codex_cdx.json",
+    "mode": "diff-first",
+    "profile": "deep"
+  }
+}

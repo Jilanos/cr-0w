@@ -1,0 +1,641 @@
+{
+  "budgets": {
+    "max_docs": 80,
+    "max_docs_per_ref": 8
+  },
+  "changed_paths": [
+    "logics/backlog/item_010_2_1_public_cdx_contract_and_provider_aware_account_policy.md",
+    "logics/backlog/item_011_2_2_shared_context_and_enforceable_guard_capabilities.md",
+    "logics/backlog/item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs.md",
+    "logics/backlog/item_013_2_4_mixed_provider_activity_and_session_registry.md",
+    "logics/backlog/item_014_2_5_provider_aware_usage_quota_and_cost_accounting.md",
+    "logics/backlog/item_015_2_6_exact_resume_and_cross_provider_task_handoff.md",
+    "logics/backlog/item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets.md",
+    "logics/backlog/item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence.md",
+    "logics/context-packs/crow_claude_codex_cdx.json",
+    "logics/product/prod_003_one_crow_hub_for_claude_and_codex.md",
+    "logics/request/req_004_run_claude_and_codex_together_through_cdx.md",
+    "logics/scaffold/crow_claude_codex_cdx.json",
+    "logics/tasks/task_003_deliver_joint_claude_and_codex_support_through_cdx.md"
+  ],
+  "command": "logics-manager sync context-pack req_004_run_claude_and_codex_together_through_cdx item_010_2_1_public_cdx_contract_and_provider_aware_account_policy item_011_2_2_shared_context_and_enforceable_guard_capabilities item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs item_013_2_4_mixed_provider_activity_and_session_registry item_014_2_5_provider_aware_usage_quota_and_cost_accounting item_015_2_6_exact_resume_and_cross_provider_task_handoff item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence task_003_deliver_joint_claude_and_codex_support_through_cdx --mode diff-first --profile deep --handoff",
+  "companion_docs": [
+    {
+      "kind": "product",
+      "linked_refs": {
+        "item": [
+          "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+          "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+          "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+          "item_013_2_4_mixed_provider_activity_and_session_registry",
+          "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+          "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+          "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+          "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/product/prod_003_one_crow_hub_for_claude_and_codex.md",
+      "ref": "prod_003_one_crow_hub_for_claude_and_codex",
+      "sections": {
+        "Goals": [
+          "- Keep one workflow for mixed-provider interactive work and background jobs.",
+          "- Show trustworthy activity and usage without treating missing provider data as zero.",
+          "- Preserve account consent, private memory and repository guard behavior during launches and transfers.",
+          "- Deliver incrementally over the current account-switching and UI work."
+        ],
+        "Key product decisions": [
+          "- Use cdx public JSON contracts for provider execution, account inventory and run lifecycle.",
+          "- Keep native conversation identities separate across providers; link task transfers explicitly.",
+          "- Treat unavailable telemetry as unknown and make provider/account provenance visible.",
+          "- Gate operations on tested enforcement capabilities, preserving account consent and private context lifetime."
+        ],
+        "Overview": [
+          "Run and observe Claude Code and Codex accounts together through cdx, choose the right provider for each task, and transfer interrupted work with its exact source context."
+        ],
+        "References": [
+          "- Product back-reference: `req_004_run_claude_and_codex_together_through_cdx`",
+          "- Task back-reference: `task_003_deliver_joint_claude_and_codex_support_through_cdx`"
+        ]
+      },
+      "status": "Proposed",
+      "title": "One crow hub for Claude and Codex"
+    },
+    {
+      "kind": "product",
+      "linked_refs": {
+        "item": [
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
+        ],
+        "prod": [
+          "prod_002_keep_working_when_an_account_runs_out"
+        ],
+        "req": [
+          "req_001_crow_account_switching_and_session_resume"
+        ],
+        "task": [
+          "task_002_deliver_account_switching_and_session_resume_in_three_steps"
+        ]
+      },
+      "path": "logics/product/prod_002_keep_working_when_an_account_runs_out.md",
+      "ref": "prod_002_keep_working_when_an_account_runs_out",
+      "sections": {
+        "Goals": [
+          "- Never lose a session to a usage limit.",
+          "- Switch accounts with one confirmation and never touch a forbidden one.",
+          "- Stay useful from the hub when no tokens are left."
+        ],
+        "Key product decisions": [
+          "- Use structured input as the source of truth for generated docs.",
+          "- Keep generated write paths local and repo-bounded."
+        ],
+        "Overview": [
+          "crow tracks which accounts the owner may use, notices a blocked account, and relaunches cut-off sessions on an allowed one after confirmation, from a terminal view."
+        ],
+        "References": [
+          "- Product back-reference: `req_001_crow_account_switching_and_session_resume`",
+          "- Task back-reference: `task_002_deliver_account_switching_and_session_resume_in_three_steps`"
+        ]
+      },
+      "status": "Proposed",
+      "title": "Keep working when an account runs out"
+    }
+  ],
+  "docs": [
+    {
+      "ai_context": {},
+      "kind": "request",
+      "linked_refs": {
+        "item": [
+          "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+          "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+          "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+          "item_013_2_4_mixed_provider_activity_and_session_registry",
+          "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+          "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+          "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+          "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_001_crow_account_switching_and_session_resume",
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_002_deliver_account_switching_and_session_resume_in_three_steps"
+        ]
+      },
+      "path": "logics/request/req_004_run_claude_and_codex_together_through_cdx.md",
+      "ref": "req_004_run_claude_and_codex_together_through_cdx",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: A versioned cdx boundary discovers provider and capabilities, validates JSON/error envelopes, rejects unsupported contracts with actionable diagnostics and works with the installed Node launcher without importing private cdx modules.",
+          "- AC2: Account configuration resolves provider from cdx and supports optional checked provider declarations, existing defaults, policy use/ask-first/never and per-job explicit account/provider selection; mismatches, disabled, unknown and forbidden targets fail before launch.",
+          "- AC3: Interactive hub/project sessions, one-shot brief, dispatch, report, wait, AFK jobs, title generation and retros work through cdx for either provider; existing Claude commands keep their behavior and provider-specific model or permission flags cannot silently cross providers.",
+          "- AC4: One Claude and one Codex job run concurrently with distinct provider/account/native-conversation identities, correct lifecycle/report/cancellation handling and a single global background-slot limit; conflicting writes in one workspace are refused or use explicit separate worktrees.",
+          "- AC5: CLI snapshots, watch and both optional widgets distinguish providers, preserve existing fields and represent missing activity/context/quota data as unknown rather than idle, healthy or zero.",
+          "- AC6: Usage aggregation separates provider, account, model, project and day, deduplicates live/history/run observations, normalizes cumulative versus delta tokens, avoids double-counting cached/reasoning subsets and keeps unknown prices/quotas null with provenance."
+        ],
+        "Needs": [
+          "- Make the fork a hub for both Claude Code and Codex, with one cdx profile per account and simultaneous sessions across registered projects.",
+          "- Choose a provider/account explicitly for interactive work, brief, project handoff and tracked background jobs; retain existing Claude-only configurations.",
+          "- Observe activity, usage, quotas and interrupted work for both providers in existing CLI, terminal board and optional widgets.",
+          "- Continue a chosen task across providers using verified context transfer, with account policy and workspace ownership preserved."
+        ]
+      },
+      "status": "Ready",
+      "title": "Run Claude and Codex together through cdx"
+    },
+    {
+      "ai_context": {
+        "keywords": "crow, account, switching, session, resume",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "kind": "request",
+      "linked_refs": {
+        "item": [
+          "item_006_1_1_memory_in_local_shared_by_every_allowed_profile",
+          "item_007_1_2_account_policy_config_and_interrupted_session_registry",
+          "item_008_1_3_guarded_relaunch_and_block_detection",
+          "item_009_1_4_interrupted_sessions_view_and_no_model_mode"
+        ],
+        "prod": [
+          "prod_002_keep_working_when_an_account_runs_out"
+        ],
+        "req": [
+          "req_001_crow_account_switching_and_session_resume"
+        ]
+      },
+      "path": "logics/request/req_001_crow_account_switching_and_session_resume.md",
+      "ref": "req_001_crow_account_switching_and_session_resume",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: An allowed-accounts config in local/ lists each account with a policy (use, ask-first, never); crow never targets an account marked never.",
+          "- AC2: A scanner builds the interrupted-sessions registry from transcripts (last turn is a limit message, retros and automatic jobs excluded) and is cheap on repeated runs.",
+          "- AC3: Relaunching a session always passes its conversation id to the handoff and refuses to run without one.",
+          "- AC4: When the active account is blocked, crow shows the recommended allowed target and asks for confirmation before any handoff; ask-first accounts always require an explicit yes.",
+          "- AC5: A crow watch view lists interrupted sessions with project, age, size and first prompt, and relaunches the selected one on a chosen allowed account.",
+          "- AC6: With no usable account, crow offers a no-model mode listing work that needs none (pipeline checks, diff review, registry triage)."
+        ],
+        "Needs": [
+          "- When the current account runs out of its 5-hour allowance the owner is blocked and cannot do much; crow should offer to continue on another allowed account instead.",
+          "- Only accounts the owner allows may be used: one is personal, one is shared and must always be confirmed, the others belong to teammates and are never used.",
+          "- Sessions cut off by a usage limit must be listed and relaunchable on any allowed account, whenever the owner wants.",
+          "- A handoff must name the exact source conversation: without an id the provider tool takes the newest transcript, which once handed off an automatic retro session instead of the owner's real one.",
+          "- While no tokens are left the owner should still have something useful to do from the hub.",
+          "- Whatever crow has learned about the owner (memory) must follow a session to any allowed account; today it sits in one profile's folder and a relaunch on another account starts without it, while the shared account must not end up holding the owner's personal memory."
+        ]
+      },
+      "status": "Draft",
+      "title": "crow account switching and session resume"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_010_2_1_public_cdx_contract_and_provider_aware_account_policy.md",
+      "ref": "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Claude-only legacy fixtures resolve the same default; mixed fixtures resolve both providers and an explicit matching account wins over defaults.",
+          "- AC2: Missing CLI, timeout, non-JSON, ok=false, unsupported schema, disabled/unknown profiles and provider mismatch produce actionable errors before any launch subprocess.",
+          "- AC3: A never account is rejected in every path; ask-first consent records the exact target and action and cannot be reused for another account.",
+          "- AC4: A Node entrypoint fixture works without importing cdx_manager or assuming a Python shebang."
+        ],
+        "Problem": [
+          "- Crow assumes a Python cdx installation and accounts without provider identity."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.1 Public cdx contract and provider-aware account policy"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_011_2_2_shared_context_and_enforceable_guard_capabilities"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_011_2_2_shared_context_and_enforceable_guard_capabilities.md",
+      "ref": "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Synthetic Claude and Codex launches receive the same required repo/task references while retaining their native instruction semantics.",
+          "- AC2: Never profiles receive no memory links or context; concurrent shared sessions retain access until the last closes and cleanup is idempotent.",
+          "- AC3: A missing enforcement capability blocks the affected operation before provider launch; fixtures prove no permission downgrade or full-access substitution.",
+          "- AC4: No private memory body, auth material or actual profile path appears in public diagnostics or committed fixtures."
+        ],
+        "Problem": [
+          "- Claude memory paths and hooks do not establish equivalent instructions or permissions for Codex."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.2 Shared context and enforceable guard capabilities"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs.md",
+      "ref": "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Mocked interactive, brief, dispatch, AFK, title and retro paths target each provider with valid argv and return its final report; old Claude invocations still pass.",
+          "- AC2: Two isolated mixed-provider jobs occupy two shared slots and a third is refused at capacity, including a simultaneous-dispatch race.",
+          "- AC3: Same-workspace writers are rejected before spawn; separate worktrees preserve each job cwd and branch.",
+          "- AC4: Provider-incompatible model/permission choices, denied policy and missing consent fail without a ledger success entry; failed/cancelled jobs release slots.",
+          "- AC5: Detached run returns run_id immediately and wait/report resolve the correct run without Claude-only stdout assumptions."
+        ],
+        "Problem": [
+          "- Launcher output and helper jobs still assume a Claude result envelope or invoke Claude directly."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.3 Provider-aware launch dispatch and helper jobs"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_013_2_4_mixed_provider_activity_and_session_registry"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_013_2_4_mixed_provider_activity_and_session_registry.md",
+      "ref": "item_013_2_4_mixed_provider_activity_and_session_registry",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Synthetic simultaneous sessions from both providers appear once each; identical native ids under different providers/accounts do not collide.",
+          "- AC2: Claude message/tool events and Codex session_meta/response_item/event_msg fixtures yield comparable prompts, actions, identity and timestamps with unknown fields retained as null.",
+          "- AC3: Unreadable/deleted files, partial trailing JSONL, unknown events and inaccessible processes do not crash a snapshot or turn an unknown session into a completed job.",
+          "- AC4: Unchanged transcript fixtures reuse incremental caches; only newly appended content is parsed where supported."
+        ],
+        "Problem": [
+          "- Live discovery scans only Claude processes and session identity is not qualified by provider."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.4 Mixed-provider activity and session registry"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_014_2_5_provider_aware_usage_quota_and_cost_accounting"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_014_2_5_provider_aware_usage_quota_and_cost_accounting.md",
+      "ref": "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Hand-calculated mixed fixtures match token/day/project totals across repeated collection and session/run overlap; cumulative Codex snapshots count only once.",
+          "- AC2: Unknown cost/limits remain null throughout rollups rather than zero; partially priced totals identify incomplete coverage.",
+          "- AC3: Provider-specific cache and reasoning fixtures prove subsets are not billed twice; frozen Claude history and existing usage regressions still pass.",
+          "- AC4: Quota freshness/source and provider window labels remain visible in emitted JSON with no live auth refresh during normal polling."
+        ],
+        "Problem": [
+          "- Claude token categories, private pricing imports and fixed quota assumptions cannot be applied to Codex."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.5 Provider-aware usage quota and cost accounting"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_015_2_6_exact_resume_and_cross_provider_task_handoff"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_015_2_6_exact_resume_and_cross_provider_task_handoff.md",
+      "ref": "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Claude-to-Codex, Codex-to-Claude and same-provider fixtures recover the explicitly selected source with the intended cwd and target account.",
+          "- AC2: Ambiguous/stale/deleted source, workspace mismatch and unsupported contract return a diagnostic and no launch; can-resume fallback-to-last cannot satisfy exact resume.",
+          "- AC3: An ask-first target requires explicit consent for each transfer; blocked/never targets are refused and failed launch leaves the source interrupted.",
+          "- AC4: Successful target launch records lineage while retaining separate native conversation ids and the original source evidence."
+        ],
+        "Problem": [
+          "- The relaunch path assumes Claude native files and does not distinguish native resume from task transfer."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.6 Exact resume and cross-provider task handoff"
+    },
+    {
+      "ai_context": {},
+      "kind": "task",
+      "linked_refs": {
+        "item": [
+          "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+          "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+          "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+          "item_013_2_4_mixed_provider_activity_and_session_registry",
+          "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+          "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+          "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+          "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/tasks/task_003_deliver_joint_claude_and_codex_support_through_cdx.md",
+      "ref": "task_003_deliver_joint_claude_and_codex_support_through_cdx",
+      "schema_version": "1.0",
+      "sections": {
+        "Context": [
+          "- Deliver mixed Claude/Codex operation over the existing account-switching helpers and observability surfaces. The installed cdx 0.21.4 is the inspected baseline; required public capabilities must be tested before launch.",
+          "- Coordinate with the active account-switching task before changing shared helpers; preserve its progress and existing behavior."
+        ],
+        "Validation": [
+          "- Corpus scaffold dry-run and inline validation completed on 2026-10-22 with no blocking findings. This checks planning readiness; implementation tests and task AC proof remain pending."
+        ]
+      },
+      "status": "Ready",
+      "title": "Deliver joint Claude and Codex support through cdx"
+    },
+    {
+      "ai_context": {},
+      "kind": "product",
+      "linked_refs": {
+        "item": [
+          "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+          "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+          "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+          "item_013_2_4_mixed_provider_activity_and_session_registry",
+          "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+          "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+          "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+          "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/product/prod_003_one_crow_hub_for_claude_and_codex.md",
+      "ref": "prod_003_one_crow_hub_for_claude_and_codex",
+      "schema_version": "1.0",
+      "sections": {},
+      "status": "Proposed",
+      "title": "One crow hub for Claude and Codex"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets.md",
+      "ref": "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Mixed snapshots display correct provider/account for agents, history, usage and interruptions in CLI, watch and both optional widgets.",
+          "- AC2: Unknown context, price and quota render as unavailable with appropriate window/source labels; zero remains a distinguishable measured value.",
+          "- AC3: Existing Claude-only fixtures and narrow-terminal navigation pass; mixed-provider renders are reviewable through existing screenshot commands.",
+          "- AC4: Selecting recovery invokes the shared policy helper with exact source identity and receives the same denial/confirmation behavior as the CLI."
+        ],
+        "Problem": [
+          "- Current views hide provider identity and can render absent metrics as ordinary values."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.7 Provider identity across watch CLI and desktop widgets"
+    },
+    {
+      "ai_context": {},
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence"
+        ],
+        "prod": [
+          "prod_003_one_crow_hub_for_claude_and_codex"
+        ],
+        "req": [
+          "req_004_run_claude_and_codex_together_through_cdx"
+        ],
+        "task": [
+          "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+        ]
+      },
+      "path": "logics/backlog/item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence.md",
+      "ref": "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence",
+      "schema_version": "1.0",
+      "sections": {
+        "Acceptance criteria": [
+          "- AC1: Offline Python and Go suites pass with no live account or provider executable required; assertions cover both providers and legacy behavior.",
+          "- AC2: Documentation contains copyable launch/dispatch/handoff examples, exact capability checks and a safe rollback that retains private source transcripts.",
+          "- AC3: Acceptance evidence maps every request AC to a passing check or explicitly pending owner-run smoke; pending required proof prevents implementation closeout.",
+          "- AC4: Public diff contains no local/ state, credentials, actual private profile inventory or unrelated upstream changes."
+        ],
+        "Problem": [
+          "- A dual-provider fork needs a reproducible migration and proof that Claude-only users remain supported."
+        ]
+      },
+      "status": "Ready",
+      "title": "2.8 Compatibility regression onboarding and delivery evidence"
+    }
+  ],
+  "estimates": {
+    "char_count": 23335,
+    "companion_doc_count": 2,
+    "doc_count": 12
+  },
+  "generated_at": "2026-10-22T14:46:57Z",
+  "handoff": {
+    "companion_doc_count": 2,
+    "enabled": true,
+    "source_refs": [
+      "req_004_run_claude_and_codex_together_through_cdx",
+      "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+      "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+      "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+      "item_013_2_4_mixed_provider_activity_and_session_registry",
+      "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+      "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+      "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+      "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence",
+      "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+    ],
+    "validation_summary_count": 1
+  },
+  "i18n": {
+    "actions": [
+      "Choose the source locale for app-owned user-facing copy.",
+      "Run logics-manager i18n init --source-locale <locale>.",
+      "Route new UI copy through stable semantic keys."
+    ],
+    "applicable": null,
+    "configured": false,
+    "contract_path": "logics/i18n/contract.json",
+    "findings": [],
+    "next_action": "Run logics-manager i18n init --source-locale <locale> for a project that owns user-facing copy.",
+    "ok": true,
+    "state": "absent"
+  },
+  "mode": "diff-first",
+  "profile": "deep",
+  "ref": "req_004_run_claude_and_codex_together_through_cdx,item_010_2_1_public_cdx_contract_and_provider_aware_account_policy,item_011_2_2_shared_context_and_enforceable_guard_capabilities,item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs,item_013_2_4_mixed_provider_activity_and_session_registry,item_014_2_5_provider_aware_usage_quota_and_cost_accounting,item_015_2_6_exact_resume_and_cross_provider_task_handoff,item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets,item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence,task_003_deliver_joint_claude_and_codex_support_through_cdx",
+  "refs": [
+    "req_004_run_claude_and_codex_together_through_cdx",
+    "item_010_2_1_public_cdx_contract_and_provider_aware_account_policy",
+    "item_011_2_2_shared_context_and_enforceable_guard_capabilities",
+    "item_012_2_3_provider_aware_launch_dispatch_and_helper_jobs",
+    "item_013_2_4_mixed_provider_activity_and_session_registry",
+    "item_014_2_5_provider_aware_usage_quota_and_cost_accounting",
+    "item_015_2_6_exact_resume_and_cross_provider_task_handoff",
+    "item_016_2_7_provider_identity_across_watch_cli_and_desktop_widgets",
+    "item_017_2_8_compatibility_regression_onboarding_and_delivery_evidence",
+    "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+  ],
+  "release": {
+    "blocking_reasons": [
+      "Missing logics/release/contract.json."
+    ],
+    "configured": false,
+    "contract_path": "logics/release/contract.json",
+    "guidance": [
+      "Release readiness must come from project-owned evidence, not conversational memory.",
+      "Use release status or validate before preparing or claiming release readiness.",
+      "Publication-oriented actions are explicit operator actions and are separate from safe read/validate actions."
+    ],
+    "next_action": "Run logics-manager release discover --write, then review and promote logics/release/contract.draft.json to logics/release/contract.json.",
+    "publication_actions": [
+      "GitHub release publication",
+      "external publication"
+    ],
+    "required_gates": [],
+    "safe_actions": [
+      "logics-manager release status",
+      "logics-manager release plan <version>",
+      "logics-manager release validate <version>"
+    ],
+    "state": "not_configured",
+    "target_id": null,
+    "target_version": null,
+    "targets": []
+  },
+  "validation_summary": [
+    {
+      "items": [
+        "- Corpus scaffold dry-run and inline validation completed on 2026-10-22 with no blocking findings. This checks planning readiness; implementation tests and task AC proof remain pending."
+      ],
+      "path": "logics/tasks/task_003_deliver_joint_claude_and_codex_support_through_cdx.md",
+      "ref": "task_003_deliver_joint_claude_and_codex_support_through_cdx"
+    }
+  ]
+}
