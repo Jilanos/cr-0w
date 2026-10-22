@@ -17,7 +17,8 @@ frozen days that still have transcripts.
 Sources: every Claude transcript in the cdx profiles (interactive sessions and
 headless runs alike, subagents folded into their session), `cdx status` for the
 usage limits, `rtk gain` for the tokens rtk saved. Costs use cdx's own price
-table, so they match `cdx stats`. Per-file totals are cached by (mtime, size).
+table, so they match `cdx stats` (EXTRA_PRICES fills models it lacks). Per-file totals are cached
+by (mtime, size).
 
 Session titles: cdx names every session after its account, so crow asks a small
 model (CROW_TITLE_CMD, default Haiku via `claude -p`) for a 3-6 word title from the
@@ -29,6 +30,7 @@ Bounded to CROW_TITLES_PER_DAY model calls (default 40, ~0.001 USD each on Haiku
 
 JSON: {generated_at, limits[], today{}, week{}, days[], sessions[], rtk{}, retros{}}
 sessions[] also carry projects[] {name, cost_usd, tokens, share_pct} and multi_project; by_project entries carry shared_sessions.
+sessions[].limit_share {five_hour_pct, week_pct}: points of its account's current windows the session used (see limit_shares).
 """
 import datetime as dt
 import fcntl
@@ -82,7 +84,7 @@ STATE = os.path.join(CROW_HOME, "local", "state")
 CACHE = os.path.join(STATE, "usage-cache.json")
 TITLES = os.path.join(STATE, "session-titles.json")
 TITLE_LOCK = os.path.join(STATE, ".titles.lock")
-CACHE_VERSION = 8
+CACHE_VERSION = 9
 TITLES_PER_RUN = 12
 TITLES_PER_DAY = int(os.environ.get("CROW_TITLES_PER_DAY") or 40)  # model calls; ~0.001 USD each on Haiku
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
@@ -103,6 +105,14 @@ def run_json(cmd):
 
 
 CACHE_1H_MULTIPLIER = 2.0  # cdx prices every cache write at the 5-minute rate (1.25x input)
+# Models cdx's table lacks (USD per million tokens, Anthropic list prices); cdx's own entries win.
+# Haiku 5.5: the rate for prompts up to 100K tokens; longer prompts list at 5x and are not split out.
+EXTRA_PRICES = {"claude-haiku-5-5": {"input": 0.10, "output": 0.50}}
+
+
+@functools.lru_cache(maxsize=1)
+def all_prices():
+    return {**EXTRA_PRICES, **(token_prices()[0] if token_prices else {})}
 
 
 def pseudo_model(model):
@@ -115,7 +125,7 @@ def price(usage, model):
         return 0.0
     if not estimate_cost:
         return None
-    prices = token_prices()[0]
+    prices = all_prices()
     base = {k: v for k, v in usage.items() if k != "cache_1h_tokens"}
     cost = estimate_cost(base, model, prices)
     if cost is None or not usage.get("cache_1h_tokens"):
@@ -266,6 +276,7 @@ def scan_transcript(path, registry=None):
     buckets per day (for the timeline)."""
     seen = set()
     per_day = {}   # date → model → usage
+    per_hour = {}  # UTC hour ("2026-10-20T13") → model → usage, for the limit windows
     tools = {}     # label → [calls, text tokens, images]
     names = {}     # tool_use id → label
     active = {}    # date → set of 10-minute buckets
@@ -335,6 +346,7 @@ def scan_transcript(path, registry=None):
                 day, hour = _local_hour(ts[:13])
                 active.setdefault(day, set()).add(hour * 6 + int(ts[14:16]) // 10)
                 add_usage(per_day.setdefault(day, {}), msg.get("model"), usage)
+                add_usage(per_hour.setdefault(ts[:13], {}), msg.get("model"), usage)
                 turn = {"day": day, "model": msg.get("model"), "usage": usage,
                         "blocks": [c for c in content if isinstance(c, dict) and c.get("type") == "tool_use"]
                         if isinstance(content, list) else []}
@@ -355,7 +367,8 @@ def scan_transcript(path, registry=None):
             tot = per_model.setdefault(model, _zero_usage())
             for k, v in u.items():
                 tot[k] += v
-    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model, "per_day": per_day, "per_proj": per_proj, "reg": registry_sig(registry), "tools": tools,
+    return {"v": CACHE_VERSION, "meta": meta, "per_model": per_model, "per_day": per_day, "per_proj": per_proj, "per_hour": per_hour,
+            "reg": registry_sig(registry), "tools": tools,
             "compactions": compactions, "active": {d: sorted(b) for d, b in active.items()}}
 
 
@@ -586,6 +599,7 @@ def live_session_ids():
 
 TOP_MODEL = os.environ.get("CROW_TOP_MODEL", "claude-opus-5-5")
 RECENT_DAY = (dt.date.today() - dt.timedelta(days=1)).isoformat()  # activity buckets kept for today + yesterday
+HOUR_CUTOFF = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=8)).strftime("%Y-%m-%dT%H")  # covers a weekly window
 
 
 def cache_read_price(prices, model):
@@ -597,7 +611,7 @@ def figures(per_model):
     """Totals, cost and what caching / cheaper models saved, for {model: usage}."""
     totals = {"input_tokens": 0, "cache_read_tokens": 0, "cache_creation_tokens": 0, "output_tokens": 0}
     cost, priced, cache_saved, routing_saved = 0.0, True, 0.0, 0.0
-    prices = token_prices()[0] if token_prices else {}
+    prices = all_prices()
     for model, usage in per_model.items():
         for k in totals:
             totals[k] += usage.get(k, 0)
@@ -704,6 +718,7 @@ def collect_sessions(days):
             "multi_project": len(projects) > 1,
             "by_day_project": by_day_project,
             "activity": {d: b for d, b in (data.get("active") or {}).items() if d >= RECENT_DAY},
+            "hours": {h: figures(models)["cost_usd"] for h, models in (data.get("per_hour") or {}).items() if h >= HOUR_CUTOFF},
         })
     os.makedirs(STATE, exist_ok=True)
     with open(CACHE, "w", encoding="utf-8") as fh:
@@ -906,6 +921,36 @@ def burn_rates(limits):
     return limits
 
 
+LIMIT_WINDOWS = (("five_hour_pct", "remaining_5h_pct", "reset_5h_at", dt.timedelta(hours=5)),
+                 ("week_pct", "remaining_week_pct", "reset_week_at", dt.timedelta(days=7)))
+
+
+def limit_shares(sessions, limits, now):
+    """Each session's part of its account's current 5h and weekly windows, in points of the window:
+    its cost since the window opened over the account's, times the share of the window used.
+    Hour granularity; sets s["limit_share"] = {five_hour_pct, week_pct} (None when unknown)."""
+    windows = {}  # (account, key) → (first UTC hour, % used)
+    for l in limits:
+        for key, left, reset, span in LIMIT_WINDOWS:
+            r = reset_dt(l.get(reset), now)
+            if l.get(left) is not None and r is not None:
+                windows[(l["account"], key)] = ((r - span).astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H"), 100 - l[left])
+    spent, total = {}, {}
+    for s in sessions:
+        for key, *_ in LIMIT_WINDOWS:
+            w = windows.get((s["account"], key))
+            if w:
+                c = sum(v for h, v in (s.get("hours") or {}).items() if h >= w[0])
+                spent[(s["id"], key)] = c
+                total[(s["account"], key)] = total.get((s["account"], key), 0) + c
+    for s in sessions:
+        s["limit_share"] = {}
+        for key, *_ in LIMIT_WINDOWS:
+            w, tot = windows.get((s["account"], key)), total.get((s["account"], key))
+            s["limit_share"][key] = round(spent[(s["id"], key)] / tot * w[1], 1) if w and tot else None
+    return sessions
+
+
 def rtk_failures():
     """Commands rtk could not filter and ran raw, summed over every database."""
     total = 0
@@ -1011,6 +1056,7 @@ def build(days):
     if os.path.exists(proposals):
         with open(proposals, encoding="utf-8") as fh:
             pending = sum(1 for line in fh if line.startswith("- [ ]"))
+    limit_shares(sessions, limits, dt.datetime.now().astimezone())
     rtk = rtk_stats(today)
     rtk["failures"] = rtk_failures()
     week = merge([h for h in history[-7:]])
@@ -1020,6 +1066,7 @@ def build(days):
         s["today"] = s["by_day"].get(today)
         s.pop("tools", None)
         s.pop("by_day_project", None)
+        s.pop("hours", None)
     out = {
         "generated_at": dt.datetime.now().isoformat(timespec="seconds"),
         "limits": limits,
