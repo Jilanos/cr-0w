@@ -7,6 +7,7 @@
 > Complexity: medium
 > Theme: nest
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-11-13 11:55:38
 
 # AI Context
 - Summary: The Nest hero table shows one planet per mission, so the owner sees only cr-0w (marked done) while several projects are live. Planets must come from the registered projects and their live sessions and dispatch agents, with missions and asks layered on top.
@@ -64,4 +65,3 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-
