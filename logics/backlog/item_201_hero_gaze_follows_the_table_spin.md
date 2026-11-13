@@ -1,10 +1,10 @@
 ## item_201_hero_gaze_follows_the_table_spin - Hero gaze follows the table spin
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 0%
+> Status: Done
+> Understanding: 100%
+> Confidence: 100%
+> Progress: 100%
 > Complexity: small
 > Theme: nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -53,6 +53,12 @@
 # Notes
 - Raised by the owner 2026-11-12.
 - Code entry points: `tools/nest/src/hero/Hero.tsx` (step input around `drag: s.drag?.moved ? s.spin.vel`), `tools/nest/src/hero/headCtl.ts` (`look`, `drag`, trail spring).
+
+# Outcome (2026-11-13)
+- Owner pick after four reel rounds: during a drag and its coast the head looks down at the table (pitch -PITCH_MAX) and turns with the table, `-14 * tanh((spin - spinAtGrab) / 40)` degrees, then eases back when the table stops. No planet tracking (planet hand-offs read as jitter) and no velocity lead (read as leaning).
+- Root causes found on the way: the head canvas was CSS-rotated up to 4 deg with the drag speed (the "lean", removed); `lookAt` and the eye offset had the pitch sign flipped (GL y is up and the camera sits on -z, so negative pitch looks down). The flip affected hover, pointer, rest and the fail droop too.
+- Camera note: spin up moves the front planets left on screen.
+- Reels: vault `Research/nest-design/item_201/` (`hero-reel-turn14-1440x900.mp4` is the approved one).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |

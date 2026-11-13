@@ -3,6 +3,8 @@
 // (no personal data); mission states change per phase so run and fail play on demand (the page polls
 // missions every 5 s, so each mood phase waits for one poll).
 // Usage: node scripts/hero-reel.mjs <out dir> [WxH ...]   (default 1440x900 707x691 368x812)
+// Env: REEL_BEATS=drag records the drag beats only. REEL_SET='{"__gaze":"front"}' sets globals before load
+// (variant switches for a design pick); REEL_TAG names the files hero-reel-<tag>-<size>.mp4.
 // Beats: load wave, planet tour (hover lifts each planet and shows its moons), long hover (think), select
 // (present), drag spins both ways + coast, working (taps, sparks), fail (glitch, shiver, brace, droop), idle.
 import { spawn, execFileSync } from 'node:child_process'
@@ -10,6 +12,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
 const [out, ...sizes] = process.argv.slice(2)
+const ONLY_DRAG = process.env.REEL_BEATS === 'drag', SET = JSON.parse(process.env.REEL_SET || '{}'), TAG = process.env.REEL_TAG ? `${process.env.REEL_TAG}-` : ''
 if (!out) throw new Error('usage: hero-reel.mjs <out dir> [WxH ...]')
 mkdirSync(out, { recursive: true })
 const PORT = 4398
@@ -55,6 +58,7 @@ try {
       return route.fulfill({ status: 404, json: { error: 'reel: not served' } })
     })
     const page = await ctx.newPage()
+    await page.addInitScript((set) => Object.assign(globalThis, set), SET)
     await page.goto(base + '/', { waitUntil: 'networkidle' })
     const box = await page.locator('.hero-box').boundingBox()
     const cdp = await ctx.newCDPSession(page), frames = [], clip = { ...box, scale: vw < 500 ? 2 : 1 }
@@ -76,10 +80,11 @@ try {
       addEventListener('scroll', (e) => { const t = e.target === document ? document.scrollingElement : e.target; if (t.scrollTop) t.scrollTop = 0 }, true)
     }, [box.x, box.y])
     const cap = (t) => page.evaluate((t) => { document.getElementById('reel-cap').textContent = t }, t)
-    await cap('hello'); await page.waitForTimeout(2800)
+    await cap('hello'); await page.waitForTimeout(ONLY_DRAG ? 1200 : 2800)
     await page.locator('.hero-pl').first().waitFor({ timeout: 8000 })
     const pls = await page.locator('.hero-pl').evaluateAll((els) => els.map((e) => e.dataset.c.split(',').map(Number)))
     if (!pls.length) throw new Error(`${s}: no planets on the table`)
+    if (!ONLY_DRAG) {
     // Planet tour: hover each planet (max 4) so it lifts and shows its moons.
     await cap('planets: hover shows moons')
     for (const [x, y] of pls.slice(0, 4)) { await page.mouse.move(box.x + x, box.y + y, { steps: 14 }); await page.waitForTimeout(1300) }
@@ -91,6 +96,7 @@ try {
     await page.keyboard.press('Escape')
     if (await page.locator('.hero-card').count()) await page.mouse.click(box.x + 12, box.y + box.height * 0.5)
     if (await page.locator('.hero-card').count()) throw new Error(`${s}: the selection did not clear`)
+    }
     await page.mouse.move(2, 2, { steps: 4 }); await page.waitForTimeout(600)
     // Spin the table (lower band, away from the head and labels): slow drag, fast flick, flick back, coast.
     const dy = Math.min(box.y + box.height * 0.82, vh - 24), dx = box.x + box.width * 0.2, span = box.width * 0.6
@@ -103,9 +109,11 @@ try {
     await page.mouse.move(dx, dy, { steps: 6 }); await page.mouse.up()
     await page.mouse.move(2, 2, { steps: 4 }); await page.waitForTimeout(3000)
     if (!page.url().endsWith('/')) throw new Error(`${s}: a drag release navigated to ${page.url()}`)
-    phase = 'run'; await cap('working'); await page.waitForTimeout(POLL + 3500)
-    phase = 'fail'; await cap('fail'); await page.waitForTimeout(POLL + 3500)
-    phase = 'idle'; await cap('back to idle'); await page.waitForTimeout(POLL + 2000)
+    if (!ONLY_DRAG) {
+      phase = 'run'; await cap('working'); await page.waitForTimeout(POLL + 3500)
+      phase = 'fail'; await cap('fail'); await page.waitForTimeout(POLL + 3500)
+      phase = 'idle'; await cap('back to idle'); await page.waitForTimeout(POLL + 2000)
+    }
     rolling = false; await roll; await ctx.close()
     console.log(s, 'fps', (frames.length / (frames.at(-1)[1] - frames[0][1])).toFixed(1))
     // Each frame lasts until the next (concat demuxer durations).
@@ -113,7 +121,7 @@ try {
     writeFileSync(join(tmp, 'list.txt'), list)
     const even = (n) => Math.floor(n / 2) * 2
     const crop = `crop=${even(box.width * clip.scale)}:${even(box.height * clip.scale)}:0:0`
-    const dst = join(out, `hero-reel-${s}.mp4`)
+    const dst = join(out, `hero-reel-${TAG}${s}.mp4`)
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', join(tmp, 'list.txt'), '-vf', `${crop},fps=30`,
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'slow', '-movflags', '+faststart', '-an', dst])
     rmSync(tmp, { recursive: true, force: true })

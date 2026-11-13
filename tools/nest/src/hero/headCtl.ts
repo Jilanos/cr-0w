@@ -155,7 +155,7 @@ export class HeadCtl {
     const u = (t - this.nodAt) / NOD_MS
     const nod = u >= 0 && u < 1 ? -c.nod * Math.sin(Math.PI * u) * (1 - 0.35 * u) + (u > 0.7 ? 0.8 * Math.sin(Math.PI * (u - 0.7) / 0.3) : 0) : 0
     const breathe = c.breathe * Math.sin((2 * Math.PI * 0.4 * t) / 1000)
-    const think = this.pose.to === 'think' ? -2 : 0, droop = this.work === 'droop' ? 4 : 0
+    const think = this.pose.to === 'think' ? -2 : 0, droop = this.work === 'droop' ? -4 : 0
     const pGoal = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, to.pitch)) + nod + think + droop
     spring(this.pitch, pGoal, 120, dt)
     busy ||= !settled(this.pitch, pGoal, 0.1) || (u >= 0 && u < 1)
@@ -198,7 +198,7 @@ export class HeadCtl {
     spring(this.mouth, mGoal, 110, dt)
     busy ||= !settled(this.mouth, mGoal, 0.01) || i.face !== this.shown
 
-    const eyeX = this.g.eye.x / 12 * 3, eyeY = Math.max(-2, Math.min(2, ((to.pitch - this.pitch.x) / PITCH_MAX) * 2))
+    const eyeX = this.g.eye.x / 12 * 3, eyeY = Math.max(-2, Math.min(2, (-this.pitch.x / PITCH_MAX) * 1.2 - ((to.pitch - this.pitch.x) / PITCH_MAX) * 2)) // face y is down, pitch down is negative
     const frame: HeadFrame = {
       yaw: this.g.head.x + shiver * 1.4 * Math.sin((2 * Math.PI * t) / 80), pitch: this.pitch.x + breathe, tilt: this.tilt.x, blink,
       gaze: [eyeX, eyeY], face: this.shown, pose: { from: this.pose.from, to: this.pose.to, k, side: this.pose.side },
@@ -214,7 +214,7 @@ export class HeadCtl {
 export function lookAt(x: number, y: number, w: number, h: number, eyeY: number): Look {
   return {
     yaw: Math.max(-YAW_MAX, Math.min(YAW_MAX, ((x - w / 2) / (w / 2)) * YAW_MAX)),
-    pitch: Math.max(-PITCH_MAX, Math.min(PITCH_MAX, ((y - eyeY) / (h / 2)) * PITCH_MAX)),
+    pitch: Math.max(-PITCH_MAX, Math.min(PITCH_MAX, ((eyeY - y) / (h / 2)) * PITCH_MAX)), // negative = down (GL: y up, camera on -z)
   }
 }
 

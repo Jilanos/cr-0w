@@ -12,7 +12,7 @@ import { DEG_PER_WIDTH, detent, liftCurve, spinToFront, step, stepTo, type Spin 
 import type { Heads, Palette, PlanetLabel, SceneOut } from './scene'
 import { drawScene, TABLE_FX } from './scene'
 import { createHead, liveHeadOk, type HeadGL } from './gl/head'
-import { bakeLook, CHARACTER, faceOf, HeadCtl, lookAt, YAW_MAX, type Look } from './headCtl'
+import { bakeLook, CHARACTER, faceOf, HeadCtl, lookAt, PITCH_MAX, type Look } from './headCtl'
 
 // Holotable hero (item_162, item_158): ASCII galaxy map of projects with the option B head above
 // the lens. Drag spins the planets, hover lifts one and shows its moons, click focuses then opens.
@@ -29,6 +29,9 @@ const HEAD_IDLE_MS = 50, HEAD_AMBIENT_MS = 33, HEAD_LIVE_MS = 1500
 const RIPPLE_MS = 700
 // Idle scan sweep round the table rim (item_197): one turn per SWEEP_MS, on the slow tick.
 const SWEEP_MS = 12000
+// Gaze during a drag and its coast (item_201): max head turn (deg), look down at the table (deg), and the
+// table angle (deg) over which the head reaches most of its turn.
+const GAZE_MAX = 14, GAZE_DOWN = -PITCH_MAX, GAZE_TURN = 40
 const LIFT_MS = 420
 const GLITCH_MS = 180
 const HOVER_MS = 200
@@ -125,10 +128,10 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
   // Mutable frame state: read by the loop without re-rendering.
   const st = useRef({
     spin: { spin: 0, vel: 0 } as Spin, drag: undefined as undefined | { id: number; x0: number; x: number; t: number; spin0: number; moved: boolean },
-    hover: undefined as undefined | { name: string; k: number; dir: 1 | -1 }, look: undefined as number | undefined, lean: 0,
+    hover: undefined as undefined | { name: string; k: number; dir: 1 | -1 }, look: undefined as number | undefined,
     lift: {} as Record<string, number>, glitch: {} as Record<string, number>, prev: undefined as Map<string, UiState> | undefined,
     raf: 0, timer: 0, last: 0, pal: undefined as Palette | undefined, out: undefined as SceneOut | undefined,
-    ptr: undefined as { x: number; y: number } | undefined, ripple: undefined as { name: string; k: number } | undefined,
+    ptr: undefined as { x: number; y: number } | undefined, coast: false, grab: undefined as number | undefined, ripple: undefined as { name: string; k: number } | undefined,
   })
   const gcv = useRef<HTMLCanvasElement>(null)
   // Live head state: the GL renderer, its controller and its own loop (item_156/196/198).
@@ -181,6 +184,12 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
       else busy = step(s.spin, dt, a0s()) || busy
     }
     if (s.drag) busy = true
+    if (!s.drag?.moved && !s.coast) s.grab = undefined
+    // Coast after a drag: the gaze keeps following the spin until the table settles (item_201).
+    if (s.coast) {
+      if (s.drag || (s.spin.vel === 0 && s.spin.to === undefined)) s.coast = false
+      else { hd.current.input = t; headKick() }
+    }
     if (s.hover) {
       const k = Math.max(0, Math.min(1, s.hover.k + (reduced ? s.hover.dir : (s.hover.dir * dt) / HOVER_MS)))
       s.hover.k = k
@@ -197,9 +206,6 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
         else busy = true
       }
     }
-    const lean = s.drag ? Math.max(-4, Math.min(4, s.spin.vel * 30)) : 0
-    s.lean += (lean - s.lean) * Math.min(1, dt / 120)
-    if (Math.abs(s.lean - lean) > 0.05) busy = true
     s.pal ??= readPalette(box.current)
     const lift: Record<string, number> = {}
     for (const n of Object.keys(s.lift)) lift[n] = liftCurve(s.lift[n])
@@ -207,7 +213,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     for (const n of Object.keys(s.glitch)) glitch[n] = 1 - s.glitch[n]
     const o = drawScene(cv.current, size.w, size.h, window.devicePixelRatio || 1, m, heads, s.pal, turn, {
       now, spin: s.spin.spin, hover: s.hover && { name: s.hover.name, k: s.hover.k },
-      look: s.look, lean: s.lean, pulse: live && !reduced ? (t % PULSE_MS) / PULSE_MS : undefined, lift, glitch,
+      look: s.look, pulse: live && !reduced ? (t % PULSE_MS) / PULSE_MS : undefined, lift, glitch,
       sweep: reduced ? undefined : (t % SWEEP_MS) / SWEEP_MS,
       t: reduced ? 0 : t, fx: reduced ? {} : TABLE_FX, ripple: s.ripple, live: glOn,
     })
@@ -223,21 +229,25 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     const o = st.current.out!
     return lookAt(x, y, size!.w, size!.h, o.head.top + o.head.hh * 0.45)
   }
+  // Drag and coast gaze (item_201): the head looks down at the table and turns with it, a few degrees at
+  // most, then eases back once the table stops. Spin up moves the front planets left; negative yaw looks left.
+  const spinGaze = (): Look => {
+    const s = st.current
+    s.grab ??= s.spin.spin
+    return { yaw: -GAZE_MAX * Math.tanh((s.spin.spin - s.grab) / GAZE_TURN), pitch: GAZE_DOWN }
+  }
   const want = (): Look | undefined => {
     const s = st.current, o = s.out
     if (!o || !size) return undefined
-    // Drag: follow the hand, leading into the spin (faster spin, bigger lead), eyes down on the table.
-    if (s.drag?.moved) {
-      const hand = s.ptr ? headLook(s.ptr.x, s.ptr.y).yaw * 0.6 : 0
-      return { yaw: Math.max(-YAW_MAX, Math.min(YAW_MAX, hand + Math.max(-12, Math.min(12, s.spin.vel * 60)))), pitch: 3 }
-    }
+    // Drag and coast: the gaze follows the spin, not the hand (item_201).
+    if (s.drag?.moved || s.coast) return spinGaze()
     const hv = s.hover && s.hover.dir > 0 ? o.planets.find((p) => p.name === s.hover!.name) : undefined
     if (hv) return headLook(hv.cx, hv.cy)
     if (s.ptr && glOn) return headLook(s.ptr.x, s.ptr.y)
     return undefined
   }
 
-  // Head canvas placement: the bake's cell grid, under the table canvas, leaning with the drag.
+  // Head canvas placement: the bake's cell grid, under the table canvas.
   const placeHead = (o: SceneOut) => {
     const h = hd.current, c = gcv.current
     if (!h.gl || !c) return
@@ -245,8 +255,6 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     const L = h.gl.layout({ cw: o.head.cw, ch: o.head.ch, font: o.head.font, dpr })
     if (h.lay !== k) { h.lay = k; c.style.width = `${L.w}px`; c.style.height = `${L.h}px` }
     c.style.left = `${o.head.left - L.ox}px`; c.style.top = `${o.head.top - L.oy}px`
-    c.style.transformOrigin = `${L.ox + o.head.hw / 2}px ${L.oy + o.head.hh}px`
-    c.style.transform = `rotate(${st.current.lean.toFixed(2)}deg)`
     headKick()
   }
 
@@ -390,6 +398,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     if (!d || d.id !== e.pointerId) return
     s.drag = undefined
     if (d.moved) {
+      s.coast = true
       // Release: inertia then detent; the head turns back to the longest wait.
       if (e.timeStamp - d.t > 80) s.spin.vel = 0
       if (reduced) s.spin.vel = 0

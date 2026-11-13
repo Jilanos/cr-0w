@@ -54,6 +54,8 @@ Put a temporary `globalThis.__ring`-style switch in the scene, shoot each varian
 
 ### Hero reels (video of every beat)
 - `node scripts/hero-reel.mjs <out_dir> [WxH ...]`: whole hero (head + table) through load, planet tour, hover, select, drag, run, fail, idle; one MP4 per viewport from fixtures (api mode, `/api` routed per phase).
+  - Env: `REEL_BEATS=drag` records the drag beats only; `REEL_SET='{"__x":1}'` sets page globals before load (variant switches); `REEL_TAG=x` names the output `hero-reel-x-<size>.mp4`. Compare variants with ffmpeg `hstack` and play with mpv (see open-links note).
+  - Head conventions: negative pitch looks down, negative yaw looks left; spinning the table up moves the front planets left.
 - `node scripts/head-reel.mjs <out.webp> [cell px]`: the GPU head alone through the same beats.
 - Playwright `recordVideo` and the CDP screencast capture at CSS px whatever `deviceScaleFactor` says: small heads smear. Use a `Page.captureScreenshot` loop with `clip.scale` (2 on phone) and ffmpeg concat durations, as `hero-reel.mjs` does.
 - `reducedMotion: 'reduce'` hides the GL head: screenshot `.hero-box` without it.
