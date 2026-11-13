@@ -66,10 +66,12 @@ export interface Resumable {
   last_prompt?: string | null
 }
 
+// scope is set on a scoped snapshot (item_206): the mailbox the row came from.
 export interface Mail {
   id: string
   subject: string
   from?: string
+  scope?: 'work' | 'perso'
 }
 
 export interface Account {
@@ -141,7 +143,8 @@ export const accountsOf = (b: SectionBody | undefined) => list<Account>(obj(b).a
 
 // Registry entry of `crow-projects json` (the parts the hero reads).
 // system groups related projects into one planet (default: the project itself); nest: false keeps it off the hero.
-export interface RegProject { name: string; path?: string; status?: string; short?: string; system?: string; nest?: boolean }
+// scope is the registry scope (work or personal); empty or absent when the entry has none.
+export interface RegProject { name: string; path?: string; status?: string; short?: string; system?: string; nest?: boolean; scope?: string }
 
 // Active registered projects, in registry order.
 export const registryOf = (b: SectionBody | undefined) =>

@@ -1,0 +1,87 @@
+import type { Snapshot } from './feed'
+import { registryOf, type Agent, type Mail, type RegProject, type Resumable } from './live'
+import { projectOfAgent, projectOfCwd } from '../hero/model'
+import type { InboxItem, Mission, SectionBody } from './types'
+
+// Nest scope filter (item_206): all, work or perso, read by every screen except Chat.
+export type ScopeMode = 'all' | 'work' | 'perso'
+export const SCOPE_MODES: ScopeMode[] = ['all', 'work', 'perso']
+export const isScopeMode = (v: unknown): v is ScopeMode => SCOPE_MODES.includes(v as ScopeMode)
+
+// Scope of one thing; undefined = unknown, shown under all only.
+export type Side = 'work' | 'perso' | undefined
+
+// Mission scope: work is work, personal and crow are perso.
+export const missionSide = (m: Mission): Side => (m.scope === 'work' ? 'work' : m.scope === 'personal' || m.scope === 'crow' ? 'perso' : undefined)
+
+// Registry scope of a project: work is work, personal is perso, anything else unknown.
+export function projectSide(name: string, registry: RegProject[]): Side {
+  const s = registry.find((p) => p.name === name)?.scope
+  return s === 'work' ? 'work' : s === 'personal' ? 'perso' : undefined
+}
+
+// An ask takes its project's registry scope; on a project the registry does not know, its mission's.
+export function askSide(r: InboxItem, registry: RegProject[], missions: Mission[]): Side {
+  if (registry.some((p) => p.name === r.project)) return projectSide(r.project, registry)
+  const m = missions.find((x) => x.id === r.mission)
+  return m ? missionSide(m) : undefined
+}
+
+// The Today section reads the work mailbox. A personal mail source tags its rows perso.
+export const TODAY_MAIL_SIDE: Side = 'work'
+
+const keep = (mode: ScopeMode, side: Side) => mode === 'all' || side === mode
+
+export interface ScopeIn { missions: Mission[]; inbox: InboxItem[]; registry: RegProject[]; agents: Agent[]; parked: Resumable[] }
+
+// Filters each list to the mode. Sessions and runs take their project's registry
+// scope; the cwd lookup uses the whole registry. The registry keeps the matching
+// projects only, so a mixed system keeps its matching members.
+export function scopeOf(d: ScopeIn, mode: ScopeMode): ScopeIn {
+  if (mode === 'all') return d
+  const reg = d.registry
+  const known = new Set([...reg.map((p) => p.name), ...d.missions.map((m) => m.project)])
+  return {
+    missions: d.missions.filter((m) => keep(mode, missionSide(m))),
+    inbox: d.inbox.filter((r) => keep(mode, askSide(r, reg, d.missions))),
+    registry: reg.filter((p) => keep(mode, projectSide(p.name, reg))),
+    agents: d.agents.filter((a) => keep(mode, projectSide(projectOfAgent(a, reg, known), reg))),
+    parked: d.parked.filter((r) => keep(mode, projectSide(projectOfCwd(r.cwd, reg) ?? r.project, reg))),
+  }
+}
+
+const obj = (b: SectionBody) => (b.data && typeof b.data === 'object' ? (b.data as Record<string, unknown>) : undefined)
+const arr = <T>(b: SectionBody, key: string) => { const v = obj(b)?.[key]; return Array.isArray(v) ? (v as T[]) : [] }
+// Replaces lists of a section body; a body with no data stays as it is.
+const withLists = (b: SectionBody, lists: Record<string, unknown[]>): SectionBody => (obj(b) ? { ...b, data: { ...obj(b), ...lists } } : b)
+
+// Mail rows of the mode, each tagged with its scope (an untagged row takes the source's).
+const mailIn = (b: SectionBody, key: string, side: Side, mode: ScopeMode) =>
+  arr<Mail>(b, key).map((m) => ({ ...m, scope: m.scope ?? side })).filter((m) => keep(mode, m.scope))
+
+// The snapshot every screen but Chat reads under a mode. Usage, accounts, checks,
+// MRs and the Today calendar are not per project and stay whole.
+export function scopeSnapshot(s: Snapshot, mode: ScopeMode): Snapshot {
+  if (mode === 'all') return s
+  const { projects, dispatch, sessions, today } = s.sections
+  const registry = arr<RegProject>(projects, 'projects')
+  const f = scopeOf({
+    missions: s.missions, inbox: s.inbox, registry: registryOf(projects),
+    agents: arr<Agent>(dispatch, 'agents'), parked: arr<Resumable>(sessions, 'sessions'),
+  }, mode)
+  return {
+    ...s,
+    missions: f.missions,
+    inbox: f.inbox,
+    sections: {
+      ...s.sections,
+      projects: withLists(projects, { projects: registry.filter((p) => keep(mode, projectSide(p.name, registry))) }),
+      dispatch: withLists(dispatch, { agents: f.agents }),
+      sessions: withLists(sessions, { sessions: f.parked }),
+      today: withLists(today, {
+        flagged: mailIn(today, 'flagged', TODAY_MAIL_SIDE, mode),
+        important: mailIn(today, 'important', TODAY_MAIL_SIDE, mode),
+      }),
+    },
+  }
+}
