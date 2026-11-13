@@ -65,6 +65,20 @@ describe('hero planets from projects and live work (item_199)', () => {
     expect(by(m).quiet).toMatchObject({ state: 'sleeping', quiet: true, open: 0 })
   })
 
+  it('groups a system into one planet, members most urgent first, and hides nest:false (item_200)', () => {
+    const sreg = [
+      { name: 'lambda', path: '/r/lambda', system: 'circle', short: 'lam' }, { name: 'web', path: '/r/web', system: 'circle' },
+      { name: 'cr-0w', path: '/p/cr-0w' }, { name: 'fork', path: '/p/fork', nest: false },
+    ]
+    const m = heroModel([], [], { registry: sreg, agents: [agent({ pid: 2, project: 'x', cwd: '/r/web' })], parked: [] }, now)
+    expect(m.projects.map((p) => p.name).sort()).toEqual(['circle', 'cr-0w'])
+    const c = by(m).circle
+    expect(c).toMatchObject({ state: 'working', live: true })
+    expect(c.members!.map((q) => q.name)).toEqual(['web', 'lambda'])
+    expect(c.members![1].label).toBe('lam')
+    expect(by(m)['cr-0w'].members).toBeUndefined()
+  })
+
   it('lets a failed mission win over a live agent (AC2)', () => {
     const m = heroModel([mission({ id: 'f', project: 'cr-0w', state: 'failed' })], [], { registry: reg, agents: [agent({})], parked: [] }, now)
     expect(by(m)['cr-0w'].state).toBe('failed')

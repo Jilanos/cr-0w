@@ -1,10 +1,10 @@
 ## item_200_hero_planet_cap_and_quiet_projects - Hero planet cap and quiet projects
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 0%
+> Status: Done
+> Understanding: 100%
+> Confidence: 100%
+> Progress: 100%
 > Complexity: small
 > Theme: nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -50,6 +50,13 @@
 
 # Notes
 - Depends on item_199.
+
+# Outcome (2026-11-13)
+- Owner reframed the cap as systems: related projects share one planet. Registry field `system` in local/projects.yaml (circle: lambda, web, mobile, vault-work; archeotech: dotfiles, shell; obsidian: vault-personal, obsidian-stacks; the rest alone). `nest: false` hides a project (cdx-manager, an upstream fork). bin/crow-registry exports both.
+- Look (pick B of five renders): members orbit their system planet as small moons, grey when quiet. Hover spreads them and names them, bare like the planet labels, no state glyph. A member label hides rather than move more than 40px from its moon (declutter `near`).
+- A system takes its most urgent member's state; its card lists every member's missions, asks and runs and opens the most urgent member's missions.
+- Live data gives 8 planets, under MAXP 9. Planets are ranked by state before the cap, so a live, failed or needs system is never cut (AC3).
+- Renders: vault `Research/nest-design/item_200/systems/` (final.html). Later: a work/perso/all scope filter on Nest, like the deck.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |

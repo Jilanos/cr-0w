@@ -13,7 +13,7 @@ export interface PlanetLabel {
   x: number; y: number; name: string; state: UiState; side: 'l' | 'r'; note?: string; target?: boolean
   cx: number; cy: number; rad: number; a0: number; back: boolean; hidden?: boolean
 }
-export interface MoonOut { x: number; y: number; r: number; id: string; title: string; state: UiState }
+export interface MoonOut { x: number; y: number; r: number; id: string; title: string; state: UiState; member?: boolean }
 // cw/ch/font: one head cell in CSS px (the live GL head draws on the same grid). hw/hh: head size.
 export interface HeadBox { x: number; y: number; top: number; left: number; right: number; cw: number; ch: number; font: number; hw: number; hh: number }
 export interface SceneOut { planets: PlanetLabel[]; head: HeadBox; lens: { x: number; y: number }; moons: MoonOut[]; more?: { x: number; y: number; n: number } }
@@ -221,7 +221,8 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
 
   // Planets.
   const hov = opts.hover
-  const ranked = m.projects.slice(0, MAXP).map((p, i) => ({ p, i })).sort((a, b) => RANK[a.p.state] - RANK[b.p.state] || a.i - b.i).map((o) => o.p)
+  // Most urgent first, then cap: a live, failed or waiting system is never cut (item_200).
+  const ranked = m.projects.map((p, i) => ({ p, i })).sort((a, b) => RANK[a.p.state] - RANK[b.p.state] || a.i - b.i).map((o) => o.p).slice(0, MAXP)
   const stepA = 360 / Math.max(ranked.length, 1)
   const ps = ranked.map((p, i) => {
     const a = 90 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * stepA
@@ -286,13 +287,13 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     if (p === target && p.state === 'needs') octa(g, cam, add(p.c, V(0, p.r + 0.34, 0)), 0.12, col, 1.4)
   }
   // Hovered planet: its open missions orbit it as moons, max 6 then +n.
-  const moons: { c: V3; r: number; id: string; title: string; state: UiState }[] = []
+  const moons: { c: V3; r: number; id: string; title: string; state: UiState; member?: boolean }[] = []
   let more: { c: V3; n: number } | undefined
   const hp = ps.find((p) => p.hk > 0)
   if (hp) {
     // Moons fly out as the hover eases in, leaving room for their titles. The orbit is
     // tilted toward the camera so the titles spread vertically instead of stacking.
-    const list = hp.missions.slice(0, 6), R = (Math.max(hp.r, 0.2) * 1.9 + 0.12) * (1 + 0.5 * hp.hk)
+    const list = hp.members ? [] : hp.missions.slice(0, 6), R = (Math.max(hp.r, 0.2) * 1.9 + 0.12) * (1 + 0.5 * hp.hk)
     list.forEach((mi, i) => {
       const t = (i / Math.max(list.length, 1)) * Math.PI * 2 + spin * D2R * 0.5 + 0.4
       const c = add(hp.c, V(R * Math.cos(t), R * 0.55 * Math.sin(t), R * 0.8 * Math.sin(t)))
@@ -300,7 +301,21 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
       moons.push({ c, r, id: mi.id, title: mi.title, state: mi.state })
       spheres.push({ c, r, col: SC[mi.state], emit: 0.3, dimf: hp.hk })
     })
-    if (hp.missions.length > 6) more = { c: add(hp.c, V(0, hp.r + 0.25, 0)), n: hp.missions.length - 6 }
+    if (!hp.members && hp.missions.length > 6) more = { c: add(hp.c, V(0, hp.r + 0.25, 0)), n: hp.missions.length - 6 }
+  }
+  // System members (item_200 pick B): small moons always orbit their system planet, grey when
+  // quiet. Hovering the planet spreads them out and names them (no state glyph).
+  const qgrey = mix(pal.dim, [128, 128, 128], 0.6)
+  for (const p of ps) {
+    if (!p.members) continue
+    const R = (p.r * 2.3 + 0.12) * (1 + 0.4 * p.hk), fade = (p.hk > 0 ? 1 : dimOthers) * (1 - 0.55 * p.depth)
+    p.members.forEach((q, i) => {
+      const t = (i / p.members!.length) * Math.PI * 2 + tt * 0.0002 + 0.4
+      const c = add(p.c, V(R * Math.cos(t), R * 0.5 * Math.sin(t), R * 0.8 * Math.sin(t)))
+      const quiet = q.state === 'sleeping' || q.state === 'queued'
+      spheres.push({ c, r: 0.1 + 0.04 * p.hk, col: quiet ? qgrey : SC[q.state], emit: quiet ? 0.12 : 0.35, dimf: (quiet ? 0.6 : 1) * fade })
+      if (p.hk > 0) moons.push({ c, r: 0.1 + 0.04 * p.hk, id: 'm:' + q.name, title: q.label ?? q.name, state: q.state, member: true })
+    })
   }
   raySpheres(g, cam, spheres)
 
@@ -362,7 +377,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   const gaps = new Map<PlanetLabel, number>()
   const out: SceneOut = {
     planets: [], head, lens: { x: lens.x, y: lens.y },
-    moons: moons.map((o) => { const s = cam.proj(o.c); return { x: s.x, y: s.y, r: Math.max(6, (o.r * cam.focal) / s.z), id: o.id, title: o.title, state: o.state } }),
+    moons: moons.map((o) => { const s = cam.proj(o.c); return { x: s.x, y: s.y, r: Math.max(6, (o.r * cam.focal) / s.z), id: o.id, title: o.title, state: o.state, member: o.member } }),
     more: more && { ...cam.proj(more.c), n: more.n },
   }
   for (const p of ps) {

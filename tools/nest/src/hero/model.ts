@@ -20,6 +20,8 @@ export interface HeroProject {
   open: number; wait?: number; runFrom?: string; cause?: string
   // No mission, agent or ask: a registered project at rest (item_200 decides how it shows).
   quiet?: boolean
+  // A system planet (item_200): its registered projects, most urgent first. label = short name.
+  members?: HeroProject[]; label?: string
 }
 
 // Everything the hero shows besides missions (req_059): the project registry, live
@@ -134,6 +136,25 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
       wait: state === 'needs' && since ? mins(since) : undefined, runFrom, cause: failed?.title, ...(quiet ? { quiet: true } : {}),
     }
   })
+  // Systems (item_200): related projects share one planet, members orbit it as moons.
+  const reg = new Map(live.registry.map((p) => [p.name, p]))
+  const shown = projects.filter((p) => reg.get(p.name)?.nest !== false)
+  for (const p of shown) { const r = reg.get(p.name); if (r?.short) p.label = r.short }
+  const groups = new Map<string, HeroProject[]>()
+  for (const p of shown) { const k = reg.get(p.name)?.system ?? p.name; groups.set(k, [...(groups.get(k) ?? []), p]) }
+  const order = (a: HeroProject, b: HeroProject) => Number(!!a.quiet) - Number(!!b.quiet) || RANK[a.state] - RANK[b.state] || (b.wait ?? 0) - (a.wait ?? 0) || a.name.localeCompare(b.name)
+  const systems = [...groups.entries()].map(([name, ms]): HeroProject => {
+    if (ms.length === 1 && ms[0].name === name) return ms[0]
+    const mem = [...ms].sort(order), top = mem[0]
+    const waits = mem.map((x) => x.wait).filter((x): x is number => x !== undefined)
+    const runs = mem.map((x) => x.runFrom).filter((x): x is string => !!x).sort()
+    return {
+      name, state: top.state, live: mem.some((x) => x.live), missions: mem.flatMap((x) => x.missions), agents: mem.flatMap((x) => x.agents),
+      open: mem.reduce((n, x) => n + x.open, 0), wait: waits.length ? Math.max(...waits) : undefined, runFrom: runs[0],
+      cause: mem.find((x) => x.cause)?.cause, ...(mem.every((x) => x.quiet) ? { quiet: true } : {}), members: mem,
+    }
+  })
+  projects.length = 0; projects.push(...systems)
   // Longest wait first: the head looks at projects[0] when it waits on you.
   projects.sort((a, b) => Number(!!a.quiet) - Number(!!b.quiet) || RANK[a.state] - RANK[b.state] || (b.wait ?? 0) - (a.wait ?? 0) || a.name.localeCompare(b.name))
 

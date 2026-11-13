@@ -23,8 +23,8 @@ def test_registry_json_lists_projects_with_git_state(hub, tmp_path):
     (repo / "a.txt").write_text("x")
     (home / "local" / "projects.yaml").write_text(
         f"identities: {{work: me@example.org}}\nprojects:\n"
-        f"  - {{name: long-repo-name, aliases: [short], scope: work, path: {repo}, forge: gitlab}}\n"
-        f"  - {{name: other, scope: personal, path: {tmp_path}/missing}}\n")
+        f"  - {{name: long-repo-name, aliases: [short], scope: work, path: {repo}, forge: gitlab, system: grp}}\n"
+        f"  - {{name: other, scope: personal, path: {tmp_path}/missing, nest: false}}\n")
     out = run(hub, "crow-registry", "json")
     assert out.returncode == 0, out.stderr
     reg = json.loads(out.stdout)
@@ -34,6 +34,7 @@ def test_registry_json_lists_projects_with_git_state(hub, tmp_path):
     assert first["short"] == "short" and first["git"]["email"] == "me@example.org" and first["git"]["dirty"] == 1
     assert second["short"] == "other" and second["git"] == {"email": "", "dirty": 0, "ahead": 0, "stale_trees": 0}
     assert first["work"] == {} and second["work"] == {}
+    assert (first["system"], first["nest"], second["system"], second["nest"]) == ("grp", True, "other", False)
 
 
 def test_work_days_counts_the_identity_commits_per_day(tmp_path):

@@ -6,7 +6,7 @@ import { ago, title } from '../format'
 import { navigate } from '../router'
 import { Glyph } from '../ui/Glyph'
 import { useMedia } from '../ui/useMedia'
-import { heroLiveOf, heroModel, type HeroAgent } from './model'
+import { heroLiveOf, heroModel, type HeroAgent, type HeroProject } from './model'
 import { declutterDom, type Box } from './declutter'
 import { DEG_PER_WIDTH, detent, liftCurve, spinToFront, step, stepTo, type Spin } from './motion'
 import type { Heads, Palette, PlanetLabel, SceneOut } from './scene'
@@ -68,14 +68,16 @@ const onHead = (out: SceneOut | undefined, x: number, y: number) =>
   !!out && x > out.head.left + 30 && x < out.head.right - 30 && y > out.head.top && y < out.lens.y + 10
 
 export const missionsHref = (project: string) => `/missions?project=${encodeURIComponent(project)}`
+// A system planet (item_200) covers its members and opens on the most urgent one.
+const namesOf = (p?: HeroProject) => (p?.members ? p.members.map((q) => q.name) : p ? [p.name] : [])
 
 // Detail card for the focused planet: open missions, what waits on you, last run.
 // Small heroes (phone, inner panel) get a compact card: one ask, two missions.
-function Card({ project, missions, inbox, agents, now, at, w }: { project: string; missions: Mission[]; inbox: InboxItem[]; agents: HeroAgent[]; now: Date; at: PlanetLabel; w: number }) {
+function Card({ project, names, missions, inbox, agents, now, at, w }: { project: string; names: string[]; missions: Mission[]; inbox: InboxItem[]; agents: HeroAgent[]; now: Date; at: PlanetLabel; w: number }) {
   const nA = w < 760 ? 1 : 2, nM = w < 760 ? 2 : 4
-  const ms = missions.filter((m) => m.project === project && m.state !== 'done' && m.state !== 'cancelled')
-  const asks = openInbox(inbox).filter((r) => r.project === project && r.type !== 'fyi')
-  const runs = missions.filter((m) => m.project === project).flatMap((m) => m.runs.map((r) => ({ r, m }))).sort((a, b) => b.r.started.localeCompare(a.r.started))
+  const ms = missions.filter((m) => names.includes(m.project) && m.state !== 'done' && m.state !== 'cancelled')
+  const asks = openInbox(inbox).filter((r) => names.includes(r.project) && r.type !== 'fyi')
+  const runs = missions.filter((m) => names.includes(m.project)).flatMap((m) => m.runs.map((r) => ({ r, m }))).sort((a, b) => b.r.started.localeCompare(a.r.started))
   const last = runs[0]
   const left = Math.max(8, Math.min(w - 248, at.cx - 120))
   const lastTxt = last && `Last run ${last.r.ended ? ago(last.r.ended, now) : 'live'}${last.r.cause && last.r.cause !== 'done' ? ` · ${last.r.cause}${last.r.exit ? ` (exit ${last.r.exit})` : ''}` : ''}`
@@ -84,7 +86,7 @@ function Card({ project, missions, inbox, agents, now, at, w }: { project: strin
     const ask = asks[0], top = ms[0], ag = agents[0]
     const detail = ask ? `Your move · ${ask.ask}` : top ? `${ms.length} open · ${title(top)}` : ag ? `${agentWord(ag)} · ${ag.title}` : lastTxt
     return (
-      <button type="button" className="hero-card strip" data-prio={1} data-fixed onClick={() => navigate(missionsHref(project))} aria-label={`Open ${project} missions`}>
+      <button type="button" className="hero-card strip" data-prio={1} data-fixed onClick={() => navigate(missionsHref(names[0]))} aria-label={`Open ${names[0]} missions`}>
         <span className="hc-h"><Glyph state={at.state} /> {project.toUpperCase()}
           {detail && <span className={`hc-t hc-n${ask ? ' c-n' : ''}`}>{detail}</span>}
           <span className="hc-go">open →</span></span>
@@ -92,7 +94,7 @@ function Card({ project, missions, inbox, agents, now, at, w }: { project: strin
     )
   }
   return (
-    <button type="button" className="hero-card" data-prio={1} data-up={2 * at.rad + 28} style={{ left, top: at.cy + at.rad + 14, '--cx': `${at.cx}px`, '--cy': `${at.cy}px`, '--r': `${at.rad}px` } as CSSProperties} onClick={() => navigate(missionsHref(project))} aria-label={`Open ${project} missions`}>
+    <button type="button" className="hero-card" data-prio={1} data-up={2 * at.rad + 28} style={{ left, top: at.cy + at.rad + 14, '--cx': `${at.cx}px`, '--cy': `${at.cy}px`, '--r': `${at.rad}px` } as CSSProperties} onClick={() => navigate(missionsHref(names[0]))} aria-label={`Open ${names[0]} missions`}>
       <span className="hc-h"><Glyph state={at.state} /> {project.toUpperCase()}<span className="hc-go">open →</span></span>
       {asks.slice(0, nA).map((r) => <span key={r.id} className="hc-r c-n"><span className="hc-t">Your move · {r.ask}</span></span>)}
       {agents.slice(0, nM).map((a) => <span key={a.pid} className={`hc-r${a.state === 'needs' ? ' c-n' : ''}`}><Glyph state={a.state} /> <span className="hc-t">{agentWord(a)} · {a.title}</span></span>)}
@@ -354,7 +356,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     kick(); headKick()
   }
   const select = (name: string) => {
-    if (focus === name) { navigate(missionsHref(name)); return }
+    if (focus === name) { navigate(missionsHref(namesOf(m.projects.find((p) => p.name === name))[0] ?? name)); return }
     setFocus(name); setHover(name); bring(name)
     // Acknowledge: nod and present toward the planet; a ripple runs from its footprint.
     if (!reduced) { st.current.ripple = { name, k: 0 }; hd.current.input = performance.now(); hd.current.ctl.present(performance.now()); headKick() }
@@ -421,7 +423,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
       e.preventDefault()
       const n = stepTo(ps, st.current.spin.spin, focus, e.key === 'ArrowRight' ? 1 : -1)
       if (n) { setFocus(n); setHover(n); bring(n) }
-    } else if (e.key === 'Enter' && focus) { e.preventDefault(); navigate(missionsHref(focus)) }
+    } else if (e.key === 'Enter' && focus) { e.preventDefault(); navigate(missionsHref(namesOf(m.projects.find((p) => p.name === focus))[0] ?? focus)) }
     else if (e.key === 'Escape' && focus) { e.preventDefault(); clear() }
   }
 
@@ -463,8 +465,8 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
       {hp && out?.moons.map((o) => {
         const l = o.x < hp.cx
         return (
-          <div key={o.id} className={`hero-ml${l ? ' l' : ''}`} style={{ left: o.x + (l ? -1 : 1) * (o.r + 12), top: o.y }} data-prio={2.5} data-hide aria-hidden="true">
-            <Glyph state={o.state} size={11} /> <span>{o.title}</span>
+          <div key={o.id} className={`hero-ml${l ? ' l' : ''}${o.member ? ' mem' : ''}`} style={{ left: o.x + (l ? -1 : 1) * (o.r + 12), top: o.y }} data-prio={2.5} data-hide data-near={o.member ? 40 : undefined} aria-hidden="true">
+            {!o.member && <><Glyph state={o.state} size={11} /> </>}<span>{o.member ? o.title.toUpperCase() : o.title}</span>
           </div>
         )
       })}
@@ -473,11 +475,11 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
           {m.asks} {m.asks === 1 ? 'ASK' : 'ASKS'}
         </div>
       )}
-      {fp && size && <Card project={fp.name} missions={missions} inbox={inbox} agents={m.projects.find((p) => p.name === fp.name)?.agents ?? []} now={now} at={fp} w={size.w} />}
+      {fp && size && <Card project={fp.name} names={namesOf(m.projects.find((p) => p.name === fp.name))} missions={missions} inbox={inbox} agents={m.projects.find((p) => p.name === fp.name)?.agents ?? []} now={now} at={fp} w={size.w} />}
       {/* Screen readers and keyboard users get the planets as a plain list. */}
       <ul className="vh">
         {m.projects.map((p) => (
-          <li key={p.name}><a href={missionsHref(p.name)} onClick={(e) => { e.preventDefault(); navigate(missionsHref(p.name)) }}>
+          <li key={p.name}><a href={missionsHref(namesOf(p)[0])} onClick={(e) => { e.preventDefault(); navigate(missionsHref(namesOf(p)[0])) }}>
             {p.name}: {p.state === 'needs' ? 'needs you' : p.state}, {p.open} open
           </a></li>
         ))}

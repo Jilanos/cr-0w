@@ -140,7 +140,8 @@ export const projectsOf = (b: SectionBody | undefined) => list<{ name: string }>
 export const accountsOf = (b: SectionBody | undefined) => list<Account>(obj(b).accounts).filter((a) => a.policy !== 'never')
 
 // Registry entry of `crow-projects json` (the parts the hero reads).
-export interface RegProject { name: string; path?: string; status?: string; short?: string }
+// system groups related projects into one planet (default: the project itself); nest: false keeps it off the hero.
+export interface RegProject { name: string; path?: string; status?: string; short?: string; system?: string; nest?: boolean }
 
 // Active registered projects, in registry order.
 export const registryOf = (b: SectionBody | undefined) =>

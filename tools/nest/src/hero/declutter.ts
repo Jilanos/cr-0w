@@ -18,6 +18,8 @@ export interface Item {
   // Ignores this obstacle at home (a planet label sits next to its own planet).
   own?: number
   prev?: [number, number]
+  // Max shift in px: a label tied to a small mark (a system member moon) hides past it.
+  near?: number
 }
 export interface Placed { dx: number; dy: number; hidden: boolean }
 
@@ -64,7 +66,7 @@ export function declutter(items: Item[], obstacles: Box[], w: number, h: number)
     }
     let best: [number, number] = [0, 0], bc = Infinity
     // Home first when free, then the last shift (stable while spinning), then the rest.
-    const all = shifts(it.box, it.alt), cands = it.prev ? [all[0], it.prev, ...all.slice(1)] : all
+    const all = shifts(it.box, it.alt).filter(([dx, dy]) => it.near === undefined || Math.hypot(dx, dy) <= it.near), cands = it.prev ? [all[0], it.prev, ...all.slice(1)] : all
     for (const s of cands) {
       const c = cost(s)
       // Prefer the earliest (nearest) candidate; a later one must be strictly better.
@@ -95,6 +97,7 @@ export function declutterDom(root: HTMLElement, obstacles: Box[]) {
       // data-up: the card may flip above its planet, or dock at the hero bottom.
       alt: e.dataset.up ? [[0, -(r.height + Number(e.dataset.up))], [0, r0.bottom - 8 - r.bottom]] : undefined,
       own: e.dataset.own !== undefined ? Number(e.dataset.own) : undefined, prev,
+      near: e.dataset.near !== undefined ? Number(e.dataset.near) : undefined,
     }
   })
   const res = declutter(items, obstacles, r0.width, r0.height)

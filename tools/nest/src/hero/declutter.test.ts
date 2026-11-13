@@ -51,4 +51,11 @@ describe('hero declutter edges', () => {
     expect(p.hidden).toBe(false)
     expect(p.dx).toBeGreaterThanOrEqual(20)
   })
+  it('hides a near label rather than moving it far from its mark (item_200)', () => {
+    const wall = box(40, 0, 120, 100)
+    const [far] = declutter([{ box: box(50, 40), prio: 4, hide: true }], [wall], 400, 100)
+    const [near] = declutter([{ box: box(50, 40), prio: 4, hide: true, near: 40 }], [wall], 400, 100)
+    expect(far.hidden).toBe(false)
+    expect(near.hidden).toBe(true)
+  })
 })

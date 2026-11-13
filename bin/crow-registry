@@ -133,6 +133,7 @@ def load():
             "scope": p.get("scope", ""), "forge": p.get("forge", "none"), "remote": p.get("remote", ""),
             "path": p.get("path", ""), "release": p.get("release") or {}, "status": p.get("status", ""),
             "logics": bool(p.get("logics")),
+            "system": p.get("system") or p["name"], "nest": p.get("nest", True) is not False,
             "road": road_info(p.get("path", ""), (p.get("release") or {}).get("roadmap")), "git": git_state(p.get("path", "")),
             "work": work_days(p.get("path", ""), ids.get(p.get("scope", ""), ""), p.get("subdir", "")),
         })
