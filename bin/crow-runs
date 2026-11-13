@@ -2,7 +2,7 @@
 """crow-runs: dispatch background runs and see what every agent is doing.
 
   crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--kind task|review|retro] [--power P] [--model M]
-                     [--permission review] [--logics REF] [--mission ID] [--write-dir DIR] [--timeout-min N]
+                     [--permission review] [--logics REF] [--mission ID | --end-state E] [--write-dir DIR] [--timeout-min N]
                      [--json] [--dry-run]
                                                      every run carries crow_lib.run_flags (model id, effort, budget, timeout, env)
   crow-runs state <run_id>                           JSON: has the run ended, its end state, the usage-limit policy (crow-core tick)
@@ -598,6 +598,36 @@ def said(text):
     return s if len(s) <= SAID_MAX else s[:SAID_MAX - 1] + "…"
 
 
+HEAD_BYTES = 256 * 1024
+
+
+def run_mission(rec):
+    """Mission of a dispatched run: the tick's own (--mission) or the linked one (--end-state)."""
+    return rec.get("mission") or rec.get("linked_mission")
+
+
+def transcript_mission(path):
+    """Mission id of a handoff session (item_203): the `Mission:` line of its first user message, the note."""
+    try:
+        with path.open("rb") as f:
+            lines = f.read(HEAD_BYTES).decode(errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if e.get("type") != "user" or e.get("isMeta"):
+            continue
+        content = (e.get("message") or {}).get("content")
+        if isinstance(content, list):
+            content = "\n".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+        m = crow_lib.MISSION_LINE.search(content or "")
+        return m[1] if m else None
+    return None
+
+
 def read_transcript(path):
     """Last action, whether it ended on plain text (= waiting on the user), context size."""
     info = {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": 0, "recent": [],
@@ -713,12 +743,14 @@ def collect(since="today", include_unledgered=False):
             "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt")},
             "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
             "prompt": {k: prompt.get(k) for k in crow_lib.PROMPT_FIELDS} if prompt else None,
+            "mission": transcript_mission(tpath) if tpath and kind == "session" else None, "branch": None,
         }
         if kind == "run":
             for rec in reversed(recs):
                 if rec["cwd"] == p["cwd"] and rec["run_id"] not in done and rec["run_id"] not in claimed:
                     claimed.add(rec["run_id"])
-                    a.update(run_id=rec["run_id"], label=rec["label"], commits=commits_since(rec["cwd"], rec.get("start_sha")))
+                    a.update(run_id=rec["run_id"], label=rec["label"], commits=commits_since(rec["cwd"], rec.get("start_sha")),
+                             mission=run_mission(rec), branch=rec.get("branch") or None)
                     break
         agents.append(a)
 
@@ -748,6 +780,7 @@ def collect(since="today", include_unledgered=False):
             "cost_usd": run_cost(r), "budget_usd": rec.get("budget_usd"), "denials": crow_lib.run_denials(r),
             "resumed_from": [k for k, v in superseded.items() if v == rec["run_id"]],
             "commits": commits_since(rec["cwd"], rec.get("start_sha"), r.get("ended_at") if r else None),
+            "mission": run_mission(rec), "branch": rec.get("branch") or None,
         })
     if include_unledgered:
         known = {rec["run_id"] for rec in recs}
@@ -918,6 +951,10 @@ def dispatch(a):
         rec["logics_ref"] = a.logics
     if a.mission:
         rec["mission"] = a.mission
+    elif a.end_state:  # linked mission (item_203); `mission` stays the tick's own runs, which skip notify
+        linked = crow_lib.ensure_mission(p["name"], a.end_state, a.logics or "", a.label)
+        if linked:
+            rec["linked_mission"] = linked
     if a.write_dir:
         rec["write_dir"] = a.write_dir
     if "--budget" in flags:
@@ -1085,6 +1122,8 @@ def main():
     d.add_argument("--write-dir", metavar="DIR", help="the run may also edit files under this folder (Claude only; "
                    "a review run then leaves plan mode and keeps the project read only through its allowlist)")
     d.add_argument("--mission", metavar="ID", help="crow-core mission this run belongs to (the tick finishes it: no notify, no requeue)")
+    d.add_argument("--end-state", metavar="E", help="what done looks like: links the run to the mission of its project and "
+                   "--logics ref (else this end state), created when missing (crow mission ensure)")
     d.add_argument("--timeout-min", type=int, help="wall-clock cap in minutes for this run (default: the kind's)")
     d.add_argument("--json", action="store_true", help="print {ok, run_id, account} or {ok: false, error: {code, message}}")
     sub.add_parser("state").add_argument("run_id")

@@ -95,6 +95,35 @@ def test_handoff_requires_an_end_state(hub, repos):
     assert r.returncode != 0 and "--end-state" in r.stderr
 
 
+def core_calls(home):
+    f = home / "core-calls.jsonl"
+    return [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
+
+
+# item_203 AC1: the end state creates or reuses the mission (the core keys it); the note and the
+# first prompt of the session carry its id.
+def test_handoff_links_its_mission_in_the_note(hub, repos):
+    home, _, _ = repos
+    r = run(hub, "crow-project", "handoff", "side", "--task", "Missions auto", "--end-state", "Commits on the branch.",
+            "--logics", "item_203_missions_created")
+    assert r.returncode == 0, r.stderr
+    assert core_calls(home) == [["ensure", "--project", "side", "--end-state", "Commits on the branch.", "--json",
+                                 "--logics", "item_203_missions_created", "--goal", "Missions auto"]]
+    assert "\nLogics: item_203_missions_created\nMission: 20261113-build-side-item-203\n" in r.stdout
+    cdx = run(hub, "crow-project", "handoff", "side", "--task", "Missions auto", "--end-state", "e",
+              "--logics", "item_203", "--for-cdx").stdout
+    assert cdx.startswith("Missions auto\n") and "Mission: 20261113-build-side-item-203" in cdx
+    assert "End state:" not in cdx
+
+
+def test_handoff_without_the_core_still_writes_its_note(hub, repos):
+    home, _, _ = repos
+    r = run(hub, "crow-project", "handoff", "side", "--task", "t", "--end-state", "e", env={"FAKE_CORE_FAIL": "store locked"})
+    assert r.returncode == 0
+    assert "warning: no mission linked (crow-core: store locked)" in r.stderr
+    assert "Mission:" not in r.stdout and list((home / "local/state/handoffs").glob("*-side.md"))
+
+
 def test_handoff_for_a_personal_repo_names_its_agents_file(hub, repos):
     note = run(hub, "crow-project", "handoff", "side", "--task", "t", "--end-state", "e").stdout
     assert "follow AGENTS.md." in note and "never merge" not in note
@@ -168,6 +197,7 @@ def test_handoff_for_a_planning_project_goes_to_its_planning_repo(hub, repos):
     assert "Project: shell, code in " in r.stdout and "planned and built from this repo" in r.stdout
     assert "follow AGENTS.md." in r.stdout
     assert list((home / "local/state/handoffs").glob("*-side.md"))
+    assert core_calls(home)[0][:3] == ["ensure", "--project", "shell"]  # the mission is the requested project's
 
 
 def test_handoff_to_the_hub_itself_opens_a_fresh_hub_session(hub, repos):

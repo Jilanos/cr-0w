@@ -6,7 +6,7 @@
 #   crow open [--account A] [--model M] [--on-busy fail] <project> [prompt | --task T --end-state E]
 #                        open a session in a registered project, optionally on a first message (model: opus, sonnet)
 #   crow term [--account A] [--model M] [--on-busy fail] <project> [...]   same, in a new terminal window (safe to call from inside a Claude session)
-#   crow handoff [--account A] <project> --task T --end-state E [--context C]   hand the work to a repo session (crow term)
+#   crow handoff [--account A] <project> --task T --end-state E [--logics REF] [--context C]   hand the work to a repo session (crow term), linked to its mission
 #   open, term and handoff pick a free allowed account with quota left (crow-accounts pick);
 #   --account <name> forces one, even the calling session's own account (CROW_ACCOUNT=<name> also
 #   forces one, except when it is only inherited from the calling session). --on-busy fail never asks (scripts).

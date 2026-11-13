@@ -27,6 +27,9 @@ const usage = `usage: crow-core <command>
   dump              print every mission, run and inbox row as JSON
   mission new --goal G --kind K --project P --end-state E [--key K] [--scope S]
               [--data-class D] [--gates a,b] [--autonomy A] [--json]
+  mission ensure --project P --end-state E [--logics REF] [--goal G] [--json]
+                    the linked mission of a handoff or dispatch: reused by project and
+                    Logics ref (else end state), created running with no core run
   mission list [--json]
   mission show <id|prefix> [--json]
   mission stop <id|prefix> [--json]    stop the live run of a running mission

@@ -45,7 +45,7 @@ def args(**kw):
             "kind": "review", "model": "opus", "power": "medium", "continue_run": None, "account": None,
             "isolate": False, "cwd": None, "permission": "review", "force": False, "budget": 5.0, "dry_run": False,
             "context": None, "logics": None, "resumes": None, "mission": "20261109-research-x", "timeout_min": 60,
-            "json": True, "write_dir": None}
+            "json": True, "write_dir": None, "end_state": None}
     return types.SimpleNamespace(**{**base, **kw})
 
 
@@ -133,3 +133,59 @@ def test_review_kind_on_claude_shares_a_busy_cwd(fake, capsys, monkeypatch):
     monkeypatch.setattr(cr, "running_runs", lambda: [{"cwd": str(fake.tmp)}])
     cr.dispatch(args(permission=None, write_dir=str(fake.tmp)))
     assert json.loads(capsys.readouterr().out)["ok"] is True
+
+
+# item_203: a dispatch with an end state links its run to the mission of the work.
+def test_dispatch_with_an_end_state_records_its_linked_mission(fake, capsys, monkeypatch):
+    seen = []
+    monkeypatch.setattr(crow_lib, "ensure_mission", lambda *a: seen.append(a) or "20261113-build-demo-item-203")
+    cr.dispatch(args(mission=None, json=False, kind="task", permission=None, logics="item_203", end_state="Commits."))
+    assert seen == [("demo", "Commits.", "item_203", "research-x")]
+    rec = json.loads(cr.LEDGER.read_text())
+    assert rec["linked_mission"] == "20261113-build-demo-item-203" and "mission" not in rec
+    assert len(fake.popen) == 1  # notify kept: no core run finishes it
+    assert cr.run_mission(rec) == "20261113-build-demo-item-203"
+
+
+def test_dispatch_without_an_end_state_or_with_a_tick_mission_links_nothing(fake, capsys, monkeypatch):
+    seen = []
+    monkeypatch.setattr(crow_lib, "ensure_mission", lambda *a: seen.append(a))
+    cr.dispatch(args(mission=None, json=False, kind="task", permission=None))
+    cr.dispatch(args(end_state="x"))  # the tick's own run keeps its mission
+    assert seen == []
+    recs = [json.loads(l) for l in cr.LEDGER.read_text().splitlines()]
+    assert "linked_mission" not in recs[0] and "mission" not in recs[0]
+    assert recs[1]["mission"] == "20261109-research-x" and "linked_mission" not in recs[1]
+
+
+def test_rows_carry_the_mission_and_branch(fake, monkeypatch):
+    start = "2999-01-01T00:00:00+00:00"
+    recs = [{"run_id": "r1", "project": "demo", "label": "a", "cwd": "/w", "started_at": start,
+             "branch": "missions-auto", "linked_mission": "m-linked"},
+            {"run_id": "r2", "project": "demo", "label": "b", "cwd": "/w", "started_at": start,
+             "branch": "", "mission": "m-tick"}]
+    monkeypatch.setattr(cr, "ledger", lambda: recs)
+    monkeypatch.setattr(cr, "finished", lambda since: {})
+    monkeypatch.setattr(cr, "agent_procs", list)
+    monkeypatch.setattr(cr, "commits_since", lambda *a: [])
+    monkeypatch.setattr(cr, "project_usage", lambda: {"today": [], "sessions": {}})
+    rows = {r["run_id"]: r for r in cr.collect(since=None)["finished"]}
+    assert (rows["r1"]["mission"], rows["r1"]["branch"]) == ("m-linked", "missions-auto")
+    assert (rows["r2"]["mission"], rows["r2"]["branch"]) == ("m-tick", None)
+
+
+def test_session_mission_comes_from_the_handoff_note(tmp_path):
+    t = tmp_path / "s.jsonl"
+
+    def write(*events):
+        t.write_text("".join(json.dumps(e) + "\n" for e in events))
+
+    def user(content, **kw):
+        return {"type": "user", "message": {"content": content}, **kw}
+
+    note = "Missions auto\n\nLogics: item_203\nMission: 20261113-build-demo-item-203\n\nHub rules..."
+    write(user("Caveat", isMeta=True), user([{"type": "text", "text": note}]), user("Mission: other"))
+    assert cr.transcript_mission(t) == "20261113-build-demo-item-203"
+    write(user("no handoff"), user("Mission: x"))
+    assert cr.transcript_mission(t) is None  # only the first prompt counts
+    assert cr.transcript_mission(tmp_path / "missing.jsonl") is None

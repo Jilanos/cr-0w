@@ -29,18 +29,24 @@ func stopRun(engine string) func(string) error {
 	}
 }
 
-// missionCmd runs `mission new|list|show|stop|cancel|brief`.
+// missionCmd runs `mission new|ensure|list|show|stop|cancel|brief`.
 func missionCmd(env mission.Env, args []string, stdout io.Writer) error {
 	if len(args) == 0 {
-		return fmt.Errorf("mission: want new, list, show, stop, cancel or brief")
+		return fmt.Errorf("mission: want new, ensure, list, show, stop, cancel or brief")
 	}
 	sub, args := args[0], args[1:]
 	fs := flag.NewFlagSet("mission "+sub, flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "print JSON")
 	var spec mission.Spec
+	var link mission.Link
 	var gates, reason string
 	var write bool
 	switch sub {
+	case "ensure":
+		fs.StringVar(&link.Project, "project", "", "registry name or alias")
+		fs.StringVar(&link.EndState, "end-state", "", "what done looks like")
+		fs.StringVar(&link.Logics, "logics", "", "Logics ref or ticket key the work is for")
+		fs.StringVar(&link.Goal, "goal", "", "the task (default: the end state)")
 	case "new":
 		fs.StringVar(&spec.Goal, "goal", "", "what the mission is for")
 		fs.StringVar(&spec.Kind, "kind", "", "kind file name")
@@ -100,6 +106,16 @@ func missionCmd(env mission.Env, args []string, stdout io.Writer) error {
 			return err
 		}
 		return printMission(stdout, m, *asJSON)
+	case "ensure":
+		m, created, err := env.Ensure(link)
+		if err != nil {
+			return err
+		}
+		if *asJSON {
+			return printJSON(stdout, map[string]any{"id": m.ID, "created": created})
+		}
+		fmt.Fprintln(stdout, m.ID)
+		return nil
 	case "list":
 		ms, err := env.List()
 		if err != nil {

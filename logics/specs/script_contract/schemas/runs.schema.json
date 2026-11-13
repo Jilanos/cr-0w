@@ -81,6 +81,20 @@
        "null"
       ]
      },
+     "mission": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Mission the work belongs to (item_203): the Mission: line of a handoff session's note, or the mission of a dispatched run."
+     },
+     "branch": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Branch a dispatched run started on; null for sessions."
+     },
      "projects": {
       "type": [
        "array",
@@ -200,6 +214,20 @@
        "array",
        "null"
       ]
+     },
+     "mission": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Mission of the run (item_203): the tick's own (--mission) or the linked one (--end-state)."
+     },
+     "branch": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Branch the run started on."
      }
     }
    }

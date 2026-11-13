@@ -874,6 +874,32 @@ def pending_prompt(pid, meta, home=None):
     return p
 
 
+MISSION_LINE = re.compile(r"^Mission: (\S+)$", re.M)
+
+
+def ensure_mission(project, end_state, logics="", goal=""):
+    """Linked mission of a handoff or a dispatch (item_203): `crow mission ensure` reuses the
+    mission of the same project and Logics ref (else end state) or creates it. Returns its id,
+    or None with a warning on stderr: work never waits on the core. CROW_CORE_CMD replaces
+    `crow mission` (tests)."""
+    if not (end_state or "").strip():
+        return None
+    base = shlex.split(os.environ["CROW_CORE_CMD"]) if os.environ.get("CROW_CORE_CMD") else \
+        [os.path.join(ENGINE, "bin", "crow"), "mission"]
+    cmd = base + ["ensure", "--project", project, "--end-state", end_state, "--json"]
+    cmd += ["--logics", logics] if logics else []
+    cmd += ["--goal", goal] if goal else []
+    try:
+        r = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=120)
+        if r.returncode == 0:
+            return json.loads(r.stdout)["id"]
+        why = (r.stderr or r.stdout).strip()[-300:]
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as e:
+        why = str(e)
+    print(f"crow: warning: no mission linked ({why})", file=sys.stderr)
+    return None
+
+
 def action_result(ok, action, target, message, code=None):
     """Print the --json result of an action script and return its exit code: 0 ok, 1 refused, 2 error."""
     code = 0 if ok else (code or 1)

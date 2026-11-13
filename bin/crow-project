@@ -4,10 +4,12 @@
   crow-project work <project> [--json]
       Index of what the repo brings (instructions, skills, commands, agents) to read on
       demand, plus what a hub session cannot run for it (hooks, permission denies, git hooks).
-  crow-project handoff <project> --task T --end-state E [--context C]
+  crow-project handoff <project> --task T --end-state E [--logics REF] [--context C]
       Write a hand-off note to <state>/handoffs/ and print the first prompt of the repo
       session (`crow handoff` opens it with `crow term`). --for-cdx prints it as the text of
       `cdx --task`: the task first, without the Task and End state lines cdx writes itself.
+      The end state creates or reuses the mission of the work (`crow mission ensure`, keyed
+      on --logics when given); its id goes in the note as a `Mission:` line.
   crow-project which <path>
       Name of the registered project that owns a path (worktrees included), or nothing.
 
@@ -161,7 +163,8 @@ def print_index(ix):
           f"\n  crow handoff {ix['name']} --task \"...\" --end-state \"...\"")
 
 
-def handoff(p, task, end_state, context, now=None):
+def handoff(p, task, end_state, context, logics="", now=None):
+    mission = crow_lib.ensure_mission(p["name"], end_state, logics, task)
     code = None
     if p.get("planning"):  # planned and built from another repo (registry `planning:`)
         code, p = p, project(p["planning"])
@@ -173,6 +176,10 @@ def handoff(p, task, end_state, context, now=None):
         f"Task: {task}",
         f"End state: {end_state}",
     ]
+    if logics:
+        lines.append(f"Logics: {logics}")
+    if mission:  # links this session to the mission in the work feed (item_203)
+        lines.append(f"Mission: {mission}")
     if code:
         lines += ["", f"Project: {code['name']}, code in {code['path']}. It is planned and built from this repo."]
     if context:
@@ -223,6 +230,8 @@ def main():
     h.add_argument("--task", required=True); h.add_argument("--end-state", required=True,
                    help="what the owner's approval unlocks, e.g. 'commit and push after my OK, open the MR with the mr skill'")
     h.add_argument("--context", default="")
+    h.add_argument("--logics", default="", metavar="REF",
+                   help="Logics ref or ticket key of the work: a second handoff for it reuses its mission")
     h.add_argument("--for-cdx", action="store_true", help=argparse.SUPPRESS)
     s = sub.add_parser("which"); s.add_argument("path")
     a = ap.parse_args()
@@ -230,7 +239,7 @@ def main():
         ix = index(project(a.project))
         print(json.dumps(ix, indent=2)) if a.json else print_index(ix)
     elif a.cmd == "handoff":
-        out, text = handoff(project(a.project, hub=True), a.task, a.end_state, a.context)
+        out, text = handoff(project(a.project, hub=True), a.task, a.end_state, a.context, a.logics)
         print(f"crow: hand-off note saved to {out}", file=sys.stderr)
         if a.for_cdx:
             rest = [l for l in text.splitlines() if l not in (f"Task: {a.task}", f"End state: {a.end_state}")]
