@@ -365,7 +365,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
 
   const local = (e: PointerEvent) => { const r = box.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top } }
   const down = (e: PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('.hero-card, .hero-chip')) return
+    if ((e.target as HTMLElement).closest('.hero-card')) return
     const s = st.current
     s.drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, t: e.timeStamp, spin0: s.spin.spin, moved: false }
     s.spin.vel = 0; s.spin.to = undefined
@@ -470,11 +470,6 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
           </div>
         )
       })}
-      {m.asks > 0 && out && (
-        <div className="hero-chip" data-prio={0} data-fixed style={{ left: Math.min(out.head.right - 40, (size?.w ?? 0) - 60), top: out.head.top + 40 }} aria-hidden="true">
-          {m.asks} {m.asks === 1 ? 'ASK' : 'ASKS'}
-        </div>
-      )}
       {fp && size && <Card project={fp.name} names={namesOf(m.projects.find((p) => p.name === fp.name))} missions={missions} inbox={inbox} agents={m.projects.find((p) => p.name === fp.name)?.agents ?? []} now={now} at={fp} w={size.w} />}
       {/* Screen readers and keyboard users get the planets as a plain list. */}
       <ul className="vh">
