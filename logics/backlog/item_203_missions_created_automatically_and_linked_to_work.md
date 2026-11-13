@@ -65,7 +65,8 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T13:53:45.132661+00:00 | cdx | 40088eb5e8594fe0912bca9568349a81 | item_203 mission state rules | running |  |  |
+| 2026-11-13T13:57:08.620110+00:00 | cdx | 40088eb5e8594fe0912bca9568349a81 | item_203 mission state rules | succeeded |  |  |
 | 2026-11-13T13:48:51.782807+00:00 | cdx | 854208bd3a594454aa9cf106fa586c98 | item_203 missions auto + linking (continue) | succeeded |  |  |
 | 2026-11-13T11:45:04.519694+00:00 | cdx | c898fb4822e04d06a6c0fd18788888a9 | item_203 missions auto + linking | failed |  | limit |
 | 2026-11-13T11:41:41.610771+00:00 | cdx | a499f12d9ab649bbb363f88fe1b3c653 | item_203 missions auto + linking | failed |  | limit |
+
