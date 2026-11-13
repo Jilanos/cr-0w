@@ -11,9 +11,6 @@ export const isScopeMode = (v: unknown): v is ScopeMode => SCOPE_MODES.includes(
 // Scope of one thing; both shows under every mode, undefined = unknown, shown under all only.
 export type Side = 'work' | 'perso' | 'both' | undefined
 
-// Mission scope: work is work, personal and crow are perso.
-export const missionSide = (m: Mission): Side => (m.scope === 'work' ? 'work' : m.scope === 'personal' || m.scope === 'crow' ? 'perso' : undefined)
-
 // Nest scope of a project (nest_scope, else scope): work, personal is perso, both, anything else unknown.
 export function projectSide(name: string, registry: RegProject[]): Side {
   const p = registry.find((x) => x.name === name)
@@ -21,11 +18,20 @@ export function projectSide(name: string, registry: RegProject[]): Side {
   return s === 'work' ? 'work' : s === 'personal' ? 'perso' : s === 'both' ? 'both' : undefined
 }
 
+// Mission scope: work is work, personal is perso. A crow mission takes its hub
+// project's registry scope (both shows it everywhere), perso when the registry has none.
+export function missionSide(m: Mission, registry: RegProject[] = []): Side {
+  if (m.scope === 'work') return 'work'
+  if (m.scope === 'personal') return 'perso'
+  if (m.scope === 'crow') return projectSide(m.project, registry) ?? 'perso'
+  return undefined
+}
+
 // An ask takes its project's registry scope; on a project the registry does not know, its mission's.
 export function askSide(r: InboxItem, registry: RegProject[], missions: Mission[]): Side {
   if (registry.some((p) => p.name === r.project)) return projectSide(r.project, registry)
   const m = missions.find((x) => x.id === r.mission)
-  return m ? missionSide(m) : undefined
+  return m ? missionSide(m, registry) : undefined
 }
 
 // The Today section reads the work mailbox. A personal mail source tags its rows perso.
@@ -43,7 +49,7 @@ export function scopeOf(d: ScopeIn, mode: ScopeMode): ScopeIn {
   const reg = d.registry
   const known = new Set([...reg.map((p) => p.name), ...d.missions.map((m) => m.project)])
   return {
-    missions: d.missions.filter((m) => keep(mode, missionSide(m))),
+    missions: d.missions.filter((m) => keep(mode, missionSide(m, reg))),
     inbox: d.inbox.filter((r) => keep(mode, askSide(r, reg, d.missions))),
     registry: reg.filter((p) => keep(mode, projectSide(p.name, reg))),
     agents: d.agents.filter((a) => keep(mode, projectSide(projectOfAgent(a, reg, known), reg))),

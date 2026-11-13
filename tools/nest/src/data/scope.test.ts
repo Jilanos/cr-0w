@@ -131,6 +131,21 @@ describe('nest_scope and both (item_206)', () => {
     expect(ids(scopeOf(d(), 'perso'))).toMatchObject({ registry: ['hub', 'tool'], inbox: ['ih', 'it'], agents: [1, 2] })
   })
 
+  it('shows crow missions under all, work and perso when the hub project is both', () => {
+    const reg: RegProject[] = [{ name: 'cr-0w', path: '/p/cr-0w', scope: 'personal', nest_scope: 'both' }]
+    const s = (mode: ScopeMode) => scopeOf({
+      missions: [mission({ id: 'mc', project: 'cr-0w', scope: 'crow' }), mission({ id: 'mx', project: 'ghost', scope: 'crow' })],
+      inbox: [ask({ id: 'ic', mission: 'mc', project: 'ghost' })], registry: reg, agents: [], parked: [],
+    }, mode)
+    for (const mode of ['all', 'work', 'perso'] as const) {
+      expect(ids(s(mode)).missions).toContain('mc')
+      expect(ids(s(mode)).inbox).toEqual(['ic'])
+    }
+    // A crow mission on a project the registry does not know stays perso.
+    expect(ids(s('work')).missions).toEqual(['mc'])
+    expect(ids(s('perso')).missions).toEqual(['mc', 'mx'])
+  })
+
   it('puts a both project in its system under both modes', () => {
     const reg: RegProject[] = [
       { name: 'hub', path: '/p/hub', nest_scope: 'both', system: 'grp' },
