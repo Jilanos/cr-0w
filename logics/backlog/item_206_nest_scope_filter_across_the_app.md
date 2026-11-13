@@ -4,11 +4,11 @@
 > Status: In progress
 > Understanding: 90
 > Confidence: 80
-> Progress: 60%
+> Progress: 80%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-13 14:53:05
+> Indicators reviewed: 2026-11-13 19:53:02
 
 # AI Context
 - Summary: Add an all / work / perso scope filter to Nest that every screen reads, remembered per device.
@@ -71,11 +71,14 @@
 - 2026-11-13: filter helper with tests and storage + wiring on every screen but Chat are done on branch `nest-scope-filter`. No visible control yet. Control pick pending: options A (header segmented), B (header chip), C (strip under the header) in `Research/nest-design/item_206/` with `spec.json`.
 - Decided 2026-11-13: an open ask on an unregistered project follows its mission's scope; Chat reads unfiltered data; mail rows carry a scope, Today mail is the work mailbox (perso shows none).
 - 2026-11-13: `both` scope done (registry field `nest_scope`: work, personal or both, default `scope`). Header options rendered (A one row, B two tiers, C capsule) in `Research/nest-design/item_206/header/` with `spec.json`. Pick pending.
+- 2026-11-13: header A built, tab-bar options rendered, pick pending. Build shots per scope in `Research/nest-design/item_206/build/{work,all,perso}/` (board vs build in `build/spec.json`); tab options in `Research/nest-design/item_206/tabs/` with `spec.json`.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-13T18:41:29.413705+00:00 | cdx | a9110765d90f4b538d624fa1fa16e5bd | item_206 header A build + tab options (continue) | running |  |  |
+| 2026-11-13T14:17:22.413431+00:00 | cdx | 4cde807657b8448a8eff291918e2f2fb | item_206 header A build + tab options | failed |  | limit |
+| 2026-11-13T14:13:59.669861+00:00 | cdx | 570319e068c64526a0e6a4d06b5bb86d | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T13:53:38.163012+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | succeeded |  |  |
 | 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
-
