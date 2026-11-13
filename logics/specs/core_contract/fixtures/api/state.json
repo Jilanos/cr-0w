@@ -1,5 +1,5 @@
 {
-  "version": "b4914b9d1ab8f4a7",
+  "version": "f3bbb3baa9761135",
   "sections": {
     "accounts": {
       "section": "accounts",
@@ -784,6 +784,64 @@
           "unpriced": "unpriced"
         }
       }
+    },
+    "work": {
+      "section": "work",
+      "version": "148a7deb01d9b662",
+      "updated_at": "2026-11-10T09:00:00Z",
+      "data": [
+        {
+          "id": "session:1",
+          "kind": "session",
+          "project": "name",
+          "state": "working",
+          "title": "title",
+          "since": "2026-01-01T09:00:00+00:00",
+          "source": {
+            "section": "dispatch",
+            "ref": "1"
+          }
+        },
+        {
+          "id": "mr:url",
+          "kind": "mr",
+          "project": "name",
+          "state": "queued",
+          "title": "ref title",
+          "since": "updated",
+          "why": "waiting on review",
+          "source": {
+            "section": "mrs",
+            "ref": "url"
+          }
+        },
+        {
+          "id": "mission:20261109-research-android-push-options",
+          "kind": "mission",
+          "project": "demo",
+          "state": "done",
+          "title": "Compare push providers for the Android app.",
+          "since": "2026-11-09T14:52:02+01:00",
+          "mission": "20261109-research-android-push-options",
+          "source": {
+            "section": "missions",
+            "ref": "20261109-research-android-push-options"
+          }
+        },
+        {
+          "id": "mission:20261109-build-item-095",
+          "kind": "mission",
+          "project": "",
+          "state": "done",
+          "title": "Pick the account for a dispatch from the scope of the target repo (backlog item item_095).",
+          "since": "2026-11-09T11:02:10+01:00",
+          "mission": "20261109-build-item-095",
+          "source": {
+            "section": "missions",
+            "ref": "20261109-build-item-095"
+          }
+        }
+      ]
     }
   }
 }

@@ -161,6 +161,7 @@ func TestResponseFixtures(t *testing.T) {
 		"state-mrs":           {path: "/api/state/mrs"},
 		"state-checks":        {path: "/api/state/checks"},
 		"state-projects":      {path: "/api/state/projects"},
+		"state-work":          {path: "/api/state/work"},
 		"mission":             {path: "/api/missions/20261109-build-item-095"},
 		"mission-questions":   {path: "/api/missions/20261109-research-android-push-options"},
 		"events":              {path: "/api/events?limit=3"},

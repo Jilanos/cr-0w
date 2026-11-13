@@ -1,0 +1,186 @@
+[
+  {
+    "id": "run:r-fail",
+    "kind": "run",
+    "project": "cr-0w",
+    "state": "failed",
+    "title": "night job",
+    "since": "2026-11-13T07:00:00Z",
+    "why": "run failed",
+    "source": {
+      "section": "dispatch",
+      "ref": "r-fail"
+    }
+  },
+  {
+    "id": "mr:https://forge/lambda/230",
+    "kind": "mr",
+    "project": "platform-api",
+    "state": "needs",
+    "title": "!230 chg: give drivers time",
+    "since": "2026-11-13T11:30:00Z",
+    "wait_s": 3600,
+    "why": "review asked",
+    "source": {
+      "section": "mrs",
+      "ref": "https://forge/lambda/230"
+    }
+  },
+  {
+    "id": "mission:20261113-ask",
+    "kind": "mission",
+    "project": "cr-0w",
+    "state": "needs",
+    "title": "pick a filter",
+    "since": "2026-11-13T11:00:00Z",
+    "wait_s": 1800,
+    "why": "choice",
+    "mission": "20261113-ask",
+    "source": {
+      "section": "missions",
+      "ref": "20261113-ask"
+    }
+  },
+  {
+    "id": "mr:https://forge/lambda/231",
+    "kind": "mr",
+    "project": "platform-api",
+    "state": "needs",
+    "title": "!231 new: feature x",
+    "since": "2026-11-13T11:50:00Z",
+    "wait_s": 600,
+    "why": "red pipeline",
+    "mission": "20261113-build-x",
+    "source": {
+      "section": "mrs",
+      "ref": "https://forge/lambda/231"
+    }
+  },
+  {
+    "id": "session:101",
+    "kind": "session",
+    "project": "cr-0w",
+    "state": "needs",
+    "title": "wire the feed",
+    "since": "2026-11-13T10:00:00Z",
+    "wait_s": 90,
+    "why": "asks Bash",
+    "source": {
+      "section": "dispatch",
+      "ref": "101"
+    }
+  },
+  {
+    "id": "session:102",
+    "kind": "session",
+    "project": "nest-app",
+    "state": "working",
+    "title": "tidy",
+    "since": "2026-11-13T11:20:00Z",
+    "source": {
+      "section": "dispatch",
+      "ref": "102"
+    }
+  },
+  {
+    "id": "mission:20261113-build-x",
+    "kind": "mission",
+    "project": "platform-api",
+    "state": "working",
+    "title": "build feature x",
+    "since": "2026-11-13T11:00:00Z",
+    "mission": "20261113-build-x",
+    "source": {
+      "section": "missions",
+      "ref": "20261113-build-x"
+    }
+  },
+  {
+    "id": "run:r-live",
+    "kind": "run",
+    "project": "platform-api",
+    "state": "working",
+    "title": "build x",
+    "since": "2026-11-13T11:00:00Z",
+    "mission": "20261113-build-x",
+    "source": {
+      "section": "dispatch",
+      "ref": "r-live"
+    }
+  },
+  {
+    "id": "session:103",
+    "kind": "session",
+    "project": "platform-api",
+    "state": "working",
+    "title": "mystery",
+    "source": {
+      "section": "dispatch",
+      "ref": "103"
+    }
+  },
+  {
+    "id": "session:104",
+    "kind": "session",
+    "project": "platform-api",
+    "state": "working",
+    "title": "platform-api",
+    "source": {
+      "section": "dispatch",
+      "ref": "104"
+    }
+  },
+  {
+    "id": "parked:conv-parked",
+    "kind": "parked",
+    "project": "platform-api",
+    "state": "sleeping",
+    "title": "port the rules",
+    "since": "2026-11-13T09:30:00Z",
+    "resets_at": "2026-11-13T14:00:00Z",
+    "why": "usage limit",
+    "source": {
+      "section": "sessions",
+      "ref": "conv-parked"
+    }
+  },
+  {
+    "id": "mission:20261113-limit",
+    "kind": "mission",
+    "project": "cr-0w",
+    "state": "sleeping",
+    "title": "long build",
+    "since": "2026-11-13T07:00:00Z",
+    "mission": "20261113-limit",
+    "source": {
+      "section": "missions",
+      "ref": "20261113-limit"
+    }
+  },
+  {
+    "id": "mr:https://forge/cr-0w/5",
+    "kind": "mr",
+    "project": "cr-0w",
+    "state": "queued",
+    "title": "#5 new: hub",
+    "since": "2026-11-12T12:00:00Z",
+    "why": "waiting on review",
+    "source": {
+      "section": "mrs",
+      "ref": "https://forge/cr-0w/5"
+    }
+  },
+  {
+    "id": "run:r-done",
+    "kind": "run",
+    "project": "cr-0w",
+    "state": "done",
+    "title": "docs",
+    "since": "2026-11-13T08:00:00Z",
+    "why": "run done",
+    "source": {
+      "section": "dispatch",
+      "ref": "r-done"
+    }
+  }
+]

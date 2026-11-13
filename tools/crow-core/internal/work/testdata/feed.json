@@ -1,0 +1,58 @@
+{
+  "projects": {"projects": [
+    {"name": "cr-0w", "short": "crow", "path": "/p/cr-0w"},
+    {"name": "platform-api", "short": "api", "path": "/p/platform-api/"}
+  ]},
+  "dispatch": {
+    "agents": [
+      {"kind": "session", "pid": 101, "session_id": "s101", "cwd": "/p/cr-0w.wt/x", "project": "cr-0w", "state": "waiting",
+       "title": "wire the feed", "last_activity_s": 90, "started_at": "2026-11-13T10:00:00Z", "prompt": {"id": "p1", "tool": "Bash", "detail": "make"}},
+      {"kind": "run", "pid": 201, "run_id": "r-live", "session_id": "s201", "cwd": "/p/platform-api.wt/feat-x", "project": "platform-api",
+       "state": "working", "label": "build x", "started_at": "2026-11-13T11:00:00Z"},
+      {"kind": "session", "pid": 102, "session_id": "s102", "cwd": "/tmp/elsewhere", "project": "nest-app", "state": "working",
+       "last_prompt": "tidy", "recent": [{"action": "Edit", "ts": "2026-11-13T11:40:00Z"}, {"action": "Read", "ts": "2026-11-13T11:20:00Z"}]},
+      {"kind": "session", "pid": 103, "session_id": "s103", "cwd": "/home/x", "project": "mystery", "state": "working",
+       "projects": [{"name": "cr-0w", "share_pct": 20}, {"name": "platform-api", "share_pct": 50}]},
+      {"kind": "session", "pid": 104, "session_id": "conv-live", "cwd": "/p/platform-api", "project": "platform-api", "state": "working"}
+    ],
+    "finished": [
+      {"run_id": "r-fail", "project": "cr-0w", "label": "night job", "status": "failed", "ended_at": "2026-11-13T07:00:00Z"},
+      {"run_id": "r-done", "project": "crow", "label": "docs", "status": "done", "ended_at": "2026-11-13T08:00:00Z"},
+      {"run_id": "r-live", "project": "platform-api", "label": "build x", "status": "done", "ended_at": "2026-11-13T09:00:00Z"}
+    ]
+  },
+  "sessions": {"sessions": [
+    {"conversation_id": "conv-parked", "cwd": "/p/platform-api/sub", "project": "api", "limit": "five_hour",
+     "resets_at": "2026-11-13T14:00:00Z", "last_event": "2026-11-13T09:30:00Z", "last_prompt": "port the rules"},
+    {"conversation_id": "conv-reset", "cwd": "/p/cr-0w", "limit": "five_hour", "resets_at": "2026-11-13T11:00:00Z"},
+    {"conversation_id": "conv-live", "cwd": "/p/platform-api", "limit": "seven_day", "resets_at": "2026-11-14T00:00:00Z"}
+  ]},
+  "mrs": {"mrs": [
+    {"name": "platform-api", "project": "api", "number": 230, "ref": "!230", "title": "chg: give drivers time", "role": "REVIEWER",
+     "draft": false, "pipeline": "passed", "threads_open": 0, "created": "2026-11-13T11:00:00Z", "updated": "2026-11-13T11:30:00Z",
+     "branch": "other", "url": "https://forge/lambda/230"},
+    {"name": "platform-api", "project": "api", "number": 231, "ref": "!231", "title": "new: feature x", "role": "AUTHOR",
+     "draft": false, "pipeline": "failed", "threads_open": 0, "created": "2026-11-12T11:00:00Z", "updated": "2026-11-13T11:50:00Z",
+     "branch": "feat-x", "url": "https://forge/lambda/231"},
+    {"name": "cr-0w", "project": "crow", "number": 5, "ref": "#5", "title": "new: hub", "role": "AUTHOR",
+     "draft": false, "pipeline": "passed", "threads_open": 0, "created": "2026-11-12T11:00:00Z", "updated": "2026-11-12T12:00:00Z",
+     "branch": "hub", "url": "https://forge/cr-0w/5"}
+  ]},
+  "missions": [
+    {"id": "20261113-ask", "kind": "research", "project": "cr-0w", "goal": "pick a filter", "state": "running", "runs": [],
+     "created": "2026-11-13T10:00:00Z", "updated": "2026-11-13T11:00:00Z"},
+    {"id": "20261113-build-x", "kind": "build", "project": "api", "goal": "build feature x", "state": "running",
+     "branch": "feat-x", "worktree": "/p/platform-api.wt/feat-x",
+     "runs": [{"run": "r-live", "mission": "20261113-build-x", "started": "2026-11-13T11:00:00Z", "ended": null}],
+     "created": "2026-11-13T10:00:00Z", "updated": "2026-11-13T11:00:00Z"},
+    {"id": "20261113-limit", "kind": "build", "project": "cr-0w", "goal": "long build", "state": "queued",
+     "runs": [{"run": "r-old", "mission": "20261113-limit", "started": "2026-11-13T06:00:00Z", "ended": "2026-11-13T07:00:00Z", "cause": "usage_limit"}],
+     "created": "2026-11-13T06:00:00Z", "updated": "2026-11-13T07:00:00Z"},
+    {"id": "20261101-old", "kind": "build", "project": "nest-app", "goal": "old", "state": "done", "runs": [],
+     "created": "2026-11-01T06:00:00Z", "updated": "2026-11-01T07:00:00Z"}
+  ],
+  "inbox": [
+    {"id": "i1", "mission": "20261113-ask", "project": "cr-0w", "type": "choice", "state": "open", "created": "2026-11-13T11:30:00Z"},
+    {"id": "i2", "mission": "20261113-build-x", "project": "api", "type": "fyi", "state": "open", "created": "2026-11-13T11:30:00Z"}
+  ]
+}

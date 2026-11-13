@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "crow/core/work-item.schema.json",
+  "title": "work item",
+  "description": "One row of GET /api/state/work: a live session, a dispatch run, a session parked on a usage limit, a merge request or a mission, in one shape (item_202).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "project", "state", "title", "source"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^(session|run|parked|mr|mission):.+$", "description": "<kind>:<source ref>."},
+    "kind": {"enum": ["session", "run", "parked", "mr", "mission"]},
+    "project": {"type": "string", "description": "Registry name: by cwd (worktrees under <path>.wt/ included), then the source's own project, then the largest usage share."},
+    "state": {"enum": ["failed", "needs", "working", "sleeping", "queued", "done"]},
+    "title": {"type": "string"},
+    "since": {"type": "string", "description": "Start of the work, or its last change for MRs and missions."},
+    "wait_s": {"type": "integer", "minimum": 0, "description": "Seconds a needs item has waited on the owner."},
+    "resets_at": {"type": "string", "format": "date-time", "description": "When a sleeping item's usage limit resets."},
+    "why": {"type": "string", "description": "What makes the state, in a few words."},
+    "mission": {"type": "string", "description": "Mission the work belongs to."},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "ref"],
+      "properties": {
+        "section": {"enum": ["dispatch", "sessions", "mrs", "missions"]},
+        "ref": {"type": "string", "description": "pid, run id, conversation id, MR url or mission id."}
+      }
+    }
+  }
+}

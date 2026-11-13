@@ -95,6 +95,7 @@ func New(o Options) *Server {
 		s.ext[src.Name] = &ext{src: src}
 		s.order = append(s.order, src.Name)
 	}
+	s.order = append(s.order, WorkSection)
 	return s
 }
 
@@ -190,6 +191,9 @@ func (s *Server) section(w http.ResponseWriter, r *http.Request) {
 func (s *Server) read(name string, r *http.Request) (Section, error) {
 	if e := s.ext[name]; e != nil {
 		return s.readExt(e), nil
+	}
+	if name == WorkSection {
+		return s.work()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

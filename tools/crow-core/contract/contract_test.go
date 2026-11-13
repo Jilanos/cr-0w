@@ -180,6 +180,13 @@ func TestRecordFixtures(t *testing.T) {
 	roundTrip(t, "runs.json", read(t, filepath.Join(fix, "records", "runs.json")), &runs)
 	var inbox []InboxItem
 	roundTrip(t, "inbox.json", read(t, filepath.Join(fix, "records", "inbox.json")), &inbox)
+	var work []WorkItem
+	roundTrip(t, "work.json", read(t, filepath.Join(fix, "records", "work.json")), &work)
+	for _, w := range work {
+		if !slices.Contains(WorkKinds, w.Kind) || !slices.Contains(WorkStates, w.State) {
+			t.Errorf("%s: unknown kind %s or state %s", w.ID, w.Kind, w.State)
+		}
+	}
 	var nested []Run
 	for _, m := range missions {
 		if !slices.Contains(States, m.State) {
@@ -411,6 +418,7 @@ func TestTypesMatchSchemas(t *testing.T) {
 		{Mission{}, core("mission.schema.json")},
 		{Run{}, core("run.schema.json")},
 		{InboxItem{}, core("inbox.schema.json")},
+		{WorkItem{}, core("work-item.schema.json")},
 		{CrowBlock{}, run("crow-block.schema.json")},
 		{Kind{}, run("kind.schema.json")},
 		{Questions{}, run("questions.schema.json")},
