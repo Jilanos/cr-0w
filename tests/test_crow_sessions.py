@@ -116,3 +116,14 @@ def test_lists_every_workspace_a_session_worked_in(hub):
     assert by["one"]["workspaces"] == ["/work/proj"]
     assert by["two"]["workspaces"] == ["/work/proj", "/work/proj/sub"]
     assert "cannot hand off" not in run(hub, "crow-sessions", "list").stdout
+
+
+def test_mission_comes_from_the_whole_handoff_note(hub):
+    # item_203: the Mission: line sits past the 400 characters first_prompt keeps
+    note = "Hand-off from the crow hub.\n\nTask: " + "x" * 500 + "\nEnd state: e\nMission: 20261113-build-demo-item-203\n"
+    transcript(hub, "main", "handoff", [user(note), reply("working"), LIMIT])
+    transcript(hub, "main", "plain", [user("fix the bug"), LIMIT])
+    rows = {s["conversation_id"]: s for s in scan(hub)["sessions"]}
+    assert "Mission:" not in rows["handoff"]["first_prompt"]
+    assert rows["handoff"]["mission"] == "20261113-build-demo-item-203"
+    assert rows["plain"]["mission"] is None

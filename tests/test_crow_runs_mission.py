@@ -189,3 +189,14 @@ def test_session_mission_comes_from_the_handoff_note(tmp_path):
     write(user("no handoff"), user("Mission: x"))
     assert cr.transcript_mission(t) is None  # only the first prompt counts
     assert cr.transcript_mission(tmp_path / "missing.jsonl") is None
+
+
+def test_session_branch_comes_from_its_transcript(tmp_path):
+    t = tmp_path / "s.jsonl"
+    events = [
+        {"type": "user", "gitBranch": "main", "message": {"content": "go"}},
+        {"type": "assistant", "gitBranch": "missions-auto", "message": {"content": [{"type": "text", "text": "ok"}]}},
+    ]
+    t.write_text("".join(json.dumps(e) + "\n" for e in events))
+    assert cr.read_transcript(t)["branch"] == "missions-auto"  # the latest event's branch
+    assert cr.read_transcript(tmp_path / "missing.jsonl")["branch"] is None
