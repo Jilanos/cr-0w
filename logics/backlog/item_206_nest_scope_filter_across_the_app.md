@@ -60,6 +60,7 @@
 - Rationale: owner request 2026-11-13, after the hero polish pass.
 
 # Notes
+- Owner decisions 2026-11-13 (header pick): header A (one row: scope chip after the logo, status chips and clock right, no extra height); crow missions show under both like the cr-0w project; laptop account gauges stay as rendered; the cut-off phone tab bar (7 tabs, Reports clipped) is fixed in this item.
 - Owner decisions 2026-11-13 (control pick):
   - Control: B (one header chip cycling all/work/perso), inside a redesigned header bar for phone and laptop that shows everything well (clock, status chips, scope chip); no hidden clock or chips. Render header options before building.
   - Fold inner screen: tabs move to the bottom like on the cover screen, for easier reach.
@@ -74,6 +75,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T13:41:26.231193+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | running |  |  |
+| 2026-11-13T13:53:38.163012+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | succeeded |  |  |
 | 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
+
