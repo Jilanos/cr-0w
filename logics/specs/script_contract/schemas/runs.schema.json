@@ -93,7 +93,7 @@
        "string",
        "null"
       ],
-      "description": "Branch a dispatched run started on; null for sessions."
+      "description": "Branch a dispatched run started on, or the git branch a live session's transcript records."
      },
      "projects": {
       "type": [

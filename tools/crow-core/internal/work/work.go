@@ -148,7 +148,10 @@ func Build(in Input) []contract.WorkItem {
 	for _, m := range in.Missions {
 		known[m.Project] = true
 	}
-	b := builder{in: in, reg: reg}
+	b := builder{in: in, reg: reg, ids: map[string]bool{}}
+	for _, m := range in.Missions {
+		b.ids[m.ID] = true
+	}
 	live := map[string]bool{} // run ids and session ids with a live process
 
 	for _, a := range rows(in.Dispatch, "agents") {
@@ -161,7 +164,7 @@ func Build(in Input) []contract.WorkItem {
 			ID: kind + ":" + ref, Kind: kind, Project: projectOfAgent(a, reg, known), State: "working",
 			Title: first(str(a, "title"), str(a, "label"), str(a, "last_prompt"), str(a, "project")),
 			Since: agentSince(a), Source: contract.WorkSource{Section: "dispatch", Ref: ref},
-			Mission: b.missionOf(str(a, "run_id"), str(a, "cwd")),
+			Mission: b.linked(str(a, "mission"), str(a, "run_id"), str(a, "cwd")),
 		}
 		if str(a, "state") == "waiting" {
 			it.State, it.Why = "needs", "waiting on you"
@@ -172,7 +175,7 @@ func Build(in Input) []contract.WorkItem {
 				it.WaitS = secs(int64(s))
 			}
 		}
-		b.add(it)
+		b.addAt(it, str(a, "cwd"), str(a, "branch"))
 	}
 
 	for _, f := range rows(in.Dispatch, "finished") {
@@ -184,9 +187,10 @@ func Build(in Input) []contract.WorkItem {
 		it := contract.WorkItem{
 			ID: contract.WorkRun + ":" + id, Kind: contract.WorkRun, Project: projectByName(reg, str(f, "project")),
 			State: finishedState(st), Title: first(str(f, "label"), str(f, "project")), Since: str(f, "ended_at"),
-			Why: "run " + st, Source: contract.WorkSource{Section: "dispatch", Ref: id}, Mission: b.missionOf(id, ""),
+			Why: "run " + st, Source: contract.WorkSource{Section: "dispatch", Ref: id},
+			Mission: b.linked(str(f, "mission"), id, ""),
 		}
-		b.add(it)
+		b.addAt(it, "", str(f, "branch"))
 	}
 
 	for _, r := range rows(in.Sessions, "sessions") {
@@ -199,44 +203,28 @@ func Build(in Input) []contract.WorkItem {
 		if p == "" {
 			p = projectByName(reg, str(r, "project"))
 		}
-		b.add(contract.WorkItem{
+		b.addAt(contract.WorkItem{
 			ID: contract.WorkParked + ":" + id, Kind: contract.WorkParked, Project: p, State: "sleeping",
 			Title: first(str(r, "last_prompt"), str(r, "first_prompt"), p), Since: str(r, "last_event"),
 			ResetsAt: str(r, "resets_at"), Why: "usage limit", Source: contract.WorkSource{Section: "sessions", Ref: id},
-			Mission: b.missionOf("", str(r, "cwd")),
-		})
+			Mission: b.linked(str(r, "mission"), "", str(r, "cwd")),
+		}, str(r, "cwd"), str(r, "branch"))
 	}
+	b.byWorktree()
 
 	for _, m := range rows(in.MRs, "mrs") {
 		b.add(b.mr(m))
 	}
 
 	for _, m := range in.Missions {
-		st := MissionState(m, in.Inbox)
-		if st == "done" && b.age(m.Updated) > DoneFor {
+		var it contract.WorkItem
+		if IsLinked(m) {
+			it = b.linkedMission(m)
+		} else {
+			it = b.mission(m)
+		}
+		if it.State == "done" && b.age(it.Since) > DoneFor {
 			continue
-		}
-		it := contract.WorkItem{
-			ID: contract.WorkMission + ":" + m.ID, Kind: contract.WorkMission, Project: projectByName(reg, m.Project),
-			State: st, Title: first(m.Goal, m.ID), Since: m.Updated, Mission: m.ID,
-			Source: contract.WorkSource{Section: "missions", Ref: m.ID},
-		}
-		if n := len(m.Runs); n > 0 && m.Runs[n-1].Ended == nil && st == "working" {
-			it.Since = m.Runs[n-1].Started
-		}
-		switch st {
-		case "needs":
-			from := m.Updated
-			if r := asked(m.ID, in.Inbox); r != nil {
-				from, it.Why = r.Created, r.Type
-			} else {
-				it.Why = m.State
-			}
-			it.WaitS = secs(int64(b.age(from) / time.Second))
-		case "failed":
-			if n := len(m.Runs); n > 0 && m.Runs[n-1].Cause != nil {
-				it.Why = *m.Runs[n-1].Cause
-			}
 		}
 		b.add(it)
 	}
@@ -256,9 +244,138 @@ type builder struct {
 	in  Input
 	reg []Project
 	out []contract.WorkItem
+	at  []place         // where each item of out runs, same index
+	ids map[string]bool // known mission ids
 }
 
-func (b *builder) add(it contract.WorkItem) { b.out = append(b.out, it) }
+// place is the cwd and git branch a work item runs in, when known.
+type place struct{ cwd, branch string }
+
+func (b *builder) add(it contract.WorkItem) { b.addAt(it, "", "") }
+
+func (b *builder) addAt(it contract.WorkItem, cwd, branch string) {
+	b.out = append(b.out, it)
+	b.at = append(b.at, place{cwd, branch})
+}
+
+// linked is the mission of a piece of work (item_203): the id it carries (a handoff
+// note's Mission: line, a dispatch run's linked mission) when that mission exists, else
+// the mission holding its run id or worktree.
+func (b *builder) linked(own, run, cwd string) string {
+	if own != "" && b.ids[own] {
+		return own
+	}
+	return b.missionOf(run, cwd)
+}
+
+// byWorktree links unlinked work to the mission of other work in the same worktree
+// (<repo>.wt/<name>). A worktree holding work of two missions links nothing more.
+func (b *builder) byWorktree() {
+	of := map[string]string{}
+	for i, it := range b.out {
+		if wt := worktreeOf(b.at[i].cwd); wt != "" && it.Mission != "" {
+			if m, seen := of[wt]; seen && m != it.Mission {
+				of[wt] = ""
+			} else {
+				of[wt] = it.Mission
+			}
+		}
+	}
+	for i := range b.out {
+		if wt := worktreeOf(b.at[i].cwd); wt != "" && b.out[i].Mission == "" {
+			b.out[i].Mission = of[wt]
+		}
+	}
+}
+
+// onBranch is the mission of linked work of a project running on a branch.
+func (b *builder) onBranch(project, branch string) string {
+	for i, it := range b.out {
+		if branch != "" && it.Mission != "" && b.at[i].branch == branch && it.Project == project {
+			return it.Mission
+		}
+	}
+	return ""
+}
+
+// worktreeOf is the <repo>.wt/<name> folder holding cwd, empty outside worktrees.
+func worktreeOf(cwd string) string {
+	parts := strings.Split(cwd, "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if len(parts[i]) > len(".wt") && strings.HasSuffix(parts[i], ".wt") && parts[i+1] != "" {
+			return strings.Join(parts[:i+2], "/")
+		}
+	}
+	return ""
+}
+
+// IsLinked says whether a mission groups work started by a handoff or a dispatch
+// (mission.Ensure): a build mission running with no core run of its own.
+func IsLinked(m contract.Mission) bool {
+	return m.Kind == "build" && m.State == "running" && len(m.Runs) == 0
+}
+
+// mission maps a mission the core runs itself: its state is the contract state.
+func (b *builder) mission(m contract.Mission) contract.WorkItem {
+	st := MissionState(m, b.in.Inbox)
+	it := contract.WorkItem{
+		ID: contract.WorkMission + ":" + m.ID, Kind: contract.WorkMission, Project: projectByName(b.reg, m.Project),
+		State: st, Title: first(m.Goal, m.ID), Since: m.Updated, Mission: m.ID,
+		Source: contract.WorkSource{Section: "missions", Ref: m.ID},
+	}
+	if n := len(m.Runs); n > 0 && m.Runs[n-1].Ended == nil && st == "working" {
+		it.Since = m.Runs[n-1].Started
+	}
+	switch st {
+	case "needs":
+		from := m.Updated
+		if r := asked(m.ID, b.in.Inbox); r != nil {
+			from, it.Why = r.Created, r.Type
+		} else {
+			it.Why = m.State
+		}
+		it.WaitS = secs(int64(b.age(from) / time.Second))
+	case "failed":
+		if n := len(m.Runs); n > 0 && m.Runs[n-1].Cause != nil {
+			it.Why = *m.Runs[n-1].Cause
+		}
+	}
+	return it
+}
+
+// linkedMission maps a linked mission: its state is the most urgent state of the work
+// linked to it (failed > needs > working > sleeping > queued), done once all of it is
+// done. An open inbox ask still makes it needs. With no work in sight it is queued.
+func (b *builder) linkedMission(m contract.Mission) contract.WorkItem {
+	if asked(m.ID, b.in.Inbox) != nil {
+		return b.mission(m)
+	}
+	it := b.mission(m)
+	it.State, it.Why = "queued", "no live work"
+	var top *contract.WorkItem
+	latest := ""
+	for i := range b.out {
+		w := &b.out[i]
+		if w.Kind == contract.WorkMission || w.Mission != m.ID {
+			continue
+		}
+		if top == nil || contract.WorkRank(w.State) < contract.WorkRank(top.State) {
+			top = w
+		}
+		latest = max(latest, w.Since)
+	}
+	if top == nil {
+		return it
+	}
+	it.State, it.Why, it.WaitS, it.ResetsAt, it.Since = top.State, top.Kind+": "+top.Why, top.WaitS, top.ResetsAt, top.Since
+	if top.Why == "" {
+		it.Why = top.Kind
+	}
+	if top.State == "done" {
+		it.Since = latest
+	}
+	return it
+}
 
 // age is how long ago an RFC 3339 time was; zero when it does not parse.
 func (b *builder) age(ts string) time.Duration {
@@ -324,6 +441,9 @@ func (b *builder) mr(m map[string]any) contract.WorkItem {
 			it.Mission = ms.ID
 			break
 		}
+	}
+	if it.Mission == "" {
+		it.Mission = b.onBranch(it.Project, str(m, "branch"))
 	}
 	return it
 }

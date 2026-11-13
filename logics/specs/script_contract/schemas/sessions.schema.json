@@ -34,6 +34,13 @@
      "relaunched"
     ],
     "properties": {
+     "mission": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Mission of a handoff session (item_203): the Mission: line of its note, read from the whole first prompt."
+     },
      "workspaces": {
       "type": [
        "array",

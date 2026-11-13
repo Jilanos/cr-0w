@@ -631,7 +631,7 @@ def transcript_mission(path):
 def read_transcript(path):
     """Last action, whether it ended on plain text (= waiting on the user), context size."""
     info = {"last_action": None, "ends_on_text": False, "context_tokens": None, "subagents_active": 0, "recent": [],
-            "last_prompt": None}
+            "last_prompt": None, "branch": None}
     if not path.exists():
         return info
     size = path.stat().st_size
@@ -645,7 +645,9 @@ def read_transcript(path):
             continue
         if e.get("type") == "last-prompt" and info["last_prompt"] is None:
             info["last_prompt"] = (e.get("lastPrompt") or "").strip()[:400] or None
-        msg = e.get("message") or {}
+        if info["branch"] is None and e.get("gitBranch"):
+            info["branch"] = e["gitBranch"]
+        msg =e.get("message") or {}
         if e.get("type") == "assistant" and isinstance(msg.get("content"), list) and len(info["recent"]) < RECENT_N:
             for c in reversed(msg["content"]):
                 if c.get("type") == "tool_use":
@@ -743,7 +745,8 @@ def collect(since="today", include_unledgered=False):
             "last_activity_s": int(idle), **{k: t.get(k) for k in ("last_action", "context_tokens", "subagents_active", "recent", "last_prompt")},
             "run_id": None, "label": None, "title": (titles.get(sid) or {}).get("title"), "commits": [],
             "prompt": {k: prompt.get(k) for k in crow_lib.PROMPT_FIELDS} if prompt else None,
-            "mission": transcript_mission(tpath) if tpath and kind == "session" else None, "branch": None,
+            "mission": transcript_mission(tpath) if tpath and kind == "session" else None,
+            "branch": t.get("branch") if kind == "session" else None,
         }
         if kind == "run":
             for rec in reversed(recs):

@@ -133,6 +133,7 @@ def scan_one(acct, path, size):
         return None
     limit = last.get("quotaLimits") or (last.get("apiErrorParams") or {}).get("rate_limit_info") or {}
     cwd = last.get("cwd") or ""
+    note = crow_lib.MISSION_LINE.search(first or "")  # handoff note (item_203)
     return {
         "conversation_id": last.get("sessionId") or os.path.basename(path)[:-6],
         "account": acct,
@@ -143,6 +144,7 @@ def scan_one(acct, path, size):
         "resets_at": limit.get("resetsAt"),
         "message": text_of(last)[:200],
         "first_prompt": (first or "")[:400] or None,
+        "mission": note[1] if note else None,
         "last_prompt": (last_prompt or "")[:400] or None,
         "transcript": path,
         "size": size,

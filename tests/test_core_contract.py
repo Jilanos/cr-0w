@@ -40,7 +40,15 @@ def lines(p):
 def test_every_schema_has_fixtures():
     assert {p.name for p in SCHEMAS.glob("*.json")} == {
         "request.schema.json", "reply.schema.json", "event.schema.json",
-        "mission.schema.json", "run.schema.json", "inbox.schema.json", "live-action.schema.json"}
+        "mission.schema.json", "run.schema.json", "inbox.schema.json", "live-action.schema.json",
+        "work-item.schema.json"}
+
+
+def test_work_record_fixture_valid():
+    items = load(FIX / "records" / "work.json")
+    assert items
+    for it in items:
+        assert not errors("work-item.schema.json", it), it["id"]
 
 
 @pytest.mark.parametrize("path", MESSAGE_FIXTURES, ids=lambda p: p.name)
@@ -206,7 +214,7 @@ def test_api_state_fixture():
     assert set(st) == {"version", "sections"}
     assert set(st["sections"]) == {
         "inbox", "missions", "runs", "sessions", "dispatch", "usage", "today",
-        "mrs", "checks", "projects", "accounts", "jobs"}
+        "mrs", "checks", "projects", "accounts", "jobs", "work"}
     for name, sec in st["sections"].items():
         assert sec["section"] == name
         check_section(sec)
