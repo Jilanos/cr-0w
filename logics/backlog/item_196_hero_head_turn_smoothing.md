@@ -1,10 +1,10 @@
 ## item_196_hero_head_turn_smoothing - Smooth head turn when following the pointer
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -57,3 +57,8 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Outcome (2026-11-13)
+- AC1: owner OK on the polish reels at 1440x900 and 368x812 (vault `Research/nest-design/item_198/hero-reel-polish-*.mp4`).
+- AC2: `headCtl.test.ts` "a fast pointer sweep gives one smooth turn".
+- AC3: `scripts/hero-idle.mjs` gives 0 paints/s and 0 GL frames/s with reduced motion.

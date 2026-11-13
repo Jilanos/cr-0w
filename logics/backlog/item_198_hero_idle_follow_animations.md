@@ -1,10 +1,10 @@
 ## item_198_hero_idle_follow_animations - Hero idle and follow animations, table spin
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 92%
 > Confidence: 88%
-> Progress: 15%
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -66,3 +66,9 @@
 - Built as a first cut: a rim scan sweep (`SWEEP_MS` 12 s) on the 10 fps slow tick. The slow tick now runs whenever the page is visible (not only with a live project), off with reduced motion. Owner: smooth it out and expand it here.
 - Rejected for now: a front-arc marker (reads too complex); hover link kept as the footprint brightening.
 - AC2 baseline changes: idle paints are about 10/s at rest now; update `scripts/hero-idle.mjs` expectations.
+
+# Outcome (2026-11-13)
+- AC1: the table spins with the planets (item_197). Idle set: breathing, blink and glance. It is already in the lively preset (`headCtl.ts` CHARACTER.lively), so no new motion was added. Rim sweep kept as built, with no expansion (owner).
+- AC2: idle runs at 11.3 2D paints/s and 22.3 GL frames/s, and at 0 with reduced motion (`scripts/hero-idle.mjs`).
+- AC3: the live path takes 6.5 ms median for the table plus 3.9 ms for the head at 1440x900; bake fallback 15 ms (`scripts/hero-perf.mjs`, fixed for the new heroModel signature).
+- AC4: owner OK on the polish reels at both sizes (vault `Research/nest-design/item_198/`).

@@ -16,7 +16,7 @@ try {
     const r = await page.evaluate(async () => {
       const sc = await import('/src/hero/scene.ts'); const md = await import('/src/hero/model.ts'); const fx = await import('/src/data/fixtures.ts')
       const heads = (await import('/src/hero/heads.json')).default
-      const src = fx.fixtureSource(); const m = md.heroModel(await src.missions(), await src.inbox(), src.now())
+      const src = fx.fixtureSource(); const m = md.heroModel(await src.missions(), await src.inbox(), undefined, src.now())
       const box = document.querySelector('.hero-box'); const W = box.clientWidth, H = box.clientHeight
       const cv = document.createElement('canvas'); const pal = { ring: [79,195,255], dim: [95,120,168], fg: [216,230,255], accent: [192,92,255], state: { needs: [255,184,0], working: [46,242,255], failed: [255,46,99], sleeping: [111,134,184], queued: [138,160,200], done: [95,120,168] } }
       const med = (t) => { t.sort((a, b) => a - b); return `${t[t.length >> 1].toFixed(1)}/${t[t.length - 1].toFixed(1)}` }
