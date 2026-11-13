@@ -3,7 +3,7 @@
 > Schema version: 1.0
 > Status: In progress
 > Understanding: 90
-> Confidence: 85
+> Confidence: 80
 > Progress: 50%
 > Complexity: Medium
 > Theme: General
@@ -59,6 +59,11 @@
 - Rationale: owner request 2026-11-13, after the hero polish pass.
 
 # Notes
+- Owner decisions 2026-11-13 (control pick):
+  - Control: B (one header chip cycling all/work/perso), inside a redesigned header bar for phone and laptop that shows everything well (clock, status chips, scope chip); no hidden clock or chips. Render header options before building.
+  - Fold inner screen: tabs move to the bottom like on the cover screen, for easier reach.
+  - Today calendar stays whole in every mode.
+  - Projects with no scope (and unregistered ones) show only under all. A project can be tagged `both` (crow is both): it shows under all, work and perso. `both` is an option when tagging a project.
 - Execution order: 1 scope in RegProject + filter helper with tests, 2 mockups and owner pick, 3 wire every screen, 4 shots.
 - Mockups and shots go in the vault (`Research/nest-design/item_206/`).
 - 2026-11-13: filter helper with tests and storage + wiring on every screen but Chat are done on branch `nest-scope-filter`. No visible control yet. Control pick pending: options A (header segmented), B (header chip), C (strip under the header) in `Research/nest-design/item_206/` with `spec.json`.
@@ -67,5 +72,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T11:26:32.497274+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | running |  |  |
+| 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
