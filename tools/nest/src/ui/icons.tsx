@@ -12,6 +12,13 @@ export const TABS: Array<{ key: TabKey; label: string; path: string; icon: React
   { key: 'reports', label: 'Reports', path: '/reports', icon: <><path d="M5 2.5h8l4 4v13H5Z" /><path d="M13 2.5v4h4M8 11h6M8 14.5h6" /></> },
 ]
 
+// Scope chip icons (item_206 header A): all = stacked layers, work = briefcase, perso = person.
+export const SCOPE_ICONS: Record<'all' | 'work' | 'perso', ReactNode> = {
+  all: <><path d="M11 3 19 7.5 11 12 3 7.5Z" /><path d="M3 11.5 11 16l8-4.5M3 15.5 11 20l8-4.5" /></>,
+  work: <><rect x="3" y="7" width="16" height="11.5" rx="2" /><path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h3A1.5 1.5 0 0 1 14 5.5V7M3 12h16" /></>,
+  perso: <><circle cx="11" cy="7.5" r="3.5" /><path d="M4 19c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></>,
+}
+
 export function TabIcon({ children }: { children: ReactNode }) {
   return (
     <svg aria-hidden="true" width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">

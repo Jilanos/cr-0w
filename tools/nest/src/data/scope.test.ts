@@ -3,7 +3,7 @@ import { fixtureSource } from './fixtures'
 import { feed, type Snapshot } from './feed'
 import { heroLiveOf, heroModel } from '../hero/model'
 import { mailOf, type Agent, type RegProject, type Resumable } from './live'
-import { scopeOf, scopeSnapshot, type ScopeIn, type ScopeMode } from './scope'
+import { nextScope, scopeChip, scopeOf, scopeSnapshot, type ScopeIn, type ScopeMode } from './scope'
 import type { InboxItem, Mission } from './types'
 
 const now = new Date('2026-11-13T10:00:00+01:00')
@@ -61,6 +61,18 @@ function data(): ScopeIn {
 const ids = (d: ScopeIn) => ({
   missions: d.missions.map((m) => m.id), inbox: d.inbox.map((r) => r.id), registry: d.registry.map((p) => p.name),
   agents: d.agents.map((a) => a.pid), parked: d.parked.map((r) => r.conversation_id),
+})
+
+describe('scope chip (item_206)', () => {
+  it('cycles all, work, perso, all', () => {
+    expect([nextScope('all'), nextScope('work'), nextScope('perso')]).toEqual(['work', 'perso', 'all'])
+  })
+
+  it('names the mode and the next one, pressed while a filter is on', () => {
+    expect(scopeChip('all')).toEqual({ label: 'all', name: 'Scope: all. Switch to work', pressed: false })
+    expect(scopeChip('work')).toEqual({ label: 'work', name: 'Scope: work. Switch to perso', pressed: true })
+    expect(scopeChip('perso')).toEqual({ label: 'perso', name: 'Scope: perso. Switch to all', pressed: true })
+  })
 })
 
 describe('scope filter (item_206)', () => {

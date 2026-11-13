@@ -21,7 +21,7 @@ const LATER: Record<string, [string, string]> = {
 export function App() {
   const route = match(usePath())
   const [raw, refresh] = useFeed()
-  const [scope] = useScope()
+  const [scope, setScope] = useScope()
   // Every screen reads the scoped snapshot; Chat reads the whole one so a link to any session opens.
   const snap = useMemo(() => raw && scopeSnapshot(raw, scope), [raw, scope])
   const active = route.tab === 'missing' ? 'home' : route.tab === 'chat' ? 'desk' : route.tab
@@ -34,5 +34,5 @@ export function App() {
     else if (route.tab === 'chat') body = <Chat snap={raw} refresh={refresh} target={route.target} />
     else body = <Placeholder name={LATER[route.tab][0]} note={LATER[route.tab][1]} />
   }
-  return <Shell active={active} snap={snap}>{body}</Shell>
+  return <Shell active={active} snap={snap} scope={scope} setScope={setScope}>{body}</Shell>
 }

@@ -5,7 +5,8 @@ import type { Snapshot } from '../data/useData'
 import { ago, headerClock, time } from '../format'
 import { Link } from '../router'
 import { Glyph } from './Glyph'
-import { TABS, TabIcon, type TabKey } from './icons'
+import { SCOPE_ICONS, TABS, TabIcon, type TabKey } from './icons'
+import { nextScope, scopeChip, type ScopeMode } from '../data/scope'
 
 type Theme = 'modern' | 'cyber'
 
@@ -26,7 +27,22 @@ function badges(snap: Snapshot | null): Partial<Record<TabKey, { n: number; fail
   return { missions: { n: c.failed, failed: true }, inbox: { n: asks } }
 }
 
-export function Shell({ active, snap, children }: { active: TabKey; snap: Snapshot | null; children: ReactNode }) {
+// Header A (item_206): one chip after the logo cycles the scope filter.
+function ScopeChip({ scope, setScope }: { scope: ScopeMode; setScope: (m: ScopeMode) => void }) {
+  const t = scopeChip(scope)
+  return (
+    <button type="button" className="scope-chip" aria-label={t.name} aria-pressed={t.pressed} title={t.name} onClick={() => setScope(nextScope(scope))}>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round">
+        {SCOPE_ICONS[scope]}
+      </svg>
+      {t.label}
+    </button>
+  )
+}
+
+interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; children: ReactNode }
+
+export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
   const [theme, toggle] = useTheme()
   const b = badges(snap)
   const c = snap ? homeCounts(snap) : null
@@ -36,6 +52,8 @@ export function Shell({ active, snap, children }: { active: TabKey; snap: Snapsh
     <div className="app">
       <header className="top">
         <Link href="/" className="logo" aria-label="CR-0W home">CR-0W</Link>
+        <ScopeChip scope={scope} setScope={setScope} />
+        <span className="hdr-sep" aria-hidden="true" />
         <nav className="pills" aria-label="Tabs">
           {TABS.map((t, i) => (
             <Link key={t.key} href={t.path} className="pill" aria-current={t.key === active ? 'page' : undefined}>

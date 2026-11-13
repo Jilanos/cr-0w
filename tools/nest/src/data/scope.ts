@@ -7,6 +7,13 @@ import type { InboxItem, Mission, SectionBody } from './types'
 export type ScopeMode = 'all' | 'work' | 'perso'
 export const SCOPE_MODES: ScopeMode[] = ['all', 'work', 'perso']
 export const isScopeMode = (v: unknown): v is ScopeMode => SCOPE_MODES.includes(v as ScopeMode)
+// The header chip cycles all > work > perso > all.
+export const nextScope = (m: ScopeMode): ScopeMode => SCOPE_MODES[(SCOPE_MODES.indexOf(m) + 1) % SCOPE_MODES.length]
+
+// Text of the header chip: visible label, accessible name, pressed while a filter is on.
+export function scopeChip(m: ScopeMode) {
+  return { label: m, name: `Scope: ${m}. Switch to ${nextScope(m)}`, pressed: m !== 'all' }
+}
 
 // Scope of one thing; both shows under every mode, undefined = unknown, shown under all only.
 export type Side = 'work' | 'perso' | 'both' | undefined
