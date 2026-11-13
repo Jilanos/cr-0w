@@ -1,10 +1,10 @@
 ## item_202_core_work_feed_over_sessions_runs_parked_and_mrs - Core work feed over sessions runs parked and MRs
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 85%
-> Confidence: 80%
-> Progress: 0%
+> Status: Done
+> Understanding: 95%
+> Confidence: 90%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -31,6 +31,12 @@
 - AC2: Waiting session, review waiting on the owner and red pipeline map to needs; parked maps to sleeping with resets_at.
 - AC3: Contract tests cover each kind and the project match (worktree path, hub, share fallback).
 - AC4: `go test ./...` passes in tools/crow-core.
+
+# Delivery
+- Implemented in 692c453: contract `WorkItem` (work-item.schema.json, records/work.json), `internal/work` builder, `GET /api/state/work`.
+- AC1: live core after restart lists sessions, runs and MRs with projects by cwd (checked 2026-11-13).
+- AC2/AC3: `internal/work` tests (TestItems, TestEveryKind, TestProjectOfCwd).
+- AC4: `go test ./...` passes.
 
 # Priority
 - Priority: High
