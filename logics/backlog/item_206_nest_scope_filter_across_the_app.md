@@ -4,10 +4,11 @@
 > Status: In progress
 > Understanding: 90
 > Confidence: 80
-> Progress: 50%
+> Progress: 60%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-13 14:53:05
 
 # AI Context
 - Summary: Add an all / work / perso scope filter to Nest that every screen reads, remembered per device.
@@ -68,9 +69,11 @@
 - Mockups and shots go in the vault (`Research/nest-design/item_206/`).
 - 2026-11-13: filter helper with tests and storage + wiring on every screen but Chat are done on branch `nest-scope-filter`. No visible control yet. Control pick pending: options A (header segmented), B (header chip), C (strip under the header) in `Research/nest-design/item_206/` with `spec.json`.
 - Decided 2026-11-13: an open ask on an unregistered project follows its mission's scope; Chat reads unfiltered data; mail rows carry a scope, Today mail is the work mailbox (perso shows none).
+- 2026-11-13: `both` scope done (registry field `nest_scope`: work, personal or both, default `scope`). Header options rendered (A one row, B two tiers, C capsule) in `Research/nest-design/item_206/header/` with `spec.json`. Pick pending.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-13T13:41:26.231193+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | running |  |  |
 | 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
