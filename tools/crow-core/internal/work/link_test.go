@@ -152,15 +152,22 @@ func TestLinkedMissionStateRollsUp(t *testing.T) {
 		inbox             []contract.InboxItem
 		state, why, since string
 	}{
-		{"no work", nil, nil, nil, nil, "queued", "no live work", "2026-11-13T09:00:00Z"},
+		{"no work", nil, nil, nil, nil, "done", "no live work", "2026-11-13T09:00:00Z"},
 		{"working session", []any{session("working")}, nil, nil, nil, "working", "session", "2026-11-13T11:00:00Z"},
 		{"waiting session wins", []any{session("waiting")}, []any{run("r1", "done", "2026-11-13T08:00:00Z")}, nil, nil,
 			"needs", "session: waiting on you", "2026-11-13T11:00:00Z"},
-		{"failed run wins", []any{session("waiting")}, []any{run("r1", "failed", "2026-11-13T08:00:00Z")}, nil, nil,
-			"failed", "run: run failed", "2026-11-13T08:00:00Z"},
+		{"failure newer than all work wins", []any{session("waiting")}, []any{run("r1", "failed", "2026-11-13T11:30:00Z")}, nil, nil,
+			"failed", "run: run failed", "2026-11-13T11:30:00Z"},
+		{"session after a failure wins", []any{session("waiting")}, []any{run("r1", "failed", "2026-11-13T08:00:00Z")}, nil, nil,
+			"needs", "session: waiting on you", "2026-11-13T11:00:00Z"},
+		{"work before the latest failure ignored", []any{session("working")},
+			[]any{run("r1", "failed", "2026-11-13T08:00:00Z"), run("r2", "failed", "2026-11-13T10:00:00Z"), run("r3", "done", "2026-11-13T09:00:00Z")},
+			nil, nil, "working", "session", "2026-11-13T11:00:00Z"},
+		{"done run after a failure", nil, []any{run("r1", "failed", "2026-11-13T08:00:00Z"), run("r2", "done", "2026-11-13T10:00:00Z")}, nil, nil,
+			"done", "run: run done", "2026-11-13T10:00:00Z"},
 		{"all done", nil, []any{run("r1", "done", "2026-11-13T08:00:00Z"), run("r2", "done", "2026-11-13T10:00:00Z")}, nil, nil,
 			"done", "run: run done", "2026-11-13T10:00:00Z"},
-		{"running pipeline", nil, nil, []any{mr("running")}, nil, "queued", "no live work", "2026-11-13T09:00:00Z"},
+		{"unlinked MR only", nil, nil, []any{mr("running")}, nil, "done", "no live work", "2026-11-13T09:00:00Z"},
 		{"run on the MR branch links the MR", []any{runOnB}, nil, []any{mr("failed")}, nil,
 			"needs", "mr: red pipeline", "2026-11-13T11:00:00Z"},
 		{"inbox ask", []any{session("working")}, nil, nil, []contract.InboxItem{ask}, "needs", "choice", "2026-11-13T09:00:00Z"},
@@ -199,6 +206,27 @@ func TestDoneLinkedMissionLeaves(t *testing.T) {
 	items := byID(Build(linkedInput(nil, fin, nil, nil)))
 	if _, ok := items["mission:"+linkedID]; ok {
 		t.Error("done linked mission older than DoneFor is still in the feed")
+	}
+}
+
+// A linked mission with no live or pending work reads done and leaves DoneFor after its
+// last linked work ended; a parked session past its reset counts as that work.
+func TestLinkedMissionWithoutWorkLeaves(t *testing.T) {
+	in := linkedInput(nil, nil, nil, nil)
+	in.Missions[0].Updated = "2026-11-12T08:00:00Z"
+	if _, ok := byID(Build(in))["mission:"+linkedID]; ok {
+		t.Error("linked mission with no work for over DoneFor is still in the feed")
+	}
+	ended := []any{map[string]any{"conversation_id": "conv-old", "cwd": "/p/demo", "limit": "five_hour",
+		"resets_at": "2026-11-13T10:00:00Z", "last_event": "2026-11-13T07:00:00Z", "mission": linkedID}}
+	in = linkedInput(nil, nil, ended, nil)
+	in.Missions[0].Updated = "2026-11-12T08:00:00Z"
+	items := byID(Build(in))
+	if _, ok := items["parked:conv-old"]; ok {
+		t.Error("parked session past its reset is in the feed")
+	}
+	if m := items["mission:"+linkedID]; m.State != "done" || m.Since != "2026-11-13T07:00:00Z" {
+		t.Errorf("mission = %s since %s, want done since the session ended", m.State, m.Since)
 	}
 }
 

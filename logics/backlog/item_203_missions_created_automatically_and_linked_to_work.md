@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 90%
+> Understanding: 95%
+> Confidence: 90%
+> Progress: 95%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -46,6 +46,10 @@
 # Notes
 - Owner decision 2026-11-13: work = live sessions, background runs, parked sessions, MRs/PRs with CI, plus missions. Missions are an automatic optional grouping (goal, end state, delegation contract), never created by hand, never a separate list.
 - Read `local/owner-prefs.md` before building. Visual changes need rendered options first.
+- Owner decisions 2026-11-13 on linked-mission state:
+  - A linked mission with no live or pending work (session ended, no run, no MR) reads done and leaves the feed 24h after its last linked work ended (the DoneFor rule of other done missions).
+  - Work finished with an MR still open: the mission stays queued, waiting on review.
+  - A failed run followed by newer work: the newest work wins. Work is compared by time (since, ended_at, started) and the state rolls up from the work after the latest failure. A failure stays on top only while nothing newer exists.
 
 # Delivery
 - 767d19d `new[GO/PY/JSON]`: `crow mission ensure` creates or reuses a linked mission (build kind, running, no core run), keyed on project + Logics ref, else project + end state. `crow handoff --end-state [--logics]` writes a `Mission:` line in the note; `crow-runs dispatch --end-state` records `linked_mission` on the run. No end state: no mission.
@@ -55,11 +59,13 @@
 - AC2: `internal/work/link_test.go` TestLinkedWorkCarriesTheMission (session by note and worktree, live and finished runs, parked session, MR by branch), TestLinkedMissionWaitsOnItsOpenMR; `tests/test_crow_sessions.py` test_mission_comes_from_the_whole_handoff_note, `tests/test_crow_runs_mission.py` test_session_branch_comes_from_its_transcript.
 - AC3: TestEnsureRefusesWithoutEndState, TestUnlinkedWorkStillShows, TestWorktreeLinkingNeedsOneMission, test_dispatch_without_an_end_state_or_with_a_tick_mission_links_nothing.
 - AC4: the tests above plus TestLinkedMissionStateRollsUp, TestDoneLinkedMissionLeaves, TestIsLinked, TestWorktreeOf.
+- State rules after the 2026-11-13 decisions (`internal/work/work.go` linkedMission): no linked work reads done since its last linked work ended (feed items, parked sessions past their reset, else the mission's last change); a failure is dropped once newer non-failed work exists. Tests: TestLinkedMissionStateRollsUp (no work, failure newest, session after a failure, work before the latest failure, done run after a failure), TestLinkedMissionWithoutWorkLeaves; TestLinkedMissionWaitsOnItsOpenMR keeps rule 2.
 - Left: live check after merge and a core restart (a handoff with `--end-state` shows its session, run and MR under one mission in `GET /api/state/work`).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T13:41:24.078774+00:00 | cdx | 854208bd3a594454aa9cf106fa586c98 | item_203 missions auto + linking (continue) | running |  |  |
+| 2026-11-13T13:53:45.132661+00:00 | cdx | 40088eb5e8594fe0912bca9568349a81 | item_203 mission state rules | running |  |  |
+| 2026-11-13T13:48:51.782807+00:00 | cdx | 854208bd3a594454aa9cf106fa586c98 | item_203 missions auto + linking (continue) | succeeded |  |  |
 | 2026-11-13T11:45:04.519694+00:00 | cdx | c898fb4822e04d06a6c0fd18788888a9 | item_203 missions auto + linking | failed |  | limit |
 | 2026-11-13T11:41:41.610771+00:00 | cdx | a499f12d9ab649bbb363f88fe1b3c653 | item_203 missions auto + linking | failed |  | limit |

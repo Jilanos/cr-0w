@@ -345,26 +345,55 @@ func (b *builder) mission(m contract.Mission) contract.WorkItem {
 
 // linkedMission maps a linked mission: its state is the most urgent state of the work
 // linked to it (failed > needs > working > sleeping > queued), done once all of it is
-// done. An open inbox ask still makes it needs. With no work in sight it is queued.
+// done. A failure counts only while no newer work exists: after it, the state rolls up
+// from the newer work alone. An open inbox ask still makes it needs. With no work in
+// sight it is done since its last linked work ended, so it leaves the feed DoneFor later.
 func (b *builder) linkedMission(m contract.Mission) contract.WorkItem {
 	if asked(m.ID, b.in.Inbox) != nil {
 		return b.mission(m)
 	}
 	it := b.mission(m)
-	it.State, it.Why = "queued", "no live work"
-	var top *contract.WorkItem
+	var work []*contract.WorkItem
+	var failed *contract.WorkItem
 	latest := ""
 	for i := range b.out {
 		w := &b.out[i]
 		if w.Kind == contract.WorkMission || w.Mission != m.ID {
 			continue
 		}
+		work = append(work, w)
+		if w.State == "failed" && (failed == nil || at(w.Since).After(at(failed.Since))) {
+			failed = w
+		}
+		latest = later(latest, w.Since)
+	}
+	for _, r := range rows(b.in.Sessions, "sessions") {
+		if str(r, "mission") == m.ID {
+			latest = later(latest, str(r, "last_event")) // parked sessions past their reset
+		}
+	}
+	if latest == "" {
+		latest = m.Updated // no linked work seen: the mission's own last change
+	}
+	if failed != nil {
+		var newer []*contract.WorkItem
+		for _, w := range work {
+			if w.State != "failed" && at(w.Since).After(at(failed.Since)) {
+				newer = append(newer, w)
+			}
+		}
+		if len(newer) > 0 {
+			work = newer
+		}
+	}
+	var top *contract.WorkItem
+	for _, w := range work {
 		if top == nil || contract.WorkRank(w.State) < contract.WorkRank(top.State) {
 			top = w
 		}
-		latest = max(latest, w.Since)
 	}
 	if top == nil {
+		it.State, it.Why, it.Since = "done", "no live work", latest
 		return it
 	}
 	it.State, it.Why, it.WaitS, it.ResetsAt, it.Since = top.State, top.Kind+": "+top.Why, top.WaitS, top.ResetsAt, top.Since
@@ -375,6 +404,20 @@ func (b *builder) linkedMission(m contract.Mission) contract.WorkItem {
 		it.Since = latest
 	}
 	return it
+}
+
+// at parses an RFC 3339 time; the zero time when it does not parse.
+func at(ts string) time.Time {
+	t, _ := time.Parse(time.RFC3339, ts)
+	return t
+}
+
+// later is the later of two RFC 3339 times.
+func later(a, b string) string {
+	if at(b).After(at(a)) {
+		return b
+	}
+	return a
 }
 
 // age is how long ago an RFC 3339 time was; zero when it does not parse.
