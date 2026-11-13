@@ -35,6 +35,25 @@ def test_registry_json_lists_projects_with_git_state(hub, tmp_path):
     assert second["short"] == "other" and second["git"] == {"email": "", "dirty": 0, "ahead": 0, "stale_trees": 0}
     assert first["work"] == {} and second["work"] == {}
     assert (first["system"], first["nest"], second["system"], second["nest"]) == ("grp", True, "other", False)
+    assert (first["nest_scope"], second["nest_scope"]) == ("work", "personal")
+
+
+def test_nest_scope_overrides_scope_for_the_nest_only():
+    reg = load_registry()
+    assert reg.nest_scope({"scope": "personal", "nest_scope": "both"}) == "both"
+    assert reg.nest_scope({"scope": "work", "nest_scope": "personal"}) == "personal"
+    assert reg.nest_scope({"scope": "work", "nest_scope": "other"}) == "work"
+    assert reg.nest_scope({}) == ""
+
+
+def test_registry_json_keeps_scope_next_to_nest_scope(hub, tmp_path):
+    home, _ = hub
+    (home / "local" / "projects.yaml").write_text(
+        f"projects:\n  - {{name: hub, scope: personal, nest_scope: both, path: {tmp_path}/missing}}\n")
+    out = run(hub, "crow-registry", "json")
+    assert out.returncode == 0, out.stderr
+    (p,) = json.loads(out.stdout)["projects"]
+    assert (p["scope"], p["nest_scope"]) == ("personal", "both")
 
 
 def test_work_days_counts_the_identity_commits_per_day(tmp_path):

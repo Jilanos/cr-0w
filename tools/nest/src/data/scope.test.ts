@@ -101,6 +101,51 @@ describe('scope filter (item_206)', () => {
   })
 })
 
+describe('nest_scope and both (item_206)', () => {
+  const both: RegProject[] = [
+    { name: 'hub', path: '/p/hub', scope: 'personal', nest_scope: 'both' },
+    // nest_scope wins over scope for the filter.
+    { name: 'tool', path: '/w/tool', scope: 'work', nest_scope: 'personal' },
+    { name: 'lambda', path: '/w/lambda', scope: 'work' },
+  ]
+  const d = (): ScopeIn => ({
+    missions: [],
+    inbox: [ask({ id: 'ih', mission: 'gone', project: 'hub' }), ask({ id: 'it', mission: 'gone', project: 'tool' })],
+    registry: both,
+    agents: [agent({ pid: 1, cwd: '/p/hub.wt/x' }), agent({ pid: 2, cwd: '/w/tool' })],
+    parked: [{ conversation_id: 'c1', account: 'a', cwd: '/q', project: 'hub', limit: 'five_hour', resets_at: '2026-11-13T12:00:00+01:00' }] as Resumable[],
+  })
+
+  it('shows a both project under all, work and perso', () => {
+    for (const mode of ['all', 'work', 'perso'] as const) {
+      const s = ids(scopeOf(d(), mode))
+      expect(s.registry).toContain('hub')
+      expect(s.inbox).toContain('ih')
+      expect(s.agents).toContain(1)
+      expect(s.parked).toEqual(['c1'])
+    }
+  })
+
+  it('files a project by nest_scope, then scope', () => {
+    expect(ids(scopeOf(d(), 'work'))).toMatchObject({ registry: ['hub', 'lambda'], inbox: ['ih'], agents: [1] })
+    expect(ids(scopeOf(d(), 'perso'))).toMatchObject({ registry: ['hub', 'tool'], inbox: ['ih', 'it'], agents: [1, 2] })
+  })
+
+  it('puts a both project in its system under both modes', () => {
+    const reg: RegProject[] = [
+      { name: 'hub', path: '/p/hub', nest_scope: 'both', system: 'grp' },
+      { name: 'lambda', path: '/w/lambda', scope: 'work', system: 'grp' },
+    ]
+    const members = (mode: ScopeMode) => {
+      const s = scopeOf({ missions: [], inbox: [], registry: reg, agents: [], parked: [] }, mode)
+      return heroModel(s.missions, s.inbox, { registry: s.registry, agents: [], parked: [] }, now).projects
+        .find((p) => p.name === 'grp')?.members?.map((p) => p.name).sort()
+    }
+    expect(members('work')).toEqual(['hub', 'lambda'])
+    expect(members('perso')).toEqual(['hub'])
+  })
+})
+
 describe('hero model under each scope (item_206)', () => {
   const hero = (mode: ScopeMode) => {
     const d = scopeOf(data(), mode)

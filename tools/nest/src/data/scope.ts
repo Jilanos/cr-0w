@@ -8,16 +8,17 @@ export type ScopeMode = 'all' | 'work' | 'perso'
 export const SCOPE_MODES: ScopeMode[] = ['all', 'work', 'perso']
 export const isScopeMode = (v: unknown): v is ScopeMode => SCOPE_MODES.includes(v as ScopeMode)
 
-// Scope of one thing; undefined = unknown, shown under all only.
-export type Side = 'work' | 'perso' | undefined
+// Scope of one thing; both shows under every mode, undefined = unknown, shown under all only.
+export type Side = 'work' | 'perso' | 'both' | undefined
 
 // Mission scope: work is work, personal and crow are perso.
 export const missionSide = (m: Mission): Side => (m.scope === 'work' ? 'work' : m.scope === 'personal' || m.scope === 'crow' ? 'perso' : undefined)
 
-// Registry scope of a project: work is work, personal is perso, anything else unknown.
+// Nest scope of a project (nest_scope, else scope): work, personal is perso, both, anything else unknown.
 export function projectSide(name: string, registry: RegProject[]): Side {
-  const s = registry.find((p) => p.name === name)?.scope
-  return s === 'work' ? 'work' : s === 'personal' ? 'perso' : undefined
+  const p = registry.find((x) => x.name === name)
+  const s = p?.nest_scope || p?.scope
+  return s === 'work' ? 'work' : s === 'personal' ? 'perso' : s === 'both' ? 'both' : undefined
 }
 
 // An ask takes its project's registry scope; on a project the registry does not know, its mission's.
@@ -30,7 +31,7 @@ export function askSide(r: InboxItem, registry: RegProject[], missions: Mission[
 // The Today section reads the work mailbox. A personal mail source tags its rows perso.
 export const TODAY_MAIL_SIDE: Side = 'work'
 
-const keep = (mode: ScopeMode, side: Side) => mode === 'all' || side === mode
+const keep = (mode: ScopeMode, side: Side) => mode === 'all' || side === mode || side === 'both'
 
 export interface ScopeIn { missions: Mission[]; inbox: InboxItem[]; registry: RegProject[]; agents: Agent[]; parked: Resumable[] }
 
