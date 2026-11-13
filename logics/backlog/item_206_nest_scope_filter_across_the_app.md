@@ -1,10 +1,10 @@
 ## item_206_nest_scope_filter_across_the_app - Nest scope filter across the app
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90
 > Confidence: 85
-> Progress: 0%
+> Progress: 50%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -61,7 +61,11 @@
 # Notes
 - Execution order: 1 scope in RegProject + filter helper with tests, 2 mockups and owner pick, 3 wire every screen, 4 shots.
 - Mockups and shots go in the vault (`Research/nest-design/item_206/`).
+- 2026-11-13: filter helper with tests and storage + wiring on every screen but Chat are done on branch `nest-scope-filter`. No visible control yet. Control pick pending: options A (header segmented), B (header chip), C (strip under the header) in `Research/nest-design/item_206/` with `spec.json`.
+- Decided 2026-11-13: an open ask on an unregistered project follows its mission's scope; Chat reads unfiltered data; mail rows carry a scope, Today mail is the work mailbox (perso shows none).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-13T11:26:32.497274+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | running |  |  |
+| 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
