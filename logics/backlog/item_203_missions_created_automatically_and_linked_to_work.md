@@ -1,10 +1,10 @@
 ## item_203_missions_created_automatically_and_linked_to_work - Missions created automatically and linked to work
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 95%
 > Confidence: 90%
-> Progress: 95%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -44,6 +44,7 @@
 - Primary task(s): (none yet)
 
 # Notes
+- Live check 2026-11-13 after merge (dcfbc6b) and core restart: `crow dispatch --end-state` for item_204 created mission 20261113-build-cr-0w-item-204; /api/state/work shows the run linked to it.
 - Owner decision 2026-11-13: work = live sessions, background runs, parked sessions, MRs/PRs with CI, plus missions. Missions are an automatic optional grouping (goal, end state, delegation contract), never created by hand, never a separate list.
 - Read `local/owner-prefs.md` before building. Visual changes need rendered options first.
 - Owner decisions 2026-11-13 on linked-mission state:
@@ -69,4 +70,3 @@
 | 2026-11-13T13:48:51.782807+00:00 | cdx | 854208bd3a594454aa9cf106fa586c98 | item_203 missions auto + linking (continue) | succeeded |  |  |
 | 2026-11-13T11:45:04.519694+00:00 | cdx | c898fb4822e04d06a6c0fd18788888a9 | item_203 missions auto + linking | failed |  | limit |
 | 2026-11-13T11:41:41.610771+00:00 | cdx | a499f12d9ab649bbb363f88fe1b3c653 | item_203 missions auto + linking | failed |  | limit |
-
