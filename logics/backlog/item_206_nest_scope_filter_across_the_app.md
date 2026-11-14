@@ -3,8 +3,8 @@
 > Schema version: 1.0
 > Status: In progress
 > Understanding: 90
-> Confidence: 80
-> Progress: 80%
+> Confidence: 85
+> Progress: 85%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -72,11 +72,12 @@
 - Decided 2026-11-13: an open ask on an unregistered project follows its mission's scope; Chat reads unfiltered data; mail rows carry a scope, Today mail is the work mailbox (perso shows none).
 - 2026-11-13: `both` scope done (registry field `nest_scope`: work, personal or both, default `scope`). Header options rendered (A one row, B two tiers, C capsule) in `Research/nest-design/item_206/header/` with `spec.json`. Pick pending.
 - 2026-11-13: header A built, tab-bar options rendered, pick pending. Build shots per scope in `Research/nest-design/item_206/build/{work,all,perso}/` (board vs build in `build/spec.json`); tab options in `Research/nest-design/item_206/tabs/` with `spec.json`.
+- Owner decision 2026-11-14 (tab bar): B, five tabs (Home, Desk, Missions, Inbox, More). More opens a sheet with MRs, Agenda and Reports and stays highlighted while one of them is open. Labels 11px. Same bar on cover and fold inner.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T18:41:29.413705+00:00 | cdx | a9110765d90f4b538d624fa1fa16e5bd | item_206 header A build + tab options (continue) | running |  |  |
+| 2026-11-13T18:53:40.623150+00:00 | cdx | a9110765d90f4b538d624fa1fa16e5bd | item_206 header A build + tab options (continue) | succeeded |  |  |
 | 2026-11-13T14:17:22.413431+00:00 | cdx | 4cde807657b8448a8eff291918e2f2fb | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T14:13:59.669861+00:00 | cdx | 570319e068c64526a0e6a4d06b5bb86d | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T13:53:38.163012+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | succeeded |  |  |
