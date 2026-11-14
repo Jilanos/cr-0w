@@ -2,13 +2,13 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90
-> Confidence: 85
-> Progress: 85%
+> Understanding: 95
+> Confidence: 90
+> Progress: 95%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-13 19:53:02
+> Indicators reviewed: 2026-11-14 19:27:36
 
 # AI Context
 - Summary: Add an all / work / perso scope filter to Nest that every screen reads, remembered per device.
@@ -73,10 +73,12 @@
 - 2026-11-13: `both` scope done (registry field `nest_scope`: work, personal or both, default `scope`). Header options rendered (A one row, B two tiers, C capsule) in `Research/nest-design/item_206/header/` with `spec.json`. Pick pending.
 - 2026-11-13: header A built, tab-bar options rendered, pick pending. Build shots per scope in `Research/nest-design/item_206/build/{work,all,perso}/` (board vs build in `build/spec.json`); tab options in `Research/nest-design/item_206/tabs/` with `spec.json`.
 - Owner decision 2026-11-14 (tab bar): B, five tabs (Home, Desk, Missions, Inbox, More). More opens a sheet with MRs, Agenda and Reports and stays highlighted while one of them is open. Labels 11px. Same bar on cover and fold inner.
+- 2026-11-14: tab bar B built, ready to merge. Shots and board vs build in `Research/nest-design/item_206/build/tabs/` with `spec.json`. AC4 waits on the owner OK on those shots.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-14T18:20:14.054393+00:00 | cdx | 66a136b0c300434697bfc889b6f2306d | item_206 tab bar B build | running |  |  |
 | 2026-11-13T18:53:40.623150+00:00 | cdx | a9110765d90f4b538d624fa1fa16e5bd | item_206 header A build + tab options (continue) | succeeded |  |  |
 | 2026-11-13T14:17:22.413431+00:00 | cdx | 4cde807657b8448a8eff291918e2f2fb | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T14:13:59.669861+00:00 | cdx | 570319e068c64526a0e6a4d06b5bb86d | item_206 header A build + tab options | failed |  | limit |
