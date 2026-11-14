@@ -1,5 +1,19 @@
 [
   {
+    "id": "mr:https://forge/lambda/231",
+    "kind": "mr",
+    "project": "platform-api",
+    "state": "failed",
+    "title": "!231 new: feature x",
+    "since": "2026-11-13T11:50:00Z",
+    "why": "red pipeline",
+    "mission": "20261113-build-x",
+    "source": {
+      "section": "mrs",
+      "ref": "https://forge/lambda/231"
+    }
+  },
+  {
     "id": "run:r-fail",
     "kind": "run",
     "project": "cr-0w",
@@ -39,21 +53,6 @@
     "source": {
       "section": "missions",
       "ref": "20261113-ask"
-    }
-  },
-  {
-    "id": "mr:https://forge/lambda/231",
-    "kind": "mr",
-    "project": "platform-api",
-    "state": "needs",
-    "title": "!231 new: feature x",
-    "since": "2026-11-13T11:50:00Z",
-    "wait_s": 600,
-    "why": "red pipeline",
-    "mission": "20261113-build-x",
-    "source": {
-      "section": "mrs",
-      "ref": "https://forge/lambda/231"
     }
   },
   {

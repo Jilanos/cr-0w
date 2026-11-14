@@ -169,7 +169,7 @@ func TestLinkedMissionStateRollsUp(t *testing.T) {
 			"done", "run: run done", "2026-11-13T10:00:00Z"},
 		{"unlinked MR only", nil, nil, []any{mr("running")}, nil, "done", "no live work", "2026-11-13T09:00:00Z"},
 		{"run on the MR branch links the MR", []any{runOnB}, nil, []any{mr("failed")}, nil,
-			"needs", "mr: red pipeline", "2026-11-13T11:00:00Z"},
+			"failed", "mr: red pipeline", "2026-11-13T11:00:00Z"},
 		{"inbox ask", []any{session("working")}, nil, nil, []contract.InboxItem{ask}, "needs", "choice", "2026-11-13T09:00:00Z"},
 	}
 	for _, c := range cases {

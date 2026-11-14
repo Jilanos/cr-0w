@@ -466,8 +466,7 @@ func (b *builder) mr(m map[string]any) contract.WorkItem {
 		it.State, it.Why = "needs", "review asked"
 		it.WaitS = secs(int64(b.age(first(str(m, "created"), str(m, "updated"))) / time.Second))
 	case mine && str(m, "pipeline") == "failed":
-		it.State, it.Why = "needs", "red pipeline"
-		it.WaitS = secs(int64(b.age(str(m, "updated")) / time.Second))
+		it.State, it.Why = "failed", "red pipeline"
 	case mine && open > 0:
 		it.State, it.Why = "needs", fmt.Sprintf("%d open threads", open)
 		it.WaitS = secs(int64(b.age(str(m, "updated")) / time.Second))

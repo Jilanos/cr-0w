@@ -114,7 +114,7 @@ func TestItems(t *testing.T) {
 		// review asked of the owner
 		{"mr:https://forge/lambda/230", "platform-api", "needs", "review asked", "", 3600},
 		// own MR with a red pipeline, linked to its mission by branch
-		{"mr:https://forge/lambda/231", "platform-api", "needs", "red pipeline", "20261113-build-x", 600},
+		{"mr:https://forge/lambda/231", "platform-api", "failed", "red pipeline", "20261113-build-x", -1},
 		// own MR waiting on review
 		{"mr:https://forge/cr-0w/5", "cr-0w", "queued", "waiting on review", "", -1},
 		// mission waiting on an inbox answer
