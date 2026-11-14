@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 80%
-> Confidence: 75%
-> Progress: 15%
+> Understanding: 90%
+> Confidence: 85%
+> Progress: 20%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -46,8 +46,14 @@
 - Owner decision 2026-11-13: work = live sessions, background runs, parked sessions, MRs/PRs with CI, plus missions. Missions are an automatic optional grouping (goal, end state, delegation contract), never created by hand, never a separate list.
 - Read `local/owner-prefs.md` before building. Visual changes need rendered options first.
 - 2026-11-13: three options (A, B, C) for the work row and the mission rollup rendered in the vault `Research/nest-design/item_204` with a compare spec; pick pending.
+- Owner decisions 2026-11-14 (row pick):
+  - Rows: option A (kind tag on the right, mission rollup on a rail), a bit bigger and with the kind icon.
+  - The work list replaces the Needs and Ready sections on Desk.
+  - Done items are hidden on Desk.
+  - Inbox also lists failed runs.
+  - An own MR with a red pipeline reads failed (core rule changed on main, 4a43d83).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-13T18:42:32.727073+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | running |  |  |
+| 2026-11-13T18:52:21.845294+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | succeeded |  |  |
