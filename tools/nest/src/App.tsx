@@ -10,6 +10,7 @@ import { Desk } from './screens/Desk'
 import { Missions } from './screens/Missions'
 import { Placeholder } from './screens/Placeholder'
 import { Shell } from './ui/Shell'
+import { screenTab } from './ui/tabs'
 
 const LATER: Record<string, [string, string]> = {
   mrs: ['MRs', 'Merge requests arrive with the live API.'],
@@ -24,7 +25,7 @@ export function App() {
   const [scope, setScope] = useScope()
   // Every screen reads the scoped snapshot; Chat reads the whole one so a link to any session opens.
   const snap = useMemo(() => raw && scopeSnapshot(raw, scope), [raw, scope])
-  const active = route.tab === 'missing' ? 'home' : route.tab === 'chat' ? 'desk' : route.tab
+  const active = screenTab(route)
   let body = null
   if (snap && raw) {
     if (route.tab === 'home') body = <Home snap={snap} />

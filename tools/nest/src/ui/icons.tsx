@@ -12,6 +12,9 @@ export const TABS: Array<{ key: TabKey; label: string; path: string; icon: React
   { key: 'reports', label: 'Reports', path: '/reports', icon: <><path d="M5 2.5h8l4 4v13H5Z" /><path d="M13 2.5v4h4M8 11h6M8 14.5h6" /></> },
 ]
 
+// Phone tab bar B (item_206): three outlined dots open the More sheet.
+export const MORE_ICON: ReactNode = <><circle cx="5" cy="11" r="1.8" /><circle cx="11" cy="11" r="1.8" /><circle cx="17" cy="11" r="1.8" /></>
+
 // Scope chip icons (item_206 header A): all = stacked layers, work = briefcase, perso = person.
 export const SCOPE_ICONS: Record<'all' | 'work' | 'perso', ReactNode> = {
   all: <><path d="M11 3 19 7.5 11 12 3 7.5Z" /><path d="M3 11.5 11 16l8-4.5M3 15.5 11 20l8-4.5" /></>,
