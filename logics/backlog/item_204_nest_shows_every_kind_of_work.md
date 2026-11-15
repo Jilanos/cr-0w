@@ -1,10 +1,10 @@
 ## item_204_nest_shows_every_kind_of_work - Nest shows every kind of work
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 20%
+> Progress: 60%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -52,6 +52,7 @@
   - Done items are hidden on Desk.
   - Inbox also lists failed runs.
   - An own MR with a red pipeline reads failed (core rule changed on main, 4a43d83).
+- 2026-11-15: data layer and Desk built (shots in vault `Research/nest-design/item_204/build/desk/`), Inbox next after owner OK.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
