@@ -78,10 +78,11 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-14T18:20:14.054393+00:00 | cdx | 66a136b0c300434697bfc889b6f2306d | item_206 tab bar B build | running |  |  |
+| 2026-11-14T18:29:22.010788+00:00 | cdx | 66a136b0c300434697bfc889b6f2306d | item_206 tab bar B build | succeeded |  |  |
 | 2026-11-13T18:53:40.623150+00:00 | cdx | a9110765d90f4b538d624fa1fa16e5bd | item_206 header A build + tab options (continue) | succeeded |  |  |
 | 2026-11-13T14:17:22.413431+00:00 | cdx | 4cde807657b8448a8eff291918e2f2fb | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T14:13:59.669861+00:00 | cdx | 570319e068c64526a0e6a4d06b5bb86d | item_206 header A build + tab options | failed |  | limit |
 | 2026-11-13T13:53:38.163012+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | succeeded |  |  |
 | 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
+

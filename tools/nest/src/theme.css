@@ -262,8 +262,10 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 }
 /* Board B: More is 12px wider than the four tabs. */
 .tabbar > button.tab { flex-basis: 12px; }
-.tab[aria-expanded='true'] { color: var(--fg); }
-.tab[aria-current='page'] { background: var(--accent-soft); color: var(--accent); }
+.tab[aria-current='page'],
+.tab[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent); }
+/* While the More sheet is open, More is the only highlighted tab. */
+.tabbar:has(.tab[aria-expanded='true']) a.tab[aria-current='page'] { background: none; color: var(--dim); }
 /* More sheet (tab bar B, item_206): anchored above the More tab. */
 .more-sheet {
   position: absolute;
