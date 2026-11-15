@@ -51,9 +51,11 @@
 
 # Notes
 - 2026-11-15: three boot options prototyped behind `?boot=a|b|c` (A trace, B scan line, C unfold), each planned under 1.5 s. The flag replays on every load; the real boot (`REAL_BOOT`, unset) runs once per session. Home is never hidden more than 1 s. Recordings not made yet (`npm run reel:boot`); pick pending.
+- 2026-11-15: recordings made from the hub (runs cannot launch the browser): `Research/nest-design/item_166/{A,B,C}/`, compare page `spec.html`, timing 1.16 to 1.42 s. Pick pending (owner reviews at the laptop).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-15T09:10:15.545919+00:00 | cdx | 03beba0f55004df589ee3714538ab02a | item_166 boot options (continue) | running |  |  |
+| 2026-11-15T09:13:18.678237+00:00 | cdx | 03beba0f55004df589ee3714538ab02a | item_166 boot options (continue) | succeeded |  |  |
 | 2026-11-15T08:48:47.829182+00:00 | cdx | 29d60d047eb94faf81066360609533f0 | item_166 boot options | succeeded |  |  |
+
