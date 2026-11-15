@@ -1,14 +1,14 @@
 ## item_166_boot_sequence_on_first_load_of_the_nest - Boot sequence on first load of the Nest
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 50%
 > Complexity: Low
 > Theme: nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-10 16:17:34
+> Indicators reviewed: 2026-11-15 10:12:53
 
 # AI Context
 - Summary: a boot sequence under 1.5 s on the first load of a session: frames draw, the hero resolves, the prompt types in; skipped with reduced motion.
@@ -49,6 +49,11 @@
 - Priority: Low
 - Rationale: Set by scaffold input or defaulted for grooming.
 
+# Notes
+- 2026-11-15: three boot options prototyped behind `?boot=a|b|c` (A trace, B scan line, C unfold), each planned under 1.5 s. The flag replays on every load; the real boot (`REAL_BOOT`, unset) runs once per session. Home is never hidden more than 1 s. Recordings not made yet (`npm run reel:boot`); pick pending.
+
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-15T09:10:15.545919+00:00 | cdx | 03beba0f55004df589ee3714538ab02a | item_166 boot options (continue) | running |  |  |
+| 2026-11-15T08:48:47.829182+00:00 | cdx | 29d60d047eb94faf81066360609533f0 | item_166 boot options | succeeded |  |  |

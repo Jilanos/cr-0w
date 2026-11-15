@@ -57,6 +57,7 @@ Put a temporary `globalThis.__ring`-style switch in the scene, shoot each varian
   - Env: `REEL_BEATS=drag` records the drag beats only; `REEL_SET='{"__x":1}'` sets page globals before load (variant switches); `REEL_TAG=x` names the output `hero-reel-x-<size>.mp4`. Compare variants with ffmpeg `hstack` and play with mpv (see open-links note).
   - Head conventions: negative pitch looks down, negative yaw looks left; spinning the table up moves the front planets left.
 - `node scripts/head-reel.mjs <out.webp> [cell px]`: the GPU head alone through the same beats.
+- `npm run reel:boot -- <out root> [a b c]`: boot options (`?boot=a|b|c`, `src/boot/`) at cover and laptop, both themes. Writes `<A|B|C>/boot-<id>-<size>-<theme>.{webm,gif}` plus 4 keyframe PNGs, and `timing.json` with the real-time wall duration. Frames come from seeking the paused animations (`__nestBootHold`), so slow screenshots do not stretch the timing.
 - Playwright `recordVideo` and the CDP screencast capture at CSS px whatever `deviceScaleFactor` says: small heads smear. Use a `Page.captureScreenshot` loop with `clip.scale` (2 on phone) and ffmpeg concat durations, as `hero-reel.mjs` does.
 - `reducedMotion: 'reduce'` hides the GL head: screenshot `.hero-box` without it.
 - Live core data for a check: `curl --unix-socket local/state/core.sock http://x/api/state/<section>`.
