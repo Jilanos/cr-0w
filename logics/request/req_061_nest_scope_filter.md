@@ -1,7 +1,7 @@
 ## req_061_nest_scope_filter - Nest scope filter: all, work, perso
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 90
 > Confidence: 85
 > Complexity: Medium

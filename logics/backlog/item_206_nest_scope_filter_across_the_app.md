@@ -1,10 +1,10 @@
 ## item_206_nest_scope_filter_across_the_app - Nest scope filter across the app
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 95
-> Confidence: 90
-> Progress: 95%
+> Confidence: 95
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -74,6 +74,7 @@
 - 2026-11-13: header A built, tab-bar options rendered, pick pending. Build shots per scope in `Research/nest-design/item_206/build/{work,all,perso}/` (board vs build in `build/spec.json`); tab options in `Research/nest-design/item_206/tabs/` with `spec.json`.
 - Owner decision 2026-11-14 (tab bar): B, five tabs (Home, Desk, Missions, Inbox, More). More opens a sheet with MRs, Agenda and Reports and stays highlighted while one of them is open. Labels 11px. Same bar on cover and fold inner.
 - 2026-11-14: tab bar B built, ready to merge. Shots and board vs build in `Research/nest-design/item_206/build/tabs/` with `spec.json`. AC4 waits on the owner OK on those shots.
+- 2026-11-15: owner OK on the shots (AC4). More takes the full tab highlight while its sheet is open. Merged into main (e98f961).
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
@@ -85,4 +86,3 @@
 | 2026-11-13T13:53:38.163012+00:00 | cdx | 154fbc5ba05d4bca9d2ff940cf0a1436 | item_206 both scope + header options | succeeded |  |  |
 | 2026-11-13T11:36:20.898840+00:00 | cdx | 5fb0498e1ead476eba90323ea23d1a2e | item_206 scope filter (continue) | succeeded |  |  |
 | 2026-11-13T11:02:00.732037+00:00 | cdx | 049a30da502c4f85af660da658cefbde | item_206 scope filter logic + mockups | succeeded |  |  |
-
