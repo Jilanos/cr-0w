@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { homeModel, type HomeModel } from '../data/home'
+import { homeCounts, homeModel, type HomeModel } from '../data/home'
 import type { Snapshot } from '../data/useData'
 import { time } from '../format'
 import { Hero } from '../hero/Hero'
@@ -111,9 +111,10 @@ function HomeCompact({ snap }: { snap: Snapshot }) {
   const { missions, inbox, now } = snap
   const inner = useMedia(INNER)
   const m = homeModel(snap)
-  const say = m.needs.length
-    ? `${m.needs.length} need you, Sir. ${m.working} working.`
-    : m.working ? `Nothing needs you, Sir. ${m.working} working.` : 'All quiet, Sir.'
+  const c = homeCounts(snap)
+  const say = c.needs
+    ? `${c.needs} need you, Sir. ${c.working} working.`
+    : c.working ? `Nothing needs you, Sir. ${c.working} working.` : 'All quiet, Sir.'
   const holo = <div className="hwrap"><Hero missions={missions} inbox={inbox} now={now} say={say} sections={snap.sections} /></div>
   if (inner) {
     return (

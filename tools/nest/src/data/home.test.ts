@@ -87,7 +87,7 @@ describe('homeModel', () => {
       ['run', false, '/desk?pid=3'],
     ])
     expect(m.working).toBe(2)
-    expect(homeCounts(s)).toEqual({ needs: 2, working: 2 })
+    expect(homeCounts(s)).toEqual({ needs: 2, working: 2, failed: 0 })
   })
   it('carries ages and stale flags', () => {
     expect(m.usage).toEqual({ age: 6, stale: true })

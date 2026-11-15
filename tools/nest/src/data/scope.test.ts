@@ -230,13 +230,14 @@ describe('scoped snapshot', () => {
     const s = await snapshot()
     const w = scopeSnapshot(s, 'work')
     expect(w.missions.length).toBeGreaterThan(0)
-    expect(w.missions.every((m) => m.scope === 'work')).toBe(true)
+    // cr-0w is both in the fixture registry: its crow missions stay under work.
+    expect(w.missions.every((m) => m.scope === 'work' || (m.scope === 'crow' && m.project === 'cr-0w'))).toBe(true)
     expect(w.sections.accounts).toBe(s.sections.accounts)
-    // The fixture registry has no scope: every project, row and agent is unknown.
-    expect(w.inbox).toEqual([])
     const live = heroLiveOf(w.sections)
-    expect(live).toMatchObject({ registry: [], agents: [], parked: [] })
-    expect(heroLiveOf(s.sections).agents.length).toBeGreaterThan(0)
+    expect(live.registry.map((p) => p.name)).toEqual(['cr-0w', 'lambda', 'infra'])
+    expect(live.agents.map((a) => a.pid)).toEqual([4242, 5252, 7171])
+    expect(live.parked.map((r) => r.project)).toEqual(['infra'])
+    expect(heroLiveOf(s.sections).agents.length).toBe(5)
   })
 
   it('shows Today mail as work mail: under work tagged, under perso none, under all both', async () => {

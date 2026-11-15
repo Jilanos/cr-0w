@@ -3,6 +3,7 @@ import stateMissions from '../../fixtures/states/missions.json'
 import stateInbox from '../../fixtures/states/inbox.json'
 import stateAgenda from '../../fixtures/states/agenda.json'
 import stateLive from '../../fixtures/states/live.json'
+import stateWork from '../../fixtures/states/work.json'
 import { ApiError } from './api'
 import type { ChatTarget, ConversationPage, Entry, PageAsk } from './conversation'
 import type { Actions, Dispatch, LiveReply } from './live'
@@ -18,6 +19,8 @@ const NOW = new Date('2026-11-09T16:10:00+01:00')
 // Sections without a state fixture stay empty until their screens bring one (item_171/172).
 const NO_SECTION: SectionBody = { data: null, stale: false, updated_at: null }
 type LiveData = Partial<Record<SectionName, unknown>>
+// The work feed (item_204) over the live fixture: one row per kind and state, a mission rollup.
+const LIVE: LiveData = { ...stateLive, work: stateWork }
 
 // In-memory live actions over the fixture sections: they check targets like core
 // (404 unknown, 409 full slots) and change the section so a refetch shows the result.
@@ -150,7 +153,7 @@ function fixtureChats(known: (t: ChatTarget) => void) {
   return { page, said }
 }
 
-export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[] = INBOX, now: Date = NOW, agenda: AgendaEvent[] = AGENDA, live: LiveData = stateLive): DataSource {
+export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[] = INBOX, now: Date = NOW, agenda: AgendaEvent[] = AGENDA, live: LiveData = LIVE): DataSource {
   const data: LiveData = structuredClone(live)
   // One body object per section version, so unchanged sections keep their reference.
   const bodies = new Map<SectionName, SectionBody>()
