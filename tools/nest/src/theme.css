@@ -887,6 +887,12 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .ibx .row.two .l1 .f1 { font-weight: 600; }
 .ibx .row.two > .sm { text-align: left; }
 .ibx .grp.c-q { color: var(--c-q); }
+/* To answer rows: Desk row A; the picked one carries the accent, failed rows no red edge. */
+.ibx .wlist { gap: 6px; }
+.ibx .wrow.on { background: var(--accent-soft); border-color: var(--accent); }
+[data-theme='cyber'] .ibx .wrow.s-failed { border-left-color: var(--line); }
+[data-theme='cyber'] .ibx .wrow.on { border-left-color: var(--accent); }
+.ibx .read .ktag { vertical-align: middle; }
 .ibx .body { font-size: 12px; line-height: 1.55; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ibx .well { border-left: 2px solid var(--accent); padding: 8px 10px; background: var(--well); border-radius: 0 8px 8px 0; gap: 6px; }
 .ibx .well .wh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

@@ -12,13 +12,18 @@ const KIND_ICON: Record<WorkKind, ReactNode> = {
   parked: <path d="M8 5v12M14 5v12" />,
 }
 
-export function KindTag({ kind }: { kind: WorkKind }) {
+// Inbox rows add mail (item_204, owner 2026-11-15).
+export type TagKind = WorkKind | 'mail'
+const TAG_ICON: Record<TagKind, ReactNode> = { ...KIND_ICON, mail: <><rect x="3" y="5" width="16" height="12" rx="2" /><path d="m3 7 8 5.5L19 7" /></> }
+const TAG_LABEL: Record<TagKind, string> = { ...KIND_LABEL, mail: 'Mail' }
+
+export function KindTag({ kind }: { kind: TagKind }) {
   return (
     <span className="ktag">
       <svg aria-hidden="true" width="13" height="13" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round">
-        {KIND_ICON[kind]}
+        {TAG_ICON[kind]}
       </svg>
-      {KIND_LABEL[kind]}
+      {TAG_LABEL[kind]}
     </span>
   )
 }

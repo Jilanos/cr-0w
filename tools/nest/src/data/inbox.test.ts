@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest'
+import { feed, type Snapshot } from './feed'
+import { fixtureSource } from './fixtures'
+import { answerOf, inboxBadge, toAnswer } from './inbox'
+import type { Mail } from './live'
+import { scopeSnapshot } from './scope'
+import type { InboxItem } from './types'
+import type { WorkItem } from './work'
+
+const snapshot = async (): Promise<Snapshot> => {
+  const box: { s?: Snapshot } = {}
+  await feed(fixtureSource(), (x) => { box.s = x })()
+  return box.s!
+}
+
+const ask = (id: string, created: string, extra: Partial<InboxItem> = {}) =>
+  ({ id, mission: 'm', project: 'p', type: 'decision', state: 'open', created, ask: id, verbs: [], artifacts: [], version: 1, source: 'crow', file: 'f', ...extra }) as unknown as InboxItem
+const work = (id: string, state: WorkItem['state'], since?: string) =>
+  ({ id, kind: 'run', project: 'p', title: id, state, since, source: { section: 'dispatch', ref: id } }) as WorkItem
+const mail = (id: string): Mail => ({ id, subject: id })
+
+describe('toAnswer', () => {
+  it('puts failed work first, then questions and mail by wait', () => {
+    const rows = toAnswer(
+      [ask('q-new', '2026-11-09T15:00:00+01:00'), ask('q-old', '2026-11-09T10:00:00+01:00'), ask('f', '2026-11-09T09:00:00+01:00', { type: 'fyi' })],
+      [work('w-late', 'failed', '2026-11-09T15:30:00+01:00'), work('w-needs', 'needs', '2026-11-09T08:00:00+01:00'), work('w-early', 'failed', '2026-11-09T11:00:00+01:00')],
+      [mail('m-1'), mail('m-2')],
+    )
+    expect(rows.map((r) => r.key)).toEqual(['w:w-early', 'w:w-late', 'q:q-old', 'q:q-new', 'm:m-1', 'm:m-2'])
+  })
+
+  it('skips answered questions and works without the work feed', () => {
+    const rows = toAnswer([ask('done', '2026-11-09T10:00:00+01:00', { state: 'answered' } as Partial<InboxItem>)], null, [mail('m')])
+    expect(rows.map((r) => r.key)).toEqual(['m:m'])
+  })
+
+  it('merges the fixture sources', async () => {
+    const rows = answerOf(await snapshot())
+    const kinds = rows.map((r) => r.kind)
+    expect(kinds.slice(0, 2)).toEqual(['failed', 'failed'])
+    expect(rows.slice(0, 2).map((r) => r.key)).toEqual(['w:run:0ff1ce01', expect.stringMatching(/^w:mr:/)])
+    expect(kinds).toContain('ask')
+    expect(rows.filter((r) => r.kind === 'mail').map((r) => r.key)).toEqual(['m:mail-2', 'm:mail-1'])
+    expect(kinds.lastIndexOf('ask')).toBeLessThan(kinds.indexOf('mail'))
+  })
+})
+
+describe('scope filter on mail', () => {
+  it('work keeps the mail, perso drops it', async () => {
+    const s = await snapshot()
+    const mails = (m: Snapshot) => answerOf(m).filter((r) => r.kind === 'mail').length
+    expect(mails(scopeSnapshot(s, 'all'))).toBe(2)
+    expect(mails(scopeSnapshot(s, 'work'))).toBe(2)
+    expect(mails(scopeSnapshot(s, 'perso'))).toBe(0)
+  })
+})
+
+describe('inboxBadge', () => {
+  it('counts needs and failed of the work feed', async () => {
+    expect(inboxBadge(await snapshot())).toEqual({ n: 7, failed: true })
+  })
+
+  it('falls back to open questions without the work feed', async () => {
+    const s = await snapshot()
+    const bare = { ...s, sections: { ...s.sections, work: undefined } } as unknown as Snapshot
+    expect(inboxBadge(bare)).toEqual({ n: s.inbox.filter((r) => r.state === 'open' && r.type !== 'fyi').length })
+  })
+})
