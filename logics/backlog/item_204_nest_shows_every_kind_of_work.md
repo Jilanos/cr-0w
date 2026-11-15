@@ -4,7 +4,7 @@
 > Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 60%
+> Progress: 55%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -53,8 +53,14 @@
   - Inbox also lists failed runs.
   - An own MR with a red pipeline reads failed (core rule changed on main, 4a43d83).
 - 2026-11-15: data layer and Desk built (shots in vault `Research/nest-design/item_204/build/desk/`), Inbox next after owner OK.
+- Owner decisions 2026-11-15 (Desk review):
+  - Desk approved as built (work list first on cover, slots and queue below on inner, resumable list gone on laptop).
+  - Keep the failed count tile on laptop, the Inbox badge (needs + failed) and the hero "N items failed".
+  - No red outline on failed rows (match board A).
+  - Flagged mail leaves Desk. Inbox follows the approved board (item_138 fold-inbox): flagged mail joins "To answer" with crow questions and failed runs, scoped by mailbox. "Drafts ready" fills later with item_092/093.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-15T09:07:21.014666+00:00 | cdx | 357510a13cac4e66963502e012cb6241 | item_204 data layer + Desk build | succeeded |  |  |
 | 2026-11-13T18:52:21.845294+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | succeeded |  |  |
