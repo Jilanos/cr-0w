@@ -9,6 +9,8 @@ import { Link, navigate } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
+import { deskWork, workCounts, workOf, type WorkItem } from '../data/work'
+import { WorkList } from '../ui/WorkList'
 
 // Desk (item_138 boards desk, fold-desk-inner, fold-desk-cover) on the live actions of
 // item_170. Every action goes through the confirm sheet, then the feed refetches.
@@ -195,6 +197,29 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     run: wrap(`${verb === 'done' ? 'Done' : 'Snooze'}: ${subject}`, () => act.mail(id, verb)),
   })
   const pick = (a: Agent, talk = false) => { setSel(a.pid); setTell(talk) }
+  // The work feed (item_204) drives the list; null on a core without it (old sections stay).
+  const work = workOf(snap.sections.work)
+  const groups = deskWork(work ?? [])
+  const shown = groups.reduce((n, g) => n + 1 + g.children.length, 0)
+  const counts = work ? workCounts(work) : null
+  // A row opens what it is: the live agent, the resume sheet, the mission, the MRs.
+  // The cover has no side panel: a live row opens its chat screen there.
+  const openWork = (w: WorkItem, cover = false) => {
+    const ref = w.source.ref
+    if (w.kind === 'session' || w.kind === 'run') {
+      const a = agents.find((x) => (w.kind === 'run' ? x.run_id === ref : String(x.pid) === ref))
+      if (a && cover) navigate(`/desk/${a.pid}`)
+      else if (a) pick(a, waits(a) && !a.prompt)
+      else if (w.kind === 'run' && w.mission) navigate(`/missions/${encodeURIComponent(w.mission)}`)
+    } else if (w.kind === 'parked') {
+      const r = resumable.find((x) => x.conversation_id === ref)
+      if (r) resume(r)
+    } else if (w.kind === 'mission') {
+      navigate(`/missions/${encodeURIComponent(ref)}`)
+    } else {
+      navigate('/mrs')
+    }
+  }
   // A prompt answer is one tap: the card already shows the exact command (item_174).
   const answer = (a: Agent, key: 'allow' | 'deny') => {
     const p = a.prompt
@@ -225,6 +250,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     sheet, setSheet, log, picked, slotOf, since, pick, tell, setTell, text, setText, ask, setAsk, submitAsk,
     form, setForm, run, setRun, start, setStart,
     send, pause, stop, dispatch, open, resume, flag, answer, queue, cancel,
+    work, groups, shown, counts, openWork,
   }
 }
 type D = ReturnType<typeof useDesk>
@@ -315,6 +341,36 @@ function Needs({ d, short }: { d: D; short?: boolean }) {
         </div>
       ))}
     </div>
+  )
+}
+
+// Flagged mail stays under the work list until the work feed carries it.
+function FlagMail({ d }: { d: D }) {
+  if (!d.mail.length) return null
+  return (
+    <div className="list">
+      <div className="grp c-n">Flagged mail <span className="sm">{d.mail.length}</span></div>
+      {d.mail.map((m) => (
+        <div key={m.id} className="row edge-n">
+          <Mail /><span className="f1">{m.subject}{m.from && <span className="sm"> · {m.from}</span>}</span>
+          <button type="button" className="btn" onClick={() => d.flag(m.id, m.subject, 'snooze')}>Snooze</button>
+          <button type="button" className="btn p" onClick={() => d.flag(m.id, m.subject, 'done')}>Done</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// The Work panel (item_204 option A) in place of Needs you and Ready to run.
+function Work({ d, id }: { d: D; id: string }) {
+  return (
+    <section className="pn grow work-pn" aria-labelledby={id}>
+      <Ph id={id} sm={<span className="num">{d.shown}</span>}>Work</Ph>
+      <div className="wscroll">
+        <WorkList groups={d.groups} now={d.snap.now} open={d.openWork} />
+        <FlagMail d={d} />
+      </div>
+    </section>
   )
 }
 
@@ -443,22 +499,30 @@ function DeskLaptop({ d }: { d: D }) {
   const working = d.agents.filter((a) => a.state === 'working')
   const accts = [...new Set(working.map((a) => a.account))].join(', ')
   const waiting = d.sessions.filter(waits)
-  const needs = waiting.length + d.mail.length
-  const oldest = waiting.map((a) => a.started_at).filter(Boolean).sort()[0]
+  const needs = d.counts ? d.counts.needs : waiting.length + d.mail.length
+  const longest = Math.max(0, ...(d.work ?? []).filter((w) => w.state === 'needs').map((w) => w.wait_s ?? 0))
+  const oldest = d.work
+    ? (longest ? new Date(d.snap.now.getTime() - longest * 1000).toISOString() : undefined)
+    : waiting.map((a) => a.started_at).filter(Boolean).sort()[0]
   const a = d.picked
   return (
     <div className="desk desk-lp">
       <div className="kps">
         <h1 className="dt">Desk</h1>
-        <span className="kp c-w"><span className="kn">{working.length}</span><span className="sm">working{accts && ` · ${accts}`}</span></span>
+        <span className="kp c-w"><span className="kn">{d.counts ? d.counts.working : working.length}</span><span className="sm">working{accts && ` · ${accts}`}</span></span>
         <span className="kp n"><span className="kn c-n">{needs}</span><span className="sm">need you{oldest && ` · oldest ${ago(oldest, d.snap.now)}`}</span></span>
+        {d.counts && d.counts.failed > 0 && <span className="kp f"><span className="kn c-f">{d.counts.failed}</span><span className="sm">failed</span></span>}
         <span className="kp c-sub"><span className="kn">{d.slots.busy}/{d.slots.max}</span><span className="sm">slots · {Math.max(0, d.slots.max - d.slots.busy)} free</span></span>
         <span className="kp c-b"><span className="kn">{d.resumable.length}</span><span className="sm">resumable</span></span>
       </div>
       <div className="dg">
         <div className="col">
-          <section className="pn none" aria-labelledby="dn"><Ph id="dn" className="c-n" sm={<span className="c-n">{needs || ''}</span>}>Needs you</Ph><Needs d={d} /></section>
-          <section className="pn grow" aria-labelledby="dr"><Ph id="dr" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
+          {d.work ? <Work d={d} id="dw" /> : (
+            <>
+              <section className="pn none" aria-labelledby="dn"><Ph id="dn" className="c-n" sm={<span className="c-n">{needs || ''}</span>}>Needs you</Ph><Needs d={d} /></section>
+              <section className="pn grow" aria-labelledby="dr"><Ph id="dr" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
+            </>
+          )}
         </div>
         {a ? (
           <AgentChat key={a.pid} snap={d.snap} refresh={d.refresh} target={{ pid: a.pid }} log={<Timeline d={d} a={a} term />} />
@@ -508,9 +572,14 @@ function DeskInner({ d }: { d: D }) {
   return (
     <div className="desk desk-in">
       <div className="col">
-        <section className="pn" aria-labelledby="is"><Ph id="is" sm={`${d.slots.busy}/${d.slots.max} busy`}>Slots and queue</Ph><Slots d={d} ib /></section>
-        <section className="pn needs" aria-labelledby="in"><Ph id="in" className="c-n" sm={needs || ''}>Needs you</Ph><Needs d={d} short /></section>
-        <section className="pn grow" aria-labelledby="ir"><Ph id="ir" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
+        {!d.work && <section className="pn" aria-labelledby="is"><Ph id="is" sm={`${d.slots.busy}/${d.slots.max} busy`}>Slots and queue</Ph><Slots d={d} ib /></section>}
+        {d.work ? <Work d={d} id="iw" /> : (
+          <>
+            <section className="pn needs" aria-labelledby="in"><Ph id="in" className="c-n" sm={needs || ''}>Needs you</Ph><Needs d={d} short /></section>
+            <section className="pn grow" aria-labelledby="ir"><Ph id="ir" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
+          </>
+        )}
+        {d.work && <section className="pn none" aria-labelledby="is"><Ph id="is" sm={`${d.slots.busy}/${d.slots.max} busy`}>Slots and queue</Ph><Slots d={d} ib /></section>}
       </div>
       <div className="col">
         {a ? (
@@ -538,9 +607,7 @@ function DeskCover({ d }: { d: D }) {
   // The board shows two rows; the rest is one unfold away.
   const rest = d.agents.filter((x) => x !== a).slice(0, 2)
   const queued = d.resumable.slice(0, 2 - rest.length)
-  return (
-    <div className="desk desk-cv">
-      {a ? (
+  const hero = a ? (
         <section className={`gcard dhero${waits(a) ? ' n' : ''}`} aria-labelledby="ch">
           <div className="gt"><span className={waits(a) ? 'c-n' : 'c-w'}>● {d.slotOf(a) || 'Session'} · {waits(a) ? 'waits' : a.state}</span><span>{a.account} · {a.project}</span></div>
           <div className="hr">
@@ -564,7 +631,26 @@ function DeskCover({ d }: { d: D }) {
       ) : (
         <section className="gcard dhero none-run"><div className="gt"><span>Nothing runs</span><span>{d.slots.busy}/{d.slots.max}</span></div>
           <div className="gs">Type /dispatch below to start a run.</div></section>
-      )}
+      )
+  // With the work feed the list leads (item_204 option A); the live card follows.
+  if (d.work) {
+    return (
+      <div className="desk desk-cv">
+        <section className="gl" aria-labelledby="cw">
+          <h2 className="gls" id="cw"><span>Work</span><span className="num">{d.shown}</span></h2>
+          <WorkList groups={d.groups} now={d.snap.now} open={(w) => d.openWork(w, true)} />
+          <FlagMail d={d} />
+        </section>
+        {a && hero}
+        {(d.form || d.log.length > 0) && <Chat d={d} />}
+        <AskBox d={d} ph="Ask CR-0W: run, queue…" big />
+        <div className="uf"><Unfold />unfold for live transcript and chat</div>
+      </div>
+    )
+  }
+  return (
+    <div className="desk desk-cv">
+      {hero}
       <div className="gl">
         <div className="gls"><span>Slots and queue</span><span>{d.resumable.length} ready</span></div>
         {rest.map((x) => (

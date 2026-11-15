@@ -764,7 +764,54 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .desk .btnrow.wide .btn, .desk .btnrow.gbtns .btn { flex: 1; }
 .desk .ask-pn { gap: 10px; min-height: 0; }
 
+/* Work list (item_204 option A): glyph, title over project · why, kind tag, state over time.
+   A notch bigger than the board, with the kind icon in the tag (owner pick). */
+.wlist { display: flex; flex-direction: column; gap: 8px; }
+.wgrp { display: flex; flex-direction: column; gap: 6px; }
+.wrow { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 12px; border-radius: 10px; background: var(--row); border: 1px solid transparent; cursor: pointer; min-width: 0; }
+.wrow:hover { border-color: var(--line); }
+.wrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrow .wg { flex: none; width: 22px; display: grid; place-items: center; }
+.wrow .t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.wrow .t b { font: 600 15px var(--font-head); color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow .t > span { font-size: 13px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow .t .c-f { color: var(--c-f); }
+.ktag { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border: 1px solid var(--sub); border-radius: 7px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.ktag svg { flex: none; width: 12px; height: 12px; color: var(--dim); }
+.wrow .ws { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 13px; white-space: nowrap; }
+.wrow .ws .num { font-size: 12.5px; color: var(--dim); }
+/* Fold inner and laptop: the board's compact row, one step up. */
+.desk-in .wrow, .desk-lp .wrow { min-height: 50px; padding: 6px 10px; gap: 8px; }
+.desk-in .wrow .t b, .desk-lp .wrow .t b { font-size: 13.5px; }
+.desk-in .wrow .t > span, .desk-lp .wrow .t > span { font-size: 12px; }
+.desk-in .ktag, .desk-lp .ktag { font-size: 11px; padding: 1px 5px; gap: 3px; }
+.desk-in .ktag svg, .desk-lp .ktag svg { width: 10px; height: 10px; }
+.desk-in .wrow .ws, .desk-lp .wrow .ws { font-size: 12px; gap: 2px; }
+.desk-in .wrow .ws .num, .desk-lp .wrow .ws .num { font-size: 12px; }
+.desk-in .wrow .wg, .desk-lp .wrow .wg { width: 18px; }
+.desk-in .wrow .wg svg, .desk-lp .wrow .wg svg { width: 16px; height: 16px; }
+.desk-in .wrail, .desk-lp .wrail { margin-left: 12px; padding-left: 10px; }
+.wrail { display: flex; flex-direction: column; gap: 6px; margin-left: 14px; padding-left: 12px; border-left: 3px solid var(--sub); }
+.wrail .wrow { background: color-mix(in srgb, var(--row) 70%, var(--line)); }
+.work-pn { min-height: 0; }
+.work-pn .wscroll { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+[data-theme='cyber'] .wrow { border-radius: 0; border-left: 3px solid var(--line); }
+[data-theme='cyber'] .wrow.s-failed { border-left-color: var(--c-f); }
+[data-theme='cyber'] .desk-cv .wrow { border-radius: 0; }
+[data-theme='cyber'] .ktag { border-color: var(--line); }
+/* Inner: the work list keeps most of the column, Slots and queue scrolls below it. */
+.desk-in .work-pn ~ .pn.none { max-height: 34%; overflow-y: auto; }
+
 /* cover */
+.desk-cv .gl h2.gls { margin: 0; font-weight: 400; }
+.desk-cv .wrow { background: var(--panel); border-radius: 14px; min-height: 62px; gap: 9px; }
+.desk-cv .wrow .t b { font-size: 14px; }
+.desk-cv .wrow .t > span { font-size: 12.5px; }
+.desk-cv .ktag { font-size: 11px; padding: 1px 6px; gap: 3px; }
+.desk-cv .ktag svg { width: 11px; height: 11px; }
+.desk-cv .wrow .ws { font-size: 12.5px; }
+.desk-cv .wrow .ws .num { font-size: 12px; }
+.desk-cv .wrail .wrow { background: color-mix(in srgb, var(--panel) 70%, var(--line)); }
 .desk-cv .gcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; clip-path: var(--clip-pn); padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .desk-cv { min-height: 100%; }
 .desk-cv .dhero { padding: 16px; gap: 12px; flex: 1; justify-content: space-between; }
