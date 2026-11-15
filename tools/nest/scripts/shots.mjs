@@ -1,20 +1,23 @@
 // Headless screenshots of the Nest screens at the three board sizes, both themes.
-// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs]
+// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]
 //   scope: sets the saved scope filter (nest.scope) before load.
 //   --fixtures: runs vite dev (fixture data, pinned clock) instead of vite preview of dist/.
 //   --tabs: phone sizes only, the More sheet states and checks (see moreSheet below).
+//   --only: comma list of SCREENS keys; default all of them.
 // Without --fixtures, run `npm run build` first.
 // Never opens a visible window: uses chromium-headless-shell from playwright-core.
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright-core'
 
+const USAGE = 'usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]'
 const args = process.argv.slice(2)
 const fixtures = args.includes('--fixtures')
 const tabs = args.includes('--tabs')
-const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs')
+const only = args.find((a) => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean)
+const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs' && !a.startsWith('--only='))
 if (!out || out.startsWith('-') || !['', 'all', 'work', 'perso'].includes(scope)) {
-  console.error('usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs]')
+  console.error(USAGE)
   process.exit(2)
 }
 mkdirSync(out, { recursive: true })
@@ -28,6 +31,12 @@ const SCREENS = {
   inbox: '/inbox',
   desk: '/desk',
 }
+const unknown = (only ?? []).filter((n) => !(n in SCREENS))
+if (unknown.length || (only && !only.length)) {
+  console.error(`${USAGE}\nscreens: ${Object.keys(SCREENS).join(', ')}`)
+  process.exit(2)
+}
+const shoot = Object.entries(SCREENS).filter(([n]) => !only || only.includes(n))
 
 const cmd = fixtures ? ['vite', '--port', String(PORT), '--strictPort'] : ['vite', 'preview', '--port', String(PORT), '--strictPort']
 // Own process group, so the kill below also stops vite under npx.
@@ -125,7 +134,7 @@ try {
         await ctx.close()
         continue
       }
-      for (const [name, path] of Object.entries(SCREENS)) {
+      for (const [name, path] of shoot) {
         await page.goto(base + path, { waitUntil: 'networkidle' })
         await page.evaluate(() => document.fonts.ready)
         if (fixtures && name === 'home') await page.waitForSelector('.hero-pl[data-c]', { timeout: 15000 }).catch(() => {})
