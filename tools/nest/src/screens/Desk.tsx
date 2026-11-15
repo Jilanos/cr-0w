@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { ApiError } from '../data/api'
-import { accountsOf, dispatchOf, mailOf, projectsOf, resumableOf, type Agent, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
@@ -38,9 +38,6 @@ const Diamond = ({ s = 12 }: { s?: number }) => (
 const Play = () => (
   <svg className="c-b" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M5 3 13 8 5 13Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
 )
-const Mail = () => (
-  <svg className="c-n" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5" /><path d="m2.5 4.5 5.5 4 5.5-4" /></svg>
-)
 const Mic = ({ s = 18 }: { s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
     <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
@@ -77,7 +74,6 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const runs = agents.filter((a) => a.kind === 'run')
   const sessions = agents.filter((a) => a.kind === 'session')
   const resumable = resumableOf(snap.sections.sessions)
-  const mail = mailOf(snap.sections.today)
   const projects = projectsOf(snap.sections.projects)
   const accounts = accountsOf(snap.sections.accounts)
 
@@ -191,11 +187,6 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       void refresh()
     },
   })
-  const flag = (id: string, subject: string, verb: 'done' | 'snooze') => setSheet({
-    title: verb === 'done' ? 'Mark done' : 'Snooze', lead: verb === 'done' ? 'Marks the Outlook flag as complete.' : 'Moves the Outlook flag to tomorrow.',
-    target: [['mail', subject]], note: 'Changes the Outlook flag only; nothing is sent.', ok: verb === 'done' ? 'Done' : 'Snooze',
-    run: wrap(`${verb === 'done' ? 'Done' : 'Snooze'}: ${subject}`, () => act.mail(id, verb)),
-  })
   const pick = (a: Agent, talk = false) => { setSel(a.pid); setTell(talk) }
   // The work feed (item_204) drives the list; null on a core without it (old sections stay).
   const work = workOf(snap.sections.work)
@@ -246,10 +237,10 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   }
 
   return {
-    snap, refresh, slots, agents, runs, sessions, resumable, mail, projects, accounts,
+    snap, refresh, slots, agents, runs, sessions, resumable, projects, accounts,
     sheet, setSheet, log, picked, slotOf, since, pick, tell, setTell, text, setText, ask, setAsk, submitAsk,
     form, setForm, run, setRun, start, setStart,
-    send, pause, stop, dispatch, open, resume, flag, answer, queue, cancel,
+    send, pause, stop, dispatch, open, resume, answer, queue, cancel,
     work, groups, shown, counts, openWork,
   }
 }
@@ -324,37 +315,13 @@ function Ask({ d, a }: { d: D; a: Agent }) {
 
 function Needs({ d, short }: { d: D; short?: boolean }) {
   const waiting = d.sessions.filter(waits)
-  if (!waiting.length && !d.mail.length) return <div className="sm">Nothing waits on you.</div>
+  if (!waiting.length) return <div className="sm">Nothing waits on you.</div>
   return (
     <div className="list">
       {waiting.map((a) => (
         <div key={a.pid} className="row edge-n">
           <Diamond s={short ? 13 : 12} /><span className="f1">{nameOf(a)}<span className="sm"> · {a.account}</span></span>
           <button type="button" className="btn p" onClick={() => d.pick(a, !a.prompt)}>Answer</button>
-        </div>
-      ))}
-      {d.mail.map((m) => (
-        <div key={m.id} className="row edge-n">
-          <Mail /><span className="f1">{m.subject}{m.from && <span className="sm"> · {m.from}</span>}</span>
-          <button type="button" className="btn" onClick={() => d.flag(m.id, m.subject, 'snooze')}>Snooze</button>
-          <button type="button" className="btn p" onClick={() => d.flag(m.id, m.subject, 'done')}>Done</button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Flagged mail stays under the work list until the work feed carries it.
-function FlagMail({ d }: { d: D }) {
-  if (!d.mail.length) return null
-  return (
-    <div className="list">
-      <div className="grp c-n">Flagged mail <span className="sm">{d.mail.length}</span></div>
-      {d.mail.map((m) => (
-        <div key={m.id} className="row edge-n">
-          <Mail /><span className="f1">{m.subject}{m.from && <span className="sm"> · {m.from}</span>}</span>
-          <button type="button" className="btn" onClick={() => d.flag(m.id, m.subject, 'snooze')}>Snooze</button>
-          <button type="button" className="btn p" onClick={() => d.flag(m.id, m.subject, 'done')}>Done</button>
         </div>
       ))}
     </div>
@@ -368,7 +335,6 @@ function Work({ d, id }: { d: D; id: string }) {
       <Ph id={id} sm={<span className="num">{d.shown}</span>}>Work</Ph>
       <div className="wscroll">
         <WorkList groups={d.groups} now={d.snap.now} open={d.openWork} />
-        <FlagMail d={d} />
       </div>
     </section>
   )
@@ -499,7 +465,7 @@ function DeskLaptop({ d }: { d: D }) {
   const working = d.agents.filter((a) => a.state === 'working')
   const accts = [...new Set(working.map((a) => a.account))].join(', ')
   const waiting = d.sessions.filter(waits)
-  const needs = d.counts ? d.counts.needs : waiting.length + d.mail.length
+  const needs = d.counts ? d.counts.needs : waiting.length
   const longest = Math.max(0, ...(d.work ?? []).filter((w) => w.state === 'needs').map((w) => w.wait_s ?? 0))
   const oldest = d.work
     ? (longest ? new Date(d.snap.now.getTime() - longest * 1000).toISOString() : undefined)
@@ -568,7 +534,7 @@ function DeskLaptop({ d }: { d: D }) {
 // ---- Fold inner (board fold-desk-inner) ----
 function DeskInner({ d }: { d: D }) {
   const a = d.picked
-  const needs = d.sessions.filter(waits).length + d.mail.length
+  const needs = d.sessions.filter(waits).length
   return (
     <div className="desk desk-in">
       <div className="col">
@@ -639,7 +605,6 @@ function DeskCover({ d }: { d: D }) {
         <section className="gl" aria-labelledby="cw">
           <h2 className="gls" id="cw"><span>Work</span><span className="num">{d.shown}</span></h2>
           <WorkList groups={d.groups} now={d.snap.now} open={(w) => d.openWork(w, true)} />
-          <FlagMail d={d} />
         </section>
         {a && hero}
         {(d.form || d.log.length > 0) && <Chat d={d} />}
