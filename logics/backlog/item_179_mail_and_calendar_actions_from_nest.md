@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 75%
-> Confidence: 65%
+> Understanding: 90%
+> Confidence: 80%
 > Progress: 0%
 > Complexity: High
 > Theme: General
@@ -49,6 +49,8 @@
 # Priority
 - Priority: Medium
 - Rationale: daily need, but reading already works in Outlook.
+
+- 2026-11-15 owner: mail lives in Inbox (approved board item_138 fold-inbox: To answer, Drafts ready, FYI), not on a Work screen. Mail detail, reply and send flows go in Inbox.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
