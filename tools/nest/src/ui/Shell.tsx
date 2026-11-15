@@ -1,11 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 import { countByState, openInbox } from '../data/state'
 import { homeCounts } from '../data/home'
 import type { Snapshot } from '../data/useData'
 import { ago, headerClock, time } from '../format'
 import { Link } from '../router'
 import { Glyph } from './Glyph'
-import { TABS, TabIcon, type TabKey } from './icons'
+import { MORE_ICON, SCOPE_ICONS, TABS, TabIcon, type TabKey } from './icons'
+import { BAR_KEYS, MORE_KEYS, barTab } from './tabs'
+import { nextScope, scopeChip, type ScopeMode } from '../data/scope'
 
 type Theme = 'modern' | 'cyber'
 
@@ -26,7 +28,22 @@ function badges(snap: Snapshot | null): Partial<Record<TabKey, { n: number; fail
   return { missions: { n: c.failed, failed: true }, inbox: { n: asks } }
 }
 
-export function Shell({ active, snap, children }: { active: TabKey; snap: Snapshot | null; children: ReactNode }) {
+// Header A (item_206): one chip after the logo cycles the scope filter.
+function ScopeChip({ scope, setScope }: { scope: ScopeMode; setScope: (m: ScopeMode) => void }) {
+  const t = scopeChip(scope)
+  return (
+    <button type="button" className="scope-chip" aria-label={t.name} aria-pressed={t.pressed} title={t.name} onClick={() => setScope(nextScope(scope))}>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round">
+        {SCOPE_ICONS[scope]}
+      </svg>
+      {t.label}
+    </button>
+  )
+}
+
+interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; children: ReactNode }
+
+export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
   const [theme, toggle] = useTheme()
   const b = badges(snap)
   const c = snap ? homeCounts(snap) : null
@@ -36,6 +53,8 @@ export function Shell({ active, snap, children }: { active: TabKey; snap: Snapsh
     <div className="app">
       <header className="top">
         <Link href="/" className="logo" aria-label="CR-0W home">CR-0W</Link>
+        <ScopeChip scope={scope} setScope={setScope} />
+        <span className="hdr-sep" aria-hidden="true" />
         <nav className="pills" aria-label="Tabs">
           {TABS.map((t, i) => (
             <Link key={t.key} href={t.path} className="pill" aria-current={t.key === active ? 'page' : undefined}>
@@ -71,17 +90,83 @@ export function Shell({ active, snap, children }: { active: TabKey; snap: Snapsh
         </button>
       </header>
       <main className="main" id="main">{children}</main>
-      <nav className="tabbar" aria-label="Tabs">
-        {TABS.map((t) => (
-          <Link key={t.key} href={t.path} className="tab" aria-current={t.key === active ? 'page' : undefined}>
-            <TabIcon>{t.icon}</TabIcon>
-            {t.label}
-            {b[t.key]?.n ? (
-              <span className={`badge${b[t.key]!.failed ? ' f' : ''}`} aria-label={`${b[t.key]!.n} ${b[t.key]!.failed ? 'failed' : 'to answer'}`}>{b[t.key]!.n}</span>
-            ) : null}
-          </Link>
-        ))}
-      </nav>
+      <TabBar active={active} b={b} />
     </div>
+  )
+}
+
+type Badges = ReturnType<typeof badges>
+
+// Phone tab bar B (item_206): Home, Desk, Missions, Inbox, More. More opens a sheet
+// with MRs, Agenda and Reports and stays highlighted while one of them is open.
+function TabBar({ active, b }: { active: TabKey; b: Badges }) {
+  const [open, setOpen] = useState(false)
+  const btn = useRef<HTMLButtonElement>(null)
+  const sheet = useRef<HTMLUListElement>(null)
+  const id = useId()
+  const cur = barTab(active)
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false)
+    if (refocus) btn.current?.focus()
+  }, [])
+  useEffect(() => {
+    if (!open) return
+    const items = sheet.current
+    ;(items?.querySelector<HTMLElement>('[aria-current="page"]') ?? items?.querySelector<HTMLElement>('a'))?.focus()
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); close(true) } }
+    const down = (e: PointerEvent) => {
+      const t = e.target as Node
+      if (!items?.contains(t) && !btn.current?.contains(t)) close(false)
+    }
+    addEventListener('keydown', key)
+    document.addEventListener('pointerdown', down)
+    return () => {
+      removeEventListener('keydown', key)
+      document.removeEventListener('pointerdown', down)
+    }
+  }, [open, close])
+  const blur = (e: FocusEvent<HTMLUListElement>) => {
+    const to = e.relatedTarget as Node | null
+    if (to && !sheet.current?.contains(to) && to !== btn.current) close(false)
+  }
+  const tabs = TABS.filter((t) => (BAR_KEYS as readonly TabKey[]).includes(t.key))
+  const more = TABS.filter((t) => (MORE_KEYS as readonly TabKey[]).includes(t.key))
+  const openMore = more.find((t) => t.key === active)
+  return (
+    <nav className="tabbar" aria-label="Tabs">
+      {tabs.map((t) => (
+        <Link key={t.key} href={t.path} className="tab" aria-current={t.key === cur ? 'page' : undefined}>
+          <TabIcon>{t.icon}</TabIcon>
+          {t.label}
+          {b[t.key]?.n ? (
+            <span className={`badge${b[t.key]!.failed ? ' f' : ''}`} aria-label={`${b[t.key]!.n} ${b[t.key]!.failed ? 'failed' : 'to answer'}`}>{b[t.key]!.n}</span>
+          ) : null}
+        </Link>
+      ))}
+      <button
+        ref={btn}
+        type="button"
+        className="tab"
+        aria-expanded={open}
+        aria-controls={id}
+        aria-current={cur === 'more' ? 'page' : undefined}
+        onClick={() => (open ? close(false) : setOpen(true))}
+      >
+        <TabIcon>{MORE_ICON}</TabIcon>
+        More{openMore && <span className="sr-only">, {openMore.label} open</span>}
+      </button>
+      {open && (
+        <ul ref={sheet} id={id} className="more-sheet" aria-label="More screens" onBlur={blur}>
+          {more.map((t) => (
+            <li key={t.key}>
+              <Link href={t.path} className="more-item" aria-current={t.key === active ? 'page' : undefined} onClick={() => close(true)}>
+                <TabIcon>{t.icon}</TabIcon>
+                {t.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </nav>
   )
 }

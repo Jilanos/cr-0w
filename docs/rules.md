@@ -7,6 +7,7 @@ what it may do alone and what needs your OK. Hooks enforce it.
 |---|---|
 | Accounts crow may use (`use`, `ask-first`, `never`) and how memory is shared | `local/accounts.yaml` (start from [`accounts.example.yaml`](accounts.example.yaml)) |
 | Your projects: path, scope (work or personal), forge, identity, status | `local/projects.yaml` |
+| Where a project shows in the Nest scope filter: `nest_scope` (work, personal or both; default `scope`). `scope` still picks identity and accounts | `local/projects.yaml` |
 | Words and patterns that must never reach a commit or a push | `local/commit-msg-deny.txt`, `local/prepush-deny.txt` |
 | What the hub may do alone: commit, push, merge, send mail, run infra, start runs | the autonomy table in [`CLAUDE.md`](../CLAUDE.md) |
 | Your commit format | the commit-msg hook, `bin/crow-commit-msg-check` |

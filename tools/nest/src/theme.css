@@ -170,8 +170,30 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
   font-variant-numeric: tabular-nums;
 }
 [data-theme='cyber'] .chip { border-radius: 0; clip-path: var(--clip-btn); }
+/* Scope chip (header A, item_206): cycles all > work > perso. */
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 700 11px var(--font-head);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+}
+.scope-chip::after { content: ''; position: absolute; inset: -9px -2px; }
+.scope-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-theme='cyber'] .scope-chip { border-radius: 0; clip-path: var(--clip-btn); }
+.hdr-sep { display: none; width: 1px; height: 24px; background: var(--line); flex: none; }
 .link-down { font-size: 12px; color: var(--c-f); white-space: nowrap; }
-.clock { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.clock { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .icon-btn {
   min-width: 44px;
   min-height: 44px;
@@ -230,13 +252,51 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
   margin: 2px 0;
   border-radius: 9px;
   clip-path: var(--clip-btn);
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--dim);
-  font-size: 9.5px;
-  font-weight: 600;
+  font: 600 11px var(--font-head);
   letter-spacing: 0.02em;
-  font-family: var(--font-head);
+  cursor: pointer;
 }
-.tab[aria-current='page'] { background: var(--accent-soft); color: var(--accent); }
+/* Board B: More is 12px wider than the four tabs. */
+.tabbar > button.tab { flex-basis: 12px; }
+.tab[aria-current='page'],
+.tab[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent); }
+/* While the More sheet is open, More is the only highlighted tab. */
+.tabbar:has(.tab[aria-expanded='true']) a.tab[aria-current='page'] { background: none; color: var(--dim); }
+/* More sheet (tab bar B, item_206): anchored above the More tab. */
+.more-sheet {
+  position: absolute;
+  right: 8px;
+  bottom: calc(100% + 8px);
+  width: 190px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--fg);
+  font: 600 13px var(--font-head);
+}
+.more-item:hover { background: var(--row); }
+.more-item[aria-current='page'] { background: var(--accent-soft); color: var(--accent); }
+.more-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tab .badge {
   position: absolute;
   top: 4px;
@@ -383,13 +443,18 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .span2 { grid-column: 1 / -1; }
 .ga { grid-area: a; } .gb { grid-area: b; } .gc { grid-area: c; }
 .home { grid-template-areas: 'a' 'b' 'c'; }
-@media (max-width: 599.98px) { .only-inner { display: none !important; } }
+@media (max-width: 599.98px) {
+  .only-inner { display: none !important; }
+  /* Header A on cover: logo, scope chip, two status chips, clock and theme fit 360px. */
+  .top { gap: 6px; padding: 0 8px 0 12px; }
+  .top .logo { margin-right: 2px; }
+  .top .chip { padding: 2px 7px; }
+  .top .icon-btn { min-width: 34px; }
+}
 
 @media (min-width: 600px) {
-  .tabbar { display: none; }
-  .app { grid-template-rows: auto 1fr; }
-  .pills { display: flex; }
-  .top .chips { display: none; }
+  /* Header A (item_206): fold inner keeps the bottom tab bar; the clock reads bold. */
+  .clock { font: 600 13px var(--font-body); color: var(--fg); }
   .only-cover { display: none !important; }
   .home { grid-template-columns: minmax(260px, 300px) 1fr; grid-template-areas: 'a b' 'a c'; align-items: start; }
   .missions { grid-template-columns: 1fr 1fr; align-items: start; }
@@ -411,26 +476,36 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .top .logo { white-space: nowrap; }
 .top .chips { flex-wrap: nowrap; }
 @media (min-width: 1200px) {
-  .app { height: 100vh; }
-  .top { height: 56px; gap: 22px; padding: 0 20px; background: var(--hdr); }
+  .app { height: 100vh; grid-template-rows: auto 1fr; }
+  .tabbar { display: none; }
+  .pills { display: flex; }
+  .hdr-sep { display: block; }
+  .scope-chip { height: 28px; padding: 0 10px; }
+  /* The spacer would take a gap on each side: keep one so the cyber header fits 1440px. */
+  .top .grow { margin-right: calc(-1 * var(--top-gap)); }
+  .top { --top-gap: 18px; height: 56px; gap: var(--top-gap); padding: 0 20px; background: var(--hdr); }
+  .top { min-width: 0; }
+  .top > * { flex-shrink: 0; }
   .top .logo { font-size: 18px; letter-spacing: 0.14em; color: var(--logo-lp); }
   .pills { gap: 4px; font: 600 13px var(--font-head); letter-spacing: 0.04em; text-transform: uppercase; }
-  .pill { min-height: 0; padding: 6px 12px; border-radius: 7px; gap: 0; }
+  .pill { min-height: 0; padding: 6px 10px; border-radius: 7px; gap: 0; }
   .pill .tn { display: inline; margin-right: 0.5em; }
   .pill .badge-t { margin-left: 0.5em; }
   .clock .short { display: none; }
   .link-down .long { display: inline; }
   .clock .long { display: inline; font: 600 13px var(--font-body); letter-spacing: 0.04em; color: var(--fg); }
   .main { overflow: hidden; background: var(--dots); }
-  .accts { display: flex; gap: 14px; font: 600 11px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
-  .acct { display: flex; gap: 6px; align-items: center; }
-  .acct .gb { width: 60px; height: 6px; border-radius: 3px; background: var(--line); }
+  /* Gauge bars give up width first when all scopes and badges fill the row. */
+  .top > .accts { flex-shrink: 1; min-width: 0; }
+  .accts { display: flex; gap: 12px; font: 600 11px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+  .acct { display: flex; gap: 6px; align-items: center; min-width: 0; flex: 0 1 auto; }
+  .acct .gb { width: 60px; flex-shrink: 1; min-width: 16px; height: 6px; border-radius: 3px; background: var(--line); }
 }
 [data-theme='cyber'] .lp { text-transform: lowercase; }
 @media (min-width: 1200px) {
-  [data-theme='cyber'] .top { border-bottom-color: var(--chrome); }
+  [data-theme='cyber'] .top { --top-gap: 14px; border-bottom-color: var(--chrome); }
   [data-theme='cyber'] .top .logo { font: 700 20px var(--font-display); letter-spacing: 0.2em; text-shadow: var(--logo-glow); }
-  [data-theme='cyber'] .pills { font-size: 14px; letter-spacing: 0.14em; }
+  [data-theme='cyber'] .pills { font-size: 14px; letter-spacing: 0.08em; }
   [data-theme='cyber'] .pill { border-radius: 0; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
   [data-theme='cyber'] .acct .gb { border-radius: 0; background: var(--line); }
   [data-theme='cyber'] .accts { color: var(--fg); }
