@@ -4,7 +4,7 @@
 > Status: Ready
 > Understanding: 80%
 > Confidence: 70%
-> Progress: 0%
+> Progress: 35%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -51,3 +51,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Decisions
+- 2026-11-16 AC1: sketches for A (projector table) and B (war table) approved for static renders. Sketches and compare page in the vault crow folder under `Research/nest-design/item_212/board-sketch/`.
+- B change: no raised 3D hex tile under each planet (reads crowded). The board stays a flat hex etch; priority and state move off the tile (next pass shows how, e.g. a flat lit hex patch and a light thread).
