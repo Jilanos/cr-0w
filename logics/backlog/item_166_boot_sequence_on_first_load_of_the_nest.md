@@ -58,6 +58,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-16T08:56:10.224851+00:00 | cdx | 644704401afd4dffb2ff4705e88f692b | item_166 scan line boot | running |  |  |
+| 2026-11-16T09:02:21.899241+00:00 | cdx | 644704401afd4dffb2ff4705e88f692b | item_166 scan line boot | succeeded |  |  |
 | 2026-11-15T09:13:18.678237+00:00 | cdx | 03beba0f55004df589ee3714538ab02a | item_166 boot options (continue) | succeeded |  |  |
 | 2026-11-15T08:48:47.829182+00:00 | cdx | 29d60d047eb94faf81066360609533f0 | item_166 boot options | succeeded |  |  |
+
