@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 75%
-> Confidence: 70%
+> Understanding: 85%
+> Confidence: 80%
 > Progress: 0%
 > Complexity: Medium
 > Theme: Nest
@@ -40,6 +40,7 @@
 - Primary task(s): (none yet)
 
 # Notes
+- 2026-11-16: owner focuses on Nest first; deck work waits after the Nest queue (204, 208, 166, 212, 210, 211).
 - Owner decision 2026-11-13: work = live sessions, background runs, parked sessions, MRs/PRs with CI, plus missions. Missions are an automatic optional grouping (goal, end state, delegation contract), never created by hand, never a separate list.
 - Read `local/owner-prefs.md` before building. Visual changes need rendered options first.
 
