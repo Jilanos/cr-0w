@@ -22,6 +22,7 @@
   - Cover "tell you" button: Nest said "sent", the session never received the text.
 - Seen 2026-11-16 on the phone and on the laptop web Nest (owner):
   - Assistant text written in the same turn as a tool call (text, then Bash or AskUserQuestion) shows in the terminal but not in the Nest chat. Text that ends a turn shows.
+  - Shift+Enter in the send box sends the message instead of adding a new line (laptop web): a one-letter message "a" went out by mistake.
   - Owner messages arrive with stray digits in front ("123what's…", "1ok…"): likely option-digit keys from the ask dock left in the session's input line.
 
 # Scope
@@ -39,7 +40,8 @@
 - AC3: A "tell you" message from the cover lands in the session; a failed delivery shows an error, never "sent".
 - AC4: Every assistant text block of a turn shows in the Nest chat on every layout (laptop web, inner, cover), including text before a tool call.
 - AC5: On every layout, answering an ask from Nest leaves no stray keys in the session's input; the next typed message arrives clean.
-- AC6: Live test on a hidden tmux session at 1440x900, 707x691 and 368x812; tsc, vitest, pytest, go test pass.
+- AC6: Shift+Enter adds a new line in the send box on every layout; Enter sends; a multi-line message reaches the session with its line breaks.
+- AC7: Live test on a hidden tmux session at 1440x900, 707x691 and 368x812; tsc, vitest, pytest, go test pass.
 
 # Links
 - Builds on item_193 (AskUserQuestion buttons) and item_170 (free text send).
