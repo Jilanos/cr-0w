@@ -1009,7 +1009,10 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 :is(.chat-cv, .desk-cv) .ask { border: 1px solid #eed49f; background: rgba(238, 212, 159, 0.1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.45; flex: none; }
 .chat-cv .ask .aq code { font-family: var(--font-head); font-size: 12px; overflow-wrap: anywhere; }
 :is(.chat-cv, .desk-cv) .gb { display: flex; gap: 8px; }
-/* Docked AskUserQuestion (item_193, board A), on the chat and the cover. */
+/* Docked AskUserQuestion (item_193, board A), on the chat and the cover. Capped to the viewport; the body scrolls, the buttons stay. */
+:is(.chat-cv, .desk-cv) .ask-q { flex: 0 1 auto; min-height: 0; max-height: 60vh; max-height: 60dvh; box-sizing: border-box; }
+:is(.chat-cv, .desk-cv) .ask-q .ab { display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+:is(.chat-cv, .desk-cv) .ask-q > .who, :is(.chat-cv, .desk-cv) .ask-q > .gb { flex: none; }
 :is(.chat-cv, .desk-cv) .ask-q .stp { display: flex; flex-wrap: wrap; gap: 6px; }
 :is(.chat-cv, .desk-cv) .ask-q .stp button { all: unset; cursor: pointer; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--sub); font: 600 10.5px var(--font-head); letter-spacing: 0.05em; text-transform: uppercase; }
 :is(.chat-cv, .desk-cv) .ask-q .stp button.on { border-color: #eed49f; color: #eed49f; }
