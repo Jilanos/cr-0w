@@ -3,8 +3,8 @@
 > Schema version: 1.0
 > Status: In progress
 > Understanding: 90%
-> Confidence: 85%
-> Progress: 65%
+> Confidence: 90%
+> Progress: 80%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -64,10 +64,12 @@
   - Inbox badge counts everything in "To answer", mail included.
   - Desk cyber keeps the state-colour left edge (row style, not an outline).
   - Anything waiting on the owner's answer carries a "Question" tag, whatever asks it (mission, run, session); the source shows on the second line.
+- 2026-11-16: Inbox review built on branch `nest-work-rows`, shots pending from the hub. Rows use the board row (kind icon in the state colour, title and time over source · status). Questions come from mission asks and from sessions and runs waiting on a prompt; a mission's needs item is its ask, listed once; MRs asking a review stay off. The badge is the "To answer" row count. Desk is unchanged.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-16T08:29:13.879357+00:00 | cdx | abd3305869214363b67ba524e23953f6 | item_204 Inbox rework | running |  |  |
 | 2026-11-15T11:02:58.732084+00:00 | cdx | 9f7a81c273974ac98760dcd8d2c1ca96 | item_204 Inbox | succeeded |  |  |
 | 2026-11-15T09:07:21.014666+00:00 | cdx | 357510a13cac4e66963502e012cb6241 | item_204 data layer + Desk build | succeeded |  |  |
 | 2026-11-13T18:52:21.845294+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | succeeded |  |  |
