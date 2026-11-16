@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 95%
-> Confidence: 90%
-> Progress: 60%
+> Understanding: 98%
+> Confidence: 95%
+> Progress: 90%
 > Complexity: Low
 > Theme: nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -53,9 +53,11 @@
 - 2026-11-15: three boot options prototyped behind `?boot=a|b|c` (A trace, B scan line, C unfold), each planned under 1.5 s. The flag replays on every load; the real boot (`REAL_BOOT`, unset) runs once per session. Home is never hidden more than 1 s. Recordings not made yet (`npm run reel:boot`); pick pending.
 - 2026-11-15: recordings made from the hub (runs cannot launch the browser): `Research/nest-design/item_166/{A,B,C}/`, compare page `spec.html`, timing 1.16 to 1.42 s. Pick pending (owner reviews at the laptop).
 - 2026-11-16: owner picked B (scan line). Build B as the real boot, drop A and C.
+- 2026-11-16: scan line is the real boot (branch `nest-boot`): first Home load of a session, skipped with reduced motion, planned end 1.3 s, safety stop at 1.5 s, Home hidden at most 1 s, theme tones read at run time. A and C code removed. `?boot=1` (or `?boot=b`) replays it; `npm run reel:boot -- <out dir>` records B only. AC1 and AC2 covered by `src/boot/plan.test.ts`. AC3 open: hub records the reel, owner approves it.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-16T08:56:10.224851+00:00 | cdx | 644704401afd4dffb2ff4705e88f692b | item_166 scan line boot | running |  |  |
 | 2026-11-15T09:13:18.678237+00:00 | cdx | 03beba0f55004df589ee3714538ab02a | item_166 boot options (continue) | succeeded |  |  |
 | 2026-11-15T08:48:47.829182+00:00 | cdx | 29d60d047eb94faf81066360609533f0 | item_166 boot options | succeeded |  |  |
