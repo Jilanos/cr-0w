@@ -3,14 +3,13 @@ import { mailOf, type Mail } from './live'
 import type { InboxItem } from './types'
 import { workOf, type WorkItem } from './work'
 
-// The Inbox "To answer" list (item_204, owner 2026-11-15 and 2026-11-16): failed work,
-// questions and flagged or important mail, read from the scoped snapshot. A question is
-// anything waiting on the owner's answer: a crow inbox question (`ask`, from a mission)
-// or a live session or run waiting on a prompt (`prompt`).
+// The Inbox "To answer" list (item_204, owner 2026-11-16 second review): only what the
+// owner reads or answers. A question is a crow inbox question (`ask`, from a mission) or a
+// live session or run waiting on a prompt (`prompt`); mail is flagged or important mail.
+// Failed runs and red-pipeline MRs stay on Desk.
 export type AnswerRow =
   | { key: string; kind: 'ask'; at: string; item: InboxItem }
   | { key: string; kind: 'prompt'; at?: string; item: WorkItem }
-  | { key: string; kind: 'failed'; at?: string; item: WorkItem }
   | { key: string; kind: 'mail'; at?: undefined; item: Mail }
 
 export const isAsk = (r: InboxItem) => r.state === 'open' && r.type !== 'fyi'
@@ -33,22 +32,19 @@ function waitFrom(w: WorkItem, now?: Date): string | undefined {
   return w.since
 }
 
-// Failed items first, then questions and mail by how long they wait.
+// Questions and mail by how long they wait.
 export function toAnswer(inbox: InboxItem[], work: WorkItem[] | null, mail: Mail[], now?: Date): AnswerRow[] {
-  const failed: AnswerRow[] = (work ?? []).filter((w) => w.state === 'failed')
-    .map((w) => ({ key: `w:${w.id}`, kind: 'failed' as const, at: w.since, item: w }))
   const asks: AnswerRow[] = inbox.filter(isAsk).map((r) => ({ key: `q:${r.id}`, kind: 'ask' as const, at: r.created, item: r }))
   const prompts: AnswerRow[] = (work ?? []).filter(isPrompt)
     .map((w) => ({ key: `w:${w.id}`, kind: 'prompt' as const, at: waitFrom(w, now), item: w }))
   const mails: AnswerRow[] = mail.map((m) => ({ key: `m:${m.id}`, kind: 'mail' as const, item: m }))
-  return [...failed.sort(byWait), ...[...asks, ...prompts, ...mails].sort(byWait)]
+  return [...asks, ...prompts, ...mails].sort(byWait)
 }
 
 export const answerOf = (s: Snapshot) => toAnswer(s.inbox, workOf(s.sections.work), mailOf(s.sections.today), s.now)
 
 // Inbox tab badge (owner 2026-11-16): the number of rows in "To answer", so the badge
-// and the list always agree. It reads failed when any of them failed.
-export function inboxBadge(s: Snapshot): { n: number; failed?: boolean } {
-  const rows = answerOf(s)
-  return { n: rows.length, failed: rows.some((r) => r.kind === 'failed') }
+// and the list always agree.
+export function inboxBadge(s: Snapshot): { n: number } {
+  return { n: answerOf(s).length }
 }

@@ -24,11 +24,13 @@ const refresh = async () => {}
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('Inbox to answer (item_204)', () => {
-  it('lists failed work first, then questions, then mail, in the board row', async () => {
+  it('lists questions then mail in the board row, no failed work (owner 2026-11-16)', async () => {
     at(707)
     const html = render(<Inbox snap={await snapshot()} refresh={refresh} />)
     const titles = [...html.matchAll(/class="row irow[^"]*".*?<b>(.*?)<\/b>/g)].map((m) => m[1])
-    expect(titles[0]).toBe('night job')
+    expect(titles.length).toBeGreaterThan(2)
+    expect(titles).not.toContain('night job')
+    expect(titles.some((t) => t.startsWith('!230'))).toBe(false)
     expect(titles.slice(-2)).toEqual(['Invoice to check', 'Contract renewal'])
     expect(html).toContain('<span>To answer</span><span class="num">' + titles.length + '</span>')
   })
@@ -40,28 +42,33 @@ describe('Inbox to answer (item_204)', () => {
     const rows = list.split('<button').slice(1)
     expect(rows.length).toBeGreaterThan(0)
     for (const r of rows) {
-      expect(r).toMatch(/<span class="ic c-[fn]"><svg/)
+      expect(r).toMatch(/<span class="ic c-n"><svg/)
       expect(r).toMatch(/<span class="t"><b>[^<]+<\/b><span>/)
       expect(r).not.toContain('ktag')
       expect(r).not.toContain('class="ws"')
     }
-    expect(rows[0]).toContain('<span class="ic c-f">')
-    expect(rows[0]).toContain('cr-0w · <span class="c-f">run failed</span>')
+    expect(list).not.toContain('c-f')
     expect(list).toContain('session · lambda')
     expect(list).toContain('mission · ')
     expect(list).toContain('Accounting · <span>flagged</span>')
     expect(list).toContain('Legal · <span>important</span>')
   })
 
-  it('opens the cover on the first failed item', async () => {
+  it('opens the cover on the first question, never a failed item', async () => {
     at(368)
     const html = render(<Inbox snap={await snapshot()} refresh={refresh} />)
-    expect(html).toMatch(/<h2 class="gh" id="ct">night job<\/h2>/)
+    expect(html).toContain('<h2 class="gh" id="ct">')
+    expect(html).not.toContain('night job')
     expect(html).toContain('Also today')
   })
 })
 
 describe('Desk without flagged mail (item_204)', () => {
+  it('keeps the failed run that left Inbox (owner 2026-11-16)', async () => {
+    at(707)
+    expect(render(<Desk snap={await snapshot()} refresh={refresh} />)).toContain('night job')
+  })
+
   it('shows no mail group at any width', async () => {
     for (const w of [368, 707, 1440]) {
       at(w)

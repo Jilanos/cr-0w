@@ -5,7 +5,7 @@ import { answerOf, inboxBadge, toAnswer } from './inbox'
 import type { Mail } from './live'
 import { scopeSnapshot } from './scope'
 import type { InboxItem } from './types'
-import type { WorkItem } from './work'
+import { workOf, type WorkItem } from './work'
 
 const snapshot = async (): Promise<Snapshot> => {
   const box: { s?: Snapshot } = {}
@@ -20,13 +20,13 @@ const work = (id: string, state: WorkItem['state'], since?: string, extra: Parti
 const mail = (id: string): Mail => ({ id, subject: id })
 
 describe('toAnswer', () => {
-  it('puts failed work first, then questions and mail by wait', () => {
+  it('lists questions and mail by wait, never failed work (owner 2026-11-16)', () => {
     const rows = toAnswer(
       [ask('q-new', '2026-11-09T15:00:00+01:00'), ask('q-old', '2026-11-09T10:00:00+01:00'), ask('f', '2026-11-09T09:00:00+01:00', { type: 'fyi' })],
       [work('w-late', 'failed', '2026-11-09T15:30:00+01:00'), work('w-needs', 'needs', '2026-11-09T08:00:00+01:00'), work('w-early', 'failed', '2026-11-09T11:00:00+01:00')],
       [mail('m-1'), mail('m-2')],
     )
-    expect(rows.map((r) => r.key)).toEqual(['w:w-early', 'w:w-late', 'w:w-needs', 'q:q-old', 'q:q-new', 'm:m-1', 'm:m-2'])
+    expect(rows.map((r) => r.key)).toEqual(['w:w-needs', 'q:q-old', 'q:q-new', 'm:m-1', 'm:m-2'])
   })
 
   it('skips answered questions and works without the work feed', () => {
@@ -37,11 +37,18 @@ describe('toAnswer', () => {
   it('merges the fixture sources', async () => {
     const rows = answerOf(await snapshot())
     const kinds = rows.map((r) => r.kind)
-    expect(kinds.slice(0, 2)).toEqual(['failed', 'failed'])
-    expect(rows.slice(0, 2).map((r) => r.key)).toEqual(['w:run:0ff1ce01', expect.stringMatching(/^w:mr:/)])
-    expect(kinds).toContain('ask')
+    expect(new Set(kinds)).toEqual(new Set(['ask', 'prompt', 'mail']))
     expect(rows.filter((r) => r.kind === 'mail').map((r) => r.key)).toEqual(['m:mail-2', 'm:mail-1'])
     expect(kinds.lastIndexOf('ask')).toBeLessThan(kinds.indexOf('mail'))
+  })
+
+  it('has no failed run or MR row (owner 2026-11-16)', async () => {
+    const s = await snapshot()
+    expect(workOf(s.sections.work)?.some((w) => w.state === 'failed')).toBe(true)
+    const rows = answerOf(s)
+    expect(rows.map((r) => r.key)).not.toContain('w:run:0ff1ce01')
+    expect(rows.some((r) => r.key.startsWith('w:mr:'))).toBe(false)
+    expect(rows.some((r) => r.kind === 'prompt' && r.item.state === 'failed')).toBe(false)
   })
 })
 
@@ -78,7 +85,7 @@ describe('questions (owner 2026-11-16)', () => {
   it('maps the fixture sessions waiting on a prompt', async () => {
     const rows = answerOf(await snapshot())
     expect(rows.filter((r) => r.kind === 'prompt').map((r) => r.key).sort()).toEqual(['w:session:5151', 'w:session:5252', 'w:session:6161'])
-    expect(rows.some((r) => r.key.startsWith('w:mr:') && r.kind !== 'failed')).toBe(false)
+    expect(rows.some((r) => r.key.startsWith('w:mr:'))).toBe(false)
     expect(rows.some((r) => r.key.startsWith('w:mission:'))).toBe(false)
   })
 })
@@ -98,7 +105,7 @@ describe('inboxBadge (owner 2026-11-16)', () => {
     const s = await snapshot()
     const rows = answerOf(s)
     expect(rows.some((r) => r.kind === 'mail')).toBe(true)
-    expect(inboxBadge(s)).toEqual({ n: rows.length, failed: true })
+    expect(inboxBadge(s)).toEqual({ n: rows.length })
   })
 
   it('equals the To answer length in every scope', async () => {
@@ -112,6 +119,6 @@ describe('inboxBadge (owner 2026-11-16)', () => {
   it('equals the To answer length without the work feed', async () => {
     const s = await snapshot()
     const bare = { ...s, sections: { ...s.sections, work: undefined } } as unknown as Snapshot
-    expect(inboxBadge(bare)).toEqual({ n: answerOf(bare).length, failed: false })
+    expect(inboxBadge(bare)).toEqual({ n: answerOf(bare).length })
   })
 })

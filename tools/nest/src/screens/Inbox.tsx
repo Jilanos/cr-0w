@@ -5,7 +5,7 @@ import type { Mail } from '../data/live'
 import { LABEL, type UiState } from '../data/state'
 import type { InboxItem, Mission } from '../data/types'
 import { useSource, type Snapshot } from '../data/useData'
-import { KIND_LABEL, workWhen, type WorkItem } from '../data/work'
+import { workWhen, type WorkItem } from '../data/work'
 import { ago, time, title } from '../format'
 import { Link } from '../router'
 import { REJECT, useAnswer, verbLabel } from '../ui/answer'
@@ -15,9 +15,9 @@ import { useMedia } from '../ui/useMedia'
 import { KindIcon, KindTag, TAG_LABEL, type TagKind } from '../ui/WorkList'
 
 // Inbox (item_138 boards fold-inbox-inner, fold-inbox-cover) on the mission inbox of
-// item_168. "To answer" merges questions, failed work and flagged or important mail
-// (item_204, owner 2026-11-15 and 2026-11-16) in the board row. The reading pane answers
-// a question inline, flags a mail done or snoozed, and opens a failed item.
+// item_168. "To answer" merges questions and flagged or important mail (item_204, owner
+// 2026-11-16) in the board row. Failed work stays on Desk. The reading pane answers a
+// question inline, flags a mail done or snoozed, and opens a waiting session or run.
 const INNER = '(min-width: 600px)'
 const LATER = 'Arrives with the live API'
 const short = (id: string) => id.replace(/^\d{8}-/, '')
@@ -42,7 +42,7 @@ const Unfold = () => (
   </svg>
 )
 
-// Where a failed or waiting work item opens: its mission, the MRs, or the Desk for live work.
+// Where a waiting work item opens: its mission, the MRs, or the Desk for live work.
 export function workHref(w: WorkItem) {
   if (w.kind === 'mission') return `/missions/${encodeURIComponent(w.source.ref)}`
   if (w.kind === 'mr') return '/mrs'
@@ -55,10 +55,6 @@ export function workHref(w: WorkItem) {
 interface Line { state: UiState; title: string; src: string; status?: string; kind: TagKind; at?: string; when: string; why?: string }
 function lineOf(r: AnswerRow, missions: Mission[], now: Date): Line {
   const at = valid(r.at) ? time(r.at!) : undefined
-  if (r.kind === 'failed') {
-    const w = r.item
-    return { state: 'failed', title: w.title, src: w.project, status: w.why ?? `${KIND_LABEL[w.kind].toLowerCase()} failed`, kind: w.kind, at, when: workWhen(w, now), why: w.why }
-  }
   if (r.kind === 'prompt') {
     const w = r.item
     const run = w.kind === 'run'
@@ -152,7 +148,7 @@ function Verbs({ i, hide, cls }: { i: I; hide?: boolean; cls: string }) {
       </div>
     )
   }
-  if (p.kind === 'failed' || p.kind === 'prompt') {
+  if (p.kind === 'prompt') {
     return <div className={`btnrow ${cls}`}><Link className="btn p" href={workHref(p.item)}>Open</Link></div>
   }
   const item = i.a.item
@@ -182,7 +178,7 @@ function AnsRow({ i, r, cover }: { i: I; r: AnswerRow; cover?: boolean }) {
       <span className={`ic ${stateClass(l.state)}`}><KindIcon kind={l.kind} size={16} /></span>
       <span className="t">
         <b>{l.title}</b>
-        <span>{l.src}{l.status && <> · <span className={l.state === 'failed' ? 'c-f' : undefined}>{l.status}</span></>}</span>
+        <span>{l.src}{l.status && <> · <span>{l.status}</span></>}</span>
       </span>
       {l.at && <span className="tm num">{l.at}</span>}
     </button>
@@ -214,14 +210,13 @@ function Read({ i }: { i: I }) {
       </section>
     )
   }
-  if (p.kind === 'failed' || p.kind === 'prompt') {
+  if (p.kind === 'prompt') {
     const w = p.item
-    const failed = p.kind === 'failed'
     return (
       <section className="pn grow read" aria-labelledby="rt" aria-live="polite">
         <h2 className="ph" id="rt"><span className="rt">{w.title}</span>{valid(w.since) && <span className="sm num">{stamp(w.since!)}</span>}</h2>
         <div className="sm">{w.project} · <KindTag kind={w.kind} /></div>
-        <div className={`body${failed ? ' c-f' : ''}`}>{w.why ?? (failed ? 'Failed.' : 'Waiting on you.')}</div>
+        <div className="body">{w.why ?? 'Waiting on you.'}</div>
         <Verbs i={i} cls="end act" />
       </section>
     )
@@ -294,12 +289,12 @@ function Hero({ i }: { i: I }) {
     const l = i.line(p)
     return (
       <section className="gcard dhero ask" aria-labelledby="ct">
-        <div className="gt"><span className={p.kind === 'failed' ? 'c-f' : 'c-n'}>{count}</span><span className="num">{l.when}</span></div>
+        <div className="gt"><span className="c-n">{count}</span><span className="num">{l.when}</span></div>
         <div className="who">
           <span className="av" aria-hidden="true">{initials(l.src)}</span>
           <div className="hm"><h2 className="gh" id="ct">{l.title}</h2><span className="gs">{l.src} · <KindTag kind={l.kind} /></span></div>
         </div>
-        {l.why && <div className={`body${p.kind === 'failed' ? ' c-f' : ''}`}>{p.kind === 'mail' ? `${l.why} mailbox` : l.why}</div>}
+        {l.why && <div className="body">{p.kind === 'mail' ? `${l.why} mailbox` : l.why}</div>}
       </section>
     )
   }
