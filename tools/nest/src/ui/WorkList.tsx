@@ -21,15 +21,16 @@ export const TAG_ICON: Record<TagKind, ReactNode> = {
 }
 export const TAG_LABEL: Record<TagKind, string> = { ...KIND_LABEL, mail: 'Mail', question: 'Question' }
 
-export function KindTag({ kind }: { kind: TagKind }) {
+export function KindIcon({ kind, size = 13 }: { kind: TagKind; size?: number }) {
   return (
-    <span className="ktag">
-      <svg aria-hidden="true" width="13" height="13" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round">
-        {TAG_ICON[kind]}
-      </svg>
-      {TAG_LABEL[kind]}
-    </span>
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round">
+      {TAG_ICON[kind]}
+    </svg>
   )
+}
+
+export function KindTag({ kind }: { kind: TagKind }) {
+  return <span className="ktag"><KindIcon kind={kind} />{TAG_LABEL[kind]}</span>
 }
 
 function Row({ w, now, open }: { w: WorkItem; now: Date; open: (w: WorkItem) => void }) {

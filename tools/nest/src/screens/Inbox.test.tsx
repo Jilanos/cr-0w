@@ -24,16 +24,33 @@ const refresh = async () => {}
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('Inbox to answer (item_204)', () => {
-  it('lists failed work first, then questions, then mail, in row A with kind tags', async () => {
+  it('lists failed work first, then questions, then mail, in the board row', async () => {
     at(707)
     const html = render(<Inbox snap={await snapshot()} refresh={refresh} />)
-    const titles = [...html.matchAll(/class="wrow [^"]*".*?<b>(.*?)<\/b>/g)].map((m) => m[1])
+    const titles = [...html.matchAll(/class="row irow[^"]*".*?<b>(.*?)<\/b>/g)].map((m) => m[1])
     expect(titles[0]).toBe('night job')
     expect(titles.slice(-2)).toEqual(['Invoice to check', 'Contract renewal'])
-    expect(html).toContain('</svg>Mail</span>')
-    expect(html).toContain('</svg>Question</span>')
-    expect(html).not.toContain('</svg>Mission</span>')
     expect(html).toContain('<span>To answer</span><span class="num">' + titles.length + '</span>')
+  })
+
+  it('draws each row on two lines with the kind icon, no pill and no state column (owner 2026-11-16)', async () => {
+    at(707)
+    const html = render(<Inbox snap={await snapshot()} refresh={refresh} />)
+    const list = html.slice(html.indexOf('class="alist"'), html.indexOf('Drafts ready'))
+    const rows = list.split('<button').slice(1)
+    expect(rows.length).toBeGreaterThan(0)
+    for (const r of rows) {
+      expect(r).toMatch(/<span class="ic c-[fn]"><svg/)
+      expect(r).toMatch(/<span class="t"><b>[^<]+<\/b><span>/)
+      expect(r).not.toContain('ktag')
+      expect(r).not.toContain('class="ws"')
+    }
+    expect(rows[0]).toContain('<span class="ic c-f">')
+    expect(rows[0]).toContain('cr-0w · <span class="c-f">run failed</span>')
+    expect(list).toContain('session · lambda')
+    expect(list).toContain('mission · ')
+    expect(list).toContain('Accounting · <span>flagged</span>')
+    expect(list).toContain('Legal · <span>important</span>')
   })
 
   it('opens the cover on the first failed item', async () => {

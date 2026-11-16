@@ -887,11 +887,17 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .ibx .row.two .l1 .f1 { font-weight: 600; }
 .ibx .row.two > .sm { text-align: left; }
 .ibx .grp.c-q { color: var(--c-q); }
-/* To answer rows: Desk row A; the picked one carries the accent, failed rows no red edge. */
-.ibx .wlist { gap: 6px; }
-.ibx .wrow.on { background: var(--accent-soft); border-color: var(--accent); }
-[data-theme='cyber'] .ibx .wrow.s-failed { border-left-color: var(--line); }
-[data-theme='cyber'] .ibx .wrow.on { border-left-color: var(--accent); }
+/* To answer rows: the board row, kind icon left in the state colour, title and time over source · status. */
+.ibx .alist { display: flex; flex-direction: column; gap: 4px; }
+.ibx .irow { align-items: flex-start; gap: 10px; }
+.ibx .irow .ic { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--well); }
+.ibx .irow .ic svg { width: 15px; height: 15px; }
+.ibx .irow .t .c-f { color: var(--c-f); }
+.ibx .irow .tm { flex: none; font-size: 11px; color: var(--sub); padding-top: 1px; }
+.desk-cv .irow .ic { width: 36px; height: 36px; border-radius: 10px; background: rgba(36, 39, 58, 0.9); }
+.desk-cv .irow .ic svg { width: 16px; height: 16px; }
+.desk-cv .irow .tm { font-size: 12px; }
+.desk-cv .irow.on { border-left: 3px solid var(--accent); }
 .ibx .read .ktag { vertical-align: middle; }
 .ibx .body { font-size: 12px; line-height: 1.55; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ibx .well { border-left: 2px solid var(--accent); padding: 8px 10px; background: var(--well); border-radius: 0 8px 8px 0; gap: 6px; }

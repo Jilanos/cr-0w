@@ -5,18 +5,18 @@ import type { Mail } from '../data/live'
 import { LABEL, type UiState } from '../data/state'
 import type { InboxItem, Mission } from '../data/types'
 import { useSource, type Snapshot } from '../data/useData'
-import { workWhen, type WorkItem } from '../data/work'
+import { KIND_LABEL, workWhen, type WorkItem } from '../data/work'
 import { ago, time, title } from '../format'
 import { Link } from '../router'
 import { REJECT, useAnswer, verbLabel } from '../ui/answer'
-import { Glyph, stateClass } from '../ui/Glyph'
+import { stateClass } from '../ui/Glyph'
 import { Sheet, type Confirm } from '../ui/Sheet'
 import { useMedia } from '../ui/useMedia'
-import { KindTag, type TagKind } from '../ui/WorkList'
+import { KindIcon, KindTag, TAG_LABEL, type TagKind } from '../ui/WorkList'
 
 // Inbox (item_138 boards fold-inbox-inner, fold-inbox-cover) on the mission inbox of
-// item_168. "To answer" merges crow questions, failed work and flagged or important
-// mail (item_204, owner 2026-11-15) in the Desk row A style. The reading pane answers
+// item_168. "To answer" merges questions, failed work and flagged or important mail
+// (item_204, owner 2026-11-15 and 2026-11-16) in the board row. The reading pane answers
 // a question inline, flags a mail done or snoozed, and opens a failed item.
 const INNER = '(min-width: 600px)'
 const LATER = 'Arrives with the live API'
@@ -50,24 +50,27 @@ export function workHref(w: WorkItem) {
   return '/desk'
 }
 
-// One row A line per answer row: glyph, title over project · why, kind tag, state over time.
-interface Line { state: UiState; title: string; sub: string; why?: string; kind: TagKind; when: string }
+// One board row per answer row (owner 2026-11-16): title and clock time over source and
+// status. A question's source line names what asks it. `when` and `why` feed the cover hero.
+interface Line { state: UiState; title: string; src: string; status?: string; kind: TagKind; at?: string; when: string; why?: string }
 function lineOf(r: AnswerRow, missions: Mission[], now: Date): Line {
+  const at = valid(r.at) ? time(r.at!) : undefined
   if (r.kind === 'failed') {
     const w = r.item
-    return { state: 'failed', title: w.title, sub: w.project, why: w.why, kind: w.kind, when: workWhen(w, now) }
+    return { state: 'failed', title: w.title, src: w.project, status: w.why ?? `${KIND_LABEL[w.kind].toLowerCase()} failed`, kind: w.kind, at, when: workWhen(w, now), why: w.why }
   }
   if (r.kind === 'prompt') {
     const w = r.item
-    return { state: 'needs', title: w.title, sub: w.project, why: w.why, kind: 'question', when: workWhen(w, now) }
+    const run = w.kind === 'run'
+    return { state: 'needs', title: run ? w.why ?? w.title : w.title, src: `${w.kind} · ${run ? w.title : w.project}`, kind: 'question', at, when: workWhen(w, now), why: w.why }
   }
   if (r.kind === 'mail') {
     const m = r.item
-    return { state: 'needs', title: m.subject, sub: m.from ?? 'Outlook', why: m.scope, kind: 'mail', when: '' }
+    return { state: 'needs', title: m.subject, src: m.from ?? 'Outlook', status: m.flag ?? 'flagged', kind: 'mail', when: '', why: m.scope }
   }
   const q = r.item
   const m = missions.find((x) => x.id === q.mission)
-  return { state: 'needs', title: m ? title(m) : short(q.mission), sub: q.project, why: q.ask, kind: 'question', when: valid(q.created) ? `waits ${ago(q.created, now)}` : '' }
+  return { state: 'needs', title: q.ask, src: `mission · ${m ? title(m) : short(q.mission)}`, kind: 'question', at, when: valid(q.created) ? `waits ${ago(q.created, now)}` : '', why: q.ask }
 }
 
 function useInbox(snap: Snapshot, refresh: () => Promise<void>) {
@@ -167,23 +170,21 @@ function Verbs({ i, hide, cls }: { i: I; hide?: boolean; cls: string }) {
 
 const hasVerbs = (p: AnswerRow) => p.kind !== 'ask' || (p.item.state === 'open' && p.item.type !== 'fyi')
 
-// Row A (Desk, item_204): the inbox list and the cover's "Also today".
-function ARow({ i, r }: { i: I; r: AnswerRow }) {
+// Board row (fold-inbox-inner, owner 2026-11-16): the kind icon on the left in the state
+// colour, title and time over source · status. No kind pill, no state column. Desk keeps row A.
+function AnsRow({ i, r, cover }: { i: I; r: AnswerRow; cover?: boolean }) {
   const l = i.line(r)
   const on = r.key === i.sel
+  const sub = l.status ? `${l.src} · ${l.status}` : l.src
   return (
-    <button type="button" className={`wrow s-${l.state}${on ? ' on' : ''}`} aria-pressed={on} onClick={() => i.setSel(r.key)}
-      aria-label={`${l.kind} ${l.title}, ${l.sub}, ${LABEL[l.state]}${l.when ? `, ${l.when}` : ''}`}>
-      <span className="wg"><Glyph state={l.state} size={18} /></span>
+    <button type="button" className={`row irow${cover ? ' r2' : ''}${on ? ' on' : ''}`} aria-pressed={on} onClick={() => i.setSel(r.key)}
+      aria-label={`${TAG_LABEL[l.kind]} ${l.title}, ${sub}, ${LABEL[l.state]}${l.at ? `, ${l.at}` : ''}`}>
+      <span className={`ic ${stateClass(l.state)}`}><KindIcon kind={l.kind} size={16} /></span>
       <span className="t">
         <b>{l.title}</b>
-        <span>{l.sub}{l.why && <> · <span className={l.state === 'failed' ? 'c-f' : undefined}>{l.why}</span></>}</span>
+        <span>{l.src}{l.status && <> · <span className={l.state === 'failed' ? 'c-f' : undefined}>{l.status}</span></>}</span>
       </span>
-      <KindTag kind={l.kind} />
-      <span className="ws">
-        <span className={stateClass(l.state)}>{LABEL[l.state]}</span>
-        {l.when && <span className="num">{l.when}</span>}
-      </span>
+      {l.at && <span className="tm num">{l.at}</span>}
     </button>
   )
 }
@@ -257,7 +258,7 @@ function InboxInner({ i }: { i: I }) {
           {show('answer') && (
             <>
               <div className="grp c-n"><span>To answer</span><span className="num">{i.rows.length}</span></div>
-              <div className="wlist">{i.rows.map((r) => <ARow key={r.key} i={i} r={r} />)}</div>
+              <div className="alist">{i.rows.map((r) => <AnsRow key={r.key} i={i} r={r} />)}</div>
             </>
           )}
           {show('drafts') && (
@@ -295,8 +296,8 @@ function Hero({ i }: { i: I }) {
       <section className="gcard dhero ask" aria-labelledby="ct">
         <div className="gt"><span className={p.kind === 'failed' ? 'c-f' : 'c-n'}>{count}</span><span className="num">{l.when}</span></div>
         <div className="who">
-          <span className="av" aria-hidden="true">{initials(l.sub)}</span>
-          <div className="hm"><h2 className="gh" id="ct">{l.title}</h2><span className="gs">{l.sub} · <KindTag kind={l.kind} /></span></div>
+          <span className="av" aria-hidden="true">{initials(l.src)}</span>
+          <div className="hm"><h2 className="gh" id="ct">{l.title}</h2><span className="gs">{l.src} · <KindTag kind={l.kind} /></span></div>
         </div>
         {l.why && <div className={`body${p.kind === 'failed' ? ' c-f' : ''}`}>{p.kind === 'mail' ? `${l.why} mailbox` : l.why}</div>}
       </section>
@@ -326,7 +327,7 @@ function InboxCover({ i }: { i: I }) {
       <Hero i={i} />
       <div className="gl">
         <div className="gls"><span>Also today</span><span className="num">{rest.length + i.fyis.length}</span></div>
-        <div className="wlist">{rest.slice(0, 3).map((x) => <ARow key={x.key} i={i} r={x} />)}</div>
+        {rest.slice(0, 3).map((x) => <AnsRow key={x.key} i={i} r={x} cover />)}
         {i.fyis.length > 0 && (
           <button type="button" className="row r2" onClick={() => i.setSel(`q:${i.fyis[0].id}`)}>
             <span className="ic"><Env /></span>

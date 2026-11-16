@@ -244,8 +244,8 @@ describe('scoped snapshot', () => {
     const s = await snapshot()
     expect(mailOf(s.sections.today).map((m) => m.id)).toEqual(['mail-2', 'mail-1'])
     expect(mailOf(scopeSnapshot(s, 'work').sections.today)).toEqual([
-      { id: 'mail-2', subject: 'Invoice to check', from: 'Accounting', scope: 'work' },
-      { id: 'mail-1', subject: 'Contract renewal', from: 'Legal', scope: 'work' },
+      { id: 'mail-2', subject: 'Invoice to check', from: 'Accounting', scope: 'work', flag: 'flagged' },
+      { id: 'mail-1', subject: 'Contract renewal', from: 'Legal', scope: 'work', flag: 'important' },
     ])
     const p = scopeSnapshot(s, 'perso').sections.today
     expect(mailOf(p)).toEqual([])
