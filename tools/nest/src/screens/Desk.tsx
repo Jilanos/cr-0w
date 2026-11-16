@@ -1,12 +1,14 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { ApiError } from '../data/api'
-import { accountsOf, dispatchOf, mailOf, projectsOf, resumableOf, type Agent, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, mailOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
 import { missionOfRun } from '../data/state'
 import { Link, navigate } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
+import { AskDock } from '../ui/AskDock'
+import { promptView } from '../ui/prompt'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 
@@ -202,6 +204,16 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     wrap(`${key === 'allow' ? 'Allow once' : 'Deny'} ${nameOf(a)}: ${p.tool} ${p.detail}`, () => act.answer(a.pid, p.id, key))()
       .catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
   }
+  // An AskUserQuestion answer sends every step at once (item_193).
+  const [asking, setAsking] = useState(false)
+  const answerAsk = (a: Agent, answers: AskAnswer[]) => {
+    const p = a.prompt
+    if (!p) return
+    setAsking(true)
+    wrap(`Answer ${nameOf(a)}`, () => act.ask(a.pid, p.id, answers))()
+      .catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
+      .finally(() => setAsking(false))
+  }
 
   // The ask box: /dispatch and /session open their form; free chat waits for the hub API.
   const submitAsk = () => {
@@ -224,7 +236,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     snap, refresh, slots, agents, runs, sessions, resumable, mail, projects, accounts,
     sheet, setSheet, log, picked, slotOf, since, pick, tell, setTell, text, setText, ask, setAsk, submitAsk,
     form, setForm, run, setRun, start, setStart,
-    send, pause, stop, dispatch, open, resume, flag, answer, queue, cancel,
+    send, pause, stop, dispatch, open, resume, flag, answer, answerAsk, asking, queue, cancel,
   }
 }
 type D = ReturnType<typeof useDesk>
@@ -280,12 +292,17 @@ function Slots({ d, ib }: { d: D; ib?: boolean }) {
 function Ask({ d, a }: { d: D; a: Agent }) {
   const p = a.prompt
   if (!p) return null
+  const view = promptView(p)
+  if (view === 'questions') {
+    return <AskDock key={p.id} who={nameOf(a)} questions={p.questions!} busy={d.asking}
+      onSend={(x) => d.answerAsk(a, x)} onCancel={() => d.answer(a, 'deny')} />
+  }
   return (
     <div className="pq" role="group" aria-label={`Permission asked by ${nameOf(a)}`}>
       <div className="pqh"><span className="tool c-n">{p.tool}</span>{p.description && <span className="sm f1">{p.description}</span>}</div>
       <code className="pqc">{p.detail}</code>
       <div className="btnrow">
-        {p.work_approval
+        {view === 'approval'
           ? <button type="button" className="btn p" disabled title="Approvals arrive with the approvals screen">Open in approvals</button>
           : p.options.map((o) => (
             <button type="button" key={o.key} className={`btn${o.key === 'allow' ? ' p' : ' x'}`} onClick={() => d.answer(a, o.key)}>{o.label}</button>
