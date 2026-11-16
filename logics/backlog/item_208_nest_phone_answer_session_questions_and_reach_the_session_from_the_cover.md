@@ -1,10 +1,10 @@
 ## item_208_nest_phone_answer_session_questions_and_reach_the_session_from_the_cover - Nest phone: answer session questions and reach the session from the cover
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90
-> Confidence: 75
-> Progress: 0%
+> Confidence: 80
+> Progress: 70%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -52,7 +52,16 @@
 
 # Notes
 - Raised by the owner 2026-11-16. Until fixed, hub sessions keep AskUserQuestion text short when the owner is on the phone.
+- Root causes (2026-11-16):
+  - Cover ask: Desk.tsx `Ask` rendered `prompt.options` only, which an AskUserQuestion carries as [Cancel]; `prompt.questions` was ignored and the ask styles applied to `.chat-cv` only.
+  - Ask scroll: `.ask` was `flex:none` with no max-height or overflow, so a long dock grew past the viewport on every layout.
+  - Tell you: `crow-focus --send` typed into the window whatever the session state and replied "sent"; while the session waited on the AskUserQuestion the text went into the dialog. A failed kitty or tmux command crashed instead of reporting.
+  - Text before a tool call: not found in the static path (cdx reader, crow-runs, core, `blocksOf` keep every text block); needs a live capture of `GET /api/sessions/<pid>/conversation` next to the transcript.
+  - Stray digits: `crow-prompt answer` checked the prompt against Claude's status file, which lags the dialog; a second answer (double tap, retry) passed the check and typed the option digits into the input line.
+  - Shift+Enter: the send boxes were single-line inputs that submit on Enter, and `crow_term` typed line breaks as keystrokes, each one a submit.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-16T08:55:53.031352+00:00 | cdx | f470e8459fa84b08a9854288f6916e80 | item_208 Nest chat fixes | succeeded |  |  |
+
