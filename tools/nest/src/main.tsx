@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { startBoot } from './boot/boot'
 import { apiSource } from './data/api'
 import { fixtureSource } from './data/fixtures'
 import { DataContext } from './data/useData'
@@ -11,6 +12,9 @@ import './theme.css'
 // dev and tests use fixtures unless VITE_NEST_SOURCE=api.
 const live = import.meta.env.PROD || import.meta.env.VITE_NEST_SOURCE === 'api'
 const source = live ? apiSource() : fixtureSource()
+
+// Trace boot on the first Home load of a session; ?boot=1 replays it.
+startBoot()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
