@@ -4,7 +4,7 @@
 > Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 70%
+> Progress: 65%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -59,6 +59,11 @@
   - No red outline on failed rows (match board A).
   - Flagged mail leaves Desk. Inbox follows the approved board (item_138 fold-inbox): flagged mail joins "To answer" with crow questions and failed runs, scoped by mailbox. "Drafts ready" fills later with item_092/093.
 - 2026-11-15: Inbox built, shots pending from the hub (compare spec in vault `Research/nest-design/item_204/build/inbox/spec.json`).
+- Owner decisions 2026-11-16 (Inbox review):
+  - Inbox rows use the board row (title + time / source line) with the kind icon; no kind pill, no state column. Desk keeps row A.
+  - Inbox badge counts everything in "To answer", mail included.
+  - Desk cyber keeps the state-colour left edge (row style, not an outline).
+  - Anything waiting on the owner's answer carries a "Question" tag, whatever asks it (mission, run, session); the source shows on the second line.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
@@ -66,4 +71,3 @@
 | 2026-11-15T11:02:58.732084+00:00 | cdx | 9f7a81c273974ac98760dcd8d2c1ca96 | item_204 Inbox | succeeded |  |  |
 | 2026-11-15T09:07:21.014666+00:00 | cdx | 357510a13cac4e66963502e012cb6241 | item_204 data layer + Desk build | succeeded |  |  |
 | 2026-11-13T18:52:21.845294+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | succeeded |  |  |
-
