@@ -3,7 +3,7 @@
 > Schema version: 1.0
 > Status: In progress
 > Understanding: 90
-> Confidence: 80
+> Confidence: 85
 > Progress: 70%
 > Complexity: Medium
 > Theme: General
@@ -51,6 +51,7 @@
 - Rationale: the owner answers sessions from the phone; both paths failed in real use.
 
 # Notes
+- 2026-11-16: owner decision: a send shows 'sending' until the message appears in the session transcript, then 'delivered'. Build in the follow-up run.
 - Raised by the owner 2026-11-16. Until fixed, hub sessions keep AskUserQuestion text short when the owner is on the phone.
 - Root causes (2026-11-16):
   - Cover ask: Desk.tsx `Ask` rendered `prompt.options` only, which an AskUserQuestion carries as [Cancel]; `prompt.questions` was ignored and the ask styles applied to `.chat-cv` only.
@@ -64,4 +65,3 @@
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-16T08:55:53.031352+00:00 | cdx | f470e8459fa84b08a9854288f6916e80 | item_208 Nest chat fixes | succeeded |  |  |
-
