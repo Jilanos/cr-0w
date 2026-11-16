@@ -1,40 +1,51 @@
 import { describe, expect, it } from 'vitest'
-import { BOOT_IDS, BUDGET_MS, OPTIONS, REAL_BOOT, delayOf, optionEnd, pickBoot } from './plan'
+import { BUDGET_MS, STEPS, bootEnd, delayOf, pickBoot } from './plan'
 
-const base = { search: '?boot=a', path: '/', reduced: false, seen: false }
+const base = { search: '', path: '/', reduced: false, seen: false }
 
 describe('pickBoot', () => {
-  it('picks an option from the flag', () => {
-    expect(pickBoot({ ...base, search: '?boot=z' })).toBeNull()
-    for (const id of BOOT_IDS) expect(pickBoot({ ...base, search: `?boot=${id}` })).toBe(id)
+  it('runs the boot once per session', () => {
+    expect(pickBoot(base)).toBe(true)
+    expect(pickBoot({ ...base, seen: true })).toBe(false)
   })
   it('skips with reduced motion', () => {
-    expect(pickBoot({ ...base, reduced: true })).toBeNull()
-    expect(pickBoot({ ...base, search: '', real: 'b', reduced: true })).toBeNull()
+    expect(pickBoot({ ...base, reduced: true })).toBe(false)
+    expect(pickBoot({ ...base, search: '?boot=1', reduced: true })).toBe(false)
   })
-  it('replays the flag on every load', () => expect(pickBoot({ ...base, seen: true })).toBe('a'))
-  it('runs the real boot once per session', () => {
-    expect(pickBoot({ ...base, search: '', real: 'b' })).toBe('b')
-    expect(pickBoot({ ...base, search: '', real: 'b', seen: true })).toBeNull()
+  it('replays with ?boot=1 or ?boot=b on every load', () => {
+    expect(pickBoot({ ...base, search: '?boot=1', seen: true })).toBe(true)
+    expect(pickBoot({ ...base, search: '?boot=b', seen: true })).toBe(true)
   })
-  it('does nothing without a flag or a real boot', () => expect(pickBoot({ ...base, search: '', real: null })).toBeNull())
-  it('plays the scan line as the real boot once per session', () => {
-    expect(REAL_BOOT).toBe('b')
-    expect(pickBoot({ ...base, search: '' })).toBe('b')
-    expect(pickBoot({ ...base, search: '', seen: true })).toBeNull()
-    expect(pickBoot({ ...base, search: '', reduced: true })).toBeNull()
+  it('has no other options', () => {
+    for (const f of ['a', 'c', 'z']) expect(pickBoot({ ...base, search: `?boot=${f}`, seen: true })).toBe(false)
   })
-  it('runs on Home only', () => expect(pickBoot({ ...base, path: '/inbox' })).toBeNull())
+  it('can be turned off', () => expect(pickBoot({ ...base, real: false })).toBe(false))
+  it('runs on Home only', () => expect(pickBoot({ ...base, path: '/inbox' })).toBe(false))
 })
 
-describe('options', () => {
-  it('each finishes under the budget', () => {
-    for (const id of BOOT_IDS) expect(optionEnd(OPTIONS[id])).toBeLessThan(BUDGET_MS)
-  })
-  it('spreads delays over the step span whatever the count', () => {
-    const s = { sel: '.pn', fx: 'trace' as const, at: 100, dur: 300, spread: 400 }
+describe('steps', () => {
+  it('finish under the budget', () => expect(bootEnd()).toBeLessThan(BUDGET_MS))
+  it('spread delays over the step span whatever the count', () => {
+    const s = { sel: '.pn', fx: 'flash' as const, at: 100, dur: 300, spread: 400 }
     expect(delayOf(s, 0, 1)).toBe(100)
     expect(delayOf(s, 0, 7)).toBe(100)
     expect(delayOf(s, 6, 7)).toBe(500)
+  })
+  it('are the scan line only', () => expect(STEPS.map((s) => s.fx)).toEqual(['line', 'crt', 'flash', 'resolve', 'type']))
+})
+
+// Prototype A (trace) and C (unfold) are gone from the boot code and the reel script.
+const SOURCES = import.meta.glob(['./*.ts', './*.css', '!./*.test.ts', '../../scripts/boot-reel.mjs'], {
+  query: '?raw', import: 'default', eager: true,
+}) as Record<string, string>
+
+describe('prototype code', () => {
+  it('is reachable from the test', () => expect(Object.keys(SOURCES).length).toBe(4))
+  it('has no A or C code left', () => {
+    for (const [file, src] of Object.entries(SOURCES)) {
+      for (const word of ['trace', 'unfold', 'emerge', 'boot-tr', 'BOOT_IDS', 'OPTIONS', "'a' | 'b' | 'c'"]) {
+        expect(src.includes(word), `${file} has ${word}`).toBe(false)
+      }
+    }
   })
 })

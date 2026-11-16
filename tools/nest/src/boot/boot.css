@@ -1,20 +1,6 @@
-/* Boot sequence prototypes (item_166). Only active while html[data-boot] is set. */
-@property --boot-c { syntax: '<color>'; inherits: false; initial-value: transparent; }
-
+/* Scan line boot (item_166). Only active while html[data-boot] is set. */
 html[data-boot-wait] .app { visibility: hidden; }
 html[data-boot] .main { overflow: hidden; }
-
-/* Trace: four 1px lines in the border box; the real border stays hidden until the end. */
-html[data-boot] .boot-tr {
-  border-color: transparent;
-  background-image: linear-gradient(var(--boot-c), var(--boot-c)), linear-gradient(var(--boot-c), var(--boot-c)),
-    linear-gradient(var(--boot-c), var(--boot-c)), linear-gradient(var(--boot-c), var(--boot-c));
-  background-repeat: no-repeat;
-  background-origin: border-box;
-  background-position: 0 0, 100% 0, 100% 100%, 0 100%;
-  background-size: 100% 1px, 1px 100%, 100% 1px, 1px 100%;
-  --boot-c: var(--line);
-}
 
 .boot-line {
   position: fixed; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; z-index: 60; pointer-events: none;
