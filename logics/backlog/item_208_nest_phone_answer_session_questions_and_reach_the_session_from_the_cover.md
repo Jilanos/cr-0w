@@ -3,8 +3,8 @@
 > Schema version: 1.0
 > Status: In progress
 > Understanding: 90
-> Confidence: 85
-> Progress: 70%
+> Confidence: 90
+> Progress: 80%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -52,6 +52,7 @@
 
 # Notes
 - 2026-11-16: owner decision: a send shows 'sending' until the message appears in the session transcript, then 'delivered'. Build in the follow-up run.
+- 2026-11-16: delivery built (bde0836): chat box and cover Tell it show "sending…" until a new user turn in the transcript holds the text (whitespace and line breaks fold, so a multi-line send matches one turn), then "delivered"; after 20 s "not delivered" with Retry. Reads reuse the chat's 3 s conversation poll; the cover watches only while a send is open. vitest covers sending to delivered, timeout and multi-line. Live test pending (AC7).
 - Raised by the owner 2026-11-16. Until fixed, hub sessions keep AskUserQuestion text short when the owner is on the phone.
 - Root causes (2026-11-16):
   - Cover ask: Desk.tsx `Ask` rendered `prompt.options` only, which an AskUserQuestion carries as [Cancel]; `prompt.questions` was ignored and the ask styles applied to `.chat-cv` only.
@@ -64,4 +65,6 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-16T09:08:32.335093+00:00 | cdx | 38e5ab90330d4d4b8f63ed7a6fc6a79d | item_208 delivery confirmed | running |  |  |
+| 2026-11-16T09:08:29.022026+00:00 | cdx | b845f64b011c4f3887df1cf253ccd86d | item_208 delivery confirmed | failed |  | limit |
 | 2026-11-16T08:55:53.031352+00:00 | cdx | f470e8459fa84b08a9854288f6916e80 | item_208 Nest chat fixes | succeeded |  |  |
