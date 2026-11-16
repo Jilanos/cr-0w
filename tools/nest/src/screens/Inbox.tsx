@@ -55,10 +55,10 @@ export function workHref(w: WorkItem) {
 interface Line { state: UiState; title: string; src: string; status?: string; kind: TagKind; at?: string; when: string; why?: string }
 function lineOf(r: AnswerRow, missions: Mission[], now: Date): Line {
   const at = valid(r.at) ? time(r.at!) : undefined
+  // Line 2 names what the session or run asks (owner 2026-11-16): "session · lambda · asks Bash".
   if (r.kind === 'prompt') {
     const w = r.item
-    const run = w.kind === 'run'
-    return { state: 'needs', title: run ? w.why ?? w.title : w.title, src: `${w.kind} · ${run ? w.title : w.project}`, kind: 'question', at, when: workWhen(w, now), why: w.why }
+    return { state: 'needs', title: w.title, src: `${w.kind} · ${w.project}`, status: w.why, kind: 'question', at, when: workWhen(w, now), why: w.why }
   }
   if (r.kind === 'mail') {
     const m = r.item

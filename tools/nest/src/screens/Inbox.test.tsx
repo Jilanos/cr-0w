@@ -48,10 +48,22 @@ describe('Inbox to answer (item_204)', () => {
       expect(r).not.toContain('class="ws"')
     }
     expect(list).not.toContain('c-f')
-    expect(list).toContain('session · lambda')
+    expect(list).toContain('<b>fix timeout</b><span>session · lambda · <span>asks Bash</span></span>')
+    expect(list).toContain('session · website · <span>asks AskUserQuestion</span>')
     expect(list).toContain('mission · ')
     expect(list).toContain('Accounting · <span>flagged</span>')
     expect(list).toContain('Legal · <span>important</span>')
+  })
+
+  it('adds the why to a waiting run, only when it has one (owner 2026-11-16)', async () => {
+    at(707)
+    const s = await snapshot()
+    const run = (id: string, title: string, why?: string) =>
+      ({ id, kind: 'run', project: 'cr-0w', state: 'needs', title, since: '2026-11-09T09:00:00+01:00', why, source: { section: 'dispatch', ref: id } })
+    const data = [...(s.sections.work!.data as unknown[]), run('run:r1', 'nightly', 'asks Edit'), run('run:r2', 'backup')]
+    const html = render(<Inbox snap={{ ...s, sections: { ...s.sections, work: { ...s.sections.work!, data } } }} refresh={refresh} />)
+    expect(html).toContain('<b>nightly</b><span>run · cr-0w · <span>asks Edit</span></span>')
+    expect(html).toContain('<b>backup</b><span>run · cr-0w</span>')
   })
 
   it('opens the cover on the first question, never a failed item', async () => {
