@@ -1015,6 +1015,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 /* Docked AskUserQuestion (item_193, board A), on the chat and the cover. Capped to the viewport; the body scrolls, the buttons stay. */
 :is(.chat-cv, .desk-cv) .ask-q { flex: 0 1 auto; min-height: 0; max-height: 60vh; max-height: 60dvh; box-sizing: border-box; }
 :is(.chat-cv, .desk-cv) .ask-q .ab { display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+:is(.chat-cv, .desk-cv) .ask-q .ab > * { flex: none; } /* items keep their height; the body scrolls */
 :is(.chat-cv, .desk-cv) .ask-q > .who, :is(.chat-cv, .desk-cv) .ask-q > .gb { flex: none; }
 :is(.chat-cv, .desk-cv) .ask-q .stp { display: flex; flex-wrap: wrap; gap: 6px; }
 :is(.chat-cv, .desk-cv) .ask-q .stp button { all: unset; cursor: pointer; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--sub); font: 600 10.5px var(--font-head); letter-spacing: 0.05em; text-transform: uppercase; }
@@ -1022,7 +1023,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 :is(.chat-cv, .desk-cv) .ask-q .stp button.dn { border-color: #a6da95; color: #a6da95; }
 :is(.chat-cv, .desk-cv) .ask-q .stp button:disabled { cursor: default; }
 :is(.chat-cv, .desk-cv) .ask-q .q { font-weight: 600; font-size: 13.5px; }
-:is(.chat-cv, .desk-cv) .ask-q .oc { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); background: #363a4f; border-radius: 10px; padding: 9px 10px; min-height: 44px; }
+:is(.chat-cv, .desk-cv) .ask-q .oc { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); background: #363a4f; border-radius: 10px; padding: 9px 10px; min-height: 44px; flex: none; }
 :is(.chat-cv, .desk-cv) .ask-q .oc:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 :is(.chat-cv, .desk-cv) .ask-q .oc:disabled { opacity: 0.6; cursor: default; }
 :is(.chat-cv, .desk-cv) .ask-q .oc .k { flex: none; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font: 700 11px var(--font-head); background: rgba(24, 25, 38, 0.6); color: var(--dim); }
