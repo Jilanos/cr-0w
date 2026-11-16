@@ -93,14 +93,25 @@ describe('scope filter on mail', () => {
   })
 })
 
-describe('inboxBadge', () => {
-  it('counts needs and failed of the work feed', async () => {
-    expect(inboxBadge(await snapshot())).toEqual({ n: 7, failed: true })
+describe('inboxBadge (owner 2026-11-16)', () => {
+  it('equals the To answer length, mail included', async () => {
+    const s = await snapshot()
+    const rows = answerOf(s)
+    expect(rows.some((r) => r.kind === 'mail')).toBe(true)
+    expect(inboxBadge(s)).toEqual({ n: rows.length, failed: true })
   })
 
-  it('falls back to open questions without the work feed', async () => {
+  it('equals the To answer length in every scope', async () => {
+    const s = await snapshot()
+    for (const sc of ['all', 'work', 'perso'] as const) {
+      const v = scopeSnapshot(s, sc)
+      expect(inboxBadge(v).n).toBe(answerOf(v).length)
+    }
+  })
+
+  it('equals the To answer length without the work feed', async () => {
     const s = await snapshot()
     const bare = { ...s, sections: { ...s.sections, work: undefined } } as unknown as Snapshot
-    expect(inboxBadge(bare)).toEqual({ n: s.inbox.filter((r) => r.state === 'open' && r.type !== 'fyi').length })
+    expect(inboxBadge(bare)).toEqual({ n: answerOf(bare).length, failed: false })
   })
 })

@@ -1,8 +1,7 @@
 import type { Snapshot } from './feed'
 import { mailOf, type Mail } from './live'
-import { openInbox } from './state'
 import type { InboxItem } from './types'
-import { workCounts, workOf, type WorkItem } from './work'
+import { workOf, type WorkItem } from './work'
 
 // The Inbox "To answer" list (item_204, owner 2026-11-15 and 2026-11-16): failed work,
 // questions and flagged or important mail, read from the scoped snapshot. A question is
@@ -47,10 +46,9 @@ export function toAnswer(inbox: InboxItem[], work: WorkItem[] | null, mail: Mail
 
 export const answerOf = (s: Snapshot) => toAnswer(s.inbox, workOf(s.sections.work), mailOf(s.sections.today), s.now)
 
-// Inbox tab badge: needs + failed of the work feed; without the feed, open asks.
+// Inbox tab badge (owner 2026-11-16): the number of rows in "To answer", so the badge
+// and the list always agree. It reads failed when any of them failed.
 export function inboxBadge(s: Snapshot): { n: number; failed?: boolean } {
-  const work = workOf(s.sections.work)
-  if (!work) return { n: openInbox(s.inbox).filter((r) => r.type !== 'fyi').length }
-  const c = workCounts(work)
-  return { n: c.needs + c.failed, failed: c.failed > 0 }
+  const rows = answerOf(s)
+  return { n: rows.length, failed: rows.some((r) => r.kind === 'failed') }
 }
