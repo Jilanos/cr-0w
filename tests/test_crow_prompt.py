@@ -164,3 +164,51 @@ def test_answer_questions_checks_the_prompt_and_presses_nothing_on_refusal(tmp_p
     cp.hook(json.dumps(event("ls")), home=tmp_path, pid=42, projects=PROJECTS, now=2.0)
     bid = cp.pending(42, home=tmp_path, meta=WAITING)["id"]
     assert cp.answer(42, bid, answers=[[0]], dry=True, backend="tmux", home=tmp_path, meta=WAITING)[0] == 2
+
+
+def keyboard(monkeypatch):
+    """Record the keys answer() presses instead of touching a window."""
+    pressed = []
+    monkeypatch.setattr(cp, "KEY_PAUSE", 0)
+    monkeypatch.setattr(cp.crow_term, "send_key", lambda pid, k, b=None: pressed.append(k) or True)
+    monkeypatch.setattr(cp.crow_term, "send_special", lambda pid, k, b=None: pressed.append(k) or True)
+    monkeypatch.setattr(cp.crow_term, "send_escape", lambda pid, b=None: pressed.append("escape") or True)
+    return pressed
+
+
+def test_a_prompt_is_answered_once_and_a_second_answer_presses_nothing(tmp_path, monkeypatch):
+    # Claude's status file lags the dialog: a second answer must not type digits into the input.
+    pressed = keyboard(monkeypatch)
+    cp.hook(json.dumps(ask_event()), home=tmp_path, pid=42, projects=PROJECTS, now=1.0)
+    pid_ = cp.pending(42, home=tmp_path, meta=ASKING)["id"]
+    ans = [[1], [0, 2], [0]]
+    assert cp.answer(42, pid_, answers=ans, backend="tmux", home=tmp_path, meta=ASKING)[0] == 0
+    first = list(pressed)
+    assert first[-1] == "1"
+    code, msg = cp.answer(42, pid_, answers=ans, backend="tmux", home=tmp_path, meta=ASKING)
+    assert code == 1 and pressed == first
+    cp.hook(json.dumps(event("ls")), home=tmp_path, pid=42, projects=PROJECTS, now=2.0)
+    bid = cp.pending(42, home=tmp_path, meta=WAITING)["id"]
+    assert cp.answer(42, bid, "allow", backend="tmux", home=tmp_path, meta=WAITING)[0] == 0
+    assert cp.answer(42, bid, "allow", backend="tmux", home=tmp_path, meta=WAITING)[0] == 1
+    assert pressed == first + ["1"]
+
+
+def test_keys_stop_when_the_dialog_closes(tmp_path, monkeypatch):
+    # No key is pressed once the session stops waiting: it would land in the input line.
+    pressed = keyboard(monkeypatch)
+    cp.hook(json.dumps(ask_event()), home=tmp_path, pid=42, projects=PROJECTS, now=1.0)
+    pid_ = cp.pending(42, home=tmp_path, meta=ASKING)["id"]
+    states = iter([ASKING, ASKING, {"status": "idle", "sessionId": "s1"}])
+    code, _ = cp.answer(42, pid_, answers=[[1], [0, 2], [0]], backend="tmux", home=tmp_path, meta=ASKING,
+                        live=lambda: next(states, {"status": "idle"}))
+    assert code == 0 and pressed == ["2", "1", "3"]
+
+
+def test_a_prompt_left_by_a_missing_window_can_be_answered_again(tmp_path, monkeypatch):
+    keyboard(monkeypatch)
+    monkeypatch.setattr(cp.crow_term, "send_key", lambda *a: False)
+    cp.hook(json.dumps(event("ls")), home=tmp_path, pid=42, projects=PROJECTS, now=1.0)
+    bid = cp.pending(42, home=tmp_path, meta=WAITING)["id"]
+    assert cp.answer(42, bid, "allow", backend="tmux", home=tmp_path, meta=WAITING)[0] == 1
+    assert cp.pending(42, home=tmp_path, meta=WAITING)["id"] == bid
