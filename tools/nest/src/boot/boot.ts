@@ -1,15 +1,18 @@
 import './boot.css'
 import { BUDGET_MS, SEEN_KEY, STEPS, delayOf, isReplay, pickBoot, type Fx } from './plan'
 
-// Runs the scan line boot with the Web Animations API once the Home and its hero are on screen.
+// Runs the trace boot with the Web Animations API once the Home and its hero are on screen.
 // html[data-boot-wait] hides the app until the first frame of the boot is set.
 
 const EASE = 'cubic-bezier(.2,.7,.2,1)'
 // Home stays hidden at most this long; past it the page shows without the boot.
 const WAIT_MS = 1000
 
-interface Ctx { cw: string; line: string }
-interface Out { frames: Keyframe[]; ease?: string }
+interface Ctx { cw: string; line: string; panel: string }
+interface Out { frames: Keyframe[]; ease?: string; cls?: string }
+
+const SIZES = ['0 1px, 1px 0, 0 1px, 1px 0', '100% 1px, 1px 0, 0 1px, 1px 0', '100% 1px, 1px 100%, 0 1px, 1px 0',
+  '100% 1px, 1px 100%, 100% 1px, 1px 0', '100% 1px, 1px 100%, 100% 1px, 1px 100%']
 
 function typing(el: HTMLElement): Out {
   const range = document.createRange()
@@ -25,20 +28,16 @@ function typing(el: HTMLElement): Out {
 
 function fx(kind: Fx, el: HTMLElement, c: Ctx): Out {
   switch (kind) {
-    case 'line':
-      return { ease: 'linear', frames: [
-        { opacity: 1, transform: 'scaleX(0)' },
-        { opacity: 1, transform: 'scaleX(1)', offset: 0.25 },
-        { opacity: 0.9, transform: 'scaleX(1) scaleY(1)', offset: 0.4 },
-        { opacity: 0, transform: 'scaleX(1) scaleY(24)' },
-      ] }
-    case 'crt':
-      return { frames: [
-        { transform: 'scaleY(.004)', filter: 'brightness(4)', opacity: 1 },
-        { transform: 'scaleY(1)', filter: 'brightness(1.8)', offset: 0.7 },
-        { transform: 'scaleY(1)', filter: 'brightness(1)' },
-      ] }
-    case 'flash': return { frames: [{ borderColor: c.cw, boxShadow: `0 0 12px ${c.cw}` }, { borderColor: c.line, boxShadow: '0 0 0 transparent' }] }
+    case 'trace':
+      return {
+        cls: 'boot-tr', ease: 'linear',
+        frames: [
+          ...SIZES.map((s, i) => ({ backgroundSize: s, offset: i * 0.2, '--boot-c': c.cw, backgroundColor: 'transparent' })),
+          { backgroundSize: SIZES[4], '--boot-c': c.line, backgroundColor: c.panel },
+        ],
+      }
+    case 'fade':
+    case 'fill': return { frames: [{ opacity: 0 }, { opacity: 1 }] }
     case 'resolve':
       return { frames: [
         { opacity: 0, filter: 'blur(12px) brightness(2.4)' },
@@ -53,16 +52,13 @@ function run() {
   const html = document.documentElement
   const css = getComputedStyle(html)
   const tone = (v: string) => css.getPropertyValue(v).trim()
-  const c: Ctx = { cw: tone('--c-w'), line: tone('--line') }
-  const line = document.createElement('div')
-  line.className = 'boot-line'
-  line.setAttribute('aria-hidden', 'true')
-  document.body.append(line)
-  const anims: Animation[] = []
+  const c: Ctx = { cw: tone('--c-w'), line: tone('--line'), panel: tone('--panel') }
+  const anims: Animation[] = [], tagged: [HTMLElement, string][] = []
   for (const s of STEPS) {
     const els = [...document.querySelectorAll<HTMLElement>(s.sel)]
     els.forEach((el, i) => {
       const o = fx(s.fx, el, c)
+      if (o.cls) { el.classList.add(o.cls); tagged.push([el, o.cls]) }
       anims.push(el.animate(o.frames, { delay: delayOf(s, i, els.length), duration: s.dur, easing: o.ease ?? EASE, fill: 'backwards' }))
     })
   }
@@ -74,7 +70,7 @@ function run() {
     over = true
     html.dataset.bootMs = String(Math.round(performance.now() - t0))
     for (const a of anims) a.cancel()
-    line.remove()
+    for (const [el, k] of tagged) el.classList.remove(k)
     delete html.dataset.boot
   }
   Promise.all(anims.map((a) => a.finished)).then(done, done)
@@ -93,7 +89,7 @@ export function startBoot() {
     try { sessionStorage.setItem(SEEN_KEY, '1') } catch { /* storage blocked: boot may replay */ }
   }
   const html = document.documentElement
-  html.dataset.boot = 'scan'
+  html.dataset.boot = 'trace'
   html.dataset.bootWait = ''
   const start = performance.now()
   const ready = () => !!document.querySelector('.home-ph, .home-lp') && !!document.querySelector('.hero-box')

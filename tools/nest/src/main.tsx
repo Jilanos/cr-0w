@@ -13,7 +13,7 @@ import './theme.css'
 const live = import.meta.env.PROD || import.meta.env.VITE_NEST_SOURCE === 'api'
 const source = live ? apiSource() : fixtureSource()
 
-// Scan line boot on the first Home load of a session; ?boot=1 replays it.
+// Trace boot on the first Home load of a session; ?boot=1 replays it.
 startBoot()
 
 createRoot(document.getElementById('root')!).render(

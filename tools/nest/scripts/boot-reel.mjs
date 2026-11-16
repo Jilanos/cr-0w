@@ -1,4 +1,4 @@
-// Boot reel (item_166): records the scan line boot (?boot=1) on Home from fixtures and writes, per size and
+// Boot reel (item_166): records the trace boot (?boot=1) on Home from fixtures and writes, per size and
 // theme, a WebM, a GIF and 4 keyframe PNGs into <out dir>. Frames come from seeking the boot animations
 // (paused, 30 fps), so slow screenshots do not stretch the timing. A separate real-time load measures the
 // wall time from the first boot frame to the end (data-boot-ms).
