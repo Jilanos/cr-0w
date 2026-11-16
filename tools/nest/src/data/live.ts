@@ -98,7 +98,7 @@ export interface LiveReply {
 }
 
 export interface NewSession { project: string; account?: string; prompt?: string }
-export interface NewRun { project: string; label: string; prompt: string; model?: string }
+export interface NewRun { project: string; label: string; prompt: string; model?: string; account?: string }
 
 // Each call resolves with the reply or rejects with an ApiError (4xx/5xx).
 export interface Actions {

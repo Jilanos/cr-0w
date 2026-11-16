@@ -498,8 +498,11 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
   /* Gauge bars give up width first when all scopes and badges fill the row. */
   .top > .accts { flex-shrink: 1; min-width: 0; }
   .accts { display: flex; gap: 12px; font: 600 11px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
-  .acct { display: flex; gap: 6px; align-items: center; min-width: 0; flex: 0 1 auto; }
-  .acct .gb { width: 60px; flex-shrink: 1; min-width: 16px; height: 6px; border-radius: 3px; background: var(--line); }
+  .acct { display: flex; gap: 6px; align-items: center; min-width: 0; flex: 0 1 auto; white-space: nowrap; }
+  .acct .gb { width: 60px; flex-shrink: 1; min-width: 8px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .acct .gb i { display: block; height: 100%; background: var(--c-d); }
+  .acct .gb i.lo { background: var(--c-f); }
+  .acct .gb i.md { background: var(--c-n); }
 }
 [data-theme='cyber'] .lp { text-transform: lowercase; }
 @media (min-width: 1200px) {
@@ -510,6 +513,11 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
   [data-theme='cyber'] .acct .gb { border-radius: 0; background: var(--line); }
   [data-theme='cyber'] .accts { color: var(--fg); }
   [data-theme='cyber'] .clock .long { font: 500 14px var(--font-display); letter-spacing: 0.1em; color: var(--fg); }
+}
+/* Below 1680px the header keeps the short clock so three account gauges fit. */
+@media (min-width: 1200px) and (max-width: 1679px) {
+  .clock .short { display: inline; }
+  .clock .long { display: none; }
 }
 
 .lp { height: 100%; display: grid; gap: 14px; padding: 12px 20px 16px; font-size: 13px; line-height: 1.4; min-height: 0; }

@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { homeCounts, homeModel, type HomeModel } from '../data/home'
+import { homeCounts, homeModel, quotaCls as cls, type HomeModel } from '../data/home'
 import type { Snapshot } from '../data/useData'
 import { time } from '../format'
 import { Hero } from '../hero/Hero'
@@ -16,7 +16,6 @@ export function Home({ snap }: { snap: Snapshot }) {
   return <HomeCompact snap={snap} />
 }
 
-const cls = (p: number) => (p < 15 ? 'lo' : p < 40 ? 'md' : '')
 const old = (m: number | null) => (m === null ? 'age unknown' : m < 1 ? 'just now' : `${m} min old`)
 
 const K = {

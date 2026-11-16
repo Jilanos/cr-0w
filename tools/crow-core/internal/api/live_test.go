@@ -198,6 +198,27 @@ func TestDispatchPromptFile(t *testing.T) {
 	}
 }
 
+// The account the owner picked reaches crow-runs as --account and the log line.
+func TestDispatchAccount(t *testing.T) {
+	cases := []struct{ body, want, tail string }{
+		{`{"project":"demo","label":"fix","prompt":"p","account":"spare"}`, "spare", "--json --account spare"},
+		{`{"project":"demo","label":"fix","prompt":"p"}`, "", "--json"},
+	}
+	for _, tc := range cases {
+		s, calls, log := liveServer(t, nil)
+		if w := do(t, s, post("/api/dispatch", tc.body)); w.Code != 200 {
+			t.Fatalf("status %d: %s", w.Code, w.Body)
+		}
+		args := strings.Join((*calls)[0].Args, " ")
+		if !strings.HasSuffix(args, tc.tail) {
+			t.Errorf("args %q, want suffix %q", args, tc.tail)
+		}
+		if evs := logLines(t, log); len(evs) != 1 || evs[0].Account != tc.want {
+			t.Errorf("log = %+v", evs)
+		}
+	}
+}
+
 // AC2, AC3, AC6: refusals run nothing and log nothing.
 func TestLiveRefusalsRunNothing(t *testing.T) {
 	cases := []struct {
@@ -223,6 +244,8 @@ func TestLiveRefusalsRunNothing(t *testing.T) {
 		{post("/api/sessions", `{"project":"ghost"}`), 400},
 		{post("/api/sessions", `{"project":"demo","account":"nobody"}`), 400},
 		{post("/api/dispatch", `{"project":"demo","label":"x"}`), 400},
+		{post("/api/dispatch", `{"project":"demo","label":"x","prompt":"y","account":"nobody"}`), 400},
+		{post("/api/dispatch", `{"project":"demo","label":"x","prompt":"y","account":"locked"}`), 400},
 		{call{method: "POST", path: "/api/sessions/4242/send", body: `{"text":"x"}`}, 403},
 		{call{method: "POST", path: "/api/sessions/4242/stop", header: map[string]string{CSRFHeader: "1", "Origin": "https://evil.example"}}, 403},
 	}

@@ -3,7 +3,7 @@ import { ApiError } from '../data/api'
 import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
 import { useConversation } from '../data/useConversation'
 import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
-import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Account, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
@@ -93,7 +93,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const [text, setText] = useState('')
   const [ask, setAsk] = useState('')
   const [form, setForm] = useState<Form>(null)
-  const [run, setRun] = useState({ project: '', label: '', model: 'default', prompt: '' })
+  const [run, setRun] = useState({ project: '', label: '', model: 'default', account: '', prompt: '' })
   const [start, setStart] = useState({ project: '', account: '', prompt: '' })
 
   const picked = agents.find((a) => a.pid === sel) ?? runs[0] ?? sessions.find((a) => a.state === 'working') ?? agents[0]
@@ -181,14 +181,14 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     })
   const dispatch = () => setSheet({
     title: 'Start a run', lead: 'Opens a new run on a free allowed account. Nothing is pushed.', quote: run.prompt,
-    target: [['project', run.project], ['label', run.label], ['model', run.model], ['slots', `${slots.busy} of ${slots.max} busy`]],
+    target: [['project', run.project], ['label', run.label], ['model', run.model], ['account', run.account || 'auto'], ['slots', `${slots.busy} of ${slots.max} busy`]],
     note: 'The prompt above is sent as written.', ok: 'Start run',
-    run: wrap(`/dispatch ${run.project} ${run.label}`, () => act.dispatch({ project: run.project, label: run.label, prompt: run.prompt, model: run.model === 'default' ? undefined : run.model }),
-      () => { setRun({ project: '', label: '', model: 'default', prompt: '' }); setForm(null) }),
+    run: wrap(`/dispatch ${run.project} ${run.label}`, () => act.dispatch({ project: run.project, label: run.label, prompt: run.prompt, model: run.model === 'default' ? undefined : run.model, account: run.account || undefined }),
+      () => { setRun({ project: '', label: '', model: 'default', account: '', prompt: '' }); setForm(null) }),
   })
   const open = () => setSheet({
     title: 'New session', lead: `Opens a claude session on ${start.project} in a new window.`, quote: start.prompt || undefined,
-    target: [['project', start.project], ['account', start.account || 'default']],
+    target: [['project', start.project], ['account', start.account || 'auto']],
     note: 'Fails when that account is busy; nothing else is started.', ok: 'Open session',
     run: wrap(`/session ${start.project}`, () => act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined }),
       () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
@@ -423,6 +423,15 @@ function Timeline({ d, a, term }: { d: D; a: Agent; term?: boolean }) {
   )
 }
 
+// Allowed accounts only (accountsOf drops never); auto lets crow pick a free one.
+function AccountField({ value, accounts, set }: { value: string; accounts: Account[]; set: (a: string) => void }) {
+  return (
+    <label>Account<select className="field" value={value} onChange={(e) => set(e.target.value)}>
+      <option value="">auto</option>{accounts.map((a) => <option key={a.name} value={a.name}>{a.name} · {a.policy}</option>)}
+    </select></label>
+  )
+}
+
 function Forms({ d }: { d: D }) {
   if (d.form === 'run') {
     const r = d.run
@@ -436,6 +445,7 @@ function Forms({ d }: { d: D }) {
         <label>Model<select className="field" value={r.model} onChange={(e) => d.setRun({ ...r, model: e.target.value })}>
           {MODELS.map((m) => <option key={m}>{m}</option>)}
         </select></label>
+        <AccountField value={r.account} accounts={d.accounts} set={(account) => d.setRun({ ...r, account })} />
         <label>Prompt<textarea className="field" value={r.prompt} onChange={(e) => d.setRun({ ...r, prompt: e.target.value })} /></label>
         <button type="submit" className="btn p" disabled={!r.project || !r.label.trim() || !r.prompt.trim()}>Review run</button>
       </form>
@@ -449,9 +459,7 @@ function Forms({ d }: { d: D }) {
         <label>Project<select className="field" value={s.project} onChange={(e) => d.setStart({ ...s, project: e.target.value })}>
           <option value="">Pick a project</option>{d.projects.map((p) => <option key={p}>{p}</option>)}
         </select></label>
-        <label>Account<select className="field" value={s.account} onChange={(e) => d.setStart({ ...s, account: e.target.value })}>
-          <option value="">default</option>{d.accounts.map((a) => <option key={a.name} value={a.name}>{a.name} · {a.policy}</option>)}
-        </select></label>
+        <AccountField value={s.account} accounts={d.accounts} set={(account) => d.setStart({ ...s, account })} />
         <label>First prompt<input className="field" value={s.prompt} onChange={(e) => d.setStart({ ...s, prompt: e.target.value })} placeholder="optional" /></label>
         <button type="submit" className="btn p" disabled={!s.project}>Review session</button>
       </form>

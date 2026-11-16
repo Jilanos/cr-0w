@@ -100,9 +100,9 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       set('dispatch', {
         ...d,
         slots: { ...d.slots, busy: d.slots.busy + 1 },
-        agents: [...d.agents, { kind: 'run', pid, account: 'work', project: r.project, cwd: `/src/${r.project}.wt/${r.label}`, run_id: run, label: r.label, title: r.prompt, state: 'working', started_at: now.toISOString() }],
+        agents: [...d.agents, { kind: 'run', pid, account: r.account ?? 'work', project: r.project, cwd: `/src/${r.project}.wt/${r.label}`, run_id: run, label: r.label, title: r.prompt, state: 'working', started_at: now.toISOString() }],
       })
-      return reply('dispatch', r.project, { text: r.prompt, account: 'work', project: r.project, run_id: run, message: `dispatched run ${run}` })
+      return reply('dispatch', r.project, { text: r.prompt, account: r.account ?? 'work', project: r.project, run_id: run, message: `dispatched run ${run}` })
     },
     async mail(id, verb) {
       const t = data.today as { important: Array<{ id: string }>; flagged: Array<{ id: string }> }

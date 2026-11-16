@@ -62,6 +62,8 @@ type RunRequest struct {
 	Label   string `json:"label"`
 	Prompt  string `json:"prompt"`
 	Model   string `json:"model,omitempty"`
+	// Account pins the run to one allowed account; empty lets crow-runs pick.
+	Account string `json:"account,omitempty"`
 }
 
 // PromptAnswer is the body of POST /api/sessions/{pid}/answer (item_174): the prompt id the
@@ -370,6 +372,10 @@ func (s *Server) dispatchRun(w http.ResponseWriter, r *http.Request) {
 		liveFail(w, err, http.StatusBadRequest)
 		return
 	}
+	if err := s.account(b.Account); err != nil {
+		liveFail(w, err, http.StatusBadRequest)
+		return
+	}
 	m, err := s.live("dispatch")
 	if err != nil {
 		liveFail(w, err, http.StatusConflict)
@@ -401,7 +407,10 @@ func (s *Server) dispatchRun(w http.ResponseWriter, r *http.Request) {
 	if b.Model != "" {
 		args = append(args, "--model", b.Model)
 	}
-	ev := LiveAction{Action: "dispatch", Target: b.Project, Text: b.Prompt, Project: b.Project}
+	if b.Account != "" {
+		args = append(args, "--account", b.Account)
+	}
+	ev := LiveAction{Action: "dispatch", Target: b.Project, Text: b.Prompt, Account: b.Account, Project: b.Project}
 	s.runAction(w, ev, nil, "crow-runs", args...)
 	s.Refresh("dispatch")
 }

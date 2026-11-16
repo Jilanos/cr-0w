@@ -64,6 +64,9 @@ export interface RunRow { key: string; kind: RunKind; title: string; state: stri
 
 export interface QuotaRow { account: string; h: number; w: number }
 
+// Bar class of a percent left: lo under 15, md under 40.
+export const quotaCls = (p: number) => (p < 15 ? 'lo' : p < 40 ? 'md' : '')
+
 export interface HomeModel {
   needs: NeedRow[]
   running: RunRow[]
@@ -82,9 +85,9 @@ const bare = (a: Agent) => agentName(a).replace(new RegExp(`^${a.project.replace
 const deskOf = (a: Agent, tell = false) => `/desk?pid=${a.pid}${tell ? '&tell=1' : ''}`
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-// The quota HUD shows the accounts crow may use (policy other than never), in
-// accounts order; without the accounts section it shows every limit row.
-function quotaOf(snap: Snapshot): QuotaRow[] {
+// The quota HUD and the laptop header gauges show the accounts crow may use (policy
+// other than never), in accounts order; without the accounts section, every limit row.
+export function quotaOf(snap: Snapshot): QuotaRow[] {
   const limits = usageOf(snap.sections.usage)
   const allowed = accountsOf(snap.sections.accounts).map((a) => a.name)
   const pick = allowed.length ? allowed.flatMap((n) => limits.filter((l) => l.account === n)) : limits

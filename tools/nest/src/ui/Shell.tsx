@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 import { countByState } from '../data/state'
-import { homeCounts } from '../data/home'
+import { homeCounts, quotaCls, quotaOf } from '../data/home'
 import { inboxBadge } from '../data/inbox'
 import type { Snapshot } from '../data/useData'
 import { ago, headerClock, time } from '../format'
@@ -47,8 +47,9 @@ export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
   const [theme, toggle] = useTheme()
   const b = badges(snap)
   const c = snap ? homeCounts(snap) : null
-  // Account gauges (laptop): names from the runs, usage waits for the live API.
-  const accts = [...new Set(snap?.missions.flatMap((m) => m.runs.map((r) => r.account)) ?? [])].sort().slice(0, 3)
+  // Account gauges (laptop), allowed accounts only: 5h left as bar and number, week in the
+  // title; the number turns red when the week runs low.
+  const accts = snap ? quotaOf(snap) : []
   return (
     <div className="app">
       <header className="top">
@@ -65,9 +66,13 @@ export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
         </nav>
         <span className="grow" />
         {accts.length > 0 && (
-          <span className="accts" title="Usage arrives with the live API">
-            {accts.map((a) => (
-              <span key={a} className="acct">{a}<span className="gb" aria-hidden="true" /><span className="pc">–</span></span>
+          <span className="accts" role="group" aria-label="Quota left">
+            {accts.map((q) => (
+              <span key={q.account} className="acct" title={`${q.account}: ${q.h}% of 5 hours, ${q.w}% of the week left`}>
+                {q.account}
+                <span className="gb" aria-hidden="true"><i className={quotaCls(q.h)} style={{ width: `${q.h}%` }} /></span>
+                <span className={`pc num${quotaCls(q.w) === 'lo' ? ' c-f' : ''}`} aria-label={`${q.h}% of 5 hours, ${q.w}% of the week left`}>{q.h}%</span>
+              </span>
             ))}
           </span>
         )}

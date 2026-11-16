@@ -8,6 +8,7 @@
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-16 18:29:42
 
 # AI Context
 - Summary: a chat in Nest with the butler (CR-0W persona), run by the req_032 engine: one long-lived `claude -p` stream-json process per conversation, core MCP tools only, a core bridge that streams replies to Nest. The butler starts missions first, and sessions or dispatch only when asked.
@@ -22,6 +23,8 @@
 - In:
   - Core bridge: start, keep and stop one butler process per conversation; `POST /api/butler/<conv>/say`, replies streamed over SSE (item_146) with a polling fallback; transcript kept in core state; one process idles out after 30 min and resumes from the transcript.
   - Flags per req_032: `--tools "" --strict-mcp-config --allowedTools "mcp__core__*" --permission-mode dontAsk`, on an account allowed by the cdx policy.
+  - Account choice (owner 2026-11-16): `say` takes `account?`; the core validates it with `s.account` (never and unknown are 400, empty = auto pick). A conversation keeps its account until the owner changes it; a change restarts the process on the new account and resumes from the transcript. The chat input reuses Desk `AccountField` (allowed accounts, default auto).
+  - Desk ask box: free text (not /dispatch, /session) goes to the butler conversation and replaces the "Free chat with CR-0W: later" reply in `submitAsk`.
   - Core MCP server exposes the item_169 reads and the item_147/170 actions. Missions first: `mission.new` with a kind, then session and dispatch.
   - Any action that needs a tap (confirmation, approval) becomes an inbox item. The butler never confirms for the owner.
   - Persona from item_118 ("Sir", formal and calm).
@@ -40,6 +43,8 @@
 - AC4: Closing Nest and coming back an hour later shows the same conversation; the next message continues it.
 - AC5: The butler process has no tool outside `mcp__core__*` (checked from its init event).
 - AC6: The owner approved rendered rail boards before the build; on the laptop the rail shows on every screen, folds by hotkey, and its hero mood changes when a run starts or a session asks.
+- AC7: The chat lets the owner pick an allowed account (default auto); the butler process runs on it (checked from its launch args), and the core refuses never and unknown accounts.
+- AC8: Free text in the Desk ask box reaches the butler; no "later" reply remains.
 
 # AC Traceability
 - request-AC1 -> AC1, AC2, AC3, AC5. Proof: talk to the orchestrator from the phone under the same rules.
@@ -60,6 +65,7 @@
 - Rationale: the main surface the owner asked for.
 
 # Notes
+- Owner 2026-11-16 (header gauges hand-off): free chat needs an account choice like /dispatch and /session.
 - Owner 2026-11-10: "when i talk to the butler i want the hero to respond". Placement on Home under the holotable, transcript on Desk. Layout base: item_171 approved design D.
 
 - Owner 2026-11-12: on the laptop Home is rarely open, so the hero must be visible while working → butler rail on every laptop screen, badge on phone.
