@@ -18,3 +18,10 @@ Notes
 - Nest shots on fixtures need the vite dev server (`npx vite --port N`): `vite preview` serves the production build, which reads the real core API.
 - Claude's own status file `<HOME>/.claude/sessions/<pid>.json` shows `waiting` / `permission prompt` while the dialog is up.
 - Never `pkill -f` a pattern that matches your own command line.
+
+Test a Nest/core branch live (without touching the running core)
+- Build the branch app: `npm run build` in `<worktree>/tools/nest`.
+- Scratch config (`CROW_CORE_CONFIG`): `store:` a copy of `local/state/core.db`, `serve.listen` another port, `serve.socket` a short path (unix sockets cap at ~108 chars; scratchpad paths are too long).
+- Start: `CROW_HOME=<main repo> CROW_ENGINE=<worktree> CROW_CORE_CONFIG=<yaml> crow-core serve`. Engine = worktree, so core runs the branch's `bin/` scripts and serves its `tools/nest/dist`.
+- Drive with headless playwright-core on the TCP port, `extraHTTPHeaders` holding the owner identity header; the socket needs none. Chat route: `/desk/<pid>`.
+- The test session is a real session on the account: it shows in the live Nest Desk until it is killed. Kill it and the branch core when done.
