@@ -42,8 +42,8 @@ const Unfold = () => (
   </svg>
 )
 
-// Where a failed item opens: its mission, the MRs, or the Desk for live work.
-export function failedHref(w: WorkItem) {
+// Where a failed or waiting work item opens: its mission, the MRs, or the Desk for live work.
+export function workHref(w: WorkItem) {
   if (w.kind === 'mission') return `/missions/${encodeURIComponent(w.source.ref)}`
   if (w.kind === 'mr') return '/mrs'
   if (w.mission) return `/missions/${encodeURIComponent(w.mission)}`
@@ -57,13 +57,17 @@ function lineOf(r: AnswerRow, missions: Mission[], now: Date): Line {
     const w = r.item
     return { state: 'failed', title: w.title, sub: w.project, why: w.why, kind: w.kind, when: workWhen(w, now) }
   }
+  if (r.kind === 'prompt') {
+    const w = r.item
+    return { state: 'needs', title: w.title, sub: w.project, why: w.why, kind: 'question', when: workWhen(w, now) }
+  }
   if (r.kind === 'mail') {
     const m = r.item
     return { state: 'needs', title: m.subject, sub: m.from ?? 'Outlook', why: m.scope, kind: 'mail', when: '' }
   }
   const q = r.item
   const m = missions.find((x) => x.id === q.mission)
-  return { state: 'needs', title: m ? title(m) : short(q.mission), sub: q.project, why: q.ask, kind: 'mission', when: valid(q.created) ? `waits ${ago(q.created, now)}` : '' }
+  return { state: 'needs', title: m ? title(m) : short(q.mission), sub: q.project, why: q.ask, kind: 'question', when: valid(q.created) ? `waits ${ago(q.created, now)}` : '' }
 }
 
 function useInbox(snap: Snapshot, refresh: () => Promise<void>) {
@@ -145,8 +149,8 @@ function Verbs({ i, hide, cls }: { i: I; hide?: boolean; cls: string }) {
       </div>
     )
   }
-  if (p.kind === 'failed') {
-    return <div className={`btnrow ${cls}`}><Link className="btn p" href={failedHref(p.item)}>Open</Link></div>
+  if (p.kind === 'failed' || p.kind === 'prompt') {
+    return <div className={`btnrow ${cls}`}><Link className="btn p" href={workHref(p.item)}>Open</Link></div>
   }
   const item = i.a.item
   const r = p.item
@@ -209,13 +213,14 @@ function Read({ i }: { i: I }) {
       </section>
     )
   }
-  if (p.kind === 'failed') {
+  if (p.kind === 'failed' || p.kind === 'prompt') {
     const w = p.item
+    const failed = p.kind === 'failed'
     return (
       <section className="pn grow read" aria-labelledby="rt" aria-live="polite">
         <h2 className="ph" id="rt"><span className="rt">{w.title}</span>{valid(w.since) && <span className="sm num">{stamp(w.since!)}</span>}</h2>
         <div className="sm">{w.project} · <KindTag kind={w.kind} /></div>
-        <div className="body c-f">{w.why ?? 'Failed.'}</div>
+        <div className={`body${failed ? ' c-f' : ''}`}>{w.why ?? (failed ? 'Failed.' : 'Waiting on you.')}</div>
         <Verbs i={i} cls="end act" />
       </section>
     )

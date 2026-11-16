@@ -15,8 +15,8 @@ const snapshot = async (): Promise<Snapshot> => {
 
 const ask = (id: string, created: string, extra: Partial<InboxItem> = {}) =>
   ({ id, mission: 'm', project: 'p', type: 'decision', state: 'open', created, ask: id, verbs: [], artifacts: [], version: 1, source: 'crow', file: 'f', ...extra }) as unknown as InboxItem
-const work = (id: string, state: WorkItem['state'], since?: string) =>
-  ({ id, kind: 'run', project: 'p', title: id, state, since, source: { section: 'dispatch', ref: id } }) as WorkItem
+const work = (id: string, state: WorkItem['state'], since?: string, extra: Partial<WorkItem> = {}) =>
+  ({ id, kind: 'run', project: 'p', title: id, state, since, source: { section: 'dispatch', ref: id }, ...extra }) as WorkItem
 const mail = (id: string): Mail => ({ id, subject: id })
 
 describe('toAnswer', () => {
@@ -26,7 +26,7 @@ describe('toAnswer', () => {
       [work('w-late', 'failed', '2026-11-09T15:30:00+01:00'), work('w-needs', 'needs', '2026-11-09T08:00:00+01:00'), work('w-early', 'failed', '2026-11-09T11:00:00+01:00')],
       [mail('m-1'), mail('m-2')],
     )
-    expect(rows.map((r) => r.key)).toEqual(['w:w-early', 'w:w-late', 'q:q-old', 'q:q-new', 'm:m-1', 'm:m-2'])
+    expect(rows.map((r) => r.key)).toEqual(['w:w-early', 'w:w-late', 'w:w-needs', 'q:q-old', 'q:q-new', 'm:m-1', 'm:m-2'])
   })
 
   it('skips answered questions and works without the work feed', () => {
@@ -42,6 +42,44 @@ describe('toAnswer', () => {
     expect(kinds).toContain('ask')
     expect(rows.filter((r) => r.kind === 'mail').map((r) => r.key)).toEqual(['m:mail-2', 'm:mail-1'])
     expect(kinds.lastIndexOf('ask')).toBeLessThan(kinds.indexOf('mail'))
+  })
+})
+
+describe('questions (owner 2026-11-16)', () => {
+  const at = '2026-11-09T10:00:00+01:00'
+  it('takes a mission question, a waiting run and a waiting session', () => {
+    const rows = toAnswer([ask('q', at, { mission: 'inbox-filters' })], [
+      work('run:r', 'needs', at, { why: 'asks Bash' }),
+      work('session:s', 'needs', at, { kind: 'session', why: 'asks AskUserQuestion' }),
+    ], [])
+    expect(rows.map((r) => [r.key, r.kind])).toEqual([['q:q', 'ask'], ['w:run:r', 'prompt'], ['w:session:s', 'prompt']])
+  })
+
+  it('leaves out MRs asking a review, parked sessions and working items', () => {
+    const rows = toAnswer([], [
+      work('mr:1', 'needs', at, { kind: 'mr', why: 'review asked' }),
+      work('parked:p', 'sleeping', at, { kind: 'parked' }),
+      work('session:w', 'working', at, { kind: 'session' }),
+    ], [])
+    expect(rows).toEqual([])
+  })
+
+  it('lists a mission question once, not again as the mission needs item', () => {
+    const rows = toAnswer([ask('q', at, { mission: 'm1' })], [work('mission:m1', 'needs', at, { kind: 'mission', mission: 'm1', why: 'choice' })], [])
+    expect(rows.map((r) => r.key)).toEqual(['q:q'])
+  })
+
+  it('orders a waiting session by wait_s', () => {
+    const now = new Date('2026-11-09T12:00:00+01:00')
+    const rows = toAnswer([ask('q', '2026-11-09T11:00:00+01:00')], [work('session:s', 'needs', '2026-11-09T08:00:00+01:00', { kind: 'session', wait_s: 600 })], [], now)
+    expect(rows.map((r) => r.key)).toEqual(['q:q', 'w:session:s'])
+  })
+
+  it('maps the fixture sessions waiting on a prompt', async () => {
+    const rows = answerOf(await snapshot())
+    expect(rows.filter((r) => r.kind === 'prompt').map((r) => r.key).sort()).toEqual(['w:session:5151', 'w:session:5252', 'w:session:6161'])
+    expect(rows.some((r) => r.key.startsWith('w:mr:') && r.kind !== 'failed')).toBe(false)
+    expect(rows.some((r) => r.key.startsWith('w:mission:'))).toBe(false)
   })
 })
 

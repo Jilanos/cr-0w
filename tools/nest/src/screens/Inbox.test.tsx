@@ -31,7 +31,8 @@ describe('Inbox to answer (item_204)', () => {
     expect(titles[0]).toBe('night job')
     expect(titles.slice(-2)).toEqual(['Invoice to check', 'Contract renewal'])
     expect(html).toContain('</svg>Mail</span>')
-    expect(html).toContain('</svg>Mission</span>')
+    expect(html).toContain('</svg>Question</span>')
+    expect(html).not.toContain('</svg>Mission</span>')
     expect(html).toContain('<span>To answer</span><span class="num">' + titles.length + '</span>')
   })
 

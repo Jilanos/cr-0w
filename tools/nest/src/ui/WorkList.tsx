@@ -12,10 +12,14 @@ const KIND_ICON: Record<WorkKind, ReactNode> = {
   parked: <path d="M8 5v12M14 5v12" />,
 }
 
-// Inbox rows add mail (item_204, owner 2026-11-15).
-export type TagKind = WorkKind | 'mail'
-const TAG_ICON: Record<TagKind, ReactNode> = { ...KIND_ICON, mail: <><rect x="3" y="5" width="16" height="12" rx="2" /><path d="m3 7 8 5.5L19 7" /></> }
-const TAG_LABEL: Record<TagKind, string> = { ...KIND_LABEL, mail: 'Mail' }
+// Inbox rows add mail (owner 2026-11-15) and questions (owner 2026-11-16), item_204.
+export type TagKind = WorkKind | 'mail' | 'question'
+export const TAG_ICON: Record<TagKind, ReactNode> = {
+  ...KIND_ICON,
+  mail: <><rect x="3" y="5" width="16" height="12" rx="2" /><path d="m3 7 8 5.5L19 7" /></>,
+  question: <><circle cx="11" cy="11" r="8.5" /><path d="M8.6 8.7a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.6M11 15.9v.1" /></>,
+}
+export const TAG_LABEL: Record<TagKind, string> = { ...KIND_LABEL, mail: 'Mail', question: 'Question' }
 
 export function KindTag({ kind }: { kind: TagKind }) {
   return (
