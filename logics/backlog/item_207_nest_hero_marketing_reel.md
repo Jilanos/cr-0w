@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 75
-> Confidence: 70
+> Understanding: 90
+> Confidence: 85
 > Progress: 0%
 > Complexity: Medium
 > Theme: General
@@ -55,6 +55,7 @@
 - Rationale: owner request 2026-11-13; runs last, once the hero and planets settle.
 
 # Notes
+- 2026-11-16: owner defers the reel until more of the Nest functions and design are in (Desk item_210, Inbox reviews item_211, terminal item_209, holotable item_212).
 - Start from the approved QA reels (vault `Research/nest-design/item_198/hero-reel-labels-*`) for the look.
 - Output in the vault (`Research/nest-design/item_207/`).
 
