@@ -3,6 +3,7 @@ import { lastRun, openInbox, uiState } from './state'
 import type { Snapshot } from './feed'
 import type { AgendaEvent, SectionBody, TodayEvent } from './types'
 import { title } from '../format'
+import { workCounts, workOf } from './work'
 
 // Phone Home (item_171): quota HUD, status HUD, Needs you first, one Running list
 // and the next agenda slots, all from one snapshot.
@@ -147,8 +148,14 @@ export function homeModel(snap: Snapshot): HomeModel {
   }
 }
 
-// Header chips and the butler line share these two counts.
+// Header chips, tab badges and the butler line share these counts: the work feed
+// (item_204) when core serves it, else the Home lists.
 export function homeCounts(snap: Snapshot) {
+  const work = workOf(snap.sections.work)
+  if (work) {
+    const c = workCounts(work)
+    return { needs: c.needs, working: c.working, failed: c.failed }
+  }
   const m = homeModel(snap)
-  return { needs: m.needs.length, working: m.working }
+  return { needs: m.needs.length, working: m.working, failed: 0 }
 }

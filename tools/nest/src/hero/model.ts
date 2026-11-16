@@ -3,6 +3,7 @@ import { countByState, lastRun, openInbox, uiState } from '../data/state'
 import type { InboxItem, Mission, SectionBody, SectionName } from '../data/types'
 import { dispatchOf, registryOf, resumableOf, type Agent, type RegProject, type Resumable } from '../data/live'
 import { title } from '../format'
+import { workCounts, workOf, type WorkItem } from '../data/work'
 
 // What the hero shows, derived from the data layer only (item_155, holotable item_162).
 
@@ -25,12 +26,13 @@ export interface HeroProject {
 }
 
 // Everything the hero shows besides missions (req_059): the project registry, live
-// sessions and dispatch runs, and sessions parked on a usage limit.
-export interface HeroLive { registry: RegProject[]; agents: Agent[]; parked: Resumable[] }
+// sessions and dispatch runs, and sessions parked on a usage limit. work is the
+// core work feed (item_204); when present, mood and line count it.
+export interface HeroLive { registry: RegProject[]; agents: Agent[]; parked: Resumable[]; work?: WorkItem[] }
 export const NO_LIVE: HeroLive = { registry: [], agents: [], parked: [] }
 
 export const heroLiveOf = (s: Partial<Record<SectionName, SectionBody>> | undefined): HeroLive => s
-  ? { registry: registryOf(s.projects), agents: dispatchOf(s.dispatch).agents, parked: resumableOf(s.sessions) }
+  ? { registry: registryOf(s.projects), agents: dispatchOf(s.dispatch).agents, parked: resumableOf(s.sessions), work: workOf(s.work) ?? undefined }
   : NO_LIVE
 
 // Planet state order (item_199): failed > needs > working > sleeping > queued > done.
@@ -84,8 +86,11 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
   const agentState = (a: Agent): UiState => (a.state === 'waiting' ? 'needs' : 'working')
   const waiting = live.agents.filter((a) => agentState(a) === 'needs').length
   // Live sessions and runs count like missions: waiting ones ask, the others work.
-  const working = c.working + live.agents.length - waiting, asking = asks + waiting
-  const mood = moodOf({ ...c, working }, asking)
+  // The work feed already holds every kind: its needs ask, its working work.
+  const wc = live.work && workCounts(live.work)
+  const working = wc ? wc.working : c.working + live.agents.length - waiting
+  const asking = wc ? wc.needs : asks + waiting
+  const mood = moodOf(wc ? { ...c, failed: wc.failed, working } : { ...c, working }, asking)
 
   const known = new Set([...live.registry.map((p) => p.name), ...missions.map((m) => m.project)])
   const names = new Map<string, true>()
@@ -160,9 +165,11 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
 
   const parts: string[] = []
   if (asking) parts.push(`${word(asking)} ${asking === 1 ? 'ask waits' : 'asks wait'} on you, Sir.`)
-  const failed = missions.filter((m) => uiState(m, inbox) === 'failed')
-  if (failed.length === 1) parts.push(`${title(failed[0])} failed.`)
-  else if (failed.length) parts.push(`${word(failed.length)} runs failed.`)
+  const failed = live.work
+    ? live.work.filter((w) => w.state === 'failed').map((w) => w.title)
+    : missions.filter((m) => uiState(m, inbox) === 'failed').map(title)
+  if (failed.length === 1) parts.push(`${failed[0]} failed.`)
+  else if (failed.length) parts.push(`${word(failed.length)} ${live.work ? 'items' : 'runs'} failed.`)
   if (!parts.length && working) parts.push(`${word(working)} ${working === 1 ? 'run' : 'runs'} going, Sir.`)
   if (!parts.length) parts.push('All quiet, Sir.')
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react'
-import { countByState, openInbox } from '../data/state'
+import { countByState } from '../data/state'
 import { homeCounts } from '../data/home'
+import { inboxBadge } from '../data/inbox'
 import type { Snapshot } from '../data/useData'
 import { ago, headerClock, time } from '../format'
 import { Link } from '../router'
@@ -24,8 +25,7 @@ function useTheme(): [Theme, () => void] {
 function badges(snap: Snapshot | null): Partial<Record<TabKey, { n: number; failed?: boolean }>> {
   if (!snap) return {}
   const c = countByState(snap.missions, snap.inbox)
-  const asks = openInbox(snap.inbox).filter((r) => r.type !== 'fyi').length
-  return { missions: { n: c.failed, failed: true }, inbox: { n: asks } }
+  return { missions: { n: c.failed, failed: true }, inbox: inboxBadge(snap) }
 }
 
 // Header A (item_206): one chip after the logo cycles the scope filter.

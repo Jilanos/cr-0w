@@ -72,6 +72,8 @@ export interface Mail {
   subject: string
   from?: string
   scope?: 'work' | 'perso'
+  // Set by mailOf: the Outlook list the mail came from.
+  flag?: 'flagged' | 'important'
 }
 
 export interface Account {
@@ -133,7 +135,8 @@ export const resumableOf = (b: SectionBody | undefined) => list<Resumable>(obj(b
 export function mailOf(b: SectionBody | undefined): Mail[] {
   const d = obj(b)
   const seen = new Set<string>()
-  return [...list<Mail>(d.flagged), ...list<Mail>(d.important)].filter((m) => !seen.has(m.id) && seen.add(m.id))
+  const tag = (v: unknown, flag: Mail['flag']) => list<Mail>(v).map((m) => ({ ...m, flag }))
+  return [...tag(d.flagged, 'flagged'), ...tag(d.important, 'important')].filter((m) => !seen.has(m.id) && seen.add(m.id))
 }
 
 export const projectsOf = (b: SectionBody | undefined) => list<{ name: string }>(obj(b).projects).map((p) => p.name)

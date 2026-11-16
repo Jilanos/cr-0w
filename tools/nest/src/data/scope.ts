@@ -2,6 +2,7 @@ import type { Snapshot } from './feed'
 import { registryOf, type Agent, type Mail, type RegProject, type Resumable } from './live'
 import { projectOfAgent, projectOfCwd } from '../hero/model'
 import type { InboxItem, Mission, SectionBody } from './types'
+import { workOf, type WorkItem } from './work'
 
 // Nest scope filter (item_206): all, work or perso, read by every screen except Chat.
 export type ScopeMode = 'all' | 'work' | 'perso'
@@ -41,6 +42,15 @@ export function askSide(r: InboxItem, registry: RegProject[], missions: Mission[
   return m ? missionSide(m, registry) : undefined
 }
 
+// A work item (item_204) takes its project's registry scope. A mission item on a
+// project the registry does not know takes its mission's scope.
+export function workSide(w: WorkItem, registry: RegProject[], missions: Mission[]): Side {
+  const side = projectSide(w.project, registry)
+  if (side || w.kind !== 'mission') return side
+  const m = missions.find((x) => x.id === w.source.ref)
+  return m ? missionSide(m, registry) : undefined
+}
+
 // The Today section reads the work mailbox. A personal mail source tags its rows perso.
 export const TODAY_MAIL_SIDE: Side = 'work'
 
@@ -77,10 +87,12 @@ const mailIn = (b: SectionBody, key: string, side: Side, mode: ScopeMode) =>
 // MRs and the Today calendar are not per project and stay whole.
 export function scopeSnapshot(s: Snapshot, mode: ScopeMode): Snapshot {
   if (mode === 'all') return s
-  const { projects, dispatch, sessions, today } = s.sections
+  const { projects, dispatch, sessions, today, work } = s.sections
   const registry = arr<RegProject>(projects, 'projects')
+  const reg = registryOf(projects)
+  const items = workOf(work)
   const f = scopeOf({
-    missions: s.missions, inbox: s.inbox, registry: registryOf(projects),
+    missions: s.missions, inbox: s.inbox, registry: reg,
     agents: arr<Agent>(dispatch, 'agents'), parked: arr<Resumable>(sessions, 'sessions'),
   }, mode)
   return {
@@ -92,6 +104,7 @@ export function scopeSnapshot(s: Snapshot, mode: ScopeMode): Snapshot {
       projects: withLists(projects, { projects: registry.filter((p) => keep(mode, projectSide(p.name, registry))) }),
       dispatch: withLists(dispatch, { agents: f.agents }),
       sessions: withLists(sessions, { sessions: f.parked }),
+      work: items ? { ...work, data: items.filter((w) => keep(mode, workSide(w, reg, s.missions))) } : work,
       today: withLists(today, {
         flagged: mailIn(today, 'flagged', TODAY_MAIL_SIDE, mode),
         important: mailIn(today, 'important', TODAY_MAIL_SIDE, mode),
