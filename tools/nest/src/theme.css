@@ -998,6 +998,9 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .chat-cv .li > b { flex: none; min-width: 1em; color: #a6da95; font-weight: 500; }
 .chat-cv .who { font: 600 10.5px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; color: #8087a2; display: flex; gap: 6px; margin-bottom: -6px; }
 .chat-cv .who.r { align-self: flex-end; }
+:is(.chat-cv, .desk) .dlv { align-self: flex-end; display: flex; gap: 8px; align-items: center; margin-top: -6px; font-size: 11px; color: var(--dim); }
+:is(.chat-cv, .desk) .dlv.f { color: var(--c-f); }
+:is(.chat-cv, .desk) .dlv .bare { display: inline-block; padding: 0 6px; line-height: 32px; text-decoration: underline; }
 :is(.chat-cv, .desk-cv) .ask .who { margin: 0; }
 .chat-cv .tf { align-self: stretch; border: 1px dashed var(--line); border-radius: 8px; font-size: 11.5px; color: #8087a2; flex: none; }
 .chat-cv .tfh { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 10px; min-height: 32px; cursor: pointer; }

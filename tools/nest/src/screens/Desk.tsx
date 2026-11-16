@@ -1,5 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError } from '../data/api'
+import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
+import { useConversation } from '../data/useConversation'
+import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
 import { accountsOf, dispatchOf, mailOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
@@ -68,12 +71,14 @@ function linesOf(a: Agent, now: Date): Line[] {
   return out
 }
 
-interface Msg { me?: boolean; text: string; f?: boolean }
+// A Tell it message carries its pending send and delivery state.
+interface Msg { me?: boolean; text: string; f?: boolean; p?: Pending; state?: Delivery }
 type Form = 'run' | 'session' | null
 
 // State and action builders shared by the three sizes.
 function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
-  const act = useSource().actions
+  const src = useSource()
+  const act = src.actions
   const { slots, agents } = dispatchOf(snap.sections.dispatch)
   const runs = agents.filter((a) => a.kind === 'run')
   const sessions = agents.filter((a) => a.kind === 'session')
@@ -113,10 +118,30 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const where = (a: Agent) => `${a.project} (${a.account})`
   const tgt = (a: Agent): Array<[string, string]> => [['session', nameOf(a)], ['account', a.account], ['pid', String(a.pid)]]
 
+  // A message typed into a session shows "sending…" in the chat until its transcript
+  // carries the turn (item_208). The tail read before the send is the baseline.
+  const tellIt = async (a: Agent, t: string) => {
+    const before = await src.conversation({ pid: a.pid }, { tail: 50 }).then((r) => r.entries, () => [])
+    try {
+      await act.send(a.pid, t)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) void refresh()
+      throw e
+    }
+    const p = pendingOf(a.pid, t, before, Date.now())
+    setLog((l) => [...l.filter((m) => m.p?.pid !== a.pid || m.p.text !== t || m.state !== 'failed'), { me: true, text: `Tell ${nameOf(a)}: ${t}`, p, state: 'sending' }])
+    void refresh()
+  }
+  const settle = (p: Pending, state: Delivery) => setLog((l) => l.map((m) => (m.p === p ? { ...m, state } : m)))
+  const retell = (p: Pending) => {
+    const a = agents.find((x) => x.pid === p.pid)
+    if (!a) return setLog((l) => [...l, { text: 'That session is gone.', f: true }])
+    tellIt(a, p.text).catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
+  }
   const send = (a: Agent) => setSheet({
     title: 'Send to session', lead: `Type this answer into ${where(a)} and press enter:`, quote: text, target: tgt(a),
     note: 'Lands in the open window, like typing it yourself.', ok: 'Send',
-    run: wrap(`Tell ${nameOf(a)}: ${text}`, () => act.send(a.pid, text), () => { setText(''); setTell(false) }),
+    run: async () => { await tellIt(a, text); setText(''); setTell(false) },
   })
   const pause = (a: Agent) => setSheet({
     title: 'Pause session', lead: `Interrupt the current turn of ${where(a)} (Escape in its window).`, target: tgt(a),
@@ -237,7 +262,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     snap, refresh, slots, agents, runs, sessions, resumable, mail, projects, accounts,
     sheet, setSheet, log, picked, slotOf, since, pick, tell, setTell, text, setText, ask, setAsk, submitAsk,
     form, setForm, run, setRun, start, setStart,
-    send, pause, stop, dispatch, open, resume, flag, answer, answerAsk, asking, queue, cancel,
+    send, settle, retell, pause, stop, dispatch, open, resume, flag, answer, answerAsk, asking, queue, cancel,
   }
 }
 type D = ReturnType<typeof useDesk>
@@ -434,11 +459,28 @@ function AskBox({ d, ph, big }: { d: D; ph: string; big?: boolean }) {
   )
 }
 
+// Reads the session transcript while a Tell it send is open, then reports delivered or
+// not delivered and unmounts, which ends the reads.
+function Watch({ p, onDone }: { p: Pending; onDone: (s: Delivery) => void }) {
+  const conv = useConversation({ pid: p.pid })
+  const s = deliveryOf(p, conv.entries, useDeliveryClock([p]))
+  const done = useRef(onDone)
+  done.current = onDone
+  useEffect(() => { if (s !== 'sending') done.current(s) }, [s])
+  return null
+}
+
 function Chat({ d }: { d: D }) {
   return (
     <div className="msgs" role="log" aria-live="polite">
       {d.log.length === 0 && <div className="msg cr">Use /dispatch to start a run or /session to open one. Each action asks you to confirm first.</div>}
-      {d.log.map((m, i) => <div key={i} className={`msg ${m.me ? 'me' : 'cr'}${m.f ? ' f' : ''}`}>{m.text}</div>)}
+      {d.log.map((m, i) => (
+        <Fragment key={i}>
+          <div className={`msg ${m.me ? 'me' : 'cr'}${m.f ? ' f' : ''}`}>{m.text}</div>
+          {m.p && m.state === 'sending' && <Watch p={m.p} onDone={(s) => d.settle(m.p!, s)} />}
+          {m.p && m.state && <DeliveryLine state={m.state} onRetry={() => d.retell(m.p!)} />}
+        </Fragment>
+      ))}
       <Forms d={d} />
     </div>
   )
