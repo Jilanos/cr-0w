@@ -1,10 +1,10 @@
 ## item_204_nest_shows_every_kind_of_work - Nest shows every kind of work
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 90%
-> Confidence: 90%
-> Progress: 85%
+> Confidence: 95%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -80,4 +80,3 @@
 | 2026-11-15T11:02:58.732084+00:00 | cdx | 9f7a81c273974ac98760dcd8d2c1ca96 | item_204 Inbox | succeeded |  |  |
 | 2026-11-15T09:07:21.014666+00:00 | cdx | 357510a13cac4e66963502e012cb6241 | item_204 data layer + Desk build | succeeded |  |  |
 | 2026-11-13T18:52:21.845294+00:00 | cdx | 22b5aa65638c4494b3ae28c9f93761b3 | item_204 work row options | succeeded |  |  |
-
