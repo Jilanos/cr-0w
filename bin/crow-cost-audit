@@ -8,10 +8,12 @@ Method: assistant events of every transcript in the cdx profiles (subagents incl
 (message.id, requestId). Context of a turn = input + cache reads + cache writes. Prices come from crow-usage
 (cdx's table). Buckets by context size: <50k, 50-100k, 100-150k, >150k.
 JSON: {days, since, dedup_key, turns, cost_usd, by_model{}, buckets{}, top_bucket{}, by_project{}, by_skill{},
-start_context{}}.
+start_context{}, run_start_context{}, context_tokens}.
+context_tokens: input + cache reads + cache writes summed over turns (the "context read" figure); each table row
+carries its own.
 by_skill: sessions classed by first typed prompt (/skill name, retro, headless, interactive).
 start_context: context of each session's first turn (the start cost every hub session pays), hub sessions only
-when a hub path is given with --hub.
+when a hub path is given with --hub. run_start_context: the same for headless (dispatched) sessions.
 """
 import argparse
 import datetime as dt
@@ -80,9 +82,9 @@ def audit(days, hub=None, profiles=None):
     registry = cu.load_registry()
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
     since = cutoff.isoformat(timespec="seconds")
-    total = {"turns": 0, "cost": 0.0}
+    total = {"turns": 0, "cost": 0.0, "context": 0}
     by_model, buckets, by_project, by_skill = {}, {}, {}, {}
-    top_ctx, top_proj, start = [], {}, []
+    top_ctx, top_proj, start, run_start = [], {}, [], []
     hub_root = os.path.realpath(hub).rstrip("/") if hub else None
     for _, path in cu.crow_lib.claude_transcripts(profiles or cu.PROFILES):
         if dt.datetime.fromtimestamp(os.stat(path).st_mtime, dt.timezone.utc) < cutoff:
@@ -104,15 +106,19 @@ def audit(days, hub=None, profiles=None):
             name = (model or "?").replace("claude-", "")
             total["turns"] += 1
             total["cost"] += cost
+            total["context"] += ctx
             for table, key in ((by_model, name), (by_project, project), (by_skill, skill),
                                (buckets, f"{name}|{bucket(ctx)}")):
-                row = table.setdefault(key, {"cost_usd": 0.0, "turns": 0})
+                row = table.setdefault(key, {"cost_usd": 0.0, "turns": 0, "context_tokens": 0})
                 row["cost_usd"] += cost
                 row["turns"] += 1
+                row["context_tokens"] += ctx
             if main and first_main:
                 first_main = False
                 if hub_root and cwd and os.path.realpath(cwd).rstrip("/") == hub_root and skill == "interactive":
                     start.append(ctx)
+                elif skill == "headless":
+                    run_start.append(ctx)
             if bucket(ctx) == ">150k":
                 top_ctx.append(ctx)
                 tp = top_proj.setdefault(project, {"cost_usd": 0.0, "turns": 0})
@@ -124,23 +130,29 @@ def audit(days, hub=None, profiles=None):
     top = {"turns": len(top_ctx), "median_context": int(statistics.median(top_ctx)) if top_ctx else None,
            "p90_context": int(statistics.quantiles(top_ctx, n=10)[-1]) if len(top_ctx) >= 2 else (top_ctx[0] if top_ctx else None),
            "by_project": rnd(top_proj)}
-    sc = {"sessions": len(start), "median": int(statistics.median(start)) if start else None,
-          "min": min(start) if start else None, "max": max(start) if start else None}
+    spread = lambda xs: {"sessions": len(xs), "median": int(statistics.median(xs)) if xs else None,
+                         "min": min(xs) if xs else None, "max": max(xs) if xs else None}
+    sc, rsc = spread(start), spread(run_start)
     return {"days": days, "since": since, "dedup_key": DEDUP_KEY, "turns": total["turns"],
-            "cost_usd": round(total["cost"], 2), "by_model": rnd(by_model), "buckets": rnd(buckets),
-            "top_bucket": top, "by_project": rnd(by_project), "by_skill": rnd(by_skill), "start_context": sc}
+            "cost_usd": round(total["cost"], 2), "context_tokens": total["context"], "by_model": rnd(by_model), "buckets": rnd(buckets),
+            "top_bucket": top, "by_project": rnd(by_project), "by_skill": rnd(by_skill), "start_context": sc,
+            "run_start_context": rsc}
 
 
 def text(r):
-    lines = [f"window {r['days']}d since {r['since']}, {r['turns']} turns, ${r['cost_usd']}, dedup {r['dedup_key']}"]
+    lines = [f"window {r['days']}d since {r['since']}, {r['turns']} turns, ${r['cost_usd']}, "
+             f"{r['context_tokens'] / 1e6:.1f}M context read, dedup {r['dedup_key']}"]
     for title in ("by_model", "buckets", "by_project", "by_skill"):
         lines.append(f"{title}:")
-        lines += [f"  {k:<28} ${v['cost_usd']:>9.2f} {v['share_pct']:>5}% {v['turns']:>7} turns"
+        lines += [f"  {k:<28} ${v['cost_usd']:>9.2f} {v['share_pct']:>5}% {v['turns']:>7} turns "
+                  f"{v.get('context_tokens', 0) / 1e6:>7.1f}M ctx"
                   for k, v in list(r[title].items())[:12]]
     t = r["top_bucket"]
     lines.append(f">150k turns: {t['turns']}, median ctx {t['median_context']}, p90 {t['p90_context']}")
     s = r["start_context"]
     lines.append(f"hub start context: {s['sessions']} sessions, median {s['median']}, min {s['min']}, max {s['max']}")
+    s = r["run_start_context"]
+    lines.append(f"run start context: {s['sessions']} runs, median {s['median']}, min {s['min']}, max {s['max']}")
     return "\n".join(lines)
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """crow-runs: dispatch background runs and see what every agent is doing.
 
-  crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--kind task|review|retro] [--power P] [--model M]
+  crow-runs dispatch <project> <label> (--prompt-file F | --prompt T) [--kind task|mech|review|retro] [--power P] [--model M]
                      [--permission review] [--logics REF] [--mission ID | --end-state E] [--write-dir DIR] [--timeout-min N]
                      [--json] [--dry-run]
                                                      every run carries crow_lib.run_flags (model id, effort, budget, timeout, env)
@@ -10,7 +10,7 @@
   crow-runs json                                     same data as JSON (schema in logics/specs/script_contract);
                                                      it reads <state>/runs.jsonl, so a watcher can re-read on change
   crow-runs stop <run_id> [--json]                   stop one running run; --json prints the action result
-  crow-runs report <run_id>                          final report of a finished run
+  crow-runs report <run_id>                          final report of a finished run, then its token line
   crow-runs final <stdout_path> [provider]           final message of a run's stdout log (claude | codex)
   crow-runs wait <run_id>...                         block until the runs finish (run in background to get notified)
   crow-runs inbox [--hook] [--peek]                  finished runs not reported yet (the hook runs it on every prompt)
@@ -490,6 +490,30 @@ def report(run_id, since="7d"):
     return result
 
 
+def run_tokens(run_id, since="7d"):
+    """Token figures of a finished Claude run (crow_lib.transcript_tokens), or None when its transcript is gone."""
+    r = next((v for k, v in finished(since).items() if k.startswith(run_id)), None)
+    if not r:
+        return None
+    sid = r.get("conversation_id") or r.get("provider_session_id")
+    if not sid:
+        f = Path(r.get("artifacts", {}).get("stdout_path") or "/nonexistent")
+        text = f.read_text(errors="replace") if f.exists() else ""
+        sid = next((o.get("session_id") for o in crow_lib._json_objects(text) if o.get("type") == "result"), None)
+    path = next((t for _, t in crow_lib.find_transcripts(sid)), None) if sid else None
+    return crow_lib.transcript_tokens(path) if path else None
+
+
+def token_line(run_id):
+    """'tokens: 2.1M context read · peak 96k · 14k output · 58 calls · sonnet-5-5' for a finished run."""
+    t = run_tokens(run_id)
+    if not t or not t["calls"]:
+        return None
+    fmt = crow_lib.fmt_tokens
+    return (f"tokens: {fmt(t['context'])} context read · peak {fmt(t['peak'])} · {fmt(t['output'])} output · "
+            f"{t['calls']} calls · {', '.join(t['models'])}")
+
+
 def report_from_transcript(session_id):
     pats = [Path.home() / ".claude/projects", *(Path(d) for _, d in crow_lib.transcript_dirs())]
     for base in pats:
@@ -902,12 +926,18 @@ def dispatch(a):
     if any(x["cwd"] == cwd for x in runs) and not a.force and not read_only:
         dispatch_fail(a, "cwd_busy", f"a run is already working in {cwd}; --force to override")
     src = ["--prompt-file", a.prompt_file] if a.prompt_file else ["--prompt", a.prompt]
-    if provider == "codex":  # Codex does not load CLAUDE.md: start the prompt with the read-first list
+    # The prompt cdx reads (on the host, so an isolated run gets it too): the kind's stop-and-report footer
+    # (crow_lib.run_brief) and, for Codex, which does not load CLAUDE.md, the read-first list.
+    footer = not a.continue_run and crow_lib.run_brief(a.kind, "") != ""
+    if (footer or provider == "codex") and (a.prompt or Path(a.prompt_file).is_file()):
         task = Path(a.prompt_file).read_text() if a.prompt_file else a.prompt
+        task = crow_lib.run_brief(a.kind, task) if footer else task
+        if provider == "codex":
+            task = "Read these files first: " + ", ".join(crow_lib.read_first(str(HOME), cwd)) + ".\n\n" + task
         pre = Path(STATE / "dispatch")
         pre.mkdir(parents=True, exist_ok=True)
         f = pre / f"{a.project}-{a.label}.md".replace("/", "_")
-        f.write_text("Read these files first: " + ", ".join(crow_lib.read_first(str(HOME), cwd)) + ".\n\n" + task)
+        f.write_text(task)
         src = ["--prompt-file", str(f)]
     # --continue-run pins the parent's model and effort: cdx refuses any other value.
     # The sandbox mounts only the worktree: an isolated run reads its settings file from there.
@@ -960,6 +990,8 @@ def dispatch(a):
             rec["linked_mission"] = linked
     if a.write_dir:
         rec["write_dir"] = a.write_dir
+    if "--model" in flags:
+        rec["model_id"] = flags[flags.index("--model") + 1]
     if "--budget" in flags:
         rec["budget_usd"] = float(flags[flags.index("--budget") + 1])
     if a.continue_run:
@@ -978,7 +1010,9 @@ def dispatch(a):
                      start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if a.json:
         return
-    print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}" + ("" if acct == ACCOUNT else f"  on {acct}"))
+    shown = flags[flags.index("--model") + 1].replace("claude-", "") if "--model" in flags else "parent's model"
+    print(f"dispatched {rec['run_id'][:8]}  {p['name']}  {a.label}  {a.kind} on {shown}"
+          + ("" if acct == ACCOUNT else f"  on {acct}"))
     print(f"NEXT: start `bin/crow-runs wait {rec['run_id'][:8]}` as a background Bash command now (wakes this session when the run ends)")
 
 
@@ -1171,6 +1205,9 @@ def main():
         print(crow_lib.final_text(Path(a.stdout_path).read_text(errors="replace"), a.provider))
     elif a.cmd == "report":
         print(report(a.run_id) or "")
+        line = token_line(a.run_id)
+        if line:
+            print(line)
     elif a.cmd == "json":
         json.dump({"schema": crow_lib.SCRIPT_SCHEMA, **collect(a.since, a.all)}, sys.stdout, indent=1); print()
     else:

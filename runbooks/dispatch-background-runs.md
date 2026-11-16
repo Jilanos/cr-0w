@@ -8,6 +8,15 @@ Use when the user wants work done in project repos without opening a session the
    and `git status --short` must be checked. Uncommitted owner files get named in the prompt
    as "do not stage, commit, revert or stash".
 3. Pick the work from open threads or the repo's Logics backlog (`logics/backlog/item_*`).
+4. **One scope per run.** One bug or one acceptance-criteria group per run. Six bugs in one run read 15M tokens
+   (2026-11-16): each call re-reads everything the run has seen so far.
+5. **Capture the failure live first.** For a bug, the hub reproduces it and puts the failing state in the prompt:
+   log lines, API output, a zoom crop. A run that starts from evidence does not hunt.
+6. **Batch review rounds.** Collect every decision on the previous result in one AskUserQuestion round, then
+   dispatch once. Each new round is a fresh run that re-reads the same context.
+7. **Pick the kind (it picks the model).** `mech` (Sonnet, $8, 60 min) for mechanical edits: cleanup, delete,
+   rename, wiring, a flag, recordings. `task` (Opus, $25) for design and debugging. `review` for read-only review.
+   `--model` overrides one run. The dispatch line prints the kind and model.
 
 ## Prompt template (write it to the scratchpad, then pass it with --prompt-file)
 - One line of context: repo, scope, "identity is already correct".
@@ -17,10 +26,12 @@ Use when the user wants work done in project repos without opening a session the
 - Quality gate: tests or build green before every commit. Commit on the branch the autonomy table allows; push when green.
 - No AI attribution.
 - "Stop and report if something needs a product decision", naming the likely one.
+- The stop-and-report budget is added by dispatch: task and mech prompts get a footer (`crow_lib.run_brief`) that
+  stops the run after the kind's `call_cap` tool calls (task 60, mech 40) without a confirmed cause or a passing step.
 - End with: report commits, what is left, open questions.
 
 ## Dispatch
-`crow dispatch <project> "<short label>" --prompt-file <file> [--kind task|review] [--power medium]`
+`crow dispatch <project> "<short label>" --prompt-file <file> [--kind task|mech|review] [--power medium]`
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.
 When relaunching an interrupted run, add `--resumes <run_id>` so the old run is folded into the new one.
 
@@ -62,11 +73,13 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
 
 ## After
 - Read each report (`crow-runs report <id>`). Summarise the facts in prose: what shipped, and what's left.
+  The report ends with a token line (context read, peak, output, calls, model). Mention it when a run read over 5M.
+- Day totals: `bin/crow-cost-audit --days 1` (context read per model and per kind, hub and run start context).
 - Put every decision the owner must make into AskUserQuestion: up to 4 per round, each self-contained (project + one line of context), recommended option first. Never leave decisions inside the summary text.
 - Turn the answers into the next dispatch, update the open threads, and start queued work in the freed slots.
 
 ## Headless flags (every launch, `crow_lib.run_flags`)
-- Every `cdx run` from crow (dispatch, review runs, retro, `crow` one-shots) takes its flags from one helper, per run kind (`crow_lib.RUN_KINDS`: task, review, retro, oneshot):
+- Every `cdx run` from crow (dispatch, review runs, retro, `crow` one-shots) takes its flags from one helper, per run kind (`crow_lib.RUN_KINDS`: task, mech, review, retro, oneshot):
   exact model id (`--model claude-opus-5-5`, never an alias), effort fixed at launch (`--power`), `--budget` USD (Claude only; cdx stops the run with `budget_exceeded`, exit 125) and `--timeout-seconds`.
   Every run also carries `--failover` (a usage-limit stop moves to another allowed account) and retro runs `--kind retro`. `cdx run` has no `--fallback-model` flag: set it per account with `cdx set <account> --fallback-model MODEL`.
   Override per kind with `CROW_<KIND>_BUDGET` and `CROW_<KIND>_TIMEOUT_MIN`, or for one run with `crow-runs dispatch ... --budget USD` (no default cap beyond the kind's budget). `crow-runs dispatch ... --dry-run` prints the full command and env.
@@ -111,7 +124,7 @@ Denied for every kind (a deny beats any allow or hook): git push, gh pr create/m
 ## Isolated runs: OS boundary (`--isolate`, item_100)
 `crow dispatch <project> <label> --isolate --cwd <path>.wt/<name> --prompt-file F` starts `cdx run --isolate-workspace`. The run sits in bwrap: volatile home, read-only toolchains, the worktree read-write (read-only for kind review), read-only private git with no config, remotes or hooks, an env allowlist, and pasta + nftables egress (public internet, no private, CGNAT or loopback range).
 
-- **Kinds:** `RUN_KINDS[kind]["isolate"]`: task `rw`, review `ro` (dispatch forces `--permission review`). retro and oneshot read host data and are refused.
+- **Kinds:** `RUN_KINDS[kind]["isolate"]`: task and mech `rw`, review `ro` (dispatch forces `--permission review`). retro and oneshot read host data and are refused.
 - **Refusals, never a fallback:** `--continue-run` of an unisolated run, no `--cwd` or a cwd that is not a linked worktree, a missing bwrap/pasta/nft/python3 (`sudo pacman -S passt nftables`), a Claude profile with no setup token.
 - **Continuation:** since cdx 0.26.10 `--continue-run` of an isolated run resumes inside the parent's boundary (same worktree, network and permission). `crow-runs dispatch --continue-run` of an isolated parent isolates itself and pins the parent's account and permission; a review continuation stays read-only.
 - **Host env:** cdx allowlists toolchains under `Path.home()`, so dispatch hands cdx the real HOME (and `CDX_HOME`). In a crow session HOME is the cdx profile home, which holds no claude binary ("Executable is outside the permitted toolchains"). The kind's settings file goes to `<worktree>/.crow-run/run-sandbox/` (`crow_lib.isolated_state_dir`, in `info/exclude`): the sandbox mounts only the worktree.

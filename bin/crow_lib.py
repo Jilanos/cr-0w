@@ -544,7 +544,9 @@ CLAUDE_MODEL_IDS = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "h
                     "fable": "claude-fable-5-1"}
 # kind: default model, effort, budget in USD, wall-clock cap in minutes. Env CROW_<KIND>_BUDGET / _TIMEOUT_MIN override.
 RUN_KINDS = {
-    "task": {"model": "opus", "power": "medium", "budget": 25.0, "timeout_min": 120, "isolate": "rw"},
+    "task": {"model": "opus", "power": "medium", "budget": 25.0, "timeout_min": 120, "isolate": "rw", "call_cap": 60},
+    # mech: mechanical edits (cleanup, rename, wiring, recordings) on Sonnet; design and debugging stay on task.
+    "mech": {"model": "sonnet", "power": "medium", "budget": 8.0, "timeout_min": 60, "isolate": "rw", "call_cap": 40},
     "review": {"model": "opus", "power": "high", "budget": 10.0, "timeout_min": 60, "isolate": "ro"},
     "retro": {"model": "sonnet", "power": "low", "budget": 2.0, "timeout_min": 45},
     "oneshot": {"model": "opus", "power": "medium", "budget": 3.0, "timeout_min": 20},
@@ -582,6 +584,7 @@ RUN_SANDBOX = {
     "oneshot": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "TodoWrite", "Skill"],
                 "bash": _SHELL_READ + _GIT_READ + _CROW_LOG + ["git fetch"], "mcp": []},
 }
+RUN_SANDBOX["mech"] = RUN_SANDBOX["task"]  # same tree access as task; only the model and budget differ
 # Denied for every kind (each also as `rtk <prefix>`); a deny rule beats an allow rule and a hook's allow.
 _DENY_BASH = ["git push", "gh pr create", "gh pr merge", "gh pr comment", "gh issue", "gh api", "glab mr create",
               "glab mr merge", "glab mr note", "glab api", "curl", "wget"]
@@ -690,6 +693,58 @@ def run_flags(kind, provider="claude", model=None, power=None, continue_run=None
             raise ValueError(f"sandbox args for {kind} exceed cdx's {CDX_EXTRA_ARGS_MAX}-character --extra-args cap")
         args += ["--extra-args", extra]
     return args, (dict(HEADLESS_ENV) if provider == "claude" else {})
+
+
+RUN_FOOTER = ("\n\n---\nRun budget: one scope per run (one bug or one acceptance-criteria group). "
+              "If {cap} tool calls pass without a confirmed cause or a passing step, stop: report what you checked, "
+              "what you ruled out and the next probe, then end the run. Do not hunt further.\n")
+
+
+def run_brief(kind, text):
+    """The prompt a run gets: the brief plus the kind's stop-and-report footer (kinds with a call_cap)."""
+    cap = RUN_KINDS.get(kind, {}).get("call_cap")
+    return text.rstrip() + RUN_FOOTER.format(cap=cap) if cap else text
+
+
+def transcript_tokens(path):
+    """Token figures of one Claude session file plus its subagents, deduplicated on (message.id, requestId):
+    {calls, context, peak, output, models}. context = input + cache reads + cache writes, summed over calls."""
+    seen, out = set(), {"calls": 0, "context": 0, "peak": 0, "output": 0, "models": []}
+    path = str(path)
+    for fpath in [path] + sorted(glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))):
+        try:
+            fh = open(fpath, encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for raw in fh:
+                try:
+                    ev = json.loads(raw)
+                except ValueError:
+                    continue
+                msg = ev.get("message") or {}
+                u = msg.get("usage") if isinstance(msg, dict) else None
+                if ev.get("type") != "assistant" or not u or str(msg.get("model", "")).startswith("<"):
+                    continue
+                key = (msg.get("id"), ev.get("requestId"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                ctx = sum(u.get(k) or 0 for k in ("input_tokens", "cache_read_input_tokens",
+                                                  "cache_creation_input_tokens"))
+                out["calls"] += 1
+                out["context"] += ctx
+                out["peak"] = max(out["peak"], ctx)
+                out["output"] += u.get("output_tokens") or 0
+                m = (msg.get("model") or "?").replace("claude-", "")
+                if m not in out["models"]:
+                    out["models"].append(m)
+    return out
+
+
+def fmt_tokens(n):
+    """1234567 -> '1.2M', 45600 -> '46k'."""
+    return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}k" if n >= 1e3 else str(n)
 
 
 def run_env(extra, kind=None):

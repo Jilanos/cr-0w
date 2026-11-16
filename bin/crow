@@ -20,7 +20,7 @@
 #   crow json            agents as JSON (for widgets)
 #   crow report <run_id> print a run's final report
 # Delegate
-#   crow dispatch <project> <label> --prompt-file F [--model opus]   start a tracked background run
+#   crow dispatch <project> <label> --prompt-file F [--kind task|mech|review] [--model M]   start a tracked background run (mech = Sonnet)
 #   crow runs relaunch <id> <account> [--dry-run] [--here]   continue a cut-off session on another allowed account; relaunch status
 #   crow runs stop <run_id>   stop a running background run (SIGTERM to cdx and its agent)
 #   crow rescue <account> [--to T] [--dry-run]   move every session the account lost in its last 5h window, one OK
