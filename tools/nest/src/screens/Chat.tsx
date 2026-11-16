@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError } from '../data/api'
 import { blocksOf, partsOf, spansOf, type Block, type ChatTarget, type Entry } from '../data/conversation'
+import { deliveryOf, landedOf, pendingOf, type Pending } from '../data/delivery'
 import { dispatchOf, type Agent, type AskAnswer } from '../data/live'
 import type { InboxItem, InboxVerb, Mission } from '../data/types'
 import { useConversation } from '../data/useConversation'
@@ -9,6 +10,8 @@ import { ago, elapsed, time, title } from '../format'
 import { Link, navigate } from '../router'
 import { REJECT, useAnswer, verbLabel } from '../ui/answer'
 import { AskDock } from '../ui/AskDock'
+import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
+import { enterSubmits, rowsOf } from '../ui/keys'
 import { Sheet, type Confirm } from '../ui/Sheet'
 
 // Phone chat of one session, run or mission (item_177, boards chat-cover and
@@ -99,18 +102,37 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
   const clock = agent?.started_at ? elapsed(agent.started_at, snap.now) : ''
   const blocks = blocksOf(conv.entries)
 
+  // Messages typed into the session: a bubble with "sending…" until the transcript shows
+  // the turn, then "delivered" under that turn; "not delivered" with Retry after the timeout.
+  const [sent, setSent] = useState<Pending[]>([])
+  const tick = useDeliveryClock(sent.filter((p) => deliveryOf(p, conv.entries, Date.now()) === 'sending'))
+  const sends = sent.map((p) => ({ p, state: deliveryOf(p, conv.entries, tick) }))
+  const landed = new Set(sends.map((x) => landedOf(x.p, conv.entries)?.id).filter(Boolean))
+  const tkey = 'pid' in target ? `p${target.pid}` : `m${target.mission}`
+  useEffect(() => { setSent([]) }, [tkey])
+
   // Stay at the bottom while the owner reads the end; leave the scroll alone when they read back.
   const box = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   useLayoutEffect(() => {
     const el = box.current
     if (el && pinned.current) el.scrollTop = el.scrollHeight
-  }, [blocks.length, waits, tab])
+  }, [blocks.length, waits, tab, sent.length])
   useEffect(() => { pinned.current = true }, [target])
 
   // The box answers a mission ask with its free-text verb, else types into the session.
   const textVerb: InboxVerb | undefined = answer.item?.verbs.find((v) => v === 'answer' || v === 'msg')
   const canType = answer.item ? !!textVerb : agent?.kind === 'session'
+  // Types t into the session; the send shows until the transcript carries it.
+  const tell = async (pid: number, t: string) => {
+    const p = pendingOf(pid, t, conv.entries, Date.now())
+    await act.send(pid, t)
+    setSent((l) => [...l.filter((x) => x.text !== t), p])
+  }
+  const retry = (p: Pending) => {
+    setNote('')
+    tell(p.pid, p.text).then(() => conv.refresh(), (e: unknown) => setNote(e instanceof Error ? e.message : String(e)))
+  }
   const send = async () => {
     const t = text.trim()
     if (!t || busy) return
@@ -122,7 +144,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
         await act.missionAnswer(answer.mission!.id, answer.item.id, textVerb, t, answer.mission!.version)
         await refresh()
       } else if (agent) {
-        await act.send(agent.pid, t)
+        await tell(agent.pid, t)
       }
       setText('')
       pinned.current = true
@@ -242,6 +264,13 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
               ? <div className="who r">you · {time(b.at)}</div>
               : <div className="who"><span className="c-d">●</span> crow · {time(b.at)}</div>)}
             <div className={`msg ${b.kind}`}>{b.kind === 'me' ? b.text : <Reply text={b.text} />}</div>
+            {landed.has(b.id) && <DeliveryLine state="delivered" />}
+          </Fragment>
+        ))}
+        {sends.filter((x) => x.state !== 'delivered').map(({ p, state }) => (
+          <Fragment key={`${p.at}${p.text}`}>
+            <div className="msg me">{p.text}</div>
+            <DeliveryLine state={state} onRetry={() => retry(p)} />
           </Fragment>
         ))}
       </div>
@@ -272,7 +301,8 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
       )}
       {note && <div className="sm c-f">{note}</div>}
       <form className="in" onSubmit={(e) => { e.preventDefault(); void send() }}>
-        <input className="f1" value={text} onChange={(e) => { setText(e.target.value); if (answer.item) answer.setText(e.target.value) }} disabled={!canType}
+        <textarea className="f1" rows={rowsOf(text)} value={text} onKeyDown={enterSubmits}
+          onChange={(e) => { setText(e.target.value); if (answer.item) answer.setText(e.target.value) }} disabled={!canType}
           placeholder={!canType ? (agent?.kind === 'run' ? 'A run takes no messages' : 'Nothing to answer') : waits ? 'Or type an answer…' : `Tell ${slot || name}…`}
           aria-label={`Text for ${name}`} />
         <span className="mic" aria-hidden="true"><Mic /></span>

@@ -855,6 +855,17 @@ ACTION_SCHEMA = 1  # logics/specs/script_contract/schemas/action.schema.json
 PROMPT_FIELDS = ("id", "tool", "detail", "description", "work_approval", "options", "questions")
 
 
+def session_meta(pid, proc="/proc"):
+    """Claude's own status file for pid: <HOME of pid>/.claude/sessions/<pid>.json (as crow-runs reads it)."""
+    from pathlib import Path
+    try:
+        env = dict(l.split("=", 1) for l in Path(f"{proc}/{pid}/environ").read_bytes().decode(errors="replace")
+                   .split("\0") if "=" in l)
+        return json.loads((Path(env.get("HOME", "")) / ".claude/sessions" / f"{pid}.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
 def pending_prompt(pid, meta, home=None):
     """The permission prompt pid waits on now (written by `crow-prompt hook`), else None.
 

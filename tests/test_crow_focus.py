@@ -58,6 +58,55 @@ def test_send_dry_run_and_command(hub):
     assert run(hub, "crow-focus", "--send", "yes", "--dry-run").returncode != 0
 
 
+def load_focus():
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.SourceFileLoader("crow_focus", str(BIN / "crow-focus"))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("crow_focus", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+def test_send_refuses_while_the_session_waits_on_a_prompt(tmp_path, monkeypatch):
+    # Text typed into an open question or permission dialog never reaches the session.
+    cf = load_focus()
+    d = tmp_path / "local/state/prompts"
+    d.mkdir(parents=True)
+    (d / "42.json").write_text('{"id": "p1", "session_id": "s1", "tool": "AskUserQuestion", "detail": "Pick?"}')
+    asking = {"status": "waiting", "waitingFor": "input needed", "sessionId": "s1"}
+    typed = []
+    monkeypatch.setattr(cf.crow_term, "send", lambda *a: typed.append(a) or True)
+    code, msg = cf.send(42, "hello", "tmux", False, home=tmp_path, meta=asking)
+    assert code == 1 and "question" in msg and typed == []
+    assert cf.send(42, "hello", "tmux", True, home=tmp_path, meta=asking)[0] == 1
+    assert cf.send(42, "hello", "tmux", False, home=tmp_path, meta={"status": "idle", "sessionId": "s1"}) == (0, "sent")
+    assert len(typed) == 1
+
+
+def test_send_reports_a_failed_terminal_command(tmp_path, monkeypatch):
+    import subprocess
+    cf = load_focus()
+    monkeypatch.setattr(cf.crow_term, "locate", lambda *a: ("tmux", "%7"))
+    def fail(cmd, **kw):
+        raise subprocess.CalledProcessError(1, cmd)
+    monkeypatch.setattr(cf.crow_term.subprocess, "run", fail)
+    code, msg = cf.send(42, "hello", "tmux", False, home=tmp_path, meta={"status": "idle"})
+    assert code == 2 and "not sent" in msg
+
+
+def test_multiline_send_is_one_bracketed_paste_then_enter():
+    # A line break must not submit half the message: the text goes as a paste, Enter after.
+    assert ct.kitty_send_args("unix:/s", 7, "a\r\nb") == [
+        ["kitten", "@", "--to", "unix:/s", "send-text", "--match", "id:7", "--bracketed-paste", "auto", "--", "a\nb"],
+        ["kitten", "@", "--to", "unix:/s", "send-key", "--match", "id:7", "enter"],
+    ]
+    assert ct.tmux_send_args("%7", "a\nb\n") == [
+        ["tmux", "set-buffer", "-b", "crow-send%7", "--", "a\nb"],
+        ["tmux", "paste-buffer", "-p", "-r", "-d", "-b", "crow-send%7", "-t", "%7"],
+        ["tmux", "send-keys", "-t", "%7", "Enter"],
+    ]
+
+
 # ---------- backend choice ----------
 
 def test_choice_order_and_override(monkeypatch):

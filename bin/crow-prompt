@@ -17,6 +17,8 @@ A later prompt of the same session overwrites the file, so its id changes.
 answer: re-checks that PID still waits on prompt ID, then presses the key in the window that
 holds PID: allow = "1" (Yes, once), deny = Escape (No; the turn stops and the session waits for
 the owner). "Always allow" is never offered: permission rules are not changed from here.
+A prompt is answered once: answer takes its file before pressing (a second answer is refused, since
+Claude's status file lags the dialog), and stops pressing once the status file no longer says waiting.
 Allow is refused on a work approval (push or MR/PR creation in a work repo): the owner gives
 those on the exact text (item_175).
 
@@ -194,19 +196,9 @@ def hook(stdin, home=None, pid=None, projects=None, now=None):
     return 0
 
 
-def session_meta(pid, proc="/proc"):
-    """Claude's own status file for pid: <HOME of pid>/.claude/sessions/<pid>.json (as crow-runs reads it)."""
-    try:
-        env = dict(l.split("=", 1) for l in Path(f"{proc}/{pid}/environ").read_bytes().decode(errors="replace")
-                   .split("\0") if "=" in l)
-        return json.loads((Path(env.get("HOME", "")) / ".claude/sessions" / f"{pid}.json").read_text())
-    except (OSError, ValueError):
-        return None
-
-
 def pending(pid, home=None, meta=None):
     """The prompt pid waits on now, else None."""
-    return crow_lib.pending_prompt(pid, meta if meta is not None else session_meta(pid), home)
+    return crow_lib.pending_prompt(pid, meta if meta is not None else crow_lib.session_meta(pid), home)
 
 
 def public(p):
@@ -214,19 +206,70 @@ def public(p):
     return {k: p.get(k) for k in crow_lib.PROMPT_FIELDS}
 
 
-def press(pid, steps, backend):
-    """Send key steps to the window holding pid, pausing between them. False when a step found no window."""
+def press(pid, steps, backend, live=None):
+    """Send key steps to the window holding pid, pausing between them. False when a step found no window.
+    live() returns Claude's status file: keys stop once the session no longer waits (the dialog closed)."""
     for i, (kind, value) in enumerate(steps):
         if i:
             time.sleep(KEY_PAUSE)
-        ok = crow_term.send_special(pid, value, backend) if kind == "special" else crow_term.send_key(pid, value, backend)
+            if live and (live() or {}).get("status") != "waiting":
+                return True
+        if kind == "escape":
+            ok = crow_term.send_escape(pid, backend)
+        elif kind == "special":
+            ok = crow_term.send_special(pid, value, backend)
+        else:
+            ok = crow_term.send_key(pid, value, backend)
         if not ok:
             return False
     return True
 
 
-def answer(pid, prompt_id, option=None, dry=False, backend=None, home=None, meta=None, answers=None):
-    """(exit code, message). option allow|deny, or answers for an AskUserQuestion."""
+def claim(pid, prompt_id, home=None):
+    """Take the prompt file so one answer only presses keys. The claimed path, else None (answered already)."""
+    src = prompts_dir(home) / f"{pid}.json"
+    dst = src.with_name(f".{pid}.{prompt_id}.answering")
+    try:
+        os.rename(src, dst)
+    except OSError:
+        return None
+    try:
+        same = json.loads(dst.read_text()).get("id") == prompt_id
+    except (OSError, ValueError):
+        same = False
+    if not same:
+        release(dst, home, pid)
+        return None
+    return dst
+
+
+def release(path, home, pid):
+    """Put a claimed prompt back when no key reached it, unless a newer prompt took its place."""
+    src = prompts_dir(home) / f"{pid}.json"
+    try:
+        if src.exists():
+            path.unlink()
+        else:
+            os.rename(path, src)
+    except OSError:
+        pass
+
+
+def press_once(pid, p, steps, backend, home, live):
+    """(exit code, message or None): claim the prompt, press, drop the claim. None message = done."""
+    taken = claim(pid, p["id"], home)
+    if taken is None:
+        return 1, f"prompt {p['id']} was answered already"
+    if not press(pid, steps, backend, live):
+        release(taken, home, pid)
+        return 1, f"no {backend} window holds pid {pid}"
+    taken.unlink(missing_ok=True)
+    return 0, None
+
+
+def answer(pid, prompt_id, option=None, dry=False, backend=None, home=None, meta=None, answers=None, live=None):
+    """(exit code, message). option allow|deny, or answers for an AskUserQuestion.
+    live() reads Claude's status between keys (default: its status file when meta is not given)."""
     if answers is None and option not in ("allow", "deny"):
         return 2, f"option must be allow or deny, not {option!r}"
     p = pending(pid, home, meta)
@@ -234,8 +277,10 @@ def answer(pid, prompt_id, option=None, dry=False, backend=None, home=None, meta
         return 1, f"pid {pid} waits on no prompt now"
     if p["id"] != prompt_id:
         return 1, f"pid {pid} now waits on another prompt ({p['id']}, {p['tool']}: {p['detail'][:80]})"
+    if live is None and meta is None:
+        live = lambda: crow_lib.session_meta(pid)  # noqa: E731
     if answers is not None:
-        return answer_questions(pid, p, answers, dry, backend)
+        return answer_questions(pid, p, answers, dry, backend, home, live)
     if option == "allow" and p.get("questions"):
         return 1, "an AskUserQuestion takes answers, not allow"
     if option == "allow" and p.get("work_approval"):
@@ -244,14 +289,15 @@ def answer(pid, prompt_id, option=None, dry=False, backend=None, home=None, meta
     what = "press 1 (allow once)" if option == "allow" else "press Escape (deny)"
     if dry:
         return 0, f"{what} in the {backend} window holding pid {pid}"
-    ok = crow_term.send_key(pid, "1", backend) if option == "allow" else crow_term.send_escape(pid, backend)
-    if not ok:
-        return 1, (f"no {backend} window holds pid {pid}" if backend != "print"
-                   else "the print backend cannot press keys in a window (CROW_TERMINAL=kitty|tmux)")
+    if backend == "print":
+        return 1, "the print backend cannot press keys in a window (CROW_TERMINAL=kitty|tmux)"
+    code, msg = press_once(pid, p, [("key", "1")] if option == "allow" else [("escape", "")], backend, home, live)
+    if code:
+        return code, msg
     return 0, ("allowed once: " if option == "allow" else "denied: ") + f"{p['tool']} {p['detail'][:80]}"
 
 
-def answer_questions(pid, p, answers, dry, backend):
+def answer_questions(pid, p, answers, dry, backend, home=None, live=None):
     if not p.get("questions"):
         return 2, f"pid {pid} waits on {p['tool']}, not on AskUserQuestion: use --option"
     try:
@@ -265,9 +311,8 @@ def answer_questions(pid, p, answers, dry, backend):
         return 0, f"press {keys} in the {backend} window holding pid {pid} ({summary})"
     if backend == "print":
         return 1, "the print backend cannot press keys in a window (CROW_TERMINAL=kitty|tmux)"
-    if not press(pid, steps, backend):
-        return 1, f"no {backend} window holds pid {pid}"
-    return 0, f"answered: {summary}"
+    code, msg = press_once(pid, p, steps, backend, home, live)
+    return (code, msg) if code else (0, f"answered: {summary}")
 
 
 def opts_of(args):

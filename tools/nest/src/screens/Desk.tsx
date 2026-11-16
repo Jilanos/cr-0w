@@ -1,12 +1,18 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError } from '../data/api'
-import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type LiveReply, type Resumable } from '../data/live'
+import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
+import { useConversation } from '../data/useConversation'
+import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
 import { missionOfRun } from '../data/state'
 import { Link, navigate } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
+import { AskDock } from '../ui/AskDock'
+import { promptView } from '../ui/prompt'
+import { enterSubmits, rowsOf } from '../ui/keys'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 import { deskWork, workCounts, workOf, type WorkItem } from '../data/work'
@@ -64,12 +70,14 @@ function linesOf(a: Agent, now: Date): Line[] {
   return out
 }
 
-interface Msg { me?: boolean; text: string; f?: boolean }
+// A Tell it message carries its pending send and delivery state.
+interface Msg { me?: boolean; text: string; f?: boolean; p?: Pending; state?: Delivery }
 type Form = 'run' | 'session' | null
 
 // State and action builders shared by the three sizes.
 function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
-  const act = useSource().actions
+  const src = useSource()
+  const act = src.actions
   const { slots, agents } = dispatchOf(snap.sections.dispatch)
   const runs = agents.filter((a) => a.kind === 'run')
   const sessions = agents.filter((a) => a.kind === 'session')
@@ -108,10 +116,30 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const where = (a: Agent) => `${a.project} (${a.account})`
   const tgt = (a: Agent): Array<[string, string]> => [['session', nameOf(a)], ['account', a.account], ['pid', String(a.pid)]]
 
+  // A message typed into a session shows "sending…" in the chat until its transcript
+  // carries the turn (item_208). The tail read before the send is the baseline.
+  const tellIt = async (a: Agent, t: string) => {
+    const before = await src.conversation({ pid: a.pid }, { tail: 50 }).then((r) => r.entries, () => [])
+    try {
+      await act.send(a.pid, t)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) void refresh()
+      throw e
+    }
+    const p = pendingOf(a.pid, t, before, Date.now())
+    setLog((l) => [...l.filter((m) => m.p?.pid !== a.pid || m.p.text !== t || m.state !== 'failed'), { me: true, text: `Tell ${nameOf(a)}: ${t}`, p, state: 'sending' }])
+    void refresh()
+  }
+  const settle = (p: Pending, state: Delivery) => setLog((l) => l.map((m) => (m.p === p ? { ...m, state } : m)))
+  const retell = (p: Pending) => {
+    const a = agents.find((x) => x.pid === p.pid)
+    if (!a) return setLog((l) => [...l, { text: 'That session is gone.', f: true }])
+    tellIt(a, p.text).catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
+  }
   const send = (a: Agent) => setSheet({
     title: 'Send to session', lead: `Type this answer into ${where(a)} and press enter:`, quote: text, target: tgt(a),
     note: 'Lands in the open window, like typing it yourself.', ok: 'Send',
-    run: wrap(`Tell ${nameOf(a)}: ${text}`, () => act.send(a.pid, text), () => { setText(''); setTell(false) }),
+    run: async () => { await tellIt(a, text); setText(''); setTell(false) },
   })
   const pause = (a: Agent) => setSheet({
     title: 'Pause session', lead: `Interrupt the current turn of ${where(a)} (Escape in its window).`, target: tgt(a),
@@ -218,6 +246,16 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     wrap(`${key === 'allow' ? 'Allow once' : 'Deny'} ${nameOf(a)}: ${p.tool} ${p.detail}`, () => act.answer(a.pid, p.id, key))()
       .catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
   }
+  // An AskUserQuestion answer sends every step at once (item_193).
+  const [asking, setAsking] = useState(false)
+  const answerAsk = (a: Agent, answers: AskAnswer[]) => {
+    const p = a.prompt
+    if (!p) return
+    setAsking(true)
+    wrap(`Answer ${nameOf(a)}`, () => act.ask(a.pid, p.id, answers))()
+      .catch((e: Error) => setLog((l) => [...l, { text: e.message, f: true }]))
+      .finally(() => setAsking(false))
+  }
 
   // The ask box: /dispatch and /session open their form; free chat waits for the hub API.
   const submitAsk = () => {
@@ -240,7 +278,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     snap, refresh, slots, agents, runs, sessions, resumable, projects, accounts,
     sheet, setSheet, log, picked, slotOf, since, pick, tell, setTell, text, setText, ask, setAsk, submitAsk,
     form, setForm, run, setRun, start, setStart,
-    send, pause, stop, dispatch, open, resume, answer, queue, cancel,
+    send, settle, retell, pause, stop, dispatch, open, resume, answer, answerAsk, asking, queue, cancel,
     work, groups, shown, counts, openWork,
   }
 }
@@ -256,10 +294,10 @@ function Later({ children = LATER }: { children?: ReactNode }) {
 }
 
 function TellBox({ d, a }: { d: D; a: Agent }) {
-  const ref = useRef<HTMLInputElement>(null)
+  const ref = useRef<HTMLTextAreaElement>(null)
   return (
     <form className="in tell" onSubmit={(e) => { e.preventDefault(); if (d.text.trim()) d.send(a) }}>
-      <input ref={ref} autoFocus className="f1" value={d.text} onChange={(e) => d.setText(e.target.value)}
+      <textarea ref={ref} autoFocus className="f1" rows={rowsOf(d.text)} value={d.text} onKeyDown={enterSubmits} onChange={(e) => d.setText(e.target.value)}
         placeholder={`Tell ${nameOf(a)}…`} aria-label={`Text for ${nameOf(a)}`} />
       <button type="submit" className="btn p" disabled={!d.text.trim()}>Send</button>
     </form>
@@ -297,12 +335,17 @@ function Slots({ d, ib }: { d: D; ib?: boolean }) {
 function Ask({ d, a }: { d: D; a: Agent }) {
   const p = a.prompt
   if (!p) return null
+  const view = promptView(p)
+  if (view === 'questions') {
+    return <AskDock key={p.id} who={nameOf(a)} questions={p.questions!} busy={d.asking}
+      onSend={(x) => d.answerAsk(a, x)} onCancel={() => d.answer(a, 'deny')} />
+  }
   return (
     <div className="pq" role="group" aria-label={`Permission asked by ${nameOf(a)}`}>
       <div className="pqh"><span className="tool c-n">{p.tool}</span>{p.description && <span className="sm f1">{p.description}</span>}</div>
       <code className="pqc">{p.detail}</code>
       <div className="btnrow">
-        {p.work_approval
+        {view === 'approval'
           ? <button type="button" className="btn p" disabled title="Approvals arrive with the approvals screen">Open in approvals</button>
           : p.options.map((o) => (
             <button type="button" key={o.key} className={`btn${o.key === 'allow' ? ' p' : ' x'}`} onClick={() => d.answer(a, o.key)}>{o.label}</button>
@@ -438,11 +481,28 @@ function AskBox({ d, ph, big }: { d: D; ph: string; big?: boolean }) {
   )
 }
 
+// Reads the session transcript while a Tell it send is open, then reports delivered or
+// not delivered and unmounts, which ends the reads.
+function Watch({ p, onDone }: { p: Pending; onDone: (s: Delivery) => void }) {
+  const conv = useConversation({ pid: p.pid })
+  const s = deliveryOf(p, conv.entries, useDeliveryClock([p]))
+  const done = useRef(onDone)
+  done.current = onDone
+  useEffect(() => { if (s !== 'sending') done.current(s) }, [s])
+  return null
+}
+
 function Chat({ d }: { d: D }) {
   return (
     <div className="msgs" role="log" aria-live="polite">
       {d.log.length === 0 && <div className="msg cr">Use /dispatch to start a run or /session to open one. Each action asks you to confirm first.</div>}
-      {d.log.map((m, i) => <div key={i} className={`msg ${m.me ? 'me' : 'cr'}${m.f ? ' f' : ''}`}>{m.text}</div>)}
+      {d.log.map((m, i) => (
+        <Fragment key={i}>
+          <div className={`msg ${m.me ? 'me' : 'cr'}${m.f ? ' f' : ''}`}>{m.text}</div>
+          {m.p && m.state === 'sending' && <Watch p={m.p} onDone={(s) => d.settle(m.p!, s)} />}
+          {m.p && m.state && <DeliveryLine state={m.state} onRetry={() => d.retell(m.p!)} />}
+        </Fragment>
+      ))}
       <Forms d={d} />
     </div>
   )

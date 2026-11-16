@@ -55,35 +55,38 @@ export function AskDock({ who, questions, busy, onSend, onCancel }: {
   return (
     <div className="ask ask-q" role="group" aria-label={`Question asked by ${who}`}>
       <div className="who"><span className="c-n">◆ {who} waits on you</span></div>
-      {n > 1 && (
-        <div className="stp">
-          {questions.map((x, i) => (
-            <button type="button" key={i} className={i === step ? 'on' : i < step && ready(i) ? 'dn' : ''} disabled={busy || i > step}
-              onClick={() => setStep(i)} title={x.question}>
-              {i < step && ready(i) ? `✓ ${summary(i)}` : `${i + 1} ${x.header}`}
+      {/* Scroll body: a long ask scrolls here while Back, Cancel and Send stay in view; a new step starts at its top. */}
+      <div className="ab" key={step}>
+        {n > 1 && (
+          <div className="stp">
+            {questions.map((x, i) => (
+              <button type="button" key={i} className={i === step ? 'on' : i < step && ready(i) ? 'dn' : ''} disabled={busy || i > step}
+                onClick={() => setStep(i)} title={x.question}>
+                {i < step && ready(i) ? `✓ ${summary(i)}` : `${i + 1} ${x.header}`}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="q">{q.question}{q.multiSelect && <span className="sm"> · several</span>}</div>
+        {q.options.map((o, i) => {
+          const sel = picks[step].includes(i)
+          const rec = REC.test(o.label)
+          return (
+            <button type="button" key={i} className={`oc${sel ? ' sel' : ''}`} aria-pressed={sel} disabled={busy} onClick={() => tap(i)}>
+              <span className="k">{sel && q.multiSelect ? '✓' : i + 1}</span>
+              <span>
+                <b>{o.label.replace(REC, '')}</b>{rec && <span className="rec">Recommended</span>}
+                {o.description && <span className="d">{o.description}</span>}
+              </span>
             </button>
-          ))}
-        </div>
-      )}
-      <div className="q">{q.question}{q.multiSelect && <span className="sm"> · several</span>}</div>
-      {q.options.map((o, i) => {
-        const sel = picks[step].includes(i)
-        const rec = REC.test(o.label)
-        return (
-          <button type="button" key={i} className={`oc${sel ? ' sel' : ''}`} aria-pressed={sel} disabled={busy} onClick={() => tap(i)}>
-            <span className="k">{sel && q.multiSelect ? '✓' : i + 1}</span>
-            <span>
-              <b>{o.label.replace(REC, '')}</b>{rec && <span className="rec">Recommended</span>}
-              {o.description && <span className="d">{o.description}</span>}
-            </span>
-          </button>
-        )
-      })}
-      <form className="oth" onSubmit={(e) => { e.preventDefault(); if (other && !busy) next(picks, others) }}>
-        <span aria-hidden="true">✎</span>
-        <input className="f1" value={others[step]} onChange={(e) => type(e.target.value)} disabled={busy}
-          placeholder="Other answer…" aria-label={`Other answer to ${q.header}`} />
-      </form>
+          )
+        })}
+        <form className="oth" onSubmit={(e) => { e.preventDefault(); if (other && !busy) next(picks, others) }}>
+          <span aria-hidden="true">✎</span>
+          <input className="f1" value={others[step]} onChange={(e) => type(e.target.value)} disabled={busy}
+            placeholder="Other answer…" aria-label={`Other answer to ${q.header}`} />
+        </form>
+      </div>
       <div className="gb">
         {step > 0 && <button type="button" className="btn" disabled={busy} onClick={() => setStep(step - 1)}>Back</button>}
         <button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
