@@ -15,7 +15,8 @@ export type AnswerRow =
 export const isAsk = (r: InboxItem) => r.state === 'open' && r.type !== 'fyi'
 export const isFyi = (r: InboxItem) => r.state === 'open' && r.type === 'fyi'
 // A session or run waiting on a prompt or choice. MRs waiting on a review stay on Desk
-// and MRs; a mission's needs item is its inbox question, listed once as an ask.
+// and MRs. A mission joins only through its inbox question (an ask); a mission waiting
+// on the owner without one (a review, say) stays on Desk.
 export const isPrompt = (w: WorkItem) => w.state === 'needs' && (w.kind === 'session' || w.kind === 'run')
 
 const valid = (iso: string | undefined) => !!iso && !isNaN(Date.parse(iso))

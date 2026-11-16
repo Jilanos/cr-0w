@@ -76,6 +76,14 @@ describe('questions (owner 2026-11-16)', () => {
     expect(rows.map((r) => r.key)).toEqual(['q:q'])
   })
 
+  it('leaves out a mission waiting on the owner without an inbox question (owner 2026-11-16)', () => {
+    const rows = toAnswer([ask('q', at, { mission: 'm1' })], [
+      work('mission:m1', 'needs', at, { kind: 'mission', mission: 'm1', why: 'choice' }),
+      work('mission:m2', 'needs', at, { kind: 'mission', mission: 'm2', why: 'waiting for a review' }),
+    ], [])
+    expect(rows.map((r) => r.key)).toEqual(['q:q'])
+  })
+
   it('orders a waiting session by wait_s', () => {
     const now = new Date('2026-11-09T12:00:00+01:00')
     const rows = toAnswer([ask('q', '2026-11-09T11:00:00+01:00')], [work('session:s', 'needs', '2026-11-09T08:00:00+01:00', { kind: 'session', wait_s: 600 })], [], now)
