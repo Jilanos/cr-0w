@@ -80,8 +80,8 @@ export const optionEnd = (o: Option) => Math.max(...o.steps.map(stepEnd))
 // Delay of the i-th of n elements in a step.
 export const delayOf = (s: Step, i: number, n: number) => s.at + (n > 1 ? ((s.spread ?? 0) * i) / (n - 1) : 0)
 
-// The real boot is unset until the owner picks an option.
-export const REAL_BOOT: BootId | null = null
+// The real boot: scan line (owner pick 2026-11-16).
+export const REAL_BOOT: BootId | null = 'b'
 
 // ?boot=x replays on every load (try-out flag). The real boot runs once per session.
 export function pickBoot(o: { search: string; path: string; reduced: boolean; seen: boolean; real?: BootId | null }): BootId | null {

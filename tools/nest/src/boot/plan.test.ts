@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { BOOT_IDS, BUDGET_MS, OPTIONS, delayOf, optionEnd, pickBoot } from './plan'
+import { BOOT_IDS, BUDGET_MS, OPTIONS, REAL_BOOT, delayOf, optionEnd, pickBoot } from './plan'
 
 const base = { search: '?boot=a', path: '/', reduced: false, seen: false }
 
 describe('pickBoot', () => {
-  it('runs only with the dev flag', () => {
-    expect(pickBoot({ ...base, search: '' })).toBeNull()
+  it('picks an option from the flag', () => {
     expect(pickBoot({ ...base, search: '?boot=z' })).toBeNull()
     for (const id of BOOT_IDS) expect(pickBoot({ ...base, search: `?boot=${id}` })).toBe(id)
   })
@@ -19,6 +18,12 @@ describe('pickBoot', () => {
     expect(pickBoot({ ...base, search: '', real: 'b', seen: true })).toBeNull()
   })
   it('does nothing without a flag or a real boot', () => expect(pickBoot({ ...base, search: '', real: null })).toBeNull())
+  it('plays the scan line as the real boot once per session', () => {
+    expect(REAL_BOOT).toBe('b')
+    expect(pickBoot({ ...base, search: '' })).toBe('b')
+    expect(pickBoot({ ...base, search: '', seen: true })).toBeNull()
+    expect(pickBoot({ ...base, search: '', reduced: true })).toBeNull()
+  })
   it('runs on Home only', () => expect(pickBoot({ ...base, path: '/inbox' })).toBeNull())
 })
 

@@ -13,7 +13,7 @@ import './theme.css'
 const live = import.meta.env.PROD || import.meta.env.VITE_NEST_SOURCE === 'api'
 const source = live ? apiSource() : fixtureSource()
 
-// Dev flag ?boot=a|b|c (item_166 options); without it nothing runs.
+// Scan line boot on the first Home load of a session; ?boot=a|b|c replays an option.
 startBoot()
 
 createRoot(document.getElementById('root')!).render(

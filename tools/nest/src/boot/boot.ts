@@ -129,7 +129,7 @@ function run(id: BootId) {
   Promise.all(anims.map((a) => a.finished)).then(done, done)
   const g = globalThis as { __nestBoot?: unknown; __nestBootHold?: boolean }
   // __nestBootHold: the reel script seeks the paused boot frame by frame and finishes it itself.
-  if (!g.__nestBootHold) setTimeout(done, BUDGET_MS + 500)
+  if (!g.__nestBootHold) setTimeout(done, BUDGET_MS)
   g.__nestBoot = { id, anims, t0 }
 }
 
