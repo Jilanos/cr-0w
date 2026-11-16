@@ -740,8 +740,9 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .desk .chip.ac[aria-pressed='true'] { background: var(--accent-soft); }
 .desk .chip:disabled { opacity: 0.5; cursor: default; }
 .desk .in { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(24, 25, 38, 0.7); padding: 7px 10px; }
-.desk .in input { background: none; border: 0; outline: 0; color: var(--fg); font: inherit; }
-.desk .in input::placeholder { color: var(--sub); }
+.desk .in input, .desk .in textarea { background: none; border: 0; outline: 0; color: var(--fg); font: inherit; }
+.desk .in input::placeholder, .desk .in textarea::placeholder { color: var(--sub); }
+.desk .in textarea, .chat-cv .in textarea { resize: none; padding: 0; line-height: 1.4; white-space: pre-wrap; overflow-y: auto; align-self: center; }
 .desk .in:focus-within { border-color: var(--accent); }
 .desk .in.ask { padding: 10px 12px; }
 .desk .mic { all: unset; display: inline-grid; place-items: center; color: var(--dim); padding: 0 4px; opacity: 0.55; }
@@ -1031,8 +1032,9 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 [data-theme='cyber'] :is(.chat-cv, .desk-cv) .ask-q .oc, [data-theme='cyber'] :is(.chat-cv, .desk-cv) .ask-q .oth { border-radius: 0; clip-path: var(--clip-btn); }
 :is(.chat-cv, .desk-cv) .gb .btn { flex: 1; min-height: 44px; font-size: 12.5px; border-radius: 10px; }
 .chat-cv .in { display: flex; align-items: center; gap: 8px; border: 1px solid var(--accent); min-height: 52px; border-radius: 14px; padding: 0 8px 0 14px; background: rgba(24, 25, 38, 0.7); flex: none; }
-.chat-cv .in input { background: none; border: 0; outline: 0; color: var(--fg); font: inherit; font-size: 14px; min-width: 0; }
-.chat-cv .in input::placeholder { color: var(--sub); }
+.chat-cv .in input, .chat-cv .in textarea { background: none; border: 0; outline: 0; color: var(--fg); font: inherit; font-size: 14px; min-width: 0; }
+.chat-cv .in input::placeholder, .chat-cv .in textarea::placeholder { color: var(--sub); }
+.chat-cv .in textarea { padding: 8px 0; }
 .chat-cv .in .mic { display: inline-grid; place-items: center; color: #a5adcb; padding: 0 4px; opacity: 0.55; }
 .chat-cv .in .btn { padding: 10px 14px; border-radius: 10px; }
 .chat-cv .btn { min-height: 0; font: 600 12px var(--font-head); letter-spacing: 0.04em; text-transform: uppercase; background: #363a4f; }

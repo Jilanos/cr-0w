@@ -9,6 +9,7 @@ import { Link, navigate } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
 import { AskDock } from '../ui/AskDock'
 import { promptView } from '../ui/prompt'
+import { enterSubmits, rowsOf } from '../ui/keys'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 
@@ -251,10 +252,10 @@ function Later({ children = LATER }: { children?: ReactNode }) {
 }
 
 function TellBox({ d, a }: { d: D; a: Agent }) {
-  const ref = useRef<HTMLInputElement>(null)
+  const ref = useRef<HTMLTextAreaElement>(null)
   return (
     <form className="in tell" onSubmit={(e) => { e.preventDefault(); if (d.text.trim()) d.send(a) }}>
-      <input ref={ref} autoFocus className="f1" value={d.text} onChange={(e) => d.setText(e.target.value)}
+      <textarea ref={ref} autoFocus className="f1" rows={rowsOf(d.text)} value={d.text} onKeyDown={enterSubmits} onChange={(e) => d.setText(e.target.value)}
         placeholder={`Tell ${nameOf(a)}…`} aria-label={`Text for ${nameOf(a)}`} />
       <button type="submit" className="btn p" disabled={!d.text.trim()}>Send</button>
     </form>

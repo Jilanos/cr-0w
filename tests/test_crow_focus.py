@@ -58,6 +58,19 @@ def test_send_dry_run_and_command(hub):
     assert run(hub, "crow-focus", "--send", "yes", "--dry-run").returncode != 0
 
 
+def test_multiline_send_is_one_bracketed_paste_then_enter():
+    # A line break must not submit half the message: the text goes as a paste, Enter after.
+    assert ct.kitty_send_args("unix:/s", 7, "a\r\nb") == [
+        ["kitten", "@", "--to", "unix:/s", "send-text", "--match", "id:7", "--bracketed-paste", "auto", "--", "a\nb"],
+        ["kitten", "@", "--to", "unix:/s", "send-key", "--match", "id:7", "enter"],
+    ]
+    assert ct.tmux_send_args("%7", "a\nb\n") == [
+        ["tmux", "set-buffer", "-b", "crow-send%7", "--", "a\nb"],
+        ["tmux", "paste-buffer", "-p", "-r", "-d", "-b", "crow-send%7", "-t", "%7"],
+        ["tmux", "send-keys", "-t", "%7", "Enter"],
+    ]
+
+
 # ---------- backend choice ----------
 
 def test_choice_order_and_override(monkeypatch):

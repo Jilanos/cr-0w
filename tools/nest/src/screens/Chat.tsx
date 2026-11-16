@@ -9,6 +9,7 @@ import { ago, elapsed, time, title } from '../format'
 import { Link, navigate } from '../router'
 import { REJECT, useAnswer, verbLabel } from '../ui/answer'
 import { AskDock } from '../ui/AskDock'
+import { enterSubmits, rowsOf } from '../ui/keys'
 import { Sheet, type Confirm } from '../ui/Sheet'
 
 // Phone chat of one session, run or mission (item_177, boards chat-cover and
@@ -272,7 +273,8 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
       )}
       {note && <div className="sm c-f">{note}</div>}
       <form className="in" onSubmit={(e) => { e.preventDefault(); void send() }}>
-        <input className="f1" value={text} onChange={(e) => { setText(e.target.value); if (answer.item) answer.setText(e.target.value) }} disabled={!canType}
+        <textarea className="f1" rows={rowsOf(text)} value={text} onKeyDown={enterSubmits}
+          onChange={(e) => { setText(e.target.value); if (answer.item) answer.setText(e.target.value) }} disabled={!canType}
           placeholder={!canType ? (agent?.kind === 'run' ? 'A run takes no messages' : 'Nothing to answer') : waits ? 'Or type an answer…' : `Tell ${slot || name}…`}
           aria-label={`Text for ${name}`} />
         <span className="mic" aria-hidden="true"><Mic /></span>

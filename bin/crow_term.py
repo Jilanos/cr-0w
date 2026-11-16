@@ -117,11 +117,21 @@ def kitty_nearest(listings, pid, chain=None):
     return next((owner[p] for p in chain if p in owner), None)
 
 
+def multiline(text):
+    """Text with LF line breaks and no trailing break, or None when it is one line."""
+    t = text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    return t if "\n" in t else None
+
+
 def kitty_send_args(sock, wid, text):
     """kitten commands that type text, then press Enter, in window wid. Two writes: Claude Code
-    reads one burst as a paste and turns its Enter into a newline."""
+    reads one burst as a paste and turns its Enter into a newline. Several lines go as a
+    bracketed paste so a line break never submits."""
     to = ["kitten", "@", "--to", sock]
-    return [[*to, "send-text", "--match", f"id:{wid}", "--", text], [*to, "send-key", "--match", f"id:{wid}", "enter"]]
+    lines = multiline(text)
+    paste = ["--bracketed-paste", "auto"] if lines else []
+    return [[*to, "send-text", "--match", f"id:{wid}", *paste, "--", lines or text],
+            [*to, "send-key", "--match", f"id:{wid}", "enter"]]
 
 
 # Pause between the text and its Enter, so the Enter is not part of the paste burst.
@@ -181,7 +191,14 @@ def tmux_open_args(argv, title, cwd=None, env=None):
 
 
 def tmux_send_args(pane, text):
-    return [["tmux", "send-keys", "-t", pane, "-l", text], ["tmux", "send-keys", "-t", pane, "Enter"]]
+    """tmux commands that type text, then press Enter. Several lines go through a paste buffer
+    (bracketed when the app asked for it, LF kept) so a line break never submits."""
+    lines = multiline(text)
+    if not lines:
+        return [["tmux", "send-keys", "-t", pane, "-l", text], ["tmux", "send-keys", "-t", pane, "Enter"]]
+    buf = f"crow-send{pane}"
+    return [["tmux", "set-buffer", "-b", buf, "--", lines], ["tmux", "paste-buffer", "-p", "-r", "-d", "-b", buf, "-t", pane],
+            ["tmux", "send-keys", "-t", pane, "Enter"]]
 
 
 # ---------- print ----------
