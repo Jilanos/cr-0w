@@ -110,7 +110,7 @@ export function shadePlanet(kind: Planet, P: ShadeIn, n: V3, ln: V3, view: V3, s
 }
 
 export interface Cast { pos: V3; f: V3; focal: number; proj(p: V3): { x: number; y: number; z: number }; ray(sx: number, sy: number): V3 }
-export interface Moon { c: V3; r: number; col: RGB; t?: number } // t: orbit angle, for the trail
+export interface Moon { c: V3; r: number; col: RGB; t?: number; o?: number } // t: orbit angle (trail), o: orbit lane scale
 // spin: surface turn in radians. ring.phase: angle of the bright arc on the run ring.
 // fade: depth and hover dimming (1 = full), floored at A_MIN.
 export interface Body {
@@ -146,7 +146,7 @@ export function castPlanets(cam: Cast, cols: number, rows: number, cw: number, c
     const fr = frame(p.tilt, p.spin), fade = p.fade ?? 1
     const P: ShadeIn = { col: p.col, sel: p.sel, quiet: p.quiet, glow: p.glow, toWorld: fr.toWorld }
     let ext = p.r * (p.ring ? 1.8 : p.sel ? 1.12 : 1)
-    for (const m of p.moons) { const v = sub(m.c, p.c); ext = Math.max(ext, Math.sqrt(dot(v, v)) + m.r) }
+    for (const m of p.moons) { const v = sub(m.c, p.c); ext = Math.max(ext, Math.sqrt(dot(v, v)) + m.r * 1.5) }
     const rad = (ext * cam.focal) / (s.z - ext)
     const c0 = Math.max(0, Math.floor((s.x - rad) / cw) - 1), c1 = Math.min(cols - 1, Math.ceil((s.x + rad) / cw) + 1)
     const r0 = Math.max(0, Math.floor((s.y - rad) / chh) - 1), r1 = Math.min(rows - 1, Math.ceil((s.y + rad) / chh) + 1)
@@ -156,7 +156,7 @@ export function castPlanets(cam: Cast, cols: number, rows: number, cw: number, c
     const out = (o: Shade): Shade => fade >= 1 ? [o[0], c8(o[1]), o[2]] : [o[0], c8(mix(mix(o[1], DARK, 0.5), o[1], fade)), Math.max(A_MIN, o[2] * fade)]
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) {
       const d = cam.ray(col * cw + cw / 2, row * chh + chh / 2)
-      let best = 1e9, o: Shade | null = null, solid = false
+      let best = 1e9, o: Shade | null = null, solid = false, mh = false
       const t = hitSphere(cam.pos, d, p.c, p.r)
       if (t > 0) {
         const q = add(cam.pos, mul(d, t)), n = norm(sub(q, p.c)), ln = fr.toLocal(n)
@@ -180,21 +180,18 @@ export function castPlanets(cam: Cast, cols: number, rows: number, cw: number, c
         const t2 = hitSphere(cam.pos, d, m.c, m.r)
         if (t2 > 0 && t2 < best) {
           best = t2; solid = false
-          // Solid state colour (dense glyphs, no white wash) with a bright '@' rim, so the session
-          // state reads at table size against a planet of the same hue.
           const n = norm(sub(add(cam.pos, mul(d, t2)), m.c)), L = clamp(Math.max(0, dot(n, LIGHT)) * 0.9 + 0.1, 0, 1)
-          o = Math.abs(dot(n, d)) < 0.4 ? ['@', mix(m.col, WHITE, 0.3), 1] : [RAMP[clamp(Math.floor((0.55 + 0.45 * L) * 12), 0, 11)], mix(DARK, m.col, 0.6 + 0.4 * L), 0.85 + 0.15 * L]
+          // State colour body with a pale '@' rim, so it reads against a planet of the same hue.
+          o = Math.abs(dot(n, d)) < 0.45 ? ['@', mix(m.col, WHITE, 0.7), 1] : [RAMP[clamp(Math.floor((0.6 + 0.4 * L) * 12), 0, 11)], mix(DARK, m.col, 0.7 + 0.3 * L), 1]
+          mh = true
         }
       }
-      if (o) {
+      // Dark gap round each moon, over the planet as well, so the moon keeps its edge.
+      const gap = !mh && p.moons.find((m) => { const oc = sub(m.c, cam.pos), tc = dot(oc, d), dd = Math.sqrt(Math.max(0, dot(oc, oc) - tc * tc)); return dd < m.r * 1.45 && (!o || tc - m.r < best) })
+      if (gap) put(col, row, dot(sub(gap.c, cam.pos), cam.f) - gap.r, ' ', [0, 0, 0], 0, 0)
+      else if (o) {
         const [ch, cc, a] = out(o)
         put(col, row, best * dot(d, cam.f), ch, cc, a, solid ? (0.14 + 0.16 * a) * fade : 0)
-      } else if (p.moons.length) {
-        // Dark margin round each moon so the table lines behind stay off its edge.
-        for (const m of p.moons) {
-          const oc = sub(m.c, cam.pos), tc = dot(oc, d), dd = Math.sqrt(Math.max(0, dot(oc, oc) - tc * tc))
-          if (dd < m.r * 1.35) { put(col, row, dot(oc, cam.f) - m.r, ' ', [0, 0, 0], 0, 0); break }
-        }
       }
       if (!o && p.sel) {
         // Cut-out margin round the selected planet so table lines stay out.

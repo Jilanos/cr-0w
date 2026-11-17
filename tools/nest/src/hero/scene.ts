@@ -57,23 +57,27 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
   const ags = p.members || p.hk > 0 ? [] : p.agents.slice(0, 3)
   const moons = ags.map((a, i) => {
     const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28
-    return { c: moonAt(p, t), r: p.r * 0.5, col: SC[a.state], t }
+    const o = 1 + 0.32 * i // own orbit lane per moon
+    return { c: moonAt(p, t, o), r: p.r * 0.4, col: SC[a.state], t, o }
   })
   return {
     c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
     ring: p.state === 'working' ? { phase: -tt * 0.0008 } : undefined, moons, sel: p.hk > 0, quiet, glow, fade,
   }
 }
-const moonAt = (p: { c: V3; r: number }, t: number, k = 1) => { const R = p.r * 1.9 * k; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
-// Orbit trail behind each session moon in its state colour, fading out over ~85 degrees, wider near the moon.
+const moonAt = (p: { c: V3; r: number }, t: number, k = 1) => { const R = p.r * 2.25 * k; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
+// Each session moon on its own dotted orbit, with a short comet trail behind it in its state
+// colour (no '-', '=' or ':', which the table already uses), a three-strand ribbon near the moon.
 function moonTrails(g: Grid, cam: Cam, b: Body) {
-  const f = b.fade ?? 1
-  for (const m of b.moons) for (let k = 0; k < 60; k++) {
-    const q = k / 60
-    const a = (0.55 + 0.45 * q) * Math.max(0.7, f), t = m.t! - 1.5 * (1 - q)
-    // Comet glyphs (no '-' or '=', which the table already uses), denser toward the moon.
-    splat(g, cam, moonAt(b, t), q > 0.7 ? '*' : q > 0.35 ? '+' : '.', mix(m.col, WHITE, 0.25 * q), a, 0.1)
-    if (q > 0.5) { splat(g, cam, moonAt(b, t, 0.95), '+', m.col, a * 0.8, 0.1); splat(g, cam, moonAt(b, t, 1.05), '+', m.col, a * 0.8, 0.1) }
+  const f = Math.max(0.8, b.fade ?? 1)
+  for (const m of b.moons) {
+    for (let t = 0; t < 6.28; t += 0.035) splat(g, cam, moonAt(b, m.t! + t, m.o), '.', m.col, 0.45 * f, 0.1)
+    for (let k = 0; k < 110; k++) {
+      const q = k / 110, t = m.t! - 1.6 * (1 - q), a = (0.45 + 0.55 * q) * f
+      ;[0, 0.07, -0.07].forEach((w, i) => {
+        if (i === 0 || q > 0.3 + 0.15 * i) splat(g, cam, moonAt(b, t, m.o! * (1 + w * q)), i ? '+' : q > 0.75 ? '@' : q > 0.4 ? '*' : '.', i ? m.col : mix(m.col, WHITE, 0.2 + 0.4 * q), i ? a * 0.8 : a, 0.1)
+      })
+    }
   }
 }
 const rampCh = (L: number) => RAMP[clamp(Math.floor(L * 12), 0, 11)]
@@ -312,7 +316,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     if (gl > 0) base = add(base, V((Math.random() - 0.5) * 0.5 * gl, 0, 0))
     // Lit table: size by planet type, bigger on a phone where one label leaves room; back planets grow
     // to offset perspective so they stay readable (owner 2026-11-17).
-    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.45 : 1.3) * (1 + 0.3 * depth) : SIZE[p.state] * (1 - 0.25 * depth)
+    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.75 : 1.8) : SIZE[p.state] * (1 - 0.25 * depth)
     const z0 = cam.proj(base).z, px = z0 / cam.focal
     const hk = hov?.name === p.name ? hov.k : 0
     const stalk = ALT[p.state] + (p.state === 'needs' ? 0.18 * Math.min((p.wait ?? 0) / 300, 1) : 0)
