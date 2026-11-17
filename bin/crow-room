@@ -8,6 +8,7 @@ authenticated, no rate limit is reached, room >= 20 + reserve and the burn-rate 
 (runs_out_at_iso) does not end before the run (--minutes, default 60). The reading comes from
 `cdx status --json --cached`; it is refreshed when older than 10 minutes (or with --refresh).
 Antigravity readings older than 24 hours count as unknown; Ollama has no quota, only reachability.
+An account local/accounts.yaml does not list shows as `not in policy`, not as an auth error.
 """
 import argparse, json, os, subprocess, sys
 from datetime import datetime
@@ -34,9 +35,13 @@ def age_min(row, now):
     return None if m is None else -m
 
 
-def verdict(row, now, reserve=0, minutes=60):
-    """(room, admit, why) for one cdx status row."""
+def verdict(row, now, reserve=0, minutes=60, policy=None):
+    """(room, admit, why) for one cdx status row. policy: account names accounts.yaml lists (None: no filter);
+    an account outside it is tagged, its auth or quota state is not crow's concern."""
     provider = row.get("provider") or "claude"
+    if policy is not None and row.get("session_name") not in policy:
+        r5, rw = row.get("remaining_5h_pct"), row.get("remaining_week_pct")
+        return (None if r5 is None or rw is None else min(r5, rw)), False, "not in policy"
     if provider == "ollama":
         return None, False, "no quota signal; check reachability and the model by hand"
     r5, rw = row.get("remaining_5h_pct"), row.get("remaining_week_pct")
@@ -78,9 +83,10 @@ def main():
     if not rows:
         sys.exit("crow-room: cdx did not answer")
     out = []
+    policy = crow_lib.policy_names()
     for r in rows:
         name = r["session_name"]
-        room, admit, why = verdict(r, now, reserve.get(name, 0), a.minutes)
+        room, admit, why = verdict(r, now, reserve.get(name, 0), a.minutes, policy)
         out.append({"name": name, "provider": r.get("provider") or "claude", "room": room,
                     "reset_5h": r.get("reset_5h_at_iso"), "admit": admit, "why": why})
     if a.json:

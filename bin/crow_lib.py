@@ -488,6 +488,18 @@ def pick_accounts(accts, rows, current, now, scope=None):
             "recommended": usable[0]["name"] if usable else None}
 
 
+def policy_names(path=None):
+    """Account names local/accounts.yaml lists; None when the file is missing or unreadable (no filter)."""
+    import yaml
+    path = path or os.path.join(data_home(), "local", "accounts.yaml")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    return {a["name"] for a in cfg.get("accounts") or [] if isinstance(a, dict) and a.get("name")}
+
+
 def account_state(current=None, cached=False, scope=None):
     """pick_accounts on live data: crow-accounts json and `cdx status` (--cached for hooks)."""
     from datetime import datetime
