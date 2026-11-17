@@ -33,10 +33,14 @@ want to trigger it by name.
 - [visual-concepts](visual-concepts.md): purpose, content, flat sketches, then image-model prompts before any render run for a visual world
 - [tui-render](tui-render.md): render a TUI (or ANSI mockup) to PNG in the kitty theme at real monitor sizes; fallback-glyph and contrast checks
 - [afk-runs](afk-runs.md): unattended AFK runs (night or day): queue, guardrails, pre-push denylist, return report
+- [folder-restructure](folder-restructure.md): reorganise a working folder: proposal, dry-run mv script, apply, fix hardcoded paths and backups
+- [codex-download-relay](codex-download-relay.md): get files a Codex run fetched (signed URLs) onto disk through the hub, for runs without network (full-permission runs have network)
 - [repo-tidy](repo-tidy.md): daily repo hygiene via `bin/crow-tidy` (safe auto-cleanup in the brief) and the by-hand cleanup steps
 - [own-routines](own-routines.md): write your own daily/weekly-style skills in local/hub-skills from the generic examples
 - [live-claude-session-test](live-claude-session-test.md): drive a hidden tmux Claude session to live-test hooks and permission prompt answers
 - [readme-showcase](readme-showcase.md): method for a marketing README per repo (visuals, header options, structure, audit, preview)
+- [maj-routine](maj-routine.md): end-of-night update (mail, Teams, drafts, attachments to file, framed jobs, reminders, HTML pending board) and its 06:30 Windows task
+- [office-documents](office-documents.md): DOCX edits, PDF export and page checks, tracked-changes comparison (`bin/crow-docx-redline`)
 - [claude-and-codex](claude-and-codex.md): what changes on a Codex account (instructions, skills, permission, models) and what the hub guard covers
 - [long-sessions](long-sessions.md): context cap at 150k, warning at 120k, when to wrap and how to split one session into scoped handoffs
 - [vault-capture](vault-capture.md): `crow note`, `crow notes` JSON, the `eod` skill and the capture tags that feed every recap
@@ -55,3 +59,6 @@ want to trigger it by name.
 - [nest-screenshots](nest-screenshots.md): headless screenshots of the Nest PWA at the board sizes, both themes; hero layout, idle and perf scripts
 - [nest-phone-install](nest-phone-install.md): serve Nest on the tailnet and install it as an app on Android (Play parks it while the VPN is up)
 - [vault-sync-new-device](vault-sync-new-device.md): add a machine to the vault Syncthing mesh (direct pairing, ignore patterns, conflict cleanup)
+- [android-adb-from-wsl.md](android-adb-from-wsl.md): install an APK on a USB phone from WSL (Windows adb.exe)
+- [can-log-audit](can-log-audit.md): inventory BLF/ASC frames, match DBC definitions, check reserved ID blocks and verify immutable inputs
+- [personal-fork](personal-fork.md): sync a personal worktree with upstream and push only to its fork

@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Fetch upstream, merge its main branch into a personal branch, optionally push the fork."""
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit
+
+
+def git(*args, check=True):
+    result = subprocess.run(["git", *args], check=False, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+    return result
+
+
+def remote_id(url):
+    """Compare HTTPS, SSH and local spellings of the same repository."""
+    if "://" in url:
+        parsed = urlsplit(url)
+        if parsed.scheme == "file":
+            return str(Path(parsed.path).resolve())
+        return (parsed.hostname or "").lower() + "/" + parsed.path.strip("/").removesuffix(".git")
+    if ":" in url and not url.startswith(("/", ".")):
+        host, path = url.split(":", 1)
+        return host.split("@")[-1].lower() + "/" + path.strip("/").removesuffix(".git")
+    return str(Path(url).resolve())
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--upstream", default="origin", help="upstream remote (default: origin)")
+    parser.add_argument("--upstream-branch", default="main")
+    parser.add_argument("--branch", default="paul", help="current personal branch (default: paul)")
+    parser.add_argument("--fork", default="fork", help="personal push remote (default: fork)")
+    parser.add_argument("--push", action="store_true", help="check and push the personal branch to the fork")
+    args = parser.parse_args(argv)
+    branch = git("symbolic-ref", "--quiet", "--short", "HEAD", check=False).stdout.strip()
+    if branch != args.branch or branch == args.upstream_branch:
+        raise RuntimeError(f"check out personal branch {args.branch!r} before syncing (current: {branch or 'detached HEAD'})")
+    if git("status", "--porcelain").stdout:
+        raise RuntimeError("working tree must be clean before syncing")
+    for marker in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply"):
+        if Path(git("rev-parse", "--git-path", marker).stdout.strip()).exists():
+            raise RuntimeError("finish or abort the current git operation before syncing")
+    remotes = git("remote").stdout.splitlines()
+    if args.upstream not in remotes:
+        raise RuntimeError(f"unknown upstream remote: {args.upstream}")
+    if args.push:
+        if args.fork not in remotes or args.fork == args.upstream:
+            raise RuntimeError("--push needs a separate fork remote")
+        upstream_urls = {
+            remote_id(url)
+            for flag in ([], ["--push"])
+            for url in git("remote", "get-url", *flag, "--all", args.upstream).stdout.splitlines()
+        }
+        fork_urls = git("remote", "get-url", "--push", "--all", args.fork).stdout.splitlines()
+        if any(remote_id(url) in upstream_urls for url in fork_urls):
+            raise RuntimeError("fork push URL points to upstream; refusing to push")
+    git("check-ref-format", f"refs/heads/{args.upstream_branch}")
+    ref = f"refs/remotes/{args.upstream}/{args.upstream_branch}"
+    git("fetch", "--", args.upstream, f"+refs/heads/{args.upstream_branch}:{ref}")
+    result = git("merge", "--no-edit", ref, check=False)
+    if result.stdout:
+        print(result.stdout.strip())
+    if result.returncode:
+        conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.strip()
+        if conflicts:
+            print("crow-sync: merge stopped on conflicts:\n" + conflicts, file=sys.stderr)
+            print("Resolve and commit, or run git merge --abort. Nothing was pushed.", file=sys.stderr)
+            return 1
+        raise RuntimeError(result.stderr.strip() or "merge failed; nothing was pushed")
+    if args.push:
+        checker = Path(__file__).resolve().with_name("crow-prepush-check")
+        subprocess.run([str(checker), "--check"], check=True)
+        # Export the real HOME in the caller when authentication lives outside its sandbox.
+        result = git("push", "-u", "--", args.fork, f"refs/heads/{branch}:refs/heads/{branch}")
+        print(result.stdout.strip() or result.stderr.strip())
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
+        print(f"crow-sync: {exc}", file=sys.stderr)
+        sys.exit(1)
