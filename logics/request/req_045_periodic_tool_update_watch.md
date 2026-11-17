@@ -24,6 +24,7 @@
 - 2026-11-09: a manual pass over cdx 0.26.0..0.26.11 and logics-manager 2.24.x found eight usable changes. They were filed as notes on item_116, item_133, item_136 and as item_142. This request makes that pass recurring.
 - Existing pattern to reuse: `bin/crow-retro` (systemd user timer, no-model pre-filter, one batch run, dated report). See runbooks/session-retros.md.
 - Machine package updates (pacman, AUR, npm globals, cdx install) move to the owner's dotfiles repo. This request only reads versions and changelogs.
+- Installed versions: read `~/.local/state/archeotech-updates/versions.json` (schema 1, one entry per followed tool: version, method, last_update, last_run, last_result), written by the dotfiles daily user-tool job. Never run an updater to get a version. Format: archeotech-dotfiles `docs/UPDATES.md` (versions.json section).
 
 # Acceptance criteria
 - AC1: a tool list in `local/` (name, version command, changelog source, last version read) drives the check; adding a tool is one entry.
@@ -46,6 +47,7 @@
 - `bin/crow-retro`
 - `runbooks/session-retros.md`
 - `runbooks/install-and-update.md`
+- archeotech-dotfiles `docs/UPDATES.md` (versions.json, update policy) and req_013
 
 # Backlog
 - `item_141_tool_update_watch_ritual`
