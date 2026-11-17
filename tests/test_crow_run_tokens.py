@@ -4,7 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bin"))
-import crow_lib  # noqa: E402
+import crow_lib
 
 
 def test_mech_kind_runs_sonnet_with_task_access():

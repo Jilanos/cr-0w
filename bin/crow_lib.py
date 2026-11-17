@@ -575,7 +575,11 @@ RUN_SANDBOX = {
              "bash": _GIT_READ + _SHELL_READ + ["git add", "git commit", "git switch", "git checkout", "git restore",
                                                 "git stash", "git rebase", "git mv", "git rm", "mkdir", "touch", "cp",
                                                 "mv", "python3 -m pytest", "pytest", "go test", "go build",
-                                                "go vet", "gofmt", "make", "npm test", "npm run", "logics-manager"],
+                                                "go vet", "gofmt", "make", "npm test", "npm run", "logics-manager",
+                                                # quality gate and Nest bench/typecheck (owner OK 2026-11-17)
+                                                "bin/crow-check", "ruff check", "ruff format",
+                                                "node scripts/hero-table.mjs", "node tools/nest/scripts/hero-table.mjs",
+                                                "npx tsc", "npx vitest"],
              "mcp": []},
     "retro": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "TodoWrite", "Skill"],
               "bash": _SHELL_READ + _CROW_LOG + ["bin/crow-digest", "git status", "git diff", "git add",
@@ -713,7 +717,7 @@ def transcript_tokens(path):
     path = str(path)
     for fpath in [path] + sorted(glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))):
         try:
-            fh = open(fpath, encoding="utf-8", errors="replace")
+            fh = open(fpath, encoding="utf-8", errors="replace")  # noqa: SIM115 (closed by the with below)
         except OSError:
             continue
         with fh:
@@ -940,7 +944,7 @@ def pending_prompt(pid, meta, home=None):
     return p
 
 
-MISSION_LINE = re.compile(r"^Mission: (\S+)$", re.M)
+MISSION_LINE = re.compile(r"^Mission: (\S+)$", re.MULTILINE)
 
 
 def ensure_mission(project, end_state, logics="", goal=""):
