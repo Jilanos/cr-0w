@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""crow-crop: small review images so a session never reads full 2x screenshots.
+
+Each image costs context in proportion to its pixels. Crop to the part under review
+and downscale before reading it back; compare several renders as one contact sheet.
+
+usage:
+  crow-crop IMG [IMG ...] [--region WxH+X+Y] [--width 800] [--out DIR]
+      one downscaled crop per image (region in source pixels; whole image if omitted)
+  crow-crop --sheet IMG [IMG ...] [--region WxH+X+Y] [--width 800] [--out FILE]
+      one contact sheet: the (cropped) images side by side, labelled with their file
+      names, the whole sheet at most --width wide
+
+Output defaults to local/state/crops/ (machine renders). Prints the written paths.
+"""
+import argparse
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_OUT = os.path.join(os.path.dirname(HERE), "local", "state", "crops")
+
+
+def _font():
+    try:
+        fonts = subprocess.run(["magick", "-list", "font"], capture_output=True, text=True).stdout
+    except OSError:
+        return []
+    names = [l.split(":", 1)[1].strip() for l in fonts.splitlines() if l.strip().startswith("Font:")]
+    for want in ("DejaVu-Sans", "Liberation-Sans", "Noto-Sans-Regular", "Adwaita-Sans"):
+        if want in names:
+            return ["-font", want]
+    sans = [n for n in names if "Sans" in n and "Bold" not in n and "Italic" not in n]
+    return ["-font", sans[0]] if sans else []
+
+
+def _src(img, region):
+    return [img] + (["-crop", region, "+repage"] if region else [])
+
+
+def crop(img, region, width, out_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    base = os.path.splitext(os.path.basename(img))[0]
+    tag = "-" + region.replace("+", "_") if region else ""
+    out = os.path.join(out_dir, f"{base}{tag}-w{width}.png")
+    subprocess.run(["magick", *_src(img, region), "-resize", f"{width}x>", out], check=True)
+    return out
+
+
+def sheet(imgs, region, width, out):
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    cell = max(120, (width - 8 * len(imgs)) // len(imgs))
+    cmd = ["magick", "montage"]
+    for img in imgs:
+        cmd += ["-label", os.path.basename(img), *_src(img, region)] if not region else \
+               ["(", *_src(img, region), "-set", "label", os.path.basename(img), ")"]
+    cmd += ["-tile", f"{len(imgs)}x1", "-geometry", f"{cell}x+4+4", "-pointsize", "11", *_font(),
+            "-background", "#202020", "-fill", "#e0e0e0", out]
+    subprocess.run(cmd, check=True)
+    subprocess.run(["magick", out, "-resize", f"{width}x>", out], check=True)
+    return out
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("images", nargs="+")
+    ap.add_argument("--region")
+    ap.add_argument("--width", type=int, default=800)
+    ap.add_argument("--sheet", action="store_true")
+    ap.add_argument("--out")
+    a = ap.parse_args(argv)
+    missing = [i for i in a.images if not os.path.isfile(i)]
+    if missing:
+        print("missing: " + ", ".join(missing), file=sys.stderr)
+        return 1
+    if a.sheet:
+        out = a.out or os.path.join(DEFAULT_OUT, f"sheet-{len(a.images)}-w{a.width}.png")
+        print(sheet(a.images, a.region, a.width, out))
+    else:
+        for img in a.images:
+            print(crop(img, a.region, a.width, a.out or DEFAULT_OUT))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

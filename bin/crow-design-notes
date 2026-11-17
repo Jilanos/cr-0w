@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""crow-design-notes: bring a design session's notes file back after a compaction.
+
+Design sessions keep their decisions in a `design-notes.md` file (sections Decided /
+Rejected / Open / Files) next to the renders. Compaction drops detail, so the
+SessionStart hook (matcher `compact`) runs `crow-design-notes hook`: it reads the
+session transcript, finds the last design-notes.md the session wrote (Edit/Write), and
+prints it so it lands in the fresh context. Prints nothing when there is none, so a
+session that only mentioned a notes file gets nothing.
+
+usage:
+  crow-design-notes hook              SessionStart hook (JSON on stdin: transcript_path, cwd)
+  crow-design-notes find TRANSCRIPT   print the notes path found in a transcript
+"""
+import json
+import os
+import re
+import sys
+
+NAME = "design-notes.md"
+MAX_CHARS = 8000
+WINDOW = 400
+
+
+def _roots(cwd):
+    roots = [cwd or os.getcwd()]
+    vault = os.environ.get("CROW_RESEARCH_DIR")
+    if not vault:
+        try:
+            import subprocess
+            here = os.path.dirname(os.path.abspath(__file__))
+            vault = subprocess.run([os.path.join(here, "crow-state"), "path", "research"],
+                                   capture_output=True, text=True, timeout=5).stdout.strip()
+        except Exception:
+            vault = ""
+    if vault:
+        roots += [vault, os.path.dirname(vault)]
+    return [r for r in roots if r]
+
+
+def _candidates(text, end):
+    """Paths ending at `end` (just after design-notes.md), longest first."""
+    start = max(0, end - WINDOW)
+    chunk = text[start:end]
+    # absolute (from a "/") and relative (just after a separator) readings, longest first
+    out = []
+    for i, ch in enumerate(chunk):
+        if ch == "/":
+            out += [chunk[i:], chunk[i + 1:]]
+        elif ch in " \n\t\"'`(":
+            out.append(chunk[i + 1:])
+    return out
+
+
+WRITE = re.compile(r'"name":"(?:Edit|Write|MultiEdit)","input":\{"file_path":"([^"]*' + re.escape(NAME) + ')"')
+
+
+def find(transcript, cwd=None, written_only=False):
+    try:
+        with open(transcript, encoding="utf-8", errors="replace") as f:
+            raw = f.read()
+    except OSError:
+        return None
+    if written_only:
+        # A session that only mentioned or read a notes file is not a design session.
+        for p in reversed(WRITE.findall(raw)):
+            if os.path.isfile(p):
+                return os.path.normpath(p)
+        return None
+    # Unescape JSON string content enough for paths (\/ and \" never appear in our paths).
+    text = raw.replace("\\n", "\n").replace('\\"', '"')
+    roots = _roots(cwd)
+    for m in reversed(list(re.finditer(re.escape(NAME), text))):
+        for cand in _candidates(text, m.end()):
+            cand = cand.strip().strip("`'\"(<[")
+            if not cand.endswith(NAME):
+                continue
+            paths = [cand] if cand.startswith("/") else [os.path.join(r, cand) for r in roots]
+            for p in paths:
+                if os.path.isfile(p):
+                    return os.path.normpath(p)
+    return None
+
+
+def hook():
+    try:
+        data = json.load(sys.stdin)
+    except Exception:
+        return 0
+    if data.get("source") not in (None, "compact"):
+        return 0
+    path = find(data.get("transcript_path") or "", data.get("cwd"), written_only=True)
+    if not path:
+        return 0
+    with open(path, encoding="utf-8", errors="replace") as f:
+        body = f.read()
+    cut = len(body) > MAX_CHARS
+    print(f"Design session notes ({path}). Decided items are final: never re-ask them. "
+          "Update this file after every owner answer.")
+    print(body[:MAX_CHARS] + ("\n[... truncated, read the file]" if cut else ""))
+    return 0
+
+
+def main(argv):
+    if argv[:1] == ["hook"]:
+        return hook()
+    if argv[:1] == ["find"] and len(argv) == 2:
+        p = find(argv[1])
+        if p:
+            print(p)
+        return 0 if p else 1
+    print(__doc__.strip())
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
