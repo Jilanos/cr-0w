@@ -1,14 +1,14 @@
 ## item_230_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights - Fix the crow-runs and dispatch bugs from Paul's nights
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 85
 > Confidence: 80
-> Progress: 15%
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-17 16:25:45
+> Indicators reviewed: 2026-11-17 16:53:12
 
 # AI Context
 - Summary: Fix the small reproducible bugs: list/json crash on a removed worktree, Codex report keeps only the last line, `final` wants a path, `wait ""` hangs, unknown project gives no hint, out-of-policy accounts show as 401 errors.
@@ -38,13 +38,17 @@
 
 # AC Traceability
 - req_064_paul_s_feedback_and_a_modular_public_crow-AC -> This backlog slice. Proof: Each repro from §5 passes old-fails/new-passes in a test.
+- request-AC1 -> This backlog slice. Proof: Run and dispatch bugs 1-4, 9, 10 fixed with a regression test each (6f2f0cb, 0046d97, c2e49e9, 8567edf, 2576c09); bin/crow-check green, 672 passed. Source: `2576c09`
+- request-AC2 -> This backlog slice. Proof: Not covered here; the brick split is item_235. Source: `2576c09`
+- request-AC3 -> This backlog slice. Proof: Not covered here; forge off is item_236. Source: `2576c09`
 
 # Dependencies
 - None.
 
 # Links
-- Request: req_064_paul_s_feedback_and_a_modular_public_crow.
+- Request: `req_064_paul_s_feedback_and_a_modular_public_crow`
 
+- Primary task(s): `task_024_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights`
 # Priority
 - Priority: High
 - Rationale: Small, hit every night.
@@ -52,7 +56,11 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-17T15:36:48.384135+00:00 | cdx | 207be58c83c44578853f1eb8c8171d71 | item_230 run bugs steps 2-5 | running |  |  |
 | 2026-11-17T15:29:13.517330+00:00 | cdx | 7bf24edac4d349d1b7516c5c8bc853c1 | item_230 run/dispatch bugs | succeeded |  |  |
 
 # Tasks
 - `task_024_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights`
+
+# Notes
+- Task `task_024_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights` was finished via `logics-manager flow finish task` on 2026-11-17.

@@ -7,6 +7,7 @@
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-11-17 16:53:11
 
 # AI Context
 - Summary: Take what Paul built and asked for (feedback 2026-11-17), fix the bugs he hit, and split crow into a core plus optional bricks so another user can install only what fits.
