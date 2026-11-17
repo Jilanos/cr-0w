@@ -628,6 +628,7 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .hero-pl { position: absolute; transform: translate(0, -50%); white-space: nowrap; font: 600 11px var(--font-head);
   letter-spacing: 0.1em; color: var(--dim); text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg); }
 .hero-pl.l { transform: translate(-100%, -50%); }
+.hero-pl.c { transform: translate(-50%, -100%); }
 .hero-pl.on { color: var(--fg); }
 .hero-pl span { font-weight: 400; letter-spacing: 0.04em; }
 .hero-rim { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; font: 10px var(--font-head);

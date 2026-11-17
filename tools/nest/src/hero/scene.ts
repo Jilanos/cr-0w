@@ -12,7 +12,7 @@ export interface Heads { palette: string[]; moods: Record<string, { cols: number
 export interface Palette { ring: RGB; dim: RGB; fg: RGB; accent: RGB; state: Record<UiState, RGB>; quiet?: RGB }
 // cx, cy, rad: projected planet disc for hit tests. a0: table angle without spin. back: behind the lens.
 export interface PlanetLabel {
-  x: number; y: number; name: string; state: UiState; side: 'l' | 'r'; note?: string; target?: boolean
+  x: number; y: number; name: string; state: UiState; side: 'l' | 'r' | 'c'; note?: string; target?: boolean
   cx: number; cy: number; rad: number; a0: number; back: boolean; hidden?: boolean
 }
 export interface MoonOut { x: number; y: number; r: number; id: string; title: string; state: UiState; member?: boolean }
@@ -178,6 +178,42 @@ const ALT: Record<UiState, number> = { failed: 0.95, needs: 0.62, working: 0.38,
 // Size by priority, so the same state always reads the same (not by open missions).
 const SIZE: Record<UiState, number> = { failed: 0.34, needs: 0.34, working: 0.3, sleeping: 0.26, queued: 0.26, done: 0.24 }
 const MAXP = 9
+// Lit table (item_217): size by planet type (owner 2026-11-16), hex cell size, phone breakpoint (one label).
+const TSIZE: Record<HeroProject['planet'], number> = { bands: 0.44, terrain: 0.34, ice: 0.3, rock: 0.26 }
+const HSZ = 0.62, S3 = Math.sqrt(3), DARK: RGB = [20, 20, 50]
+export const PHONE_W = 500
+const hexOf = (p: V3) => { const q = Math.round(p.x / (HSZ * 1.5)), r = Math.round(p.z / (HSZ * S3) - q / 2); return V(HSZ * 1.5 * q, PY, HSZ * S3 * (r + q / 2)) }
+const rotY = (p: V3, deg: number) => { const c = Math.cos(deg * D2R), s = Math.sin(deg * D2R); return V(p.x * c + p.z * s, p.y, -p.x * s + p.z * c) }
+// Hex etch: edge points in the table frame built once; projected cells cached per size and spin
+// (idle frames redraw the same grid, a drag re-projects about 9k points).
+let hexPts: Float32Array | undefined
+let hexCache: { k: string; cells: Float32Array } | undefined
+function hexGrid(g: Grid, cam: Cam, w: number, h: number, spin: number, col: RGB) {
+  if (!hexPts) {
+    const out: number[] = [], e = HSZ * 0.97
+    for (let q = -9; q <= 9; q++) for (let r = -9; r <= 9; r++) {
+      const cx = HSZ * 1.5 * q, cz = HSZ * S3 * (r + q / 2), d = Math.hypot(cx, cz)
+      if (d > RT * 0.93) continue
+      const a = 0.8 * (1 - (d / RT) * 0.3)
+      for (let s = 0; s < 6; s++) {
+        const a0 = (s * Math.PI) / 3, a1 = a0 + Math.PI / 3
+        for (let t = 0; t < 1; t += 0.08) out.push(cx + e * ((1 - t) * Math.cos(a0) + t * Math.cos(a1)), cz + e * ((1 - t) * Math.sin(a0) + t * Math.sin(a1)), a)
+      }
+    }
+    hexPts = Float32Array.from(out)
+  }
+  const k = `${w}x${h}:${spin}:${CW}`
+  if (hexCache?.k !== k) {
+    const out: number[] = [], c = Math.cos(spin * D2R), sn = Math.sin(spin * D2R), P = hexPts
+    for (let i = 0; i < P.length; i += 3) {
+      const x = P[i] * c + P[i + 1] * sn, z = -P[i] * sn + P[i + 1] * c, sp = cam.proj(V(x, PY, z))
+      if (sp.z > 0.1) out.push(Math.floor(sp.x / CW), Math.floor(sp.y / CH), sp.z, P[i + 2] * clamp(1 - ((z + RT) / (2 * RT)) * 0.5, 0.45, 1))
+    }
+    hexCache = { k, cells: Float32Array.from(out) }
+  }
+  const cs = hexCache.cells
+  for (let i = 0; i < cs.length; i += 4) put(g, cs[i], cs[i + 1], cs[i + 2], ':', col, cs[i + 3])
+}
 // Cell scale (item_194): one rule for every size, calibrated on the phone cover hero (344x400 at
 // 0.434). The smaller of the width and height fits wins, so head and scene keep their share of the hero.
 // DENSITY: glyphs per head-scale cell (item_195: 1.25x so spheres and head read rounder). The
@@ -200,8 +236,19 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   const at = (a: number, f: number, y = PY) => V(RT * f * Math.cos(a * D2R), y, -RT * f * Math.sin(a * D2R))
 
   // Table: faint rings, plus spokes that turn with the planets so a spin reads (item_158).
-  for (const f of [0.25, 0.5, 0.75]) for (let t = 0; t < 360; t += 2.4 / f) splat(g, cam, at(t, f), '·', pal.ring, 0.2)
-  for (let k = 0; k < 8; k++) for (let f = 0.2; f < 0.92; f += 0.05) splat(g, cam, at(k * 45 + 22.5 + spin, f), '·', pal.ring, 0.1)
+  // Lit table (item_217, pick C2): a hex grid etched in the table and a radar scope at the centre.
+  const T = !!opts.table
+  if (T) hexGrid(g, cam, w, h, spin, mix(pal.ring, SC.working, 0.45))
+  else for (const f of [0.25, 0.5, 0.75]) for (let t = 0; t < 360; t += 2.4 / f) splat(g, cam, at(t, f), '·', pal.ring, 0.2)
+  for (let k = 0; k < 8; k++) for (let f = 0.2; f < 0.92; f += 0.05) splat(g, cam, at(k * 45 + 22.5 + spin, f), '·', pal.ring, T ? 0.28 : 0.1)
+  if (T) {
+    for (const f of [0.2, 0.4, 0.6]) for (let t = 0; t < 360; t += 1.2 / f) splat(g, cam, at(t + spin, f), (Math.round(t) % 30) < 3 ? '+' : '-', SC.working, 0.8)
+    for (const t of [0, 90]) for (let f = -0.95; f <= 0.95; f += 0.02) if (Math.abs(f) > 0.12) splat(g, cam, at(t + spin, f), '-', SC.working, 0.6)
+    if (opts.sweep !== undefined) {
+      const s0 = opts.sweep * 360
+      for (let d = 0; d < 60; d += 0.5) for (let f = 0.1; f < 0.98; f += 0.022) splat(g, cam, at(s0 - d, f), d < 1.5 ? '#' : ':', mix(SC.working, WHITE, d < 1.5 ? 0.5 : 0), (d < 1.5 ? 1 : 0.55) * (1 - d / 60) ** 1.8, 0.02)
+    }
+  }
 
   // Rim (item_197, the 24h clock is gone): a bezel that turns with the planets, minor ticks every
   // 10 deg, long accent ticks every 45. Front is lit more, the back fades.
@@ -236,13 +283,16 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   const ps = ranked.map((p, i) => {
     const a = 90 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * stepA
     let base = at(a + spin, RING)
+    // C2: each planet stands on the centre of a hex cell (snapped in the table frame, then turned).
+    if (T) base = rotY(hexOf(at(a, RING)), spin)
     // Back half of the table (behind the lens): smaller and dimmer, labels hidden.
     const depth = clamp(base.z / (RT * 0.5), 0, 1)
     const back = base.z > RT * 0.15
     // Failed: one short sideways glitch.
     const gl = opts.glitch?.[p.name] ?? 0
     if (gl > 0) base = add(base, V((Math.random() - 0.5) * 0.5 * gl, 0, 0))
-    const r = SIZE[p.state] * (1 - 0.25 * depth)
+    // Lit table: size by planet type, bigger on a phone where one label leaves room (owner 2026-11-17).
+    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.45 : 1.3) * (1 - 0.15 * depth) : SIZE[p.state] * (1 - 0.25 * depth)
     const z0 = cam.proj(base).z, px = z0 / cam.focal
     const hk = hov?.name === p.name ? hov.k : 0
     const stalk = ALT[p.state] + (p.state === 'needs' ? 0.18 * Math.min((p.wait ?? 0) / 300, 1) : 0)
@@ -274,8 +324,24 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   for (const p of ps) {
     const col = SC[p.state], flat = add(p.base, V(0, 0.02, 0))
     const fade = (p.hk > 0 ? 1 : dimOthers) * (1 - 0.55 * p.depth)
-    ringOnPlane(g, cam, flat, p.r * 1.2, '.', mix(col, [20, 20, 50], 0.35), 0.5, 0.06)
-    for (let y = 0.05; y < p.stalk; y += 0.07) splat(g, cam, add(p.base, V(0, y, 0)), ':', col, 0.55)
+    if (T) {
+      // C2 foot: a dim filled shadow with a bright outline, a thin stem (broken when failed), a radar blip.
+      const back = 1 - 0.45 * p.depth
+      for (let rr = 0.05; rr < p.r * 1.05; rr += 0.05) ringOnPlane(g, cam, flat, rr, '.', mix(col, DARK, 0.4), 0.32 * back, 0.02 / Math.max(rr, 0.2))
+      ringOnPlane(g, cam, flat, p.r * 1.1, '-', mix(col, WHITE, 0.3), 0.9 * back, 0.01 / p.r)
+      if (p.state === 'needs') ringOnPlane(g, cam, flat, p.r * 1.7, '-', col, 0.45 * back, 0.008 / p.r)
+      for (let y = 0.05; y < p.stalk; y += 0.045) {
+        const u = y / p.stalk
+        if (p.state === 'failed' && ((u > 0.3 && u < 0.4) || (u > 0.6 && u < 0.68))) continue
+        splat(g, cam, add(p.base, V(0, y, 0)), '|', mix(col, WHITE, 0.2), 0.6 * back)
+      }
+      const blip = at(p.a0 + spin, 0.5, PY + 0.02)
+      ringOnPlane(g, cam, blip, 0.1, '#', col, 1, 0.04)
+      ringOnPlane(g, cam, blip, 0.05, '@', mix(col, WHITE, 0.4), 1, 0.05)
+    } else {
+      ringOnPlane(g, cam, flat, p.r * 1.2, '.', mix(col, [20, 20, 50], 0.35), 0.5, 0.06)
+      for (let y = 0.05; y < p.stalk; y += 0.07) splat(g, cam, add(p.base, V(0, y, 0)), ':', col, 0.55)
+    }
     const quiet = p.state === 'sleeping' || p.state === 'queued' || p.state === 'done'
     // One light for every live planet; the target stands out by its marker and the head's gaze.
     const emit = (quiet ? 0.12 : 0.45) + (p.state === 'working' ? 0.25 * pulse : 0) + 0.25 * p.hk + 0.35 * p.ping ** 2
@@ -385,7 +451,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
 
   paint(cv, g, dpr, layer)
 
-  const gaps = new Map<PlanetLabel, number>()
+  const gaps = new Map<PlanetLabel, number>(), depths = new Map<PlanetLabel, number>()
   const out: SceneOut = {
     planets: [], head, lens: { x: lens.x, y: lens.y },
     moons: moons.map((o) => { const s = cam.proj(o.c); return { x: s.x, y: s.y, r: Math.max(6, (o.r * cam.focal) / s.z), id: o.id, title: o.title, state: o.state, member: o.member } }),
@@ -405,6 +471,17 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     }
     out.planets.push(label)
     gaps.set(label, rad + 8)
+    depths.set(label, p.depth)
+  }
+  // Lit table (item_217): few labels. Phone: the front planet only, centred above it. Laptop: the 3 most urgent.
+  const shown = new Set(out.planets)
+  if (T) {
+    const RANK: Partial<Record<UiState, number>> = { failed: 0, needs: 1, working: 2 }
+    const phone = w < PHONE_W, rk = (l: PlanetLabel) => RANK[l.state] ?? 3, dp = (l: PlanetLabel) => depths.get(l) ?? 1
+    const pick = phone ? [...out.planets].sort((a, b) => dp(a) - dp(b)).slice(0, 1)
+      : [...out.planets].sort((a, b) => rk(a) - rk(b) || dp(a) - dp(b)).slice(0, 3)
+    shown.clear(); for (const l of pick) shown.add(l)
+    if (phone) for (const l of pick) Object.assign(l, { side: 'c', x: l.cx, y: l.cy - l.rad - 6 })
   }
   // Nudge planet labels apart (approximate text boxes), keep tags clear of the head.
   type Box = { x0: number; x1: number; y0: number; y1: number; own?: string }
@@ -414,7 +491,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const c = cam.proj(p.c), rr = (p.r * cam.focal) / c.z
     boxes.push({ x0: c.x - rr, x1: c.x + rr, y0: c.y - rr, y1: c.y + rr, own: p.name })
   }
-  for (const l of [...out.planets].sort((a, b) => a.y - b.y)) {
+  for (const l of [...shown].filter((l) => l.side !== 'c').sort((a, b) => a.y - b.y)) {
     const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2
     const span = () => (l.side === 'r' ? [l.x, l.x + tw] : [l.x - tw, l.x])
     const hit = (y: number) => { const [x0, x1] = span(); return boxes.some((b) => b.own !== l.name && b.y0 < y + 8 && b.y1 > y - 8 && b.x0 < x1 && x0 < b.x1) }
@@ -435,8 +512,8 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   const inHead = (x: number, y: number) => x > head.left + 20 && x < head.right - 20 && y > head.top && y < 2 * head.y - head.top
   // Readability (item_158): back labels hide (YOUR MOVE tags stay); nothing sits under the head.
   for (const l of out.planets) {
-    const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2, x0 = l.side === 'r' ? l.x : l.x - tw
-    l.hidden = l.back || inHead(x0, l.y) || inHead(x0 + tw, l.y) || inHead(x0 + tw / 2, l.y)
+    const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2, x0 = l.side === 'r' ? l.x : l.side === 'c' ? l.x - tw / 2 : l.x - tw
+    l.hidden = !shown.has(l) || (!T && l.back) || inHead(x0, l.y) || inHead(x0 + tw, l.y) || inHead(x0 + tw / 2, l.y)
   }
   return out
 }
