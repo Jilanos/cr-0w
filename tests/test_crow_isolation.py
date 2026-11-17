@@ -132,6 +132,12 @@ def args(**kw):
 
 
 def test_dispatch_refusals(tmp_path, monkeypatch):
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    for tool in crow_lib.ISOLATION_TOOLS:
+        (tools / tool).symlink_to("/bin/true")
+    monkeypatch.setenv("PATH", str(tools))
+    monkeypatch.setenv("CDX_PROFILES", str(tmp_path / "profiles"))
     monkeypatch.setattr(crow_lib, "provider_of", lambda acct, status=None: "claude")
     monkeypatch.setattr(cr, "ledger", lambda: [{"run_id": "abc123", "isolated": False}])
     assert "unisolated run" in cr.isolation_refusal(args(continue_run="abc"), "a", "/x", [])

@@ -129,6 +129,20 @@ def test_write_dir_refused_on_codex(fake, capsys, monkeypatch, tmp_path):
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "write_dir_unsupported"
 
 
+@pytest.mark.parametrize("overrides", [{"write_dir": True}, {"permission": None}, {"permission": "review"}])
+def test_review_boundaries_survive_full_private_permission(fake, monkeypatch, overrides):
+    home = fake.tmp / "data"
+    (home / "local").mkdir(parents=True)
+    (home / "local/headless.json").write_text('{"permission": "full"}')
+    monkeypatch.setenv("CROW_HOME", str(home))
+    options = dict(overrides)
+    if options.get("write_dir"):
+        options["write_dir"] = str(fake.tmp)
+    cr.dispatch(args(**options))
+    cdx = next(c for c in fake.calls if c["cmd"][:2] == ["cdx", "run"])["cmd"]
+    assert cdx[cdx.index("--permission") + 1] == ("review" if options.get("permission") == "review" else "default")
+
+
 def test_review_kind_on_claude_shares_a_busy_cwd(fake, capsys, monkeypatch):
     monkeypatch.setattr(cr, "running_runs", lambda: [{"cwd": str(fake.tmp)}])
     cr.dispatch(args(permission=None, write_dir=str(fake.tmp)))

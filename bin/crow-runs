@@ -951,8 +951,11 @@ def dispatch(a):
         # holds no claude binary ("Executable is outside the permitted toolchains"). CDX_HOME keeps the profiles.
         env = {**env, "HOME": crow_lib.real_home(),
                "CDX_HOME": os.environ.get("CDX_HOME") or os.path.join(crow_lib.real_home(), ".cdx")}
+    # Scoped writes and Claude reviews rely on the allowlist, even when ordinary runs use full permission.
+    scoped = a.write_dir or (a.kind == "review" and provider == "claude")
+    permission = a.permission or ("default" if scoped else crow_lib.permission(provider))
     cmd = ["cdx", "run", acct, "--cwd", cwd, *src, *(["--continue-run", a.continue_run] if a.continue_run else []), *flags,
-           "--permission", a.permission or crow_lib.permission(provider), "--detach", "--json",
+           "--permission", permission, "--detach", "--json",
            "--label", f"{p['name']}/{a.label}", *([] if a.force else ["--max-parallel", str(MAX_PARALLEL)]),
            *(["--isolate-workspace"] if a.isolate else [])]
     if a.dry_run:
