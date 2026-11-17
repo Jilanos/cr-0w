@@ -1,4 +1,5 @@
 """crow_lib: helpers shared by the crow scripts."""
+import difflib
 import functools
 import glob
 import json
@@ -210,6 +211,16 @@ def final_text(text, provider="claude"):
             if isinstance(item, dict) and item.get("type") == "agent_message":
                 found = item.get("text") or item.get("message")
     return found if found else text[-4000:]
+
+
+def closest_name(name, names):
+    """The registered name a mistyped one most likely meant: a name containing it, else the nearest spelling."""
+    low = name.lower()
+    hits = [n for n in names if low and low in n.lower()]
+    if hits:
+        return min(hits, key=len)
+    near = difflib.get_close_matches(low, names, n=1, cutoff=0.6)
+    return near[0] if near else None
 
 
 def codex_messages(text):

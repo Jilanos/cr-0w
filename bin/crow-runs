@@ -5,6 +5,7 @@
                      [--permission review] [--logics REF] [--mission ID | --end-state E] [--write-dir DIR] [--timeout-min N]
                      [--json] [--dry-run]
                                                      every run carries crow_lib.run_flags (model id, effort, budget, timeout, env)
+                                                     <project>: a registered name or alias; `hub` is the hub checkout
   crow-runs state <run_id>                           JSON: has the run ended, its end state, the usage-limit policy (crow-core tick)
   crow-runs [list] [--since today|7d|DATE] [--all]   one-shot listing
   crow-runs json                                     same data as JSON (schema in logics/specs/script_contract);
@@ -52,10 +53,15 @@ def sh(*args, cwd=None):
 
 
 def project(name):
+    """Registry entry by name or alias. `hub` is the hub checkout (CROW_HOME) even when the registry lacks it."""
     for p in REG["projects"]:
-        if p["name"] == name:
+        if p["name"] == name or name in (p.get("aliases") or []):
             return p
-    sys.exit(f"crow: unknown project '{name}' (see: crow ls)")
+    if name == "hub":
+        own = next((p for p in REG["projects"] if Path(p["path"]).resolve() == HOME.resolve()), None)
+        return own or {"name": "hub", "path": str(HOME), "scope": "personal"}
+    near = crow_lib.closest_name(name, [p["name"] for p in REG["projects"]] + ["hub"])
+    sys.exit(f"crow: unknown project '{name}'" + (f"; did you mean '{near}'?" if near else "") + " (see: crow ls)")
 
 
 def project_name(cwd):

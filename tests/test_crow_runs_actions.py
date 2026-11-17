@@ -143,6 +143,46 @@ def test_list_marks_a_run_whose_worktree_is_gone(cr, monkeypatch, tmp_path):
     assert "worktree removed" in "\n".join(cr.render(data, color=False))
 
 
+REG = {"projects": [{"name": "acme-platform-lambda", "path": "/x/lambda", "scope": "work"},
+                    {"name": "demo-shell", "path": "/x/shell", "scope": "personal", "aliases": ["shell"]}]}
+
+
+@pytest.mark.parametrize(("typo", "hint"), [("lambda", "acme-platform-lambda"), ("demo-shel", "demo-shell"),
+                                            ("hbu", "hub")])
+def test_unknown_project_suggests_the_closest_name(cr, monkeypatch, typo, hint):
+    monkeypatch.setattr(cr, "REG", REG)
+    with pytest.raises(SystemExit) as e:
+        cr.project(typo)
+    assert f"did you mean '{hint}'" in str(e.value.code)
+
+
+def test_alias_and_hub_resolve(cr, monkeypatch):
+    monkeypatch.setattr(cr, "REG", REG)
+    assert cr.project("shell")["name"] == "demo-shell"
+    assert cr.project("hub") == {"name": "hub", "path": str(cr.HOME), "scope": "personal"}
+    hub = {"name": "my-hub", "path": str(cr.HOME), "scope": "personal"}
+    monkeypatch.setattr(cr, "REG", {"projects": [*REG["projects"], hub]})
+    assert cr.project("hub") is hub
+
+
+def test_dispatch_hub_runs_in_the_hub(cr, monkeypatch, capsys):
+    import argparse
+    import subprocess
+    monkeypatch.setattr(cr, "REG", REG)
+    monkeypatch.setattr(cr, "pick_account", lambda a: "main")
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr.crow_lib, "provider_of", lambda acct, status=None: "claude")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0))
+    a = argparse.Namespace(project="hub", label="t", prompt="do it", prompt_file=None, kind="task", power=None,
+                           model=None, budget=None, context="day", dry_run=True, permission=None, force=False,
+                           logics=None, resumes=None, cwd=None, account=None, isolate=False, continue_run=None,
+                           write_dir=None, mission=None, end_state=None, timeout_min=None, json=False)
+    cr.dispatch(a)
+    cmd = capsys.readouterr().out.split()
+    assert cmd[cmd.index("--cwd") + 1] == str(cr.HOME)
+    assert cmd[cmd.index("--label") + 1] == "hub/t"
+
+
 def _codex_log(path, *texts):
     lines = [{"type": "item.completed", "item": {"id": f"i{n}", "type": "agent_message", "text": t}}
              for n, t in enumerate(texts)]
