@@ -1,6 +1,7 @@
 """crow-runs summarize_tool: a tool call's own description wins over its raw command."""
 import importlib.machinery
 import importlib.util
+import json
 
 import pytest
 from conftest import BIN
@@ -127,7 +128,6 @@ def test_wait_refuses_an_empty_id(cr, monkeypatch, ids):
 
 
 def test_list_marks_a_run_whose_worktree_is_gone(cr, monkeypatch, tmp_path):
-    import json
     from datetime import datetime
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     gone = str(tmp_path / "repo.wt" / "removed")
@@ -141,3 +141,24 @@ def test_list_marks_a_run_whose_worktree_is_gone(cr, monkeypatch, tmp_path):
     data = cr.collect("today", include_unledgered=True)
     assert [f["worktree_removed"] for f in data["finished"]] == [True, True]
     assert "worktree removed" in "\n".join(cr.render(data, color=False))
+
+
+def _codex_log(path, *texts):
+    lines = [{"type": "item.completed", "item": {"id": f"i{n}", "type": "agent_message", "text": t}}
+             for n, t in enumerate(texts)]
+    path.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+
+
+@pytest.mark.parametrize(("texts", "want"), [
+    (("Shipped:\n- a\n- b\nLeft: none", "Done."), "Shipped:\n- a\n- b\nLeft: none"),
+    (("Report\n- a\n- b", "All set."), "Report\n- a\n- b"),
+    (("one line",), "one line"),
+])
+def test_codex_report_skips_a_one_line_postscript(cr, monkeypatch, tmp_path, texts, want):
+    out = tmp_path / "o.log"
+    _codex_log(out, *texts)
+    row = {"run_id": "abc123", "ended_at": "t", "provider": "codex", "artifacts": {"stdout_path": str(out)}}
+    monkeypatch.setattr(cr, "finished", lambda since: {"abc123": row})
+    monkeypatch.setattr(cr, "sh", lambda *a, **k: json.dumps({"report": {"final_message": texts[-1]}}))
+    monkeypatch.setattr(cr, "mark_seen", lambda *a: None)
+    assert cr.report("abc") == want

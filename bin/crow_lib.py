@@ -212,6 +212,16 @@ def final_text(text, provider="claude"):
     return found if found else text[-4000:]
 
 
+def codex_messages(text):
+    """Every agent_message text of a Codex run's stdout, in order."""
+    out = []
+    for o in _json_objects(text):
+        item = o.get("item") if o.get("type") == "item.completed" else o.get("msg")
+        if isinstance(item, dict) and item.get("type") == "agent_message" and (item.get("text") or item.get("message")):
+            out.append(item.get("text") or item.get("message"))
+    return out
+
+
 # ---------- providers ----------
 
 PROVIDERS = ("claude", "codex")

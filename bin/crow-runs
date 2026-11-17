@@ -491,7 +491,18 @@ def report(run_id, since="7d"):
         full = report_from_transcript(sid)
         if full:
             return full
+    if provider == "codex" and "Shipped" not in result:
+        return codex_report(crow_lib.codex_messages(text), result)
     return result
+
+
+def codex_report(msgs, result):
+    """A Codex run that ends on a one-line postscript: its last report-shaped message, else its last multi-line one."""
+    shaped = [m for m in msgs if "Shipped" in m]
+    if shaped:
+        return shaped[-1]
+    full = [m for m in msgs if "\n" in m.strip()]
+    return full[-1] if full and "\n" not in result.strip() else result
 
 
 def final_of(target, provider=None, since="7d"):
