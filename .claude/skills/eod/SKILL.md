@@ -1,7 +1,6 @@
 ---
 name: eod
 description: End-of-day check-in. Asks up to three questions about the topics that are live right now and files each answer in the vault daily note or the project note. Use when the user says "eod", "end of day", "fin de journée", or just before /wrap.
-model: sonnet
 effort: low
 allowed-tools: Bash(bin/crow-notes:*) Bash(bin/crow-note:*) Bash(bin/crow-activity:*)
 ---

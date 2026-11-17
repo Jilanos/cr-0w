@@ -194,6 +194,8 @@ def handoff(p, task, end_state, context, logics="", now=None):
     prefs = HOME / "local/owner-prefs.md"
     if prefs.is_file():
         hub.append(f"Owner preferences (all projects): {prefs}")
+        for f in sorted((HOME / "local/prefs").glob("*.md")):
+            hub.append(f"Owner preferences topic, read when the task touches it: {f}")
     for f in ix["hub_notes"]:
         hub.append(f"Hub notes for this repo: {f}")
     if ix["review_ledger"]:

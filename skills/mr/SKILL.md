@@ -13,7 +13,7 @@ Every MR/PR you open for the user follows this flow. Never skip a step to save t
 - Write the description in the language recent MRs of the repo use (`glab mr list --merged -P 5` + `glab mr view <n>`). The template and past MRs win over generic language rules.
 - Reference the ticket the way recent MRs do (e.g. `Closes KEY-123`).
 - Title: match recent merged MRs (same convention as commits, one ticket key, short).
-- Run the title and description through the "AI-writing tells" checklist in `<hub>/local/owner-prefs.md` (Writing) and fix every hit before the gate.
+- Run the title and description through the "AI-writing tells" checklist in `<hub>/local/prefs/writing.md` and fix every hit before the gate.
 
 ## 1b. Gate (before showing anything, and before every push of new commits)
 Runs on its own: the user never has to ask for it. Same gate for a new MR, review fixes (`review-threads`) and any later push.

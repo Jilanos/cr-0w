@@ -2,14 +2,23 @@
 """Clone, update and link third-party skills listed in skills/ext.list.
 
 Usage: crow-skills-ext sync      clone missing repos, fast-forward existing ones
-       crow-skills-ext link      link every listed skill into each Claude profile
-       crow-skills-ext status    show what is cloned and linked
+       crow-skills-ext link      build the crow-design plugin and register it in each Claude profile
+       crow-skills-ext status    show what is cloned, bundled and registered
 
-Clones live in vendor/skills/<owner>__<repo> (gitignored). Each skill is linked
-under the name in its SKILL.md frontmatter, so two repos can ship the same folder name.
+Clones live in vendor/skills/<owner>__<repo> (gitignored). The listed skills are design
+skills, so they do not load in every session: `link` bundles them, with the design MCP
+servers (DESIGN_MCP), into the plugin vendor/plugins/crow-design, published by the local
+marketplace `crow` (vendor/plugins). Each profile gets the plugin installed and disabled,
+and old per-profile skill links into vendor/skills are removed. A design session turns it
+on: `/plugin enable crow-design@crow`, then `/reload-plugins` (runbooks/design-sessions.md).
+Each skill is bundled under the name in its SKILL.md frontmatter, so two repos can ship
+the same folder name.
 """
+import hashlib
+import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +30,14 @@ import crow_lib  # noqa: E402
 
 MANIFEST = ROOT / "skills" / "ext.list"
 VENDOR = ROOT / "vendor" / "skills"
+MARKET = ROOT / "vendor" / "plugins"
+PLUGIN = MARKET / "crow-design"
+PLUGIN_ID = "crow-design@crow"
+DESIGN_MCP = {
+    "figma": {"type": "http", "url": "https://mcp.figma.com/mcp"},
+    "playwright": {"type": "stdio", "command": "npx",
+                   "args": ["-y", "@playwright/mcp@0.0.84", "--isolated", "--browser", "chromium"]},
+}
 
 
 def entries():
@@ -42,7 +59,7 @@ def skill_name(folder):
 
 def claude_skill_dirs():
     root = Path(crow_lib.profiles_dir())
-    return sorted(p for p in root.glob("*/claude-home/.claude/skills") if p.is_dir())
+    return sorted(p for p in root.glob("*/claude-home/.claude/skills") if p.is_dir() and not p.parts[-4].startswith("."))
 
 
 def sync():
@@ -57,35 +74,91 @@ def sync():
         print(f"{repo}: {'ok' if r.returncode == 0 else r.stderr.strip()}")
 
 
-def link():
-    targets = claude_skill_dirs()
+def build_plugin():
+    """vendor/plugins: marketplace `crow` with one plugin, crow-design (skills + DESIGN_MCP)."""
+    skills = PLUGIN / "skills"
+    for d in (MARKET / ".claude-plugin", PLUGIN / ".claude-plugin", skills):
+        d.mkdir(parents=True, exist_ok=True)
+    (MARKET / ".claude-plugin" / "marketplace.json").write_text(json.dumps({
+        "name": "crow", "owner": {"name": "crow"},
+        "plugins": [{"name": "crow-design", "source": "./crow-design",
+                     "description": "Design skills and the figma/playwright MCP servers, for design sessions only"}],
+    }, indent=1) + "\n")
+    (PLUGIN / ".mcp.json").write_text(json.dumps({"mcpServers": DESIGN_MCP}, indent=1) + "\n")
+    names, heads = [], []
     for repo, sub in entries():
         src = (clone_dir(repo) / sub).resolve()
         if not (src / "SKILL.md").is_file():
             print(f"missing {repo}/{sub} (run sync)")
             continue
         name = skill_name(src)
-        for t in targets:
-            dst = t / name
-            if dst.is_symlink() and dst.resolve() == src:
+        names.append(name)
+        heads.append(subprocess.run(["git", "-C", str(src), "rev-parse", "--short", "HEAD"],
+                                    capture_output=True, text=True).stdout.strip())
+        # real copies: the plugin cache does not keep symlinks
+        dst = skills / name
+        if dst.is_symlink():
+            dst.unlink()
+        elif dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst, symlinks=False, ignore=shutil.ignore_patterns(".git"))
+    for old in skills.iterdir():
+        if old.name not in names:
+            old.unlink() if old.is_symlink() else shutil.rmtree(old)
+    version = "1.0.0+" + hashlib.sha1(" ".join(sorted(heads)).encode()).hexdigest()[:8]
+    (PLUGIN / ".claude-plugin" / "plugin.json").write_text(json.dumps({
+        "name": "crow-design", "version": version,
+        "description": "Design skills and the figma/playwright MCP servers, for design sessions only",
+    }, indent=1) + "\n")
+    return names
+
+
+def profile_homes():
+    return [t.parent.parent for t in claude_skill_dirs()]
+
+
+def _claude(home, *args):
+    env = {**os.environ, "HOME": str(home)}
+    env.pop("CLAUDE_CONFIG_DIR", None)
+    return subprocess.run(["claude", "plugin", *args], capture_output=True, text=True, env=env)
+
+
+def link():
+    names = build_plugin()
+    print(f"crow-design: {len(names)} skills, MCP {', '.join(DESIGN_MCP)}")
+    for home in profile_homes():
+        prof = home.parent.name
+        # old setup: every design skill linked into the profile, loaded in every session
+        for d in (home / ".claude" / "skills").iterdir():
+            if d.is_symlink() and str(d.resolve()).startswith(str(VENDOR.resolve()) + os.sep):
+                d.unlink()
+        _claude(home, "marketplace", "add", str(MARKET))
+        _claude(home, "marketplace", "update", "crow")
+        listed = _claude(home, "list").stdout
+        if PLUGIN_ID in listed:
+            _claude(home, "update", PLUGIN_ID, "--scope", "user")
+        else:
+            r = _claude(home, "install", PLUGIN_ID, "--scope", "user")
+            if r.returncode:
+                print(f"{prof}: install failed: {(r.stderr or r.stdout).strip()[:200]}")
                 continue
-            if dst.exists() or dst.is_symlink():
-                print(f"skip {dst}: something else is there")
-                continue
-            dst.symlink_to(src)
-            print(f"linked {name} -> {t.parent.parent.parent.name}")
+        _claude(home, "disable", PLUGIN_ID, "--scope", "user")
+        print(f"{prof}: {PLUGIN_ID} installed, disabled")
 
 
 def status():
-    targets = claude_skill_dirs()
     for repo, sub in entries():
         src = (clone_dir(repo) / sub).resolve()
         if not (src / "SKILL.md").is_file():
             print(f"{repo}/{sub}: not cloned")
             continue
         name = skill_name(src)
-        n = sum((t / name).is_symlink() and (t / name).resolve() == src for t in targets)
-        print(f"{name}: linked in {n}/{len(targets)} profiles")
+        dst = PLUGIN / "skills" / name
+        print(f"{name}: {'bundled' if (dst / 'SKILL.md').is_file() else 'not bundled'}")
+    for home in profile_homes():
+        line = next((l for l in _claude(home, "list").stdout.split("\n\n") if PLUGIN_ID in l), "")
+        state = "enabled" if "enabled" in line else "disabled" if line else "not installed"
+        print(f"{home.parent.name}: {PLUGIN_ID} {state}")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,12 @@ After the owner trims the profile (plugins or MCP are profile settings outside t
 `bin/crow-cost-audit --days 1` prints the context read (input + cache reads + cache writes, summed over deduplicated calls) per model and per kind, plus the first-turn context of hub sessions and of dispatched runs. `crow-runs report <id>` ends with the same figures for one run.
 - Count calls deduplicated on (message.id, requestId). A raw event count doubles them: the 2026-11-16 item_208 run read 15.0M over 181 calls, not 30.2M over 367.
 - Baseline 2026-11-16 (window 1d, ending 18:40 local): 92.4M context read, $53.42, 99.6% Opus. Interactive 62.9M, headless 29.4M. Hub start median 55k (6 sessions); run start median 28k (7 runs).
-- A run's start (28k) is Claude's system prompt and tools, the hub CLAUDE.md, the memory index and the skill listing. Each run then reads `local/owner-prefs.md` (about 6.6k) and keeps it for every call.
+- A run's start (28k) is Claude's system prompt and tools, the hub CLAUDE.md, the memory index and the skill listing. Each run then reads `local/owner-prefs.md` and keeps it for every call: 6.6k until 2026-11-17, about 3.5k since the split into a core file plus topic files (`local/prefs/`) read only when the task needs them.
 - Biggest levers measured that day: run size (one 6-bug run read 15.0M), repeated review rounds (5.5M + 2.8M + 2.8M for one item), Opus on mechanical work, denied Bash calls (each one is a full call; the item_166 run had 6 in 40 calls).
 - Hub habits: show screenshots as zoom crops, not full frames; split the session before 120k (runbooks/long-sessions.md).
 - Re-measure a comparable day with the same command and window. Target: at least 40% less context read for similar work.
+
+## Savers applied 2026-11-17
+- Hub start context: 33.7k to 30.0k tokens per call (headless measure). Design skills and figma/playwright moved to the disabled `crow-design` plugin (runbooks/design-sessions.md).
+- owner-prefs split into a core plus `local/prefs/` topic files; 14 duplicated memories pruned (MEMORY.md 7.3 KB to 5.4 KB).
+- Ritual models: forked skills (brief, daily, weekly) and `crow brief|daily|weekly` oneshots run on Sonnet. Skills that run in the live session (wrap, eod) keep the session model: the prompt cache is per model, so a switch re-reads the whole session uncached.

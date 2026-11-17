@@ -549,7 +549,7 @@ RUN_KINDS = {
     "mech": {"model": "sonnet", "power": "medium", "budget": 8.0, "timeout_min": 60, "isolate": "rw", "call_cap": 40},
     "review": {"model": "opus", "power": "high", "budget": 10.0, "timeout_min": 60, "isolate": "ro"},
     "retro": {"model": "sonnet", "power": "low", "budget": 2.0, "timeout_min": 45},
-    "oneshot": {"model": "opus", "power": "medium", "budget": 3.0, "timeout_min": 20},
+    "oneshot": {"model": "sonnet", "power": "medium", "budget": 3.0, "timeout_min": 20},
 }
 # "isolate": the kind may run under `cdx run --isolate-workspace` (rw tree, or ro for review). retro and oneshot
 # read host data (transcripts, vault) and never isolate.

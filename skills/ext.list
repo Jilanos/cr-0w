@@ -1,4 +1,5 @@
-# Third-party skills linked into every Claude profile by bin/crow-skills-ext.
+# Third-party design skills, bundled by bin/crow-skills-ext into the crow-design plugin
+# (installed disabled in every profile; design sessions enable it, runbooks/design-sessions.md).
 # Format: <github owner/repo> <path of the skill folder inside the repo>
 # Read a skill's SKILL.md and scripts before adding it here.
 jakubkrehel/skills skills/better-accessibility

@@ -35,7 +35,7 @@ Before writing, look at what the next session would load:
 - Hub: `runbooks/README.md`, `local/runbooks/README.md`, `.claude/skills/`
 - Earlier retros: `rg -l "<keyword>" "$(bin/crow-state path retros)"` to count recurrences.
 
-Before writing, check `local/owner-prefs.md`: a rule already there that the session broke means a repeat, so say so in the report and move it higher or sharpen it.
+Before writing, check `local/owner-prefs.md` and its topic files in `local/prefs/`: a rule already there that the session broke means a repeat, so say so in the report and move it higher or sharpen it.
 
 A lesson that exists but was ignored needs a sharper wording or a better place (skill step > memory > runbook), not a duplicate.
 
@@ -46,7 +46,7 @@ For each finding, choose one:
 |---|---|
 | How to do a task in that repo (steps, format, approval flow) | the repo's skill, if `git check-ignore -q <file>` says it's ignored. Otherwise **propose** |
 | User preference or correction for that project | project memory (one file + `MEMORY.md` line, per the memory format) |
-| Cross-project preference or repeated correction | `local/owner-prefs.md` (one line, existing section). Project memory is per folder and is not loaded in other projects, so never leave a cross-project rule only there |
+| Cross-project preference or repeated correction | `local/owner-prefs.md` (one line, existing section), or the matching topic file in `local/prefs/` (work repos, writing, design). Project memory is per folder and is not loaded in other projects, so never leave a cross-project rule only there |
 | A hub prompt that caused the issue | hub: `local/context.md` or a hub skill |
 | Mechanical friction with a fix (path, binary, auth step) | the runbook where the task lives (`runbooks/` generic, `local/runbooks/` private), or a `bin/` script if it repeats ≥2 times |
 | Same lesson in ≥2 retros | promote: a skill step, a checklist line, or a script. Mention it in the report |
