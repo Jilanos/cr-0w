@@ -1,13 +1,15 @@
 ## item_214_nest_planet_type_per_project_kind - Nest planet type per project kind
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 95%
-> Confidence: 90%
-> Progress: 0%
+> Confidence: 95%
+> Progress: 100%
 > Complexity: Low
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Owner: crow
+> Indicators reviewed: 2026-11-17 11:04:45
 
 # AI Context
 - Summary: Add a project kind to the registry and derive each hero planet's type (banded giant, terrain, rock, ice) from it.
@@ -45,3 +47,8 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Outcome
+- 485d899: `kind`/`planet` in `crow-registry json` (unknown values served as ""), `planetOf` and `HeroProject.planet` in the hero model; system planets take the type of their most urgent member.
+- `local/projects.yaml`: `kind` on all 15 projects per `local/nest-planet-kinds.md`; vault-work is `notes` and still resolves to bands through its work scope.
+- AC1/AC3: `model.test.ts` covers each rule, the override, the fallback and system planets with generic names. AC2: vitest 186 passed, tsc and `npm run build` clean, `pytest tests/test_crow_registry.py` 9 passed.
