@@ -56,7 +56,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-17T15:36:48.384135+00:00 | cdx | 207be58c83c44578853f1eb8c8171d71 | item_230 run bugs steps 2-5 | running |  |  |
+| 2026-11-17T15:53:47.439541+00:00 | cdx | 207be58c83c44578853f1eb8c8171d71 | item_230 run bugs steps 2-5 | succeeded |  |  |
 | 2026-11-17T15:29:13.517330+00:00 | cdx | 7bf24edac4d349d1b7516c5c8bc853c1 | item_230 run/dispatch bugs | succeeded |  |  |
 
 # Tasks

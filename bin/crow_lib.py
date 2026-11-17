@@ -612,7 +612,9 @@ RUN_SANDBOX = {
                                                 # quality gate and Nest bench/typecheck (owner OK 2026-11-17)
                                                 "bin/crow-check", "ruff check", "ruff format",
                                                 "node scripts/hero-table.mjs", "node tools/nest/scripts/hero-table.mjs",
-                                                "npx tsc", "npx vitest"],
+                                                "npx tsc", "npx vitest",
+                                                # load check before a bench (owner OK 2026-11-17)
+                                                "ps", "top -b", "uptime"],
              "mcp": []},
     "retro": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "TodoWrite", "Skill"],
               "bash": _SHELL_READ + _CROW_LOG + ["bin/crow-digest", "git status", "git diff", "git add",
@@ -635,7 +637,7 @@ RUN_KEEP_ENV = {}
 
 # Commands the RTK hook rewrites under another name (`rtk rewrite "cat f"` -> `rtk read f`).
 # rg: rtk 0.x rewrites it to `rtk grep`, 1.x to `rtk rg`.
-_RTK_ALIAS = {"cat": ["read"], "head": ["read"], "rg": ["grep", "rg"]}
+_RTK_ALIAS = {"cat": ["read"], "head": ["read"], "rg": ["grep", "rg"], "npx tsc": ["tsc"], "npx vitest": ["vitest"]}
 
 
 def sandbox_allow(kind):
