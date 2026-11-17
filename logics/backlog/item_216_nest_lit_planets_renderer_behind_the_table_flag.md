@@ -65,5 +65,13 @@
   | phone 368x812 | 16.1 / 18.5 | 16.6 / 20.6 |
 
   Headless runs vary by a few ms between runs; the lit table adds about 1-4 ms median. Open: the same check on the physical fold.
-- 2026-11-17, after the C2 board, hex feet, moons B and labels B (item_217): `perf a` gave 22.6-25 ms median on laptop and 22-33 ms on fold and phone (no flag 16.7 / 14.4 / 8.8). Two stuck image viewers held two cores during the run, and a run with the planets turned off was just as slow, so these numbers are not reliable. Re-measure on an idle machine. Either way the lit table misses the item_159 budgets (laptop 10 ms, fold 16 ms); item_159 AC4 asks to report the miss to the owner.
-- AC4: `planets.test.ts` (14 tests): table flag parsing, glyph sets per type, selected limb, frame round-trip, no blank cell and alpha ≥ 0.3 inside the disc for every type at fade 1 and 0.2, dark-side floor, channels in 0..255 at full glow. vitest 200 passed, tsc and `npm run build` clean.
+- 2026-11-17, after the C2 board, hex feet, moons B and labels B (item_217), idle machine, `perf`, median/max ms:
+
+  | Run | Laptop | Fold | Phone |
+  | --- | --- | --- | --- |
+  | No flag | 7.2 / 18.3 | 6.8 / 19.6 | 6.7 / 17.0 |
+  | `?table=a` | 16.1 / 33.9 | 15.2 / 29.9 | 14.7 / 31.8 |
+  | `?table=a`, no hex fill | 14.9 / 30.1 | 13.2 / 26.2 | 13.3 / 18.0 |
+  | `?table=a`, no planets | 12.6 / 26.5 | 11.9 / 28.0 | 11.7 / 27.2 |
+
+  Split of the ~9 ms the lit table adds: planets ~3.5 ms, hex foot fill ~1.5 ms, the rest of the board (hex grid, radar, stalks, moons) ~4 ms. The table misses the item_159 laptop budget (10 ms) and sits just under the fold budget (16 ms); maxes miss both. Reported to the owner per item_159 AC4. Earlier same-day runs (22-36 ms) were taken with two stuck image viewers on two cores and are discarded.
