@@ -15,7 +15,10 @@ bat=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -1)
 if [ -z "$bat" ]; then ok "no battery"
 elif [ "$ac" = 1 ]; then ok "on AC, battery ${bat}%"
 else fail "on battery (${bat}%): plug in before leaving"; fi
-if systemd-inhibit --list --no-legend 2>/dev/null | grep -q 'crow-afk'; then ok "sleep inhibited (crow-afk)"
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  if pgrep -f 'powershell.exe.*EncodedCommand' >/dev/null; then ok "Windows sleep blocked (crow-keep-awake)"
+  else warn "Windows sleep not blocked: run bin/crow-keep-awake 39600 as a background command and check it prints 'awake for'"; fi
+elif systemd-inhibit --list --no-legend 2>/dev/null | grep -q 'crow-afk'; then ok "sleep inhibited (crow-afk)"
 else warn "sleep not inhibited: systemd-inhibit --what=sleep:idle:handle-lid-switch --who=crow-afk --why=afk-runs sleep 14h &"; fi
 
 # A package upgraded since boot only takes effect at the next login/reboot: a surprise for the morning

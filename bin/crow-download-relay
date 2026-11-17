@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Relay downloader: for Codex runs started without network (restricted permission); they write signed attachment URLs to a
+# manifest (TSV: download_url<TAB>absolute_dest_path) and this loop fetches them from the hub.
+# Usage: crow-download-relay <manifest.tsv>   (stops when <manifest>.done exists and all rows are handled)
+set -u
+M="$1"; LOG="${M%.tsv}.download.log"; touch "$LOG"
+while true; do
+  if [ -f "$M" ]; then
+    while IFS=$'\t' read -r url dest; do
+      [ -z "${url:-}" ] && continue
+      grep -qxF "OK	$dest" "$LOG" && continue
+      grep -qF "	$dest	try3" "$LOG" && continue
+      mkdir -p "$(dirname "$dest")"
+      [ -e "$dest" ] && { echo "OK	$dest" >> "$LOG"; continue; }
+      code=$(curl -s -L -o "$dest.part" -w '%{http_code}' "$url")
+      if [ "$code" = 200 ]; then mv "$dest.part" "$dest"; echo "OK	$dest" >> "$LOG"
+      else rm -f "$dest.part"; n=$(grep -cF "	$dest	try" "$LOG"); echo "ERR $code	$dest	try$((n+1))" >> "$LOG"; fi
+    done < "$M"
+  fi
+  [ -f "$M.done" ] && break
+  sleep 20
+done
+echo "finished: $(grep -c '^OK' "$LOG") ok, $(grep -c 'try3' "$LOG") failed"

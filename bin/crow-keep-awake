@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Keep Windows awake from WSL for N seconds (default 11 h). Run it as a background command.
+# 2147483651 = ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED (0x80000003 overflows Int32 in PowerShell 5).
+# Uses -EncodedCommand: quotes inside -Command do not survive the bash -> powershell.exe hand-off.
+set -euo pipefail
+secs=${1:-39600}
+ps='$s = Add-Type -MemberDefinition '"'"'[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'"'"' -Name P -Namespace W -PassThru
+if ($s::SetThreadExecutionState([uint32]2147483651) -eq 0) { [Console]::Error.WriteLine("SetThreadExecutionState failed"); exit 1 }
+Write-Output "awake for '"$secs"' s"
+Start-Sleep -Seconds '"$secs"
+enc=$(printf '%s' "$ps" | iconv -t UTF-16LE | base64 -w0)
+exec powershell.exe -NoProfile -NonInteractive -EncodedCommand "$enc"
