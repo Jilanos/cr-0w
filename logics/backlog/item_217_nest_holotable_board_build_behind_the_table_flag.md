@@ -57,3 +57,4 @@
 
 # Decision framing
 - 2026-11-17 wrap: labels B and moons without hex marker done (331a733). Open: owner OK on the whole board (AC3), hover/select/ping recheck by hand, fold device check. Frame-time miss moved to item_220.
+- 2026-11-17: lit table is the default with no URL flag (043ba84), old table code kept until the owner says. Moons B everywhere incl. members and hover, tighter lanes, hover trails, hover moons = asks + sessions + missions (455ac16, 4429c06). Open: owner OK on the whole board, fold device check.
