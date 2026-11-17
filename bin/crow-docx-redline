@@ -1,0 +1,157 @@
+#!/usr/bin/env -S uv run -q --with python-docx python3
+"""crow-docx-redline: tracked-changes DOCX between two versions of a document.
+
+usage: crow-docx-redline <old.docx> <new.docx> <out.docx> <author>
+
+Base = new document (its layout and styles). Changes against old are written as Word
+revisions (w:ins / w:del), word-level inside matched paragraphs, whole paragraphs otherwise.
+Heavily rewritten paragraphs (<50 % similar) are shown as delete + insert for readability.
+Tables are compared cell by cell when both documents have the same table layout.
+LibreOffice CompareDocuments crashes headless on these files; this avoids it.
+Check: accept-all must equal new, reject-all must equal old.
+"""
+import sys, re, copy, difflib, datetime, itertools
+import docx
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+
+old_path, new_path, out_path, author = sys.argv[1:5]
+OLD, NEW = docx.Document(old_path), docx.Document(new_path)
+DATE = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:00Z")
+ids = itertools.count(9000)
+
+def mark(tag):
+    e = OxmlElement(tag); e.set(qn("w:id"), str(next(ids))); e.set(qn("w:author"), author); e.set(qn("w:date"), DATE); return e
+
+def runs_of(p):
+    return [r for r in p._p.iter(qn("w:r"))]
+
+def run_text(r):
+    out = []
+    for ch in r:
+        if ch.tag == qn("w:t"): out.append(ch.text or "")
+        elif ch.tag == qn("w:tab"): out.append("\t")
+        elif ch.tag in (qn("w:br"), qn("w:cr")): out.append("\n")
+    return "".join(out)
+
+def make_run(rpr, text, deleted=False):
+    r = OxmlElement("w:r")
+    if rpr is not None: r.append(copy.deepcopy(rpr))
+    for i, part in enumerate(re.split(r"(\t)", text)):
+        if part == "": continue
+        if part == "\t": r.append(OxmlElement("w:tab")); continue
+        t = OxmlElement("w:delText" if deleted else "w:t"); t.set(qn("xml:space"), "preserve"); t.text = part; r.append(t)
+    return r
+
+def para_mark(p_el, tag):
+    pPr = p_el.find(qn("w:pPr"))
+    if pPr is None: pPr = OxmlElement("w:pPr"); p_el.insert(0, pPr)
+    rPr = pPr.find(qn("w:rPr"))
+    if rPr is None: rPr = OxmlElement("w:rPr"); pPr.append(rPr)
+    rPr.append(mark(tag))
+
+def whole(p_el, kind):
+    """Mark a whole paragraph as inserted ('ins') or deleted ('del')."""
+    for r in list(p_el.iter(qn("w:r"))):
+        parent = r.getparent(); w = mark("w:" + kind); parent.replace(r, w); w.append(r)
+        if kind == "del":
+            for t in r.findall(qn("w:t")): t.tag = qn("w:delText")
+    para_mark(p_el, "w:" + kind)
+
+TOK = re.compile(r"\s+|\w+|[^\w\s]")
+
+def diff_para(op, np_):
+    """Rewrite paragraph np_ (new) with word-level changes against old paragraph op."""
+    nruns = runs_of(np_)
+    chars = []  # rPr per character of new text
+    for r in nruns:
+        rpr = r.find(qn("w:rPr")); chars += [rpr] * len(run_text(r))
+    ntext = "".join(run_text(r) for r in nruns)
+    otext = "".join(run_text(r) for r in runs_of(op))
+    if ntext == otext: return
+    ot, nt = TOK.findall(otext), TOK.findall(ntext)
+    sm = difflib.SequenceMatcher(None, ot, nt, autojunk=False)
+    anchor = nruns[0] if nruns else None
+    parent = anchor.getparent() if anchor is not None else np_._p
+    insert_at = parent.index(anchor) if anchor is not None else len(parent)
+    for r in nruns: r.getparent().remove(r)
+    out, npos = [], 0
+    def rpr_at(i): return chars[min(i, len(chars) - 1)] if chars else None
+    def emit_new(text, kind):
+        nonlocal npos
+        # split by formatting boundaries
+        start = 0
+        while start < len(text):
+            rp = rpr_at(npos + start); end = start + 1
+            while end < len(text) and rpr_at(npos + end) is rp: end += 1
+            r = make_run(rp, text[start:end])
+            if kind == "ins": w = mark("w:ins"); w.append(r); out.append(w)
+            else: out.append(r)
+            start = end
+        npos += len(text)
+    ops = sm.get_opcodes()
+    if sm.ratio() < 0.5:
+        ops = [("replace", 0, len(ot), 0, len(nt))]
+    # absorb short equal islands (<= 3 tokens or <= 4 chars) sitting between two changes
+    sm_ops = []
+    for k, o in enumerate(ops):
+        tag, i1, i2, j1, j2 = o
+        short = (i2 - i1) <= 3 or len("".join(ot[i1:i2]).strip()) <= 4
+        if tag == "equal" and short and 0 < k < len(ops) - 1:
+            o = ("replace", i1, i2, j1, j2)
+        sm_ops.append(o)
+    merged = []
+    for o in sm_ops:
+        if merged and o[0] != "equal" and merged[-1][0] != "equal":
+            t, i1, _, j1, _ = merged[-1]; merged[-1] = ("replace", i1, o[2], j1, o[4])
+        else: merged.append(o)
+    for tag, i1, i2, j1, j2 in merged:
+        if i1 == i2 and tag == "replace": tag = "insert"
+        if j1 == j2 and tag == "replace": tag = "delete"
+        if tag in ("delete", "replace"):
+            w = mark("w:del"); w.append(make_run(rpr_at(npos), "".join(ot[i1:i2]), deleted=True)); out.append(w)
+        if tag == "equal": emit_new("".join(nt[j1:j2]), "eq")
+        if tag in ("insert", "replace"): emit_new("".join(nt[j1:j2]), "ins")
+    for k, e in enumerate(out): parent.insert(insert_at + k, e)
+
+def text(p): return "".join(run_text(r) for r in runs_of(p))
+
+def align(olds, news):
+    ot, nt = [text(p) for p in olds], [text(p) for p in news]
+    pairs, odel, nins = [], [], []
+    sm = difflib.SequenceMatcher(None, ot, nt, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal": pairs += list(zip(range(i1, i2), range(j1, j2))); continue
+        j = j1
+        for i in range(i1, i2):
+            best = None
+            for jj in range(j, j2):
+                if difflib.SequenceMatcher(None, ot[i], nt[jj], autojunk=False).ratio() > 0.45: best = jj; break
+            if best is None: odel.append(i); continue
+            nins += range(j, best); pairs.append((i, best)); j = best + 1
+        nins += range(j, j2)
+    return pairs, odel, nins
+
+def apply(olds, news):
+    pairs, odel, nins = align(olds, news)
+    for i, j in pairs: diff_para(olds[i], news[j])
+    for j in nins: whole(news[j]._p, "ins")
+    matched_new = {i: j for i, j in pairs}
+    placed = {i: news[j]._p for i, j in pairs}
+    for i in odel:
+        el = copy.deepcopy(olds[i]._p); whole(el, "del")
+        prev = next((placed[k] for k in range(i - 1, -1, -1) if k in placed), None)
+        if prev is not None: prev.addnext(el)
+        else:
+            nxt = next((matched_new[k] for k in range(i + 1, len(olds)) if k in matched_new), None)
+            (news[nxt]._p.addprevious if nxt is not None else news[-1]._p.addnext)(el)
+        placed[i] = el
+    return len(pairs), len(odel), len(nins)
+
+print("body", apply(OLD.paragraphs, NEW.paragraphs))
+for to, tn in zip(OLD.tables, NEW.tables):
+    for ro, rn in zip(to.rows, tn.rows):
+        for co, cn in zip(ro.cells, rn.cells):
+            apply(co.paragraphs, cn.paragraphs)
+# turn on change display
+NEW.save(out_path)
