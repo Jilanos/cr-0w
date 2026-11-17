@@ -1,5 +1,6 @@
 import type { DataSource } from './source'
 import { SCRIPT_SECTIONS, type AgendaEvent, type InboxItem, type Mission, type SectionBody, type SectionName } from './types'
+import { withLinkedStates, workOf } from './work'
 
 export interface Snapshot {
   missions: Mission[]
@@ -32,6 +33,7 @@ async function readSections(src: DataSource, prev: Record<SectionName, SectionBo
 // returns data read before the action.
 export function feed(src: DataSource, emit: (s: Snapshot) => void) {
   let snap: Snapshot | null = null
+  let lastRaw: Mission[] | null = null
   let ok: Date | null = null
   let running: Promise<void> | null = null
   let again: Promise<void> | null = null
@@ -43,8 +45,10 @@ export function feed(src: DataSource, emit: (s: Snapshot) => void) {
     const now = src.now()
     const same = snap !== null && minute(snap.now) === minute(now)
     try {
-      const [missions, inbox, agenda, sections] = await Promise.all([src.missions(), src.inbox(), src.agenda(), readSections(src, snap?.sections)])
+      const [raw, inbox, agenda, sections] = await Promise.all([src.missions(), src.inbox(), src.agenda(), readSections(src, snap?.sections)])
       ok = now
+      const missions = raw === lastRaw && sections === snap?.sections ? snap!.missions : withLinkedStates(raw, workOf(sections.work))
+      lastRaw = raw
       if (same && !snap!.down && snap!.missions === missions && snap!.inbox === inbox && snap!.agenda === agenda && snap!.sections === sections) return
       snap = { missions, inbox, agenda, sections, now, synced: now, down: false }
     } catch {

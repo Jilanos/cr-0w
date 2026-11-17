@@ -6,6 +6,7 @@ import { Hero } from '../hero/Hero'
 import { Link } from '../router'
 import { Glyph } from '../ui/Glyph'
 import { byUrgency } from './order'
+import { KIND_LABEL, workOf, workWhen } from '../data/work'
 
 // Laptop home (board Main / home-cyber): needs + missions + MRs | hero slot | agenda + inbox + reports.
 
@@ -26,7 +27,12 @@ function Later() {
 
 export function HomeLaptop({ snap }: { snap: Snapshot }) {
   const { missions, inbox, now } = snap
-  const c = countByState(missions, inbox)
+  // Live sessions and runs from the core work feed (missions and MRs have their own rows).
+  const work = (workOf(snap.sections.work) ?? []).filter((w) => w.kind === 'session' || w.kind === 'run')
+  const waitingWork = work.filter((w) => w.state === 'needs')
+  const liveWork = work.filter((w) => w.state === 'working')
+  const mc = countByState(missions, inbox)
+  const c = { ...mc, working: mc.working + liveWork.length, needs: mc.needs + waitingWork.length }
   const open = openInbox(inbox)
   const asks = open
     .filter((r) => r.type !== 'fyi')
@@ -45,7 +51,7 @@ export function HomeLaptop({ snap }: { snap: Snapshot }) {
     <div className="lp home-lp">
       <div className="rail">
         <section className="pn" aria-labelledby="h-needs">
-          <h2 className="ph" id="h-needs"><span>Needs you</span><span className="st c-n">{asks.length + failed.length}</span></h2>
+          <h2 className="ph" id="h-needs"><span>Needs you</span><span className="st c-n">{asks.length + failed.length + waitingWork.length}</span></h2>
           {first ? (
             <div className="row card edge-n">
               <div className="line">
@@ -60,7 +66,15 @@ export function HomeLaptop({ snap }: { snap: Snapshot }) {
                 {firstM && <Link href={`/missions/${firstM.id}`} className="btn">Mission</Link>}
               </div>
             </div>
-          ) : !failed.length && <div className="sm later">All quiet, Sir.</div>}
+          ) : !failed.length && !waitingWork.length && <div className="sm later">All quiet, Sir.</div>}
+          {waitingWork.map((w) => (
+            <Link key={w.id} href="/desk" className="row edge-n">
+              <Glyph state="needs" />
+              <span className="t">{w.title}</span>
+              <span className="tag c-tag">{w.project}</span>
+              <span className="sm">{workWhen(w, now)}</span>
+            </Link>
+          ))}
           {rest.map((r) => (
             <div key={r.id} className="row edge-n">
               <Glyph state="needs" />
@@ -95,6 +109,11 @@ export function HomeLaptop({ snap }: { snap: Snapshot }) {
             <div className="c-f"><b><Pad n={c.failed} /></b><span className="sm">failed</span></div>
           </div>
           <div className="list">
+            {liveWork.map((w) => (
+              <Link key={w.id} href="/desk" className="row">
+                <Glyph state="working" /><span className="t">{w.title}</span><span className="sm">{KIND_LABEL[w.kind]}</span>
+              </Link>
+            ))}
             {live.map((m) => {
               const s = uiState(m, inbox)
               const run = lastRun(m)

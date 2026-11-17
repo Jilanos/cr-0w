@@ -6,7 +6,8 @@ import { fixtureSource } from './fixtures'
 import { homeCounts } from './home'
 import { scopeSnapshot } from './scope'
 import { UI_STATES } from './state'
-import { deskWork, KIND_LABEL, WORK_KINDS, workCounts, workOf, workWhen, type WorkItem } from './work'
+import { deskWork, KIND_LABEL, WORK_KINDS, workCounts, workOf, workWhen, withLinkedStates, type WorkItem } from './work'
+import type { Mission } from './types'
 import { heroLiveOf, heroModel } from '../hero/model'
 
 const contract = JSON.parse(API['state-work.json']) as { data: WorkItem[] }
@@ -99,5 +100,18 @@ describe('work feed (item_204)', () => {
     const x = { ...s, sections: { ...s.sections, work: { ...s.sections.work, data: [ghost] } } }
     expect(workOf(scopeSnapshot(x, scope === 'work' ? 'work' : 'perso').sections.work)).toHaveLength(1)
     expect(workOf(scopeSnapshot(x, scope === 'work' ? 'perso' : 'work').sections.work)).toHaveLength(0)
+  })
+})
+
+describe('withLinkedStates', () => {
+  const m = (id: string, extra: Partial<Mission> = {}) => ({ id, kind: 'build', state: 'running', runs: [], ...extra }) as unknown as Mission
+  const w = (ref: string, state: WorkItem['state']) => ({ id: 'mission:' + ref, kind: 'mission', project: 'p', title: ref, state, source: { section: 'missions', ref } }) as WorkItem
+  it('takes the feed state of a linked mission and ends one the feed dropped', () => {
+    const out = withLinkedStates([m('a'), m('b'), m('c'), m('d', { runs: [{}] as never })], [w('a', 'needs'), w('b', 'working')])
+    expect(out.map((x) => x.state)).toEqual(['waiting', 'running', 'done', 'running'])
+  })
+  it('leaves missions alone without a feed', () => {
+    const ms = [m('a')]
+    expect(withLinkedStates(ms, null)).toBe(ms)
   })
 })

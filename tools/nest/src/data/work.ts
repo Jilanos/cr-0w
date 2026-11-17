@@ -1,6 +1,6 @@
 import { ago, time } from '../format'
 import type { UiState } from './state'
-import type { SectionBody } from './types'
+import type { Mission, MissionState, SectionBody } from './types'
 
 // The core work feed (item_202, GET /api/state/work): every kind of work in one
 // list, most urgent first. Same fields as contract.WorkItem.
@@ -70,4 +70,15 @@ export function workWhen(w: WorkItem, now: Date): string {
   }
   if (w.state === 'sleeping' && valid(w.resets_at)) return `resets ${time(w.resets_at!)}`
   return valid(w.since) ? ago(w.since!, now) : ''
+}
+
+// Linked missions (crow handoff / dispatch, item_203) stay "running" in the store with no run
+// of their own; the core rolls their real state up in the work feed. Missions take that state,
+// and a linked mission the feed no longer lists is done. Without a feed they are left as is.
+export const isLinked = (m: Mission) => m.kind === 'build' && m.state === 'running' && m.runs.length === 0
+const AS_MISSION: Record<UiState, MissionState> = { done: 'done', failed: 'failed', needs: 'waiting', working: 'running', sleeping: 'queued', queued: 'queued' }
+export function withLinkedStates(missions: Mission[], work: WorkItem[] | null): Mission[] {
+  if (!work || !missions.some(isLinked)) return missions
+  const st = new Map(work.filter((w) => w.kind === 'mission').map((w) => [w.source.ref, w.state]))
+  return missions.map((m) => (isLinked(m) ? { ...m, state: AS_MISSION[st.get(m.id) ?? 'done'] } : m))
 }
