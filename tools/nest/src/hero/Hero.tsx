@@ -11,6 +11,7 @@ import { declutterDom, type Box } from './declutter'
 import { DEG_PER_WIDTH, detent, liftCurve, spinToFront, step, stepTo, type Spin } from './motion'
 import type { Heads, Palette, PlanetLabel, SceneOut } from './scene'
 import { drawScene, TABLE_FX } from './scene'
+import { tableOf } from './planets'
 import { createHead, liveHeadOk, type HeadGL } from './gl/head'
 import { bakeLook, CHARACTER, faceOf, HeadCtl, lookAt, PITCH_MAX, type Look } from './headCtl'
 
@@ -33,6 +34,7 @@ const SWEEP_MS = 12000
 // table angle (deg) over which the head reaches most of its turn.
 const GAZE_MAX = 14, GAZE_DOWN = -PITCH_MAX, GAZE_TURN = 40
 const LIFT_MS = 420
+const TABLE = typeof location === 'undefined' ? undefined : tableOf(location.search)
 const GLITCH_MS = 180
 const HOVER_MS = 200
 const DRAG_PX = 6
@@ -52,7 +54,7 @@ function readPalette(el: Element): Palette {
   const state = {} as Record<UiState, RGB>
   const FB: Record<UiState, RGB> = { needs: [255, 184, 0], working: [46, 242, 255], failed: [255, 46, 99], sleeping: [111, 134, 184], queued: [138, 160, 200], done: [95, 120, 168] }
   for (const k of Object.keys(VARS) as UiState[]) state[k] = rgb(VARS[k], FB[k])
-  return { ring: rgb('--c-w', [79, 195, 255]), dim: rgb('--dim', [95, 120, 168]), fg: rgb('--fg', [216, 230, 255]), accent: rgb('--accent', [192, 92, 255]), state }
+  return { ring: rgb('--c-w', [79, 195, 255]), dim: rgb('--dim', [95, 120, 168]), fg: rgb('--fg', [216, 230, 255]), accent: rgb('--accent', [192, 92, 255]), quiet: rgb('--c-quiet', [168, 140, 255]), state }
 }
 
 const hit = (out: SceneOut | undefined, x: number, y: number): PlanetLabel | undefined => {
@@ -217,7 +219,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
       now, spin: s.spin.spin, hover: s.hover && { name: s.hover.name, k: s.hover.k },
       look: s.look, pulse: live && !reduced ? (t % PULSE_MS) / PULSE_MS : undefined, lift, glitch,
       sweep: reduced ? undefined : (t % SWEEP_MS) / SWEEP_MS,
-      t: reduced ? 0 : t, fx: reduced ? {} : TABLE_FX, ripple: s.ripple, live: glOn,
+      t: reduced ? 0 : t, fx: reduced ? {} : TABLE_FX, ripple: s.ripple, live: glOn, table: TABLE,
     })
     s.out = o
     placeHead(o)

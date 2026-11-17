@@ -1,13 +1,15 @@
 import type { UiState } from '../data/state'
-import type { HeroModel } from './model'
+import type { HeroModel, HeroProject } from './model'
 import { elapsed } from '../format'
+import { castPlanets, type Body } from './planets'
+import { add, clamp, cross, dot, LIGHT, mix, mul, norm, sub, V, type RGB, type V3 } from './vec'
 
 // Static ASCII scene, ported from the approved hero pass 7 renderer (item_139) with the
 // option B head (item_126 shader port) pasted in from heads.json. Draws one frame per call.
 
 export interface Heads { palette: string[]; moods: Record<string, { cols: number; glyphs: string[]; colours: string[] }> }
-type RGB = [number, number, number]
-export interface Palette { ring: RGB; dim: RGB; fg: RGB; accent: RGB; state: Record<UiState, RGB> }
+// quiet: the violet of quiet planets on the lit table (item_216).
+export interface Palette { ring: RGB; dim: RGB; fg: RGB; accent: RGB; state: Record<UiState, RGB>; quiet?: RGB }
 // cx, cy, rad: projected planet disc for hit tests. a0: table angle without spin. back: behind the lens.
 export interface PlanetLabel {
   x: number; y: number; name: string; state: UiState; side: 'l' | 'r'; note?: string; target?: boolean
@@ -27,6 +29,8 @@ export interface SceneOpts {
   // Item 198. t: animation clock (ms). fx: table life switches. ripple: select wave (0..1 elapsed).
   // live: the GL head draws the head; the scene only clears its silhouette so the head hides the table back.
   t?: number; fx?: TableFx; ripple?: { name: string; k: number }; live?: boolean
+  // Item 216: `?table=a|b` draws lit planets (planets.ts). Unset keeps the current table.
+  table?: 'a' | 'b'
 }
 export interface TableFx { ping?: boolean; bob?: boolean; stream?: boolean }
 export const TABLE_FX: TableFx = { ping: true, bob: true, stream: true }
@@ -41,20 +45,25 @@ const RAMP = '.,-~:;=!*#$@'
 const KEYS = [...Array(94)].map((_, i) => String.fromCharCode(33 + i)).filter((c) => !'"\\'.includes(c)).join('')
 const WHITE: RGB = [255, 240, 255]
 
-interface V3 { x: number; y: number; z: number }
-const V = (x: number, y: number, z: number): V3 => ({ x, y, z })
-const add = (a: V3, b: V3) => V(a.x + b.x, a.y + b.y, a.z + b.z)
-const sub = (a: V3, b: V3) => V(a.x - b.x, a.y - b.y, a.z - b.z)
-const mul = (a: V3, s: number) => V(a.x * s, a.y * s, a.z * s)
-const dot = (a: V3, b: V3) => a.x * b.x + a.y * b.y + a.z * b.z
-const cross = (a: V3, b: V3) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
-const norm = (a: V3) => mul(a, 1 / Math.sqrt(dot(a, a)))
 const rotX = (p: V3, a: number) => { const c = Math.cos(a), s = Math.sin(a); return V(p.x, p.y * c - p.z * s, p.y * s + p.z * c) }
-const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v))
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t
-const mix = (a: RGB, b: RGB, t: number): RGB => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
 const D2R = Math.PI / 180
-const LIGHT = norm(V(-0.55, 0.75, -0.6))
+const QUIET: RGB = [168, 140, 255]
+const nameHash = (s: string) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296 }
+// Lit planet (item_216): type from the project, tilt and spin seed from its name, so each
+// planet keeps its own look. A live run wears the ring; sessions orbit as moons (max 3), hidden
+// on hover where the mission moons take over, and on systems where members orbit instead.
+function litBody(p: { name: string; planet: HeroProject['planet']; state: UiState; c: V3; r: number; hk: number; agents: HeroProject['agents']; members?: HeroProject[] }, col: RGB, quiet: boolean, tt: number, glow: number, fade: number, SC: Record<UiState, RGB>): Body {
+  const h = nameHash(p.name)
+  const ags = p.members || p.hk > 0 ? [] : p.agents.slice(0, 3)
+  const moons = ags.map((a, i) => {
+    const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28, R = p.r * 1.55
+    return { c: add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))), r: p.r * 0.2, col: SC[a.state] }
+  })
+  return {
+    c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
+    ring: p.state === 'working' ? { phase: -tt * 0.0008 } : undefined, moons, sel: p.hk > 0, quiet, glow, fade,
+  }
+}
 const rampCh = (L: number) => RAMP[clamp(Math.floor(L * 12), 0, 11)]
 
 function rng(seed: number) {
@@ -259,7 +268,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   }
   // Bot intent: longest wait first (model order), then a failure, then live work.
   const target = ps.find((p) => p.state === 'needs') ?? ps.find((p) => p.state === 'failed') ?? ps.find((p) => p.state === 'working')
-  const spheres: Sphere[] = []
+  const spheres: Sphere[] = [], bodies: Body[] = []
   const dimOthers = hov ? 1 - 0.3 * hov.k : 1
   const pulse = opts.pulse === undefined ? 0 : 0.5 - 0.5 * Math.cos(opts.pulse * Math.PI * 2)
   for (const p of ps) {
@@ -272,10 +281,11 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const emit = (quiet ? 0.12 : 0.45) + (p.state === 'working' ? 0.25 * pulse : 0) + 0.25 * p.hk + 0.35 * p.ping ** 2
     // Quiet planets go grey so only live states carry a colour; the working one glows a bit more (item_200 pick B).
     const qcol = mix(pal.dim, [128, 128, 128], 0.6), wemit = p.state === 'working' ? 0.25 : 0
-    spheres.push({ c: p.c, r: p.r, col: quiet && p.state !== 'done' ? qcol : p.state === 'failed' ? mix(col, WHITE, 0.2) : col, emit: emit + wemit, dimf: (quiet ? 0.5 : 1) * fade })
+    if (opts.table) bodies.push(litBody(p, quiet ? pal.quiet ?? QUIET : col, quiet, tt, (pulse * (p.state === 'working' ? 0.25 : 0)) + 0.25 * p.hk + 0.35 * p.ping ** 2, fade, SC))
+    else spheres.push({ c: p.c, r: p.r, col: quiet && p.state !== 'done' ? qcol : p.state === 'failed' ? mix(col, WHITE, 0.2) : col, emit: emit + wemit, dimf: (quiet ? 0.5 : 1) * fade })
     if (p.state === 'failed') brokenRing(g, cam, p.c, col)
     // Running planets wear a turning ring around their equator, so work reads without relying on colour.
-    if (p.state === 'working') {
+    if (p.state === 'working' && !opts.table) {
       // Tilted toward the camera like Saturn's, so its front arc crosses the planet's face.
       const R = p.r * 1.9, tilt = 0.45, ph = -tt * 0.0008, rc = mix(col, WHITE, 0.35)
       for (let t = 0; t < Math.PI * 2; t += 0.012) {
@@ -318,6 +328,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     })
   }
   raySpheres(g, cam, spheres)
+  if (bodies.length) castPlanets(cam, g.cols, g.rows, CW, CH, bodies, (c, r, z, ch, col, a, bg) => put(g, c, r, z, ch, col, a, bg))
 
   // Head: option B glyph grid on its own layer at HS scale, above the lens, turned toward the
   // target. Its eyes (the violet cells) take the target's state colour.

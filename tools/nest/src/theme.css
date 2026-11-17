@@ -73,6 +73,7 @@
   --glow: none;
   --logo-glow: 0 0 8px color-mix(in srgb, var(--logo) 40%, transparent);
   --chrome: #1d3a46;
+  --c-quiet: #a88cff;
   --chrome-text: #7fdcec;
   --dots: radial-gradient(color-mix(in srgb, var(--line) 33%, transparent) 1px, transparent 1.2px) 0 0 / 18px 18px;
   --accent: #c05cff;
