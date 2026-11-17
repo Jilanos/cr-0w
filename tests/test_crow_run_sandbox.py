@@ -68,7 +68,8 @@ def test_continue_run_keeps_the_permissions_only_settings(tmp_path):
     assert "--extra-args" not in crow_lib.run_flags("task", "codex", state=tmp_path)[0]
 
 
-def test_permission_is_default():
+def test_permission_is_default(tmp_path, monkeypatch):
+    monkeypatch.setenv("CROW_HOME", str(tmp_path))
     assert crow_lib.permission("claude") == "default"
     assert crow_lib.permission("codex") == "default"
 

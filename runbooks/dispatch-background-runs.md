@@ -31,7 +31,7 @@ Use when the user wants work done in project repos without opening a session the
 - End with: report commits, what is left, open questions.
 
 ## Dispatch
-`crow dispatch <project> "<short label>" --prompt-file <file> [--kind task|mech|review] [--power medium]`
+`crow dispatch <project> "<short label>" --prompt-file <file> [--kind task|mech|review] [--power medium] [--model <id>] [--cwd <repo>.wt/<name>]`
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.
 When relaunching an interrupted run, add `--resumes <run_id>` so the old run is folded into the new one.
 
@@ -62,7 +62,7 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
   the account's rank for that scope, then cdx priority, then room (same pick as `crow-accounts pick --scope <scope>`,
   which prints the deciding factor). An ask-first pick is never taken unasked. `--failover` is on every run.
   Two medium runs launched together can exhaust a session window in about 90 seconds. Stagger them if the window was recently used.
-- **Deletions in auto mode**: the permission classifier blocks deleting files with real content, so the run stops and reports.
+- **Permission**: `local/headless.json` selects `default` or `full` for headless launches. The public default is `default`. Explicit review and isolated modes retain their own constraints.
   If the prompt already expects deletions, name the exact files in it, or plan for the owner to approve them afterwards.
 - **Odd infra failures inside a run** (e.g. Docker networking): check `uname -r` against `/usr/lib/modules`. A kernel upgraded without a reboot breaks module loading.
 - **Long investigations**: the prompt must say "commit in small steps (on a branch if needed) as soon as each piece passes".

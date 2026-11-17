@@ -92,7 +92,8 @@ def test_oneshot_prompt_codex_without_skill_file_exits(tmp_path):
         crow_lib.oneshot_prompt("codex", _hub(tmp_path), "weekly")
 
 
-def test_permission_and_hub_session_guard_per_provider():
+def test_permission_and_hub_session_guard_per_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("CROW_HOME", str(tmp_path))
     assert crow_lib.permission("claude") == "default"
     assert crow_lib.permission("codex") == "default"
     assert crow_lib.hub_session_refusal("claude") is None
@@ -159,3 +160,17 @@ def test_cdx_profiles_falls_back_to_the_layout_without_cdx(tmp_path, monkeypatch
     (p,) = crow_lib.cdx_profiles(str(tmp_path))
     assert p["name"] == "a" and p["transcripts_dir"] == str(tmp_path / "a/claude-home/.claude/projects")
     assert crow_lib.account_transcripts_dir("new", str(tmp_path)).endswith("new/claude-home/.claude/projects")
+
+
+def test_permission_private_config(tmp_path, monkeypatch):
+    import pytest
+    monkeypatch.setenv("CROW_HOME", str(tmp_path))
+    local = tmp_path / "local"
+    local.mkdir()
+    config = local / "headless.json"
+    config.write_text('{"permission": "full"}')
+    assert crow_lib.permission("claude") == "full"
+    assert crow_lib.permission("codex") == "full"
+    config.write_text('{"permission": "invalid"}')
+    with pytest.raises(ValueError, match="permission must be"):
+        crow_lib.permission("claude")
