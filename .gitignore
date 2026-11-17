@@ -1,5 +1,6 @@
 # `local/` is its own private repo (private config and state), never part of this one.
 local/
+/local
 .claude/settings.local.json
 *.bak
 tools/crow-watch/crow-watch
@@ -18,3 +19,4 @@ vendor/
 tools/nest/node_modules/
 tools/nest/dist/
 tools/nest/*.tsbuildinfo
+.claude/skills/maj

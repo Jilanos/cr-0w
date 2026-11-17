@@ -1,0 +1,356 @@
+#!/usr/bin/env python3
+"""Render a pending-items Markdown file as a self-contained HTML dashboard.
+
+The Markdown stays the source of truth (humans and agents edit it). This script only
+renders it: one collapsible block per heading, one card per table row, status filters
+from the legend emojis, ages computed from the date column, links made clickable
+(Markdown links, URLs, `backticked/paths`), long cells folded with the full text on hover.
+
+usage: crow-board <file.md> [-o out.html] [--root-map LOCAL=URL ...] [--today DD/MM/YYYY]
+
+--root-map rewrites local path prefixes into links, e.g.
+  --root-map "WORK/=file://wsl.localhost/Ubuntu/home/me/dev/WORK/"
+Relative paths in a table are resolved against the nearest "Dossier : `path`" line above it.
+"""
+import argparse
+import datetime as dt
+import html
+import re
+import sys
+from pathlib import Path
+from urllib.parse import quote
+
+STATUS = {"🟢": ("go", "Go attendu"), "🟡": ("review", "Relecture"), "🔵": ("action", "Action"),
+          "⏸️": ("paused", "En pause"), "🔴": ("urgent", "Urgent"), "🟠": ("soon", "Bientôt")}
+DATE_RE = re.compile(r"\b(\d{2})/(\d{2})(?:/(\d{4}))?\b")
+MDLINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+URL_RE = re.compile(r"(?<![\"'=(])\bhttps?://[^\s<>|)]+")
+CODE_RE = re.compile(r"`([^`]+)`")
+BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+FOLD_AT = 180
+
+
+def parse_date(text, today):
+    m = DATE_RE.search(text or "")
+    if not m:
+        return None
+    d, mo, y = int(m.group(1)), int(m.group(2)), m.group(3)
+    year = int(y) if y else today.year
+    try:
+        date = dt.date(year, mo, d)
+    except ValueError:
+        return None
+    if not y and date > today + dt.timedelta(days=60):
+        date = date.replace(year=year - 1)
+    return date
+
+
+def workdays_between(a, b):
+    if a >= b:
+        return 0
+    days, cur = 0, a
+    while cur < b:
+        cur += dt.timedelta(days=1)
+        if cur.weekday() < 5:
+            days += 1
+    return days
+
+
+class Linker:
+    def __init__(self, root_map):
+        self.root_map = root_map
+        self.base = None
+
+    def path_url(self, p):
+        for local, url in self.root_map:
+            if p.startswith(local):
+                return url + quote(p[len(local):])
+        if self.base and "/" not in p.strip("/") and "." in p and " " not in p.strip():
+            return self.path_url(self.base.rstrip("/") + "/" + p)
+        if self.base and not p.startswith(("/", "http")) and "/" in p:
+            cand = self.base.rstrip("/") + "/" + p
+            for local, url in self.root_map:
+                if cand.startswith(local):
+                    return url + quote(cand[len(local):])
+        return None
+
+    def inline(self, text):
+        """Markdown inline → HTML. Escapes first, then re-inserts links via placeholders."""
+        slots = []
+
+        def keep(s):
+            slots.append(s)
+            return f"\x00{len(slots) - 1}\x00"
+
+        def mdlink(m):
+            return keep(f'<a href="{html.escape(m.group(2), quote=True)}" target="_blank" rel="noopener">'
+                        f'{html.escape(m.group(1))}</a>')
+
+        def code(m):
+            p = m.group(1)
+            url = self.path_url(p)
+            inner = f"<code>{html.escape(p)}</code>"
+            if url:
+                return keep(f'<a class="path" href="{html.escape(url, quote=True)}" title="Ouvrir {html.escape(p, quote=True)}">{inner}</a>')
+            return keep(inner)
+
+        def url(m):
+            u = m.group(0)
+            return keep(f'<a href="{html.escape(u, quote=True)}" target="_blank" rel="noopener">lien</a>')
+
+        text = MDLINK_RE.sub(mdlink, text)
+        text = CODE_RE.sub(code, text)
+        text = URL_RE.sub(url, text)
+        text = html.escape(text)
+        text = BOLD_RE.sub(r"<b>\1</b>", text)
+        return re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], text)
+
+
+def plain(text):
+    text = MDLINK_RE.sub(r"\1", text)
+    return CODE_RE.sub(r"\1", text).replace("**", "")
+
+
+def status_of(text):
+    for emo, (key, _) in STATUS.items():
+        if emo in text:
+            return key
+    return ""
+
+
+def split_row(line):
+    cells = line.strip().strip("|").split("|")
+    return [c.strip() for c in cells]
+
+
+def parse(md):
+    """Return (title, intro_lines, sections). Section = dict(level, title, blocks)."""
+    title, intro, sections, cur = "", [], [], None
+    lines = md.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("# ") and not title:
+            title = line[2:].strip()
+        elif line.startswith("## ") or line.startswith("### "):
+            level = 2 if line.startswith("## ") else 3
+            cur = {"level": level, "title": line.lstrip("#").strip(), "blocks": []}
+            sections.append(cur)
+        elif line.strip().startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|[\s:|-]+\|\s*$", lines[i + 1]):
+            header = split_row(line)
+            rows = []
+            i += 2
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                rows.append(split_row(lines[i]))
+                i += 1
+            (cur["blocks"] if cur else intro).append(("table", header, rows))
+            continue
+        elif line.strip().startswith("- "):
+            items = []
+            while i < len(lines) and lines[i].strip().startswith("- "):
+                items.append(lines[i].strip()[2:])
+                i += 1
+            (cur["blocks"] if cur else intro).append(("list", items))
+            continue
+        elif line.strip():
+            (cur["blocks"] if cur else intro).append(("para", line.strip()))
+        i += 1
+    return title, intro, sections
+
+
+def render_cell(text, linker, cls=""):
+    inner = linker.inline(text)
+    full = html.escape(plain(text), quote=True)
+    if len(plain(text)) > FOLD_AT:
+        short = linker.inline(plain(text)[:FOLD_AT].rsplit(" ", 1)[0] + " …")
+        return (f'<div class="cell fold {cls}" data-tip="{full}"><span class="short">{short}</span>'
+                f'<span class="long">{inner}</span><button class="more" type="button">plus</button></div>')
+    return f'<div class="cell {cls}" data-tip="{full}">{inner}</div>'
+
+
+def render_table(header, rows, linker, today):
+    hl = [h.lower() for h in header]
+    date_col = next((k for k, h in enumerate(hl) if h in ("depuis", "échéance", "date", "reçu")), None)
+    out = []
+    for r in rows:
+        r = r + [""] * (len(header) - len(r))
+        rowtext = " ".join(r)
+        st = status_of(rowtext)
+        age_html, age_cls, age_days = "", "", ""
+        if date_col is not None:
+            d = parse_date(r[date_col], today)
+            if d:
+                if hl[date_col] == "échéance":
+                    delta = (d - today).days
+                    age_cls = "late" if delta < 0 or "dépassée" in r[date_col] else ("due" if delta <= 1 else "")
+                    age_html = f'<span class="age {age_cls}" title="Échéance {d:%d/%m/%Y}">' + (
+                        f"J{delta:+d}" if delta else "aujourd'hui") + "</span>"
+                    age_days = str(-delta)
+                else:
+                    wd = workdays_between(d, today)
+                    age_cls = "late" if wd > 5 else ("due" if wd >= 3 else "")
+                    age_html = (f'<span class="age {age_cls}" title="Depuis le {d:%d/%m/%Y}, {wd} jour(s) ouvré(s)">'
+                                f"{wd} j</span>")
+                    age_days = str(wd)
+        cells, tags = [], []
+        for k, (h, c) in enumerate(zip(header, r)):
+            if k == date_col:
+                continue
+            if hl[k] not in ("sujet", "attendu") and len(plain(c)) <= 32:
+                tags.append(f'<span class="tag" title="{html.escape(h, quote=True)}">{linker.inline(c)}</span>')
+                continue
+            cells.append(f'<div class="field"><div class="label">{html.escape(h)}</div>{render_cell(c, linker)}</div>')
+        date_txt = html.escape(r[date_col]) if date_col is not None else ""
+        out.append(f'<article class="card st-{st or "none"} {age_cls}" data-status="{st}" data-age="{age_days}" '
+                   f'data-text="{html.escape(plain(rowtext).lower(), quote=True)}">'
+                   f'<div class="meta">{age_html}<span class="date">{date_txt}</span>{"".join(tags)}</div>{"".join(cells)}</article>')
+    return f'<div class="cards">{"".join(out)}</div>'
+
+
+def render_blocks(blocks, linker, today):
+    out = []
+    for b in blocks:
+        if b[0] == "table":
+            out.append(render_table(b[1], b[2], linker, today))
+        elif b[0] == "list":
+            items = "".join(
+                f'<li class="item st-{status_of(it) or "none"}" data-status="{status_of(it)}" '
+                f'data-text="{html.escape(plain(it).lower(), quote=True)}">{linker.inline(it)}</li>' for it in b[1])
+            out.append(f"<ul class=\"items\">{items}</ul>")
+        else:
+            m = re.match(r"^Dossier\s*:\s*`([^`]+)`", b[1])
+            if m:
+                linker.base = m.group(1)
+            out.append(f'<p class="para">{linker.inline(b[1])}</p>')
+    return "".join(out)
+
+
+CSS = """
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#16202c;--muted:#5d6b7a;--line:#dde3ea;--accent:#00366b;
+--go:#1f9d55;--review:#c99a06;--action:#2563eb;--paused:#8a94a3;--urgent:#d63a3a;--soon:#e07b13;
+--late:#d63a3a;--due:#e07b13;--tipbg:#16202c;--tipink:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f141a;--panel:#161d25;--ink:#e6edf3;
+--muted:#93a1b0;--line:#26313d;--accent:#7fb2ff;--tipbg:#e6edf3;--tipink:#0f141a}}
+:root[data-theme="dark"]{--bg:#0f141a;--panel:#161d25;--ink:#e6edf3;--muted:#93a1b0;--line:#26313d;--accent:#7fb2ff;
+--tipbg:#e6edf3;--tipink:#0f141a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 16px}
+h1{font-size:18px;margin:0 0 4px}.sub{color:var(--muted);font-size:12px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:3px 10px;
+cursor:pointer;font-size:12px}.chip[aria-pressed="true"]{background:var(--accent);color:var(--panel);border-color:var(--accent)}
+.chip b{margin-left:4px}input[type=search]{flex:1;min-width:160px;border:1px solid var(--line);border-radius:8px;
+padding:5px 10px;background:var(--bg);color:var(--ink)}
+main{max-width:1100px;margin:0 auto;padding:12px 16px 60px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:10px 0}
+details>summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;display:flex;gap:8px;align-items:center}
+details>summary::-webkit-details-marker{display:none}details>summary::before{content:"▸";color:var(--muted);transition:.15s}
+details[open]>summary::before{transform:rotate(90deg)}.count{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+.body{padding:0 14px 12px}details.l3{margin:8px 0;background:var(--bg)}details.l3>summary{font-size:13px}
+.cards{display:grid;gap:8px}.card{position:relative;border:1px solid var(--line);border-left:4px solid var(--line);
+border-radius:8px;padding:8px 10px;background:var(--panel);display:grid;grid-template-columns:1fr 1.4fr;gap:6px 14px}
+.card .meta{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.card.st-go{border-left-color:var(--go)}.card.st-review{border-left-color:var(--review)}.card.st-action{border-left-color:var(--action)}
+.card.st-paused{border-left-color:var(--paused);opacity:.75}.card.st-urgent{border-left-color:var(--urgent)}.card.st-soon{border-left-color:var(--soon)}
+.tag{color:var(--ink);font-weight:600}.label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.age{font-weight:600;padding:0 6px;border-radius:6px;background:var(--bg)}.age.late{color:#fff;background:var(--late)}
+.age.due{color:#fff;background:var(--due)}
+.cell{position:relative}.cell .long{display:none}.cell.open .long{display:inline}.cell.open .short{display:none}
+.more{border:0;background:none;color:var(--accent);cursor:pointer;padding:0 4px;font-size:12px}
+.cell.fold:hover::after{content:attr(data-tip);position:absolute;left:0;top:100%;z-index:9;width:min(560px,80vw);
+background:var(--tipbg);color:var(--tipink);padding:8px 10px;border-radius:8px;font-size:12px;white-space:normal;
+box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none}.cell.open:hover::after{display:none}
+a{color:var(--accent)}a.path code{text-decoration:underline}code{font:12px ui-monospace,Consolas,monospace;
+background:var(--bg);padding:1px 4px;border-radius:4px;word-break:break-all}
+.items{margin:0;padding-left:18px}.items li{margin:3px 0}.para{margin:6px 0;color:var(--muted)}
+.hidden{display:none!important}.theme{margin-left:auto}
+@media (max-width:700px){.card{grid-template-columns:1fr}}
+"""
+
+JS = """
+const q=document.querySelector('#q'),chips=[...document.querySelectorAll('.chip[data-f]')];
+let active=new Set();
+function apply(){const t=q.value.trim().toLowerCase();
+document.querySelectorAll('.card,.item').forEach(el=>{const okS=!active.size||active.has(el.dataset.status)||
+(active.has('late')&&el.classList.contains('late'));const okT=!t||el.dataset.text.includes(t);
+el.classList.toggle('hidden',!(okS&&okT))});
+document.querySelectorAll('details').forEach(d=>{const n=d.querySelectorAll('.card:not(.hidden),.item:not(.hidden)').length;
+const c=d.querySelector(':scope>summary .count');if(c)c.textContent=n;d.classList.toggle('hidden',(active.size||t)&&!n);
+if(active.size||t){if(n)d.open=true}});
+try{localStorage.setItem('board-f',JSON.stringify([...active]))}catch(e){}}
+chips.forEach(c=>c.addEventListener('click',()=>{const f=c.dataset.f;active.has(f)?active.delete(f):active.add(f);
+c.setAttribute('aria-pressed',active.has(f));apply()}));q.addEventListener('input',apply);
+document.querySelectorAll('.more').forEach(b=>b.addEventListener('click',e=>{const c=b.closest('.cell');
+c.classList.toggle('open');b.textContent=c.classList.contains('open')?'moins':'plus'}));
+document.querySelector('#all').addEventListener('click',()=>{const o=![...document.querySelectorAll('details')].every(d=>d.open);
+document.querySelectorAll('details').forEach(d=>d.open=o)});
+document.querySelector('.theme').addEventListener('click',()=>{const r=document.documentElement;
+const n=r.dataset.theme==='dark'?'light':'dark';r.dataset.theme=n;try{localStorage.setItem('board-theme',n)}catch(e){}});
+try{const th=localStorage.getItem('board-theme');if(th)document.documentElement.dataset.theme=th;
+JSON.parse(localStorage.getItem('board-f')||'[]').forEach(f=>{const c=chips.find(x=>x.dataset.f===f);
+if(c){active.add(f);c.setAttribute('aria-pressed','true')}})}catch(e){}
+apply();
+const ttl=parseInt(document.body.dataset.refresh||'0',10);if(ttl)setTimeout(()=>location.reload(),ttl*1000);
+"""
+
+
+def build(md, root_map, today, source_name, refresh):
+    title, intro, sections = parse(md)
+    linker = Linker(root_map)
+    counts = {}
+    for st in STATUS.values():
+        counts[st[0]] = 0
+    for emo, (key, _) in STATUS.items():
+        counts[key] = len(re.findall(r"^\|.*" + re.escape(emo), md, re.M)) + len(re.findall(r"^\s*- .*" + re.escape(emo), md, re.M))
+    body, open_l2 = [], False
+    for s in sections:
+        inner = render_blocks(s["blocks"], linker, today)
+        tl = linker.inline(s["title"])
+        closed = "⏸️" in s["title"] or "Réglé" in s["title"]
+        if s["level"] == 2:
+            if open_l2:
+                body.append("</div></details>")
+            body.append(f'<details class="l2"{"" if closed else " open"}><summary>{tl}<span class="count"></span></summary><div class="body">{inner}')
+            open_l2 = True
+        else:
+            body.append(f'<details class="l3" open><summary>{tl}<span class="count"></span></summary><div class="body">{inner}</div></details>')
+    if open_l2:
+        body.append("</div></details>")
+    intro_html = render_blocks(intro, linker, today)
+    chips = "".join(f'<button class="chip" type="button" data-f="{k}" aria-pressed="false">{e} {lbl}<b>{counts[k]}</b></button>'
+                    for e, (k, lbl) in STATUS.items() if counts[k])
+    chips += '<button class="chip" type="button" data-f="late" aria-pressed="false">⏰ En retard</button>'
+    gen = dt.datetime.now().strftime("%d/%m/%Y %H:%M")
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title or 'Tableau de bord')}</title>
+<style>{CSS}</style></head><body data-refresh="{refresh}">
+<header><h1>{html.escape(title or 'Tableau de bord')}</h1>
+<div class="sub">Généré le {gen} depuis {html.escape(source_name)} · âge en jours ouvrés · survol = texte complet</div>
+<div class="bar">{chips}<input id="q" type="search" placeholder="Filtrer (fournisseur, sujet…)">
+<button class="chip" id="all" type="button">Tout ouvrir / fermer</button><button class="chip theme" type="button">◐</button></div>
+</header><main>{intro_html}{''.join(body)}</main><script>{JS}</script></body></html>"""
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("md")
+    ap.add_argument("-o", "--out")
+    ap.add_argument("--root-map", action="append", default=[], help="LOCAL_PREFIX=URL_PREFIX")
+    ap.add_argument("--today", help="DD/MM/YYYY (tests)")
+    ap.add_argument("--refresh", type=int, default=300, help="auto-reload seconds, 0 = off")
+    a = ap.parse_args()
+    today = dt.datetime.strptime(a.today, "%d/%m/%Y").date() if a.today else dt.date.today()
+    root_map = []
+    for rm in a.root_map:
+        local, _, url = rm.partition("=")
+        root_map.append((local, url))
+    root_map.sort(key=lambda x: -len(x[0]))
+    src = Path(a.md)
+    out = Path(a.out) if a.out else src.with_suffix(".html")
+    out.write_text(build(src.read_text(encoding="utf-8"), root_map, today, src.name, a.refresh), encoding="utf-8")
+    print(out)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

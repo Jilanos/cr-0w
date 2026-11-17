@@ -1,0 +1,11 @@
+{
+  "pending_md": "/path/to/work/pending.md",
+  "board_root_map": ["WORK/=file:///path/to/work/"],
+  "staging_dir": "/path/to/attachments",
+  "drafts_dir": "/path/to/drafts",
+  "account": "main",
+  "model": "sonnet",
+  "first_run_lookback_hours": 72,
+  "staging_root_map": "attachments/=file:///path/to/attachments/",
+  "pj_relay_dir": "/path/to/relay"
+}
