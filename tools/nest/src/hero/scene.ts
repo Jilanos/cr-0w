@@ -12,13 +12,15 @@ export interface Heads { palette: string[]; moods: Record<string, { cols: number
 export interface Palette { ring: RGB; dim: RGB; fg: RGB; accent: RGB; state: Record<UiState, RGB>; quiet?: RGB }
 // cx, cy, rad: projected planet disc for hit tests. a0: table angle without spin. back: behind the lens.
 export interface PlanetLabel {
-  x: number; y: number; name: string; state: UiState; side: 'l' | 'r' | 'c'; note?: string; target?: boolean
+  x: number; y: number; name: string; state: UiState; side: 'l' | 'r' | 'c' | 'f'; note?: string; target?: boolean
   cx: number; cy: number; rad: number; a0: number; back: boolean; hidden?: boolean
+  // fx, fy: the planet's foot on the table (lit table only).
+  fx?: number; fy?: number
 }
 export interface MoonOut { x: number; y: number; r: number; id: string; title: string; state: UiState; member?: boolean }
 // cw/ch/font: one head cell in CSS px (the live GL head draws on the same grid). hw/hh: head size.
 export interface HeadBox { x: number; y: number; top: number; left: number; right: number; cw: number; ch: number; font: number; hw: number; hh: number }
-export interface SceneOut { planets: PlanetLabel[]; head: HeadBox; lens: { x: number; y: number }; moons: MoonOut[]; more?: { x: number; y: number; n: number } }
+export interface SceneOut { table?: boolean; planets: PlanetLabel[]; head: HeadBox; lens: { x: number; y: number }; moons: MoonOut[]; more?: { x: number; y: number; n: number } }
 // spin: degrees added to every planet angle (item_158). hover: lifted planet and its moons.
 // look: head turn override (-1 left, 1 right, 0 front). lean: head tilt in degrees.
 // pulse: 0..1 working pulse phase. lift: needs-you lift per project (0..1 of 4 px).
@@ -479,7 +481,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
 
   const gaps = new Map<PlanetLabel, number>(), depths = new Map<PlanetLabel, number>()
   const out: SceneOut = {
-    planets: [], head, lens: { x: lens.x, y: lens.y },
+    table: T, planets: [], head, lens: { x: lens.x, y: lens.y },
     moons: moons.map((o) => { const s = cam.proj(o.c); return { x: s.x, y: s.y, r: Math.max(6, (o.r * cam.focal) / s.z), id: o.id, title: o.title, state: o.state, member: o.member } }),
     more: more && { ...cam.proj(more.c), n: more.n },
   }
@@ -494,12 +496,13 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const label: PlanetLabel = {
       x: s.x + (side === 'r' ? rad + 8 : -rad - 8), y: s.y, name: p.name, state: p.state, side, note, target: p === target,
       cx: s.x, cy: s.y, rad: Math.max(rad, 10), a0: p.a0, back: p.back && p.hk === 0,
+      ...(T ? (({ x, y }) => ({ fx: x, fy: y }))(cam.proj(p.base)) : {}),
     }
     out.planets.push(label)
     gaps.set(label, rad + 8)
     depths.set(label, p.depth)
   }
-  // Lit table (item_217): few labels. Phone: the front planet only, centred above it. Laptop: the 3 most urgent.
+  // Lit table (item_217): few labels. Phone: the front planet only. Laptop: the 3 most urgent.
   const shown = new Set(out.planets)
   if (T) {
     const RANK: Partial<Record<UiState, number>> = { failed: 0, needs: 1, working: 2 }
@@ -507,7 +510,8 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const pick = phone ? [...out.planets].sort((a, b) => dp(a) - dp(b)).slice(0, 1)
       : [...out.planets].sort((a, b) => rk(a) - rk(b) || dp(a) - dp(b)).slice(0, 3)
     shown.clear(); for (const l of pick) shown.add(l)
-    if (phone) for (const l of pick) Object.assign(l, { side: 'c', x: l.cx, y: l.cy - l.rad - 6 })
+    // Pick B: the name sits on the table, centred under the planet's hex foot (clear of the head).
+    for (const l of pick) Object.assign(l, { side: 'f', x: l.fx, y: l.fy! + 8 })
   }
   // Nudge planet labels apart (approximate text boxes), keep tags clear of the head.
   type Box = { x0: number; x1: number; y0: number; y1: number; own?: string }
@@ -517,7 +521,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const c = cam.proj(p.c), rr = (p.r * cam.focal) / c.z
     boxes.push({ x0: c.x - rr, x1: c.x + rr, y0: c.y - rr, y1: c.y + rr, own: p.name })
   }
-  for (const l of [...shown].filter((l) => l.side !== 'c').sort((a, b) => a.y - b.y)) {
+  for (const l of [...shown].filter((l) => l.side === 'l' || l.side === 'r').sort((a, b) => a.y - b.y)) {
     const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2
     const span = () => (l.side === 'r' ? [l.x, l.x + tw] : [l.x - tw, l.x])
     const hit = (y: number) => { const [x0, x1] = span(); return boxes.some((b) => b.own !== l.name && b.y0 < y + 8 && b.y1 > y - 8 && b.x0 < x1 && x0 < b.x1) }
@@ -538,7 +542,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   const inHead = (x: number, y: number) => x > head.left + 20 && x < head.right - 20 && y > head.top && y < 2 * head.y - head.top
   // Readability (item_158): back labels hide (YOUR MOVE tags stay); nothing sits under the head.
   for (const l of out.planets) {
-    const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2, x0 = l.side === 'r' ? l.x : l.side === 'c' ? l.x - tw / 2 : l.x - tw
+    const tw = (l.name.length + (l.note ? l.note.length + 3 : 0)) * 7.2, x0 = l.side === 'r' ? l.x : l.side === 'c' || l.side === 'f' ? l.x - tw / 2 : l.x - tw
     l.hidden = !shown.has(l) || (!T && l.back) || inHead(x0, l.y) || inHead(x0 + tw, l.y) || inHead(x0 + tw / 2, l.y)
   }
   return out

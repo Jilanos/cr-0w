@@ -434,7 +434,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     if (!box.current || !out) return
     const disc = (x: number, y: number, r: number): Box => ({ x: x - r, y: y - r, w: 2 * r, h: 2 * r })
     const head: Box = { x: out.head.left + 30, y: out.head.top, w: Math.max(0, out.head.right - out.head.left - 60), h: 2 * (out.head.y - out.head.top) }
-    const root = box.current, obs = [head, ...out.planets.map((p) => p.hidden ? disc(-99, -99, 0) : disc(p.cx, p.cy, p.rad)), ...out.moons.map((o) => disc(o.x, o.y, o.r + 6))]
+    const root = box.current, obs = [head, ...out.planets.map((p) => p.hidden && !out.table ? disc(-99, -99, 0) : disc(p.cx, p.cy, p.rad)), ...out.moons.map((o) => disc(o.x, o.y, o.r + 6))]
     declutterDom(root, obs)
     // Web fonts change label widths: measure again once they are in.
     let on = true
