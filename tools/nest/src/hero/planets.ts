@@ -180,15 +180,23 @@ export function castPlanets(cam: Cast, cols: number, rows: number, cw: number, c
         const t2 = hitSphere(cam.pos, d, m.c, m.r)
         if (t2 > 0 && t2 < best) {
           best = t2; solid = false
-          // Full state colour with a bright '@' rim so the session state reads at table size.
+          // Solid state colour (dense glyphs, no white wash) with a bright '@' rim, so the session
+          // state reads at table size against a planet of the same hue.
           const n = norm(sub(add(cam.pos, mul(d, t2)), m.c)), L = clamp(Math.max(0, dot(n, LIGHT)) * 0.9 + 0.1, 0, 1)
-          o = Math.abs(dot(n, d)) < 0.4 ? ['@', mix(m.col, WHITE, 0.45), 1] : [RAMP[clamp(Math.floor(L * 12), 0, 11)], mix(m.col, WHITE, L * 0.4), 0.7 + 0.3 * L]
+          o = Math.abs(dot(n, d)) < 0.4 ? ['@', mix(m.col, WHITE, 0.3), 1] : [RAMP[clamp(Math.floor((0.55 + 0.45 * L) * 12), 0, 11)], mix(DARK, m.col, 0.6 + 0.4 * L), 0.85 + 0.15 * L]
         }
       }
       if (o) {
         const [ch, cc, a] = out(o)
         put(col, row, best * dot(d, cam.f), ch, cc, a, solid ? (0.14 + 0.16 * a) * fade : 0)
-      } else if (p.sel) {
+      } else if (p.moons.length) {
+        // Dark margin round each moon so the table lines behind stay off its edge.
+        for (const m of p.moons) {
+          const oc = sub(m.c, cam.pos), tc = dot(oc, d), dd = Math.sqrt(Math.max(0, dot(oc, oc) - tc * tc))
+          if (dd < m.r * 1.35) { put(col, row, dot(oc, cam.f) - m.r, ' ', [0, 0, 0], 0, 0); break }
+        }
+      }
+      if (!o && p.sel) {
         // Cut-out margin round the selected planet so table lines stay out.
         const oc = sub(p.c, cam.pos), tc = dot(oc, d), dd = Math.sqrt(Math.max(0, dot(oc, oc) - tc * tc))
         if (dd < p.r * 1.12) put(col, row, dot(oc, cam.f) - p.r, ' ', [0, 0, 0], 0, 0)

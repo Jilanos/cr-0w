@@ -57,20 +57,23 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
   const ags = p.members || p.hk > 0 ? [] : p.agents.slice(0, 3)
   const moons = ags.map((a, i) => {
     const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28
-    return { c: moonAt(p, t), r: p.r * 0.32, col: SC[a.state], t }
+    return { c: moonAt(p, t), r: p.r * 0.5, col: SC[a.state], t }
   })
   return {
     c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
     ring: p.state === 'working' ? { phase: -tt * 0.0008 } : undefined, moons, sel: p.hk > 0, quiet, glow, fade,
   }
 }
-const moonAt = (p: { c: V3; r: number }, t: number) => { const R = p.r * 1.55; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
-// Orbit trail behind each session moon in its state colour, fading out over ~70 degrees.
+const moonAt = (p: { c: V3; r: number }, t: number, k = 1) => { const R = p.r * 1.9 * k; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
+// Orbit trail behind each session moon in its state colour, fading out over ~85 degrees, wider near the moon.
 function moonTrails(g: Grid, cam: Cam, b: Body) {
   const f = b.fade ?? 1
-  for (const m of b.moons) for (let k = 0; k < 40; k++) {
-    const q = k / 40
-    splat(g, cam, moonAt(b, m.t! - 1.2 * (1 - q)), q > 0.6 ? ':' : '.', m.col, (0.3 + 0.7 * q) * Math.max(0.4, f))
+  for (const m of b.moons) for (let k = 0; k < 60; k++) {
+    const q = k / 60
+    const a = (0.55 + 0.45 * q) * Math.max(0.7, f), t = m.t! - 1.5 * (1 - q)
+    // Comet glyphs (no '-' or '=', which the table already uses), denser toward the moon.
+    splat(g, cam, moonAt(b, t), q > 0.7 ? '*' : q > 0.35 ? '+' : '.', mix(m.col, WHITE, 0.25 * q), a, 0.1)
+    if (q > 0.5) { splat(g, cam, moonAt(b, t, 0.95), '+', m.col, a * 0.8, 0.1); splat(g, cam, moonAt(b, t, 1.05), '+', m.col, a * 0.8, 0.1) }
   }
 }
 const rampCh = (L: number) => RAMP[clamp(Math.floor(L * 12), 0, 11)]
@@ -122,6 +125,13 @@ function ringOnPlane(g: Grid, cam: Cam, c: V3, R: number, ch: string, col: RGB, 
   for (let t = 0; t < Math.PI * 2; t += step) {
     if (dash && Math.floor((t + phase) / dash) % 2) continue
     splat(g, cam, add(c, V(R * Math.cos(t), 0, R * Math.sin(t))), ch, col, a)
+  }
+}
+// Hex outline on the table plane, same orientation as the etched grid (turned with the table).
+function hexOnPlane(g: Grid, cam: Cam, c: V3, e: number, spin: number, ch: string, col: RGB, a = 1, dt = 0.05) {
+  for (let s = 0; s < 6; s++) {
+    const a0 = (s * Math.PI) / 3, a1 = a0 + Math.PI / 3
+    for (let t = 0; t < 1; t += dt) splat(g, cam, add(c, rotY(V(e * ((1 - t) * Math.cos(a0) + t * Math.cos(a1)), 0, e * ((1 - t) * Math.sin(a0) + t * Math.sin(a1))), spin)), ch, col, a)
   }
 }
 function octa(g: Grid, cam: Cam, c: V3, s: number, col: RGB, gain = 1) {
@@ -300,8 +310,9 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     // Failed: one short sideways glitch.
     const gl = opts.glitch?.[p.name] ?? 0
     if (gl > 0) base = add(base, V((Math.random() - 0.5) * 0.5 * gl, 0, 0))
-    // Lit table: size by planet type, bigger on a phone where one label leaves room (owner 2026-11-17).
-    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.45 : 1.3) * (1 - 0.15 * depth) : SIZE[p.state] * (1 - 0.25 * depth)
+    // Lit table: size by planet type, bigger on a phone where one label leaves room; back planets grow
+    // to offset perspective so they stay readable (owner 2026-11-17).
+    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.45 : 1.3) * (1 + 0.3 * depth) : SIZE[p.state] * (1 - 0.25 * depth)
     const z0 = cam.proj(base).z, px = z0 / cam.focal
     const hk = hov?.name === p.name ? hov.k : 0
     const stalk = ALT[p.state] + (p.state === 'needs' ? 0.18 * Math.min((p.wait ?? 0) / 300, 1) : 0)
@@ -336,9 +347,11 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     if (T) {
       // C2 foot: a dim filled shadow with a bright outline, a thin stem (broken when failed), a radar blip.
       const back = 1 - 0.45 * p.depth
-      for (let rr = 0.05; rr < p.r * 1.05; rr += 0.05) ringOnPlane(g, cam, flat, rr, '.', mix(col, DARK, 0.4), 0.32 * back, 0.02 / Math.max(rr, 0.2))
-      ringOnPlane(g, cam, flat, p.r * 1.1, '-', mix(col, WHITE, 0.3), 0.9 * back, 0.01 / p.r)
-      if (p.state === 'needs') ringOnPlane(g, cam, flat, p.r * 1.7, '-', col, 0.45 * back, 0.008 / p.r)
+      // The planet's hex cell lights up: filled shadow, bright edge; needs adds a dashed outer hex.
+      const E = HSZ * 0.97
+      for (let e = 0.05; e < E * 0.9; e += 0.05) hexOnPlane(g, cam, flat, e, spin, '.', mix(col, DARK, 0.4), 0.32 * back, 0.02 / e)
+      hexOnPlane(g, cam, flat, E, spin, '=', mix(col, WHITE, 0.3), 0.9 * back, 0.012)
+      if (p.state === 'needs') hexOnPlane(g, cam, flat, E * 1.3, spin, '-', col, 0.45 * back, 0.04)
       for (let y = 0.05; y < p.stalk; y += 0.045) {
         const u = y / p.stalk
         if (p.state === 'failed' && ((u > 0.3 && u < 0.4) || (u > 0.6 && u < 0.68))) continue
