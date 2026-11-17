@@ -1,10 +1,10 @@
 ## item_217_nest_holotable_board_build_behind_the_table_flag - Nest holotable board build behind the table flag
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 60%
-> Confidence: 60%
-> Progress: 0%
+> Status: In progress
+> Understanding: 90%
+> Confidence: 85%
+> Progress: 85%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -40,3 +40,16 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Outcome
+- item_215 picked one board, C2 (hex grid plus radar centre), so `?table=a` and `?table=b` show the same board for now.
+- 1df192a: C2 board in `scene.ts` behind the flag: hex grid, radar centre and sweep, per-planet blip, type sizes, labels (phone 1, laptop 3).
+- 973e41a, a9645a7: hex feet (filled cell, bright edge, dashed outer hex on needs, stem broken on failed) replace the round shadows. Planets sized per type (`TSIZE`, x1.8 laptop, x1.75 phone) and still shrink toward the back.
+- b2262f1, a9645a7: session moons, owner pick B (round 2): 0.4r moons, each on its own dotted orbit lane, pale '@' rim, dark gap against the planet, short comet trail. Moons get no hex marker (owner rule: keeps the board clear).
+- 331a733: labels, owner pick B: the name sits on the table, centred under the planet's hex foot, on laptop and phone (above the planet the head hid it on phone). Every drawn planet and session moon blocks labels in the declutter pass, labelled or not.
+- Compare pages and real-app shots: vault `Research/nest-design/item_217/` (`moons/`, `labels/`).
+
+## Acceptance
+- AC1: done for C2 on both flags. No flag stays pixel-identical (`scripts/hero-table.mjs hash`, 1440x900, 707x691, 368x812) after every commit above.
+- AC2: state colour, priority stalk height, needs outer hex, failed broken stem, radar blip and labels 1/3 checked on real-data shots with injected sessions. Hover, select and the ping beam not re-checked by hand since the board landed. tsc clean, vitest 200 passed.
+- AC3: open. Owner OK'd moons (B) and labels (B) on 2026-11-17; a final OK on the whole board is pending.
