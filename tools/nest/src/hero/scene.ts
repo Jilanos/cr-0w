@@ -60,19 +60,22 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
   const moons = ags.map((a, i) => {
     const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28
     const o = 1 + 0.32 * i // own orbit lane per moon
-    return { c: moonAt(p, t, o), r: p.r * 0.4, col: SC[a.state], t, o }
+    return { c: moonAt(p, t, o), r: moonR(p), col: SC[a.state], t, o }
   })
   return {
     c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
     ring: p.state === 'working' ? { phase: -tt * 0.0008 } : undefined, moons, sel: p.hk > 0, quiet, glow, fade,
   }
 }
+// Moon size (moons B, 0.4r) capped at a mid planet, so big planets keep small moons.
+const moonR = (p: { r: number }) => Math.min(p.r, 0.5) * 0.4
 const moonAt = (p: { c: V3; r: number }, t: number, k = 1) => { const R = p.r * 2.25 * k; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
 // Each session moon on its own dotted orbit, with a short comet trail behind it in its state
 // colour (no '-', '=' or ':', which the table already uses), a three-strand ribbon near the moon.
 function moonTrails(g: Grid, cam: Cam, b: Body) {
   const f = Math.max(0.8, b.fade ?? 1)
   for (const m of b.moons) {
+    if (m.t === undefined) continue // hover mission moons: no orbit or trail
     for (let t = 0; t < 6.28; t += 0.035) splat(g, cam, moonAt(b, m.t! + t, m.o), '.', m.col, 0.45 * f, 0.1)
     for (let k = 0; k < 110; k++) {
       const q = k / 110, t = m.t! - 1.6 * (1 - q), a = (0.45 + 0.55 * q) * f
@@ -410,7 +413,10 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
       const c = add(hp.c, V(R * Math.cos(t), R * 0.55 * Math.sin(t), R * 0.8 * Math.sin(t)))
       const r = 0.21 * hp.hk
       moons.push({ c, r, id: mi.id, title: mi.title, state: mi.state })
-      spheres.push({ c, r, col: SC[mi.state], emit: 0.3, dimf: hp.hk })
+      // Lit table: mission moons share the session moon look (item_217 moons B).
+      const hb = opts.table ? bodies.find((b) => b.c === hp.c) : undefined
+      if (hb) hb.moons.push({ c, r, col: SC[mi.state] })
+      else spheres.push({ c, r, col: SC[mi.state], emit: 0.3, dimf: hp.hk })
     })
     if (!hp.members && hp.missions.length > 6) more = { c: add(hp.c, V(0, hp.r + 0.25, 0)), n: hp.missions.length - 6 }
   }
@@ -420,13 +426,18 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   for (const p of ps) {
     if (!p.members) continue
     const R = (p.r * 2.3 + 0.12) * (1 + 0.4 * p.hk), fade = (p.hk > 0 ? 1 : dimOthers) * (1 - 0.55 * p.depth)
+    // Lit table: members are moons B on one shared dotted lane, with the comet trail.
+    const mb = opts.table ? bodies.find((b) => b.c === p.c) : undefined
     p.members.forEach((q, i) => {
       const t = (i / p.members!.length) * Math.PI * 2 + tt * 0.0002 + 0.4
-      const c = add(p.c, V(R * Math.cos(t), R * 0.5 * Math.sin(t), R * 0.8 * Math.sin(t)))
+      const o = 1 + 0.4 * p.hk
+      const c = mb ? moonAt(p, t, o) : add(p.c, V(R * Math.cos(t), R * 0.5 * Math.sin(t), R * 0.8 * Math.sin(t)))
       const quiet = q.state === 'sleeping' || q.state === 'queued'
-      spheres.push({ c, r: 0.1 + 0.04 * p.hk, col: quiet ? qgrey : SC[q.state], emit: quiet ? 0.12 : 0.35, dimf: (quiet ? 0.6 : 1) * fade })
-      if (p.hk > 0) moons.push({ c, r: 0.1 + 0.04 * p.hk, id: 'm:' + q.name, title: q.label ?? q.name, state: q.state, member: true })
+      if (mb) mb.moons.push({ c, r: moonR(p), col: quiet ? qgrey : SC[q.state], t, o })
+      else spheres.push({ c, r: 0.1 + 0.04 * p.hk, col: quiet ? qgrey : SC[q.state], emit: quiet ? 0.12 : 0.35, dimf: (quiet ? 0.6 : 1) * fade })
+      if (p.hk > 0) moons.push({ c, r: mb ? moonR(p) : 0.1 + 0.04 * p.hk, id: 'm:' + q.name, title: q.label ?? q.name, state: q.state, member: true })
     })
+    if (mb) moonTrails(g, cam, { ...mb, moons: mb.moons.filter((m) => m.t !== undefined) })
   }
   raySpheres(g, cam, spheres)
   if (bodies.length) castPlanets(cam, g.cols, g.rows, CW, CH, bodies, (c, r, z, ch, col, a, bg) => put(g, c, r, z, ch, col, a, bg))
