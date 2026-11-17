@@ -110,7 +110,8 @@ export function shadePlanet(kind: Planet, P: ShadeIn, n: V3, ln: V3, view: V3, s
 }
 
 export interface Cast { pos: V3; f: V3; focal: number; proj(p: V3): { x: number; y: number; z: number }; ray(sx: number, sy: number): V3 }
-export interface Moon { c: V3; r: number; col: RGB; t?: number; o?: number } // t: orbit angle (trail), o: orbit lane scale
+// t: orbit angle, R: orbit radius, ty: orbit y tilt, tl: trail length (rad). With t set the moon draws its orbit and trail.
+export interface Moon { c: V3; r: number; col: RGB; t?: number; R?: number; ty?: number; tl?: number }
 // spin: surface turn in radians. ring.phase: angle of the bright arc on the run ring.
 // fade: depth and hover dimming (1 = full), floored at A_MIN.
 export interface Body {

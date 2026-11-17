@@ -23,7 +23,12 @@ export interface HeroProject {
   quiet?: boolean
   // A system planet (item_200): its registered projects, most urgent first. label = short name.
   members?: HeroProject[]; label?: string
+  // Open asks not already shown by a waiting mission (they make the planet gold).
+  asks?: HeroMission[]
 }
+// What orbits a hovered planet: asks, live sessions and open missions, most urgent first.
+export const moonsOf = (p: HeroProject): HeroMission[] =>
+  [...(p.asks ?? []), ...p.agents.map((a) => ({ id: 'a:' + a.pid, title: a.title, state: a.state })), ...p.missions].sort((a, b) => RANK[a.state] - RANK[b.state])
 
 // Planet type by project kind (item_214): work scope -> bands, tool -> rock, world -> terrain,
 // notes -> ice. A valid planet: override wins; anything else is rock.
@@ -150,9 +155,11 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
     const since = asked(name).sort()[0]
     const runFrom = [...open.map((m) => m.started), ...ags.filter((x) => x.h.state === 'working').map((x) => x.from)].filter((x): x is string => !!x).sort()[0]
     const failed = open.find((m) => m.state === 'failed')
+    const asks = openInbox(inbox).filter((r) => r.project === name && r.type !== 'fyi' && !ms.some((m) => m.id === r.mission && m.state === 'needs'))
+      .map((r): HeroMission => ({ id: 'ask:' + r.id, title: r.ask, state: 'needs' }))
     return {
       name, planet: planetOf(reg.get(name)), state, live: PRANK[state] <= PRANK.working, missions: open, agents: ags.map((x) => x.h), open: open.length + ags.length,
-      wait: state === 'needs' && since ? mins(since) : undefined, runFrom, cause: failed?.title, ...(quiet ? { quiet: true } : {}),
+      wait: state === 'needs' && since ? mins(since) : undefined, runFrom, cause: failed?.title, ...(quiet ? { quiet: true } : {}), ...(asks.length ? { asks } : {}),
     }
   })
   // Systems (item_200): related projects share one planet, members orbit it as moons.
@@ -167,7 +174,7 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
     const waits = mem.map((x) => x.wait).filter((x): x is number => x !== undefined)
     const runs = mem.map((x) => x.runFrom).filter((x): x is string => !!x).sort()
     return {
-      name, planet: top.planet, state: top.state, live: mem.some((x) => x.live), missions: mem.flatMap((x) => x.missions), agents: mem.flatMap((x) => x.agents),
+      name, planet: top.planet, state: top.state, live: mem.some((x) => x.live), missions: mem.flatMap((x) => x.missions), agents: mem.flatMap((x) => x.agents), ...(mem.some((x) => x.asks) ? { asks: mem.flatMap((x) => x.asks ?? []) } : {}),
       open: mem.reduce((n, x) => n + x.open, 0), wait: waits.length ? Math.max(...waits) : undefined, runFrom: runs[0],
       cause: mem.find((x) => x.cause)?.cause, ...(mem.every((x) => x.quiet) ? { quiet: true } : {}), members: mem,
     }

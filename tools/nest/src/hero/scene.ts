@@ -1,5 +1,5 @@
 import type { UiState } from '../data/state'
-import type { HeroModel, HeroProject } from './model'
+import { moonsOf, type HeroModel, type HeroProject } from './model'
 import { elapsed } from '../format'
 import { castPlanets, type Body } from './planets'
 import { add, clamp, cross, dot, LIGHT, mix, mul, norm, sub, V, type RGB, type V3 } from './vec'
@@ -59,8 +59,8 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
   const ags = p.members || p.hk > 0 ? [] : p.agents.slice(0, 3)
   const moons = ags.map((a, i) => {
     const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28
-    const o = 1 + 0.32 * i // own orbit lane per moon
-    return { c: moonAt(p, t, o), r: moonR(p), col: SC[a.state], t, o }
+    const R = laneR(p, i) // own orbit lane per moon
+    return { c: orbitAt(p.c, R, 0.35, t), r: moonR(p), col: SC[a.state], t, R, ty: 0.35 }
   })
   return {
     c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
@@ -69,18 +69,22 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
 }
 // Moon size (moons B, 0.4r) capped at a mid planet, so big planets keep small moons.
 const moonR = (p: { r: number }) => Math.min(p.r, 0.5) * 0.4
-const moonAt = (p: { c: V3; r: number }, t: number, k = 1) => { const R = p.r * 2.25 * k; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
+// Lanes grow with the planet but less than it does, so big planets keep tight orbits.
+const laneR = (p: { r: number }, i: number) => p.r * 1.3 + 0.35 + 0.16 * i
+const orbitAt = (c: V3, R: number, ty: number, t: number) => add(c, V(R * Math.cos(t), R * ty * Math.sin(t), R * 0.8 * Math.sin(t)))
 // Each session moon on its own dotted orbit, with a short comet trail behind it in its state
 // colour (no '-', '=' or ':', which the table already uses), a three-strand ribbon near the moon.
 function moonTrails(g: Grid, cam: Cam, b: Body) {
   const f = Math.max(0.8, b.fade ?? 1)
+  const drawn = new Set<string>() // moons sharing a lane draw it once
   for (const m of b.moons) {
-    if (m.t === undefined) continue // hover mission moons: no orbit or trail
-    for (let t = 0; t < 6.28; t += 0.035) splat(g, cam, moonAt(b, m.t! + t, m.o), '.', m.col, 0.45 * f, 0.1)
+    if (m.t === undefined || m.R === undefined) continue
+    const R = m.R, ty = m.ty ?? 0.35, tl = m.tl ?? 1.6, key = R.toFixed(3) + ty
+    if (!drawn.has(key)) { drawn.add(key); for (let t = 0; t < 6.28; t += 0.035) splat(g, cam, orbitAt(b.c, R, ty, t), '.', m.col, 0.45 * f, 0.1) }
     for (let k = 0; k < 110; k++) {
-      const q = k / 110, t = m.t! - 1.6 * (1 - q), a = (0.45 + 0.55 * q) * f
+      const q = k / 110, t = m.t - tl * (1 - q), a = (0.45 + 0.55 * q) * f
       ;[0, 0.07, -0.07].forEach((w, i) => {
-        if (i === 0 || q > 0.3 + 0.15 * i) splat(g, cam, moonAt(b, t, m.o! * (1 + w * q)), i ? '+' : q > 0.75 ? '@' : q > 0.4 ? '*' : '.', i ? m.col : mix(m.col, WHITE, 0.2 + 0.4 * q), i ? a * 0.8 : a, 0.1)
+        if (i === 0 || q > 0.3 + 0.15 * i) splat(g, cam, orbitAt(b.c, R * (1 + w * q), ty, t), i ? '+' : q > 0.75 ? '@' : q > 0.4 ? '*' : '.', i ? m.col : mix(m.col, WHITE, 0.2 + 0.4 * q), i ? a * 0.8 : a, 0.1)
       })
     }
   }
@@ -407,7 +411,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
   if (hp) {
     // Moons fly out as the hover eases in, leaving room for their titles. The orbit is
     // tilted toward the camera so the titles spread vertically instead of stacking.
-    const list = hp.members ? [] : hp.missions.slice(0, 6), R = (Math.max(hp.r, 0.2) * 1.9 + 0.12) * (1 + 0.5 * hp.hk)
+    const all = hp.members ? [] : moonsOf(hp), list = all.slice(0, 6), R = laneR(hp, 0) * (1 + 0.5 * hp.hk)
     list.forEach((mi, i) => {
       const t = (i / Math.max(list.length, 1)) * Math.PI * 2 + spin * D2R * 0.5 + 0.4
       const c = add(hp.c, V(R * Math.cos(t), R * 0.55 * Math.sin(t), R * 0.8 * Math.sin(t)))
@@ -415,10 +419,13 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
       moons.push({ c, r, id: mi.id, title: mi.title, state: mi.state })
       // Lit table: mission moons share the session moon look (item_217 moons B).
       const hb = opts.table ? bodies.find((b) => b.c === hp.c) : undefined
-      if (hb) hb.moons.push({ c, r, col: SC[mi.state] })
+      // One shared lane; the trail stops short of the moon ahead.
+      if (hb) hb.moons.push({ c, r: Math.min(r, moonR(hp)), col: SC[mi.state], t, R, ty: 0.55, tl: Math.min(1.6, (Math.PI * 2 / list.length) * 0.6) })
       else spheres.push({ c, r, col: SC[mi.state], emit: 0.3, dimf: hp.hk })
     })
-    if (!hp.members && hp.missions.length > 6) more = { c: add(hp.c, V(0, hp.r + 0.25, 0)), n: hp.missions.length - 6 }
+    const hb = opts.table ? bodies.find((b) => b.c === hp.c) : undefined
+    if (hb) moonTrails(g, cam, { ...hb, moons: hb.moons.filter((m) => m.ty === 0.55) })
+    if (all.length > 6) more = { c: add(hp.c, V(0, hp.r + 0.25, 0)), n: all.length - 6 }
   }
   // System members (item_200 pick B): small moons always orbit their system planet, grey when
   // quiet. Hovering the planet spreads them out and names them (no state glyph).
@@ -430,10 +437,10 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const mb = opts.table ? bodies.find((b) => b.c === p.c) : undefined
     p.members.forEach((q, i) => {
       const t = (i / p.members!.length) * Math.PI * 2 + tt * 0.0002 + 0.4
-      const o = 1 + 0.4 * p.hk
-      const c = mb ? moonAt(p, t, o) : add(p.c, V(R * Math.cos(t), R * 0.5 * Math.sin(t), R * 0.8 * Math.sin(t)))
+      const RL = laneR(p, 0) * (1 + 0.4 * p.hk)
+      const c = mb ? orbitAt(p.c, RL, 0.35, t) : add(p.c, V(R * Math.cos(t), R * 0.5 * Math.sin(t), R * 0.8 * Math.sin(t)))
       const quiet = q.state === 'sleeping' || q.state === 'queued'
-      if (mb) mb.moons.push({ c, r: moonR(p), col: quiet ? qgrey : SC[q.state], t, o })
+      if (mb) mb.moons.push({ c, r: moonR(p), col: quiet ? qgrey : SC[q.state], t, R: RL, ty: 0.35, tl: Math.min(1.6, (Math.PI * 2 / p.members!.length) * 0.6) })
       else spheres.push({ c, r: 0.1 + 0.04 * p.hk, col: quiet ? qgrey : SC[q.state], emit: quiet ? 0.12 : 0.35, dimf: (quiet ? 0.6 : 1) * fade })
       if (p.hk > 0) moons.push({ c, r: mb ? moonR(p) : 0.1 + 0.04 * p.hk, id: 'm:' + q.name, title: q.label ?? q.name, state: q.state, member: true })
     })
