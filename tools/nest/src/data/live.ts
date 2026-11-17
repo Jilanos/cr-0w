@@ -148,7 +148,7 @@ export const accountsOf = (b: SectionBody | undefined) => list<Account>(obj(b).a
 // system groups related projects into one planet (default: the project itself); nest: false keeps it off the hero.
 // scope is the registry scope (work or personal); empty or absent when the entry has none.
 // nest_scope (work, personal or both) is the Nest filter scope; the registry fills it from scope when unset.
-export interface RegProject { name: string; path?: string; status?: string; short?: string; system?: string; nest?: boolean; scope?: string; nest_scope?: string }
+export interface RegProject { name: string; path?: string; status?: string; short?: string; system?: string; nest?: boolean; scope?: string; nest_scope?: string; kind?: string; planet?: string }
 
 // Active registered projects, in registry order.
 export const registryOf = (b: SectionBody | undefined) =>

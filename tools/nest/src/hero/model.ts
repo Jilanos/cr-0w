@@ -17,12 +17,25 @@ export interface HeroAgent { pid: number; kind: Agent['kind']; title: string; st
 // open = missions not done (planet size). wait = minutes the oldest ask has waited (stalk height).
 // runFrom = start of the oldest live run (working label). cause = what failed (failed label).
 export interface HeroProject {
-  name: string; state: UiState; live: boolean; missions: HeroMission[]; agents: HeroAgent[]
+  name: string; planet: Planet; state: UiState; live: boolean; missions: HeroMission[]; agents: HeroAgent[]
   open: number; wait?: number; runFrom?: string; cause?: string
   // No mission, agent or ask: a registered project at rest (item_200 decides how it shows).
   quiet?: boolean
   // A system planet (item_200): its registered projects, most urgent first. label = short name.
   members?: HeroProject[]; label?: string
+}
+
+// Planet type by project kind (item_214): work scope -> bands, tool -> rock, world -> terrain,
+// notes -> ice. A valid planet: override wins; anything else is rock.
+export type Planet = 'bands' | 'terrain' | 'rock' | 'ice'
+const PLANETS: readonly string[] = ['bands', 'terrain', 'rock', 'ice']
+const BY_KIND: Record<string, Planet> = { work: 'bands', tool: 'rock', world: 'terrain', notes: 'ice' }
+
+export function planetOf(p: RegProject | undefined): Planet {
+  if (!p) return 'rock'
+  if (p.planet && PLANETS.includes(p.planet)) return p.planet as Planet
+  if (p.scope === 'work') return 'bands'
+  return BY_KIND[p.kind ?? ''] ?? 'rock'
 }
 
 // Everything the hero shows besides missions (req_059): the project registry, live
@@ -125,6 +138,7 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
     ...missions.filter((m) => m.project === p && (m.state === 'waiting' || m.state === 'review')).map((m) => m.updated),
     ...(byAgent.get(p) ?? []).filter((x) => x.h.state === 'needs').map((x) => ago(x.a.last_activity_s) ?? x.from).filter((x): x is string => !!x),
   ]
+  const reg = new Map(live.registry.map((p) => [p.name, p]))
   const projects: HeroProject[] = [...names.keys()].map((name) => {
     const ms = (byProject.get(name) ?? []).sort((a, b) => RANK[a.state] - RANK[b.state])
     const ags = byAgent.get(name) ?? []
@@ -137,12 +151,11 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
     const runFrom = [...open.map((m) => m.started), ...ags.filter((x) => x.h.state === 'working').map((x) => x.from)].filter((x): x is string => !!x).sort()[0]
     const failed = open.find((m) => m.state === 'failed')
     return {
-      name, state, live: PRANK[state] <= PRANK.working, missions: open, agents: ags.map((x) => x.h), open: open.length + ags.length,
+      name, planet: planetOf(reg.get(name)), state, live: PRANK[state] <= PRANK.working, missions: open, agents: ags.map((x) => x.h), open: open.length + ags.length,
       wait: state === 'needs' && since ? mins(since) : undefined, runFrom, cause: failed?.title, ...(quiet ? { quiet: true } : {}),
     }
   })
   // Systems (item_200): related projects share one planet, members orbit it as moons.
-  const reg = new Map(live.registry.map((p) => [p.name, p]))
   const shown = projects.filter((p) => reg.get(p.name)?.nest !== false)
   for (const p of shown) { const r = reg.get(p.name); if (r?.short) p.label = r.short }
   const groups = new Map<string, HeroProject[]>()
@@ -154,7 +167,7 @@ export function heroModel(missions: Mission[], inbox: InboxItem[], live: HeroLiv
     const waits = mem.map((x) => x.wait).filter((x): x is number => x !== undefined)
     const runs = mem.map((x) => x.runFrom).filter((x): x is string => !!x).sort()
     return {
-      name, state: top.state, live: mem.some((x) => x.live), missions: mem.flatMap((x) => x.missions), agents: mem.flatMap((x) => x.agents),
+      name, planet: top.planet, state: top.state, live: mem.some((x) => x.live), missions: mem.flatMap((x) => x.missions), agents: mem.flatMap((x) => x.agents),
       open: mem.reduce((n, x) => n + x.open, 0), wait: waits.length ? Math.max(...waits) : undefined, runFrom: runs[0],
       cause: mem.find((x) => x.cause)?.cause, ...(mem.every((x) => x.quiet) ? { quiet: true } : {}), members: mem,
     }

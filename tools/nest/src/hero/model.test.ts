@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { fixtureSource } from '../data/fixtures'
-import { heroLiveOf, heroModel, moodOf, projectOfAgent } from './model'
+import { heroLiveOf, heroModel, moodOf, planetOf, projectOfAgent } from './model'
 import type { Agent } from '../data/live'
 import type { Mission } from '../data/types'
 
@@ -77,6 +77,32 @@ describe('hero planets from projects and live work (item_199)', () => {
     expect(c.members!.map((q) => q.name)).toEqual(['web', 'lambda'])
     expect(c.members![1].label).toBe('lam')
     expect(by(m)['cr-0w'].members).toBeUndefined()
+  })
+
+  it('derives the planet type from scope, kind and the planet override (item_214)', () => {
+    expect(planetOf({ name: 'a', scope: 'work', kind: 'notes' })).toBe('bands')
+    expect(planetOf({ name: 'a', scope: 'personal', kind: 'tool' })).toBe('rock')
+    expect(planetOf({ name: 'a', kind: 'world' })).toBe('terrain')
+    expect(planetOf({ name: 'a', kind: 'notes' })).toBe('ice')
+    expect(planetOf({ name: 'a', scope: 'work', kind: 'tool', planet: 'ice' })).toBe('ice')
+    expect(planetOf({ name: 'a', kind: 'world', planet: 'gas' })).toBe('terrain')
+    expect(planetOf({ name: 'a', scope: 'personal' })).toBe('rock')
+    expect(planetOf(undefined)).toBe('rock')
+  })
+
+  it('gives a system planet the type of its most urgent member (item_214)', () => {
+    const sreg = [
+      { name: 'notes', path: '/p/notes', system: 'obs', kind: 'notes' }, { name: 'tool', path: '/p/tool', system: 'obs', kind: 'tool' },
+      { name: 'web', path: '/r/web', scope: 'work' },
+    ]
+    const m = heroModel([], [], { registry: sreg, agents: [agent({ pid: 2, project: 'x', cwd: '/p/tool' })], parked: [] }, now)
+    expect(by(m).obs.planet).toBe('rock')
+    expect(by(m).obs.members!.map((q) => q.planet)).toEqual(['rock', 'ice'])
+    expect(by(m).web.planet).toBe('bands')
+    const idle = heroModel([], [], { registry: sreg, agents: [agent({ pid: 2, project: 'x', cwd: '/p/notes' })], parked: [] }, now)
+    expect(by(idle).obs.planet).toBe('ice')
+    const orphan = heroModel([mission({ id: 'o', project: 'unregistered' })], [], { registry: sreg, agents: [], parked: [] }, now)
+    expect(by(orphan).unregistered.planet).toBe('rock')
   })
 
   it('lets a failed mission win over a live agent (AC2)', () => {

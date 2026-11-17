@@ -56,6 +56,17 @@ def test_registry_json_keeps_scope_next_to_nest_scope(hub, tmp_path):
     assert (p["scope"], p["nest_scope"]) == ("personal", "both")
 
 
+def test_registry_json_serves_kind_and_planet(hub, tmp_path):
+    home, _ = hub
+    (home / "local" / "projects.yaml").write_text(
+        f"projects:\n  - {{name: a, kind: tool, planet: ice, path: {tmp_path}/a}}\n"
+        f"  - {{name: b, kind: moon, planet: gas, path: {tmp_path}/b}}\n  - {{name: c, path: {tmp_path}/c}}\n")
+    out = run(hub, "crow-registry", "json")
+    assert out.returncode == 0, out.stderr
+    got = [(p["kind"], p["planet"]) for p in json.loads(out.stdout)["projects"]]
+    assert got == [("tool", "ice"), ("", ""), ("", "")]
+
+
 def test_work_days_counts_the_identity_commits_per_day(tmp_path):
     mod = load_registry()
     repo = tmp_path / "w"

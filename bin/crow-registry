@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """crow-registry: the project registry (local/projects.yaml) plus cheap git state, as JSON for the deck.
 
-  crow-registry json   {identities, state_dir, projects: [{name, short, scope, nest_scope, forge, remote, path, release,
+  crow-registry json   {identities, state_dir, projects: [{name, short, scope, nest_scope, kind, planet, forge, remote, path, release,
                         status, logics, road, git: {email, dirty, ahead, stale_trees}, work: {YYYY-MM-DD: commits}}]}
 
 scope (work or personal) picks the identity and the accounts. nest_scope (work, personal or both) files the project
 under the Nest scope filter; both shows it under work and perso. It defaults to scope when absent or unknown.
+kind (work, tool, world or notes) and planet (bands, terrain, rock or ice, an override) pick the Nest planet type;
+each is "" when absent or unknown. Nest derives the type from them and scope.
 
 road is read from release.roadmap (a Logics roadmap doc, path relative to the project or absolute): {done, total,
 current, exit, start, target, miles} with the milestones under "# Milestones" as "## version - title" headings. A
@@ -30,6 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import crow_lib  # noqa: E402
 HOME = crow_lib.data_home()
 NEST_SCOPES = ("work", "personal", "both")
+KINDS = ("work", "tool", "world", "notes")
+PLANETS = ("bands", "terrain", "rock", "ice")
 
 
 
@@ -129,6 +133,12 @@ def nest_scope(p):
     return s if s in NEST_SCOPES else p.get("scope", "")
 
 
+def pick(p, key, allowed):
+    """p[key] when it is one of allowed, else ""."""
+    v = p.get(key)
+    return v if v in allowed else ""
+
+
 def load():
     try:
         reg = yaml.safe_load(open(os.path.join(HOME, "local", "projects.yaml"))) or {}
@@ -140,7 +150,8 @@ def load():
         aliases = p.get("aliases") or []
         out.append({
             "name": p["name"], "short": aliases[0] if aliases else p["name"],
-            "scope": p.get("scope", ""), "nest_scope": nest_scope(p), "forge": p.get("forge", "none"), "remote": p.get("remote", ""),
+            "scope": p.get("scope", ""), "nest_scope": nest_scope(p),
+            "kind": pick(p, "kind", KINDS), "planet": pick(p, "planet", PLANETS), "forge": p.get("forge", "none"), "remote": p.get("remote", ""),
             "path": p.get("path", ""), "release": p.get("release") or {}, "status": p.get("status", ""),
             "logics": bool(p.get("logics")),
             "system": p.get("system") or p["name"], "nest": p.get("nest", True) is not False,
