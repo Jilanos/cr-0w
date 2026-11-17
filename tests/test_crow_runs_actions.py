@@ -99,3 +99,28 @@ def test_final_command_reads_both_providers(tmp_path):
                              capture_output=True, text=True,
                              env={"CROW_HOME": str(tmp_path), "CROW_ACCOUNT": "main", "PATH": "/usr/bin:/bin"})
         assert out.stdout.strip() == want, out.stderr
+
+
+def test_final_accepts_a_run_id(cr, monkeypatch):
+    from conftest import FIXTURES
+    row = {"run_id": "abc123", "provider": "codex", "artifacts": {"stdout_path": str(FIXTURES / "run-codex.jsonl")}}
+    monkeypatch.setattr(cr, "finished_rows", lambda since: {"abc123": row})
+    assert cr.final_of("abc") == "Shipped: codex report"
+
+
+def test_final_refuses_an_unknown_id(cr, monkeypatch):
+    monkeypatch.setattr(cr, "finished_rows", lambda since: {})
+    with pytest.raises(SystemExit):
+        cr.final_of("nope")
+
+
+@pytest.mark.parametrize("ids", [[""], ["  "], ["abc", ""]])
+def test_wait_refuses_an_empty_id(cr, monkeypatch, ids):
+    cr.STATE.mkdir(parents=True, exist_ok=True)
+    cr.LEDGER.write_text('{"run_id": "first", "project": "p", "label": "l"}\n')
+    monkeypatch.setattr(cr, "finished", lambda since, ttl=8: pytest.fail("polled with an empty id"))
+    monkeypatch.setattr(cr, "running_runs", lambda: pytest.fail("polled with an empty id"))
+    with pytest.raises(SystemExit):
+        cr.wait(ids, poll=0)
+    with pytest.raises(SystemExit):
+        cr.notify(ids, poll=0)

@@ -1,13 +1,14 @@
 ## item_230_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights - Fix the crow-runs and dispatch bugs from Paul's nights
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 85
 > Confidence: 80
-> Progress: 0%
+> Progress: 15%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-17 16:25:45
 
 # AI Context
 - Summary: Fix the small reproducible bugs: list/json crash on a removed worktree, Codex report keeps only the last line, `final` wants a path, `wait ""` hangs, unknown project gives no hint, out-of-policy accounts show as 401 errors.
@@ -51,3 +52,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-17T15:29:13.517330+00:00 | cdx | 7bf24edac4d349d1b7516c5c8bc853c1 | item_230 run/dispatch bugs | succeeded |  |  |
+
+# Tasks
+- `task_024_fix_the_crow_runs_and_dispatch_bugs_from_paul_s_nights`

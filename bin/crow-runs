@@ -11,7 +11,7 @@
                                                      it reads <state>/runs.jsonl, so a watcher can re-read on change
   crow-runs stop <run_id> [--json]                   stop one running run; --json prints the action result
   crow-runs report <run_id>                          final report of a finished run, then its token line
-  crow-runs final <stdout_path> [provider]           final message of a run's stdout log (claude | codex)
+  crow-runs final <stdout_path|run_id> [provider]    final message of a run's stdout log (claude | codex)
   crow-runs wait <run_id>...                         block until the runs finish (run in background to get notified)
   crow-runs inbox [--hook] [--peek]                  finished runs not reported yet (the hook runs it on every prompt)
   crow-runs notify <run_id>...                       wait, then desktop-notify (dispatch starts it detached)
@@ -103,6 +103,8 @@ def running_runs():
 def wait(run_ids, poll=20):
     """Block until every given run has finished; print one line per run as it ends.
     Run it as a background command so the caller is notified when it exits."""
+    if any(not i.strip() for i in run_ids):
+        sys.exit("crow: wait needs a run id (got an empty one)")
     recs = {r["run_id"]: r for r in ledger()}
     pending = {next((k for k in recs if k.startswith(i)), i) for i in run_ids}
     while pending:
@@ -337,6 +339,8 @@ def record_run(rec, state):
 def notify(run_ids, poll=20, max_hours=12):
     """Wait for the runs, then raise a desktop notification for each. Survives the session that started it.
     Gives up after `max_hours` so a lost run does not leave a poller behind."""
+    if any(not i.strip() for i in run_ids):
+        sys.exit("crow: notify needs a run id (got an empty one)")
     recs = {r["run_id"]: r for r in ledger()}
     pending = {next((k for k in recs if k.startswith(i)), i) for i in run_ids}
     deadline = time.time() + max_hours * 3600
@@ -488,6 +492,22 @@ def report(run_id, since="7d"):
         if full:
             return full
     return result
+
+
+def final_of(target, provider=None, since="7d"):
+    """Final message of a stdout log path, or of a run given by its id or id prefix."""
+    if not target.strip():
+        sys.exit("crow: final needs a stdout path or a run id")
+    f = Path(target)
+    if not f.is_file():
+        r = next((v for k, v in finished_rows(since).items() if k.startswith(target)), None)
+        if not r:
+            sys.exit(f"crow: '{target}' is neither a file nor a run id from the last {since}")
+        f = Path(r.get("artifacts", {}).get("stdout_path") or "/nonexistent")
+        if not f.is_file():
+            sys.exit(f"crow: run {r['run_id'][:8]} has no stdout log")
+        provider = provider or r.get("provider")
+    return crow_lib.final_text(f.read_text(errors="replace"), provider or "claude")
 
 
 def run_tokens(run_id, since="7d"):
@@ -1166,8 +1186,8 @@ def main():
     sub.add_parser("state").add_argument("run_id")
     sub.add_parser("report").add_argument("run_id")
     fp = sub.add_parser("final")
-    fp.add_argument("stdout_path")
-    fp.add_argument("provider", nargs="?", default="claude")
+    fp.add_argument("target", metavar="stdout_path|run_id")
+    fp.add_argument("provider", nargs="?", help="claude | codex (default: the run's provider, else claude)")
     sub.add_parser("wait").add_argument("run_ids", nargs="+")
     sp = sub.add_parser("stop")
     sp.add_argument("run_id")
@@ -1202,7 +1222,7 @@ def main():
     elif a.cmd == "inbox":
         inbox(a.hook, a.peek)
     elif a.cmd == "final":
-        print(crow_lib.final_text(Path(a.stdout_path).read_text(errors="replace"), a.provider))
+        print(final_of(a.target, a.provider))
     elif a.cmd == "report":
         print(report(a.run_id) or "")
         line = token_line(a.run_id)
