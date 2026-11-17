@@ -724,7 +724,7 @@ def read_transcript(path):
 
 
 def commits_since(cwd, sha, until=None):
-    if not sha:
+    if not sha or not os.path.isdir(cwd or ""):
         return []
     extra = [f"--until={until}"] if until else []
     return sh("git", "log", "--oneline", *extra, f"{sha}..HEAD", cwd=cwd).splitlines()
@@ -828,15 +828,18 @@ def collect(since="today", include_unledgered=False):
             "resumed_from": [k for k, v in superseded.items() if v == rec["run_id"]],
             "commits": commits_since(rec["cwd"], rec.get("start_sha"), r.get("ended_at") if r else None),
             "mission": run_mission(rec), "branch": rec.get("branch") or None,
+            "worktree_removed": not os.path.isdir(rec.get("cwd") or ""),
         })
     if include_unledgered:
         known = {rec["run_id"] for rec in recs}
         for rid, r in done.items():
             if rid not in known:
-                past.append({"run_id": rid, "project": project_name(r["cwd"]), "label": "(not dispatched by crow)",
+                cwd = r.get("cwd") or ""
+                past.append({"run_id": rid, "project": project_name(cwd) if cwd else "?", "label": "(not dispatched by crow)",
                              "status": "done" if r.get("exit_code") == 0 else "failed",
                              "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": [],
-                             "cost_usd": run_cost(r), "budget_usd": None, "denials": crow_lib.run_denials(r)})
+                             "cost_usd": run_cost(r), "budget_usd": None, "denials": crow_lib.run_denials(r),
+                             "worktree_removed": not os.path.isdir(cwd)})
 
     busy = len(running_runs())
     pu = project_usage()
@@ -1105,7 +1108,8 @@ def render(data, color=True, width=None):
             out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['label']}"))
             cost = fmt_cost(f.get("cost_usd"), f.get("budget_usd"))
             cost = f" · {cost}" if cost else ""
-            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended}{cost} · {len(f['commits'])} commits{resumed} · {f['run_id'][:8]}{c['0']}"))
+            commits = "worktree removed" if f.get("worktree_removed") else f"{len(f['commits'])} commits"
+            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended}{cost} · {commits}{resumed} · {f['run_id'][:8]}{c['0']}"))
             for x in f.get("denials") or []:  # a tool outside the kind's allowlist: widen it on purpose (runbook)
                 out.append(clip(f"    {c['y']}denied {x}{c['0']}"))
         if len(data["finished"]) > FINISHED_SHOWN:

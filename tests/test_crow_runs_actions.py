@@ -124,3 +124,20 @@ def test_wait_refuses_an_empty_id(cr, monkeypatch, ids):
         cr.wait(ids, poll=0)
     with pytest.raises(SystemExit):
         cr.notify(ids, poll=0)
+
+
+def test_list_marks_a_run_whose_worktree_is_gone(cr, monkeypatch, tmp_path):
+    import json
+    from datetime import datetime
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    gone = str(tmp_path / "repo.wt" / "removed")
+    cr.STATE.mkdir(parents=True, exist_ok=True)
+    cr.LEDGER.write_text(json.dumps({"run_id": "r1", "project": "p", "label": "l", "cwd": gone,
+                                     "started_at": now, "start_sha": "abc"}) + "\n")
+    row = {"run_id": "r1", "ended_at": now, "exit_code": 0, "cwd": gone, "duration_seconds": 5}
+    monkeypatch.setattr(cr, "finished_rows", lambda since, ttl=8: {"r1": row, "r2": {**row, "run_id": "r2"}})
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr, "agent_procs", lambda proc="/proc": [])
+    data = cr.collect("today", include_unledgered=True)
+    assert [f["worktree_removed"] for f in data["finished"]] == [True, True]
+    assert "worktree removed" in "\n".join(cr.render(data, color=False))

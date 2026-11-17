@@ -228,6 +228,10 @@
        "null"
       ],
       "description": "Branch the run started on."
+     },
+     "worktree_removed": {
+      "type": "boolean",
+      "description": "The run's cwd (a worktree) no longer exists; commits are not read."
      }
     }
    }
