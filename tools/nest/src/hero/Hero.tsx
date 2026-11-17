@@ -11,7 +11,6 @@ import { declutterDom, type Box } from './declutter'
 import { DEG_PER_WIDTH, detent, liftCurve, spinToFront, step, stepTo, type Spin } from './motion'
 import type { Heads, Palette, PlanetLabel, SceneOut } from './scene'
 import { drawScene, TABLE_FX } from './scene'
-import { tableOf } from './planets'
 import { createHead, liveHeadOk, type HeadGL } from './gl/head'
 import { bakeLook, CHARACTER, faceOf, HeadCtl, lookAt, PITCH_MAX, type Look } from './headCtl'
 
@@ -34,7 +33,8 @@ const SWEEP_MS = 12000
 // table angle (deg) over which the head reaches most of its turn.
 const GAZE_MAX = 14, GAZE_DOWN = -PITCH_MAX, GAZE_TURN = 40
 const LIFT_MS = 420
-const TABLE = typeof location === 'undefined' ? undefined : tableOf(location.search)
+// The lit table (item_216 board a) is the table.
+const TABLE = 'a' as const
 const GLITCH_MS = 180
 const HOVER_MS = 200
 const DRAG_PX = 6

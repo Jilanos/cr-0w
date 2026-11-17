@@ -117,8 +117,6 @@ export interface Body {
   c: V3; r: number; col: RGB; planet: Planet; tilt: number; spin: number
   ring?: { phase: number }; moons: Moon[]; sel?: boolean; quiet?: boolean; glow?: number; fade?: number
 }
-// `?table=a|b` (item_216): either board shows the lit planets; anything else keeps the current table.
-export const tableOf = (search: string): 'a' | 'b' | undefined => { const v = new URLSearchParams(search).get('table'); return v === 'a' || v === 'b' ? v : undefined }
 
 export type Put = (c: number, r: number, z: number, ch: string | null, col: RGB, a: number, bg: number) => void
 

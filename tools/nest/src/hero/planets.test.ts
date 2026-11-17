@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Planet } from './model'
-import { A_MIN, castPlanets, frame, shadePlanet, tableOf, type Body, type Cast } from './planets'
+import { A_MIN, castPlanets, frame, shadePlanet, type Body, type Cast } from './planets'
 import { add, cross, dot, mul, norm, sub, V, type RGB, type V3 } from './vec'
 
 const KINDS: Planet[] = ['bands', 'terrain', 'rock', 'ice']
@@ -32,15 +32,6 @@ function discCells(cols: number, rows: number, cw: number, ch: number, c: Cast) 
   }
   return ks
 }
-
-describe('tableOf', () => {
-  it('reads a and b only', () => {
-    expect(tableOf('?table=a')).toBe('a')
-    expect(tableOf('?x=1&table=b')).toBe('b')
-    expect(tableOf('')).toBeUndefined()
-    expect(tableOf('?table=c')).toBeUndefined()
-  })
-})
 
 describe('shadePlanet type dispatch', () => {
   const f = frame(0.2, 0.7), P = { col: COL, toWorld: f.toWorld }

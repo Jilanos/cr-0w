@@ -31,7 +31,7 @@ export interface SceneOpts {
   // Item 198. t: animation clock (ms). fx: table life switches. ripple: select wave (0..1 elapsed).
   // live: the GL head draws the head; the scene only clears its silhouette so the head hides the table back.
   t?: number; fx?: TableFx; ripple?: { name: string; k: number }; live?: boolean
-  // Item 216: `?table=a|b` draws lit planets (planets.ts). Unset keeps the current table.
+  // Item 216: a|b draws lit planets (planets.ts); the app always passes a. Unset keeps the old table.
   table?: 'a' | 'b'
 }
 export interface TableFx { ping?: boolean; bob?: boolean; stream?: boolean }
