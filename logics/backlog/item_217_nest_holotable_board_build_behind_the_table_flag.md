@@ -53,3 +53,6 @@
 - AC1: done for C2 on both flags. No flag stays pixel-identical (`scripts/hero-table.mjs hash`, 1440x900, 707x691, 368x812) after every commit above.
 - AC2: state colour, priority stalk height, needs outer hex, failed broken stem, radar blip and labels 1/3 checked on real-data shots with injected sessions. Hover, select and the ping beam not re-checked by hand since the board landed. tsc clean, vitest 200 passed.
 - AC3: open. Owner OK'd moons (B) and labels (B) on 2026-11-17; a final OK on the whole board is pending.
+
+# Decision framing
+- 2026-11-17 wrap: labels B and moons without hex marker done (331a733). Open: owner OK on the whole board (AC3), hover/select/ping recheck by hand, fold device check. Frame-time miss moved to item_220.
