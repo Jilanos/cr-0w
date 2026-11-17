@@ -1,7 +1,7 @@
 ## item_215_nest_holotable_board_redesign_sketches - Nest holotable board redesign sketches
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 80%
 > Confidence: 70%
 > Progress: 100%
