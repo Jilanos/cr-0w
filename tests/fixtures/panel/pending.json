@@ -1,0 +1,466 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "file_label": "En attente",
+  "doc_rev": "d_4be0c9a1f2",
+  "writable": true,
+  "lock": null,
+  "updated_note": "17/11 nuit (maj de nuit)",
+  "sections": [
+    {
+      "key": "drafts",
+      "title": "✉️ Brouillons Outlook à relire et envoyer",
+      "kind": "drafts",
+      "columns": [
+        "Sujet",
+        "Attendu",
+        "Depuis"
+      ],
+      "items": [
+        {
+          "id": "p_d0r4ft6b",
+          "item_rev": "r_51ac09",
+          "section": "drafts",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Sujet",
+            "Attendu",
+            "Depuis"
+          ],
+          "cells": {
+            "Sujet": [
+              {
+                "t": "link",
+                "v": "Fournisseur Alpha : offre 26-XYZ lot 2",
+                "href": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0001%3D%3D&exvsurl=1&viewmodel=ReadMessageItem"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "Brouillon relu, signature externe une fois. Relire et envoyer."
+              }
+            ],
+            "Depuis": [
+              {
+                "t": "text",
+                "v": "17/11"
+              }
+            ]
+          },
+          "title": "Fournisseur Alpha : offre 26-XYZ lot 2",
+          "due": null,
+          "due_raw": null,
+          "overdue_workdays": null,
+          "prio": null,
+          "actions": [
+            "done",
+            "chat"
+          ],
+          "topic_id": "t_9a1b2c3d4e",
+          "source_line": 38
+        }
+      ]
+    },
+    {
+      "key": "followups",
+      "title": "📌 Relances : retours attendus",
+      "kind": "followups",
+      "columns": [
+        "Échéance",
+        "Prio",
+        "Qui",
+        "Attendu"
+      ],
+      "items": [
+        {
+          "id": "p_k3m9x2qa",
+          "item_rev": "r_0f3a77",
+          "section": "followups",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Échéance",
+            "Prio",
+            "Qui",
+            "Attendu"
+          ],
+          "cells": {
+            "Échéance": [
+              {
+                "t": "text",
+                "v": "27/10 · dépassée"
+              }
+            ],
+            "Prio": [
+              {
+                "t": "text",
+                "v": "🔴"
+              }
+            ],
+            "Qui": [
+              {
+                "t": "text",
+                "v": "Fournisseur Alpha (J. Martin)"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "Brochage définitif du connecteur et débit CAN. "
+              },
+              {
+                "t": "link",
+                "v": "mail du 03/11",
+                "href": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0001%3D%3D&exvsurl=1&viewmodel=ReadMessageItem"
+              },
+              {
+                "t": "text",
+                "v": ". Si ça bloque, mettre le responsable en copie."
+              }
+            ]
+          },
+          "title": "Fournisseur Alpha (J. Martin)",
+          "due": "2026-10-27",
+          "due_raw": "27/10 · dépassée",
+          "overdue_workdays": 16,
+          "prio": "red",
+          "actions": [
+            "done",
+            "snooze",
+            "followup",
+            "chat"
+          ],
+          "topic_id": "t_1f2e3d4c5b",
+          "source_line": 51
+        },
+        {
+          "id": "p_7hd2lw0e",
+          "item_rev": "r_88b2d1",
+          "section": "followups",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Échéance",
+            "Prio",
+            "Qui",
+            "Attendu"
+          ],
+          "cells": {
+            "Échéance": [
+              {
+                "t": "text",
+                "v": "20/11"
+              }
+            ],
+            "Prio": [
+              {
+                "t": "text",
+                "v": "🟡"
+              }
+            ],
+            "Qui": [
+              {
+                "t": "text",
+                "v": "Câbles Beta : plans révision C"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "Plans révisés avec les fils 12 et 48 corrigés. Fiche "
+              },
+              {
+                "t": "file",
+                "v": "plans-revC.md",
+                "file_id": "f_7c1d0e2a"
+              },
+              {
+                "t": "text",
+                "v": "."
+              }
+            ]
+          },
+          "title": "Câbles Beta : plans révision C",
+          "due": "2026-11-20",
+          "due_raw": "20/11",
+          "overdue_workdays": null,
+          "prio": "yellow",
+          "actions": [
+            "done",
+            "snooze",
+            "followup",
+            "chat"
+          ],
+          "topic_id": "t_6a7b8c9d0e",
+          "source_line": 52
+        },
+        {
+          "id": "p_m2n4b6v8",
+          "item_rev": "r_c4e9a0",
+          "section": "followups",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Échéance",
+            "Prio",
+            "Qui",
+            "Attendu"
+          ],
+          "cells": {
+            "Échéance": [
+              {
+                "t": "text",
+                "v": "20/11"
+              }
+            ],
+            "Prio": [
+              {
+                "t": "text",
+                "v": "🟡"
+              }
+            ],
+            "Qui": [
+              {
+                "t": "text",
+                "v": "Câbles Beta : plans révision C"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "Doublon volontaire de date et priorité : régler l'une garde l'autre."
+              }
+            ]
+          },
+          "title": "Câbles Beta : plans révision C",
+          "due": "2026-11-20",
+          "due_raw": "20/11",
+          "overdue_workdays": null,
+          "prio": "yellow",
+          "actions": [
+            "done",
+            "snooze",
+            "followup",
+            "chat"
+          ],
+          "topic_id": "t_2b3c4d5e6f",
+          "source_line": 53
+        }
+      ]
+    },
+    {
+      "key": "decisions",
+      "title": "🎯 Décisions et actions de ta part",
+      "kind": "decisions",
+      "columns": [
+        "Sujet",
+        "Attendu",
+        "Depuis"
+      ],
+      "items": [
+        {
+          "id": "p_q81zc5vn",
+          "item_rev": "r_7a0e32",
+          "section": "decisions",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Sujet",
+            "Attendu",
+            "Depuis"
+          ],
+          "cells": {
+            "Sujet": [
+              {
+                "t": "text",
+                "v": "Outillage : intégrer la rédaction du fournisseur (amortissement 650 €)"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "🟡 Discuter avec le directeur, modifier le document, le renvoyer."
+              }
+            ],
+            "Depuis": [
+              {
+                "t": "text",
+                "v": "14/11"
+              }
+            ]
+          },
+          "title": "Outillage : intégrer la rédaction du fournisseur",
+          "due": null,
+          "due_raw": null,
+          "overdue_workdays": null,
+          "prio": "yellow",
+          "actions": [
+            "done",
+            "chat"
+          ],
+          "topic_id": "t_3c4d5e6f7a",
+          "source_line": 64
+        },
+        {
+          "id": "p_l5s8ne1u",
+          "item_rev": "r_19fd4b",
+          "section": "decisions",
+          "block": null,
+          "kind": "list_item",
+          "columns": null,
+          "cells": {
+            "text": [
+              {
+                "t": "strong",
+                "v": "Batteries"
+              },
+              {
+                "t": "text",
+                "v": " : envoyer la trace CAN seule au partenaire, voir "
+              },
+              {
+                "t": "code",
+                "v": "WORK/30_Essais/trace.md"
+              }
+            ]
+          },
+          "title": "Batteries : envoyer la trace CAN seule",
+          "due": null,
+          "due_raw": null,
+          "overdue_workdays": null,
+          "prio": null,
+          "actions": [
+            "done",
+            "chat"
+          ],
+          "topic_id": "t_4d5e6f7a8b",
+          "source_line": 70
+        }
+      ]
+    },
+    {
+      "key": "dossiers",
+      "title": "📁 Dossiers",
+      "kind": "dossiers",
+      "columns": null,
+      "items": [
+        {
+          "id": "p_b2c4e6g8",
+          "item_rev": "r_aa01f5",
+          "section": "dossiers",
+          "block": "faisceau-serie-a",
+          "kind": "table_row",
+          "columns": [
+            "Sujet",
+            "Attendu",
+            "Depuis"
+          ],
+          "cells": {
+            "Sujet": [
+              {
+                "t": "file",
+                "v": "Check_faisceau_2026-11-03.xlsx",
+                "file_id": "f_3b9e1c44"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "67 sorties à contrôler à l'atelier, statut automatique."
+              }
+            ],
+            "Depuis": [
+              {
+                "t": "text",
+                "v": "03/11"
+              }
+            ]
+          },
+          "title": "Check_faisceau_2026-11-03.xlsx",
+          "due": null,
+          "due_raw": null,
+          "overdue_workdays": null,
+          "prio": null,
+          "actions": [
+            "done",
+            "chat"
+          ],
+          "topic_id": "t_5e6f7a8b9c",
+          "source_line": 94
+        }
+      ],
+      "blocks": [
+        {
+          "key": "faisceau-serie-a",
+          "title": "Faisceau série A : contrôle à l'atelier",
+          "folder_file_id": "f_0d1e2f3a"
+        }
+      ]
+    },
+    {
+      "key": "done",
+      "title": "✅ Réglé récemment",
+      "kind": "done",
+      "columns": null,
+      "items": [
+        {
+          "id": "p_x0y1z2w3",
+          "item_rev": "r_e0e0e0",
+          "section": "done",
+          "block": null,
+          "kind": "list_item",
+          "columns": null,
+          "cells": {
+            "text": [
+              {
+                "t": "text",
+                "v": "16/11 Rapport CIR : "
+              },
+              {
+                "t": "link",
+                "v": "relevé envoyé",
+                "href": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0001%3D%3D&exvsurl=1&viewmodel=ReadMessageItem"
+              }
+            ]
+          },
+          "title": "16/11 Rapport CIR",
+          "due": null,
+          "due_raw": null,
+          "overdue_workdays": null,
+          "prio": null,
+          "actions": [
+            "chat"
+          ],
+          "topic_id": null,
+          "source_line": 167
+        }
+      ]
+    }
+  ],
+  "free_blocks": [
+    {
+      "id": "b_77aa01",
+      "section": null,
+      "title": "AFK du 12/11 au 13/11, livrables à relire",
+      "segments": [
+        {
+          "t": "text",
+          "v": "Trois livrables à relire dans "
+        },
+        {
+          "t": "code",
+          "v": "WORK/00_Orga/afk-1211/"
+        }
+      ],
+      "topic_id": "t_7a8b9c0d1e"
+    }
+  ],
+  "unparsed": [
+    {
+      "section": "inbox_note",
+      "line": 153,
+      "reason": "section libre affichée en texte"
+    }
+  ]
+}

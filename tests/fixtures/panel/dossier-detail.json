@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "slug": "faisceau-serie-a",
+  "title": "Faisceau série A : contrôle à l'atelier",
+  "folder_file_id": "f_0d1e2f3a",
+  "folder_label": "WORK/20_Faisceau/serie-a/",
+  "items": [
+    {
+      "id": "p_b2c4e6g8",
+      "item_rev": "r_aa01f5",
+      "section": "dossiers",
+      "block": "faisceau-serie-a",
+      "kind": "table_row",
+      "columns": [
+        "Sujet",
+        "Attendu",
+        "Depuis"
+      ],
+      "cells": {
+        "Sujet": [
+          {
+            "t": "file",
+            "v": "Check_faisceau_2026-11-03.xlsx",
+            "file_id": "f_3b9e1c44"
+          }
+        ],
+        "Attendu": [
+          {
+            "t": "text",
+            "v": "67 sorties à contrôler à l'atelier, statut automatique."
+          }
+        ],
+        "Depuis": [
+          {
+            "t": "text",
+            "v": "03/11"
+          }
+        ]
+      },
+      "title": "Check_faisceau_2026-11-03.xlsx",
+      "due": null,
+      "due_raw": null,
+      "overdue_workdays": null,
+      "prio": null,
+      "actions": [
+        "done",
+        "chat"
+      ],
+      "topic_id": "t_5e6f7a8b9c",
+      "source_line": 94
+    }
+  ],
+  "topic_id": "t_dossFA0001",
+  "recent_files": [
+    {
+      "file_id": "f_3b9e1c44",
+      "name": "Check_faisceau_2026-11-03.xlsx",
+      "modified": "2026-11-17T17:55:00+01:00",
+      "size": 48211,
+      "modified_after_crow": true
+    }
+  ],
+  "recent_files_note": "champ v1.1 : null en v1 si non implémenté"
+}

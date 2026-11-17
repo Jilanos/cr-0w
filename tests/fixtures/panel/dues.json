@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "days": 14,
+  "items": [
+    {
+      "date": "2026-10-27",
+      "kind": "pending",
+      "text": "Fournisseur Alpha : brochage connecteur",
+      "overdue": true,
+      "ref": {
+        "kind": "pending",
+        "id": "p_k3m9x2qa"
+      }
+    },
+    {
+      "date": "2026-11-18",
+      "kind": "reset",
+      "text": "worka : fenêtre 5 h à 09:12",
+      "overdue": false,
+      "ref": {
+        "kind": "account",
+        "id": "worka"
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "pending",
+      "text": "Câbles Beta : plans révision C",
+      "overdue": false,
+      "ref": {
+        "kind": "pending",
+        "id": "p_7hd2lw0e"
+      }
+    },
+    {
+      "date": "2026-11-20",
+      "kind": "pending",
+      "text": "Câbles Beta : plans révision C",
+      "overdue": false,
+      "ref": {
+        "kind": "pending",
+        "id": "p_m2n4b6v8"
+      }
+    },
+    {
+      "date": "2026-11-21",
+      "kind": "reset",
+      "text": "claude : semaine",
+      "overdue": false,
+      "ref": {
+        "kind": "account",
+        "id": "claude"
+      }
+    }
+  ]
+}

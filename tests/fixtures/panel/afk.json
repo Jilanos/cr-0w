@@ -1,0 +1,46 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "night": "2026-11-18",
+  "back_at": "2026-11-18T08:30:00+01:00",
+  "jobs": [
+    {
+      "name": "panel-back",
+      "account": "workb",
+      "status": "succeeded",
+      "run_id": "6e7f8091a2b3c4d5e6f708192a3b4c5d",
+      "report_file_id": "f_5a6b7c8d",
+      "decisions": 1
+    },
+    {
+      "name": "panel-front",
+      "account": "claude",
+      "status": "running",
+      "run_id": "7f8091a2b3c4d5e6f708192a3b4c5d6e",
+      "report_file_id": null,
+      "decisions": 0
+    },
+    {
+      "name": "panel-polish",
+      "account": null,
+      "status": "not_started",
+      "run_id": null,
+      "report_file_id": null,
+      "decisions": 0
+    }
+  ],
+  "decisions": [
+    {
+      "n": 1,
+      "job": "panel-back",
+      "question": "Corbeille : quelle suite si l'outil par message reste absent ?",
+      "options": [
+        "attendre un outil compatible",
+        "dossier « À supprimer »",
+        "traitement par conversation"
+      ],
+      "recommendation": "attendre un outil compatible",
+      "answered": false,
+      "topic_id": "t_afkdec0001"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "id": "AAMkAGFAKE0002==",
+  "conversation_id": "AAQkAGFAKECONV0002==",
+  "snapshot_rev": "s_20261118T051540",
+  "subject": "RE: Plans révision C",
+  "from": {
+    "name": "Jean Dupont (Câbles Beta)",
+    "address": "j.dupont@example.com"
+  },
+  "to": [
+    {
+      "name": "Moi",
+      "address": "moi@example.com"
+    }
+  ],
+  "cc": [
+    {
+      "name": "Anne Durand",
+      "address": "a.durand@example.org"
+    }
+  ],
+  "received": "2026-11-18T07:12:00+01:00",
+  "owa_link": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0002%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+  "body_status": "cached",
+  "body_text": "Bonjour,\n\nCi-joint les plans révisés.\nPour les fils 12 et 48, pouvez-vous confirmer la section : 0,75 ou 1 mm² ?\n\nCordialement,\nJean Dupont",
+  "body_truncated": false,
+  "body_chars": 142,
+  "attachments": [
+    {
+      "name": "plans-revC.pdf",
+      "size": 812345,
+      "type": "application/pdf"
+    }
+  ],
+  "thread": [
+    {
+      "id": "AAMkAGFAKE0001==",
+      "from": "Moi",
+      "date": "2026-11-17T16:02:00+01:00",
+      "kind": "sent",
+      "subject": "Plans révision C"
+    },
+    {
+      "id": "AAMkAGFAKE0002==",
+      "from": "Jean Dupont",
+      "date": "2026-11-18T07:12:00+01:00",
+      "kind": "received",
+      "subject": "RE: Plans révision C"
+    }
+  ],
+  "proposal": {
+    "action": "reply",
+    "folder_id": null,
+    "folder_path": null,
+    "reason": "question directe sur la section des fils 12 et 48",
+    "confidence": "high",
+    "allowed": true,
+    "disabled_reason": null
+  },
+  "pending_ref": {
+    "kind": "pending",
+    "id": "p_7hd2lw0e"
+  },
+  "draft_ref": null,
+  "topic_id": "t_mail000002",
+  "actions": [
+    "reply_all",
+    "triage",
+    "chat",
+    "open_owa"
+  ]
+}

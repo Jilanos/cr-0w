@@ -1,0 +1,42 @@
+{
+  "http_status": 200,
+  "body": {
+    "operation_id": "op_01HZPD0004",
+    "kind": "pending.done",
+    "status": "succeeded",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Réglé : Câbles Beta (reprise après redémarrage)",
+    "topic_id": null,
+    "dry_run": false,
+    "steps": [],
+    "items": [
+      {
+        "ref": {
+          "kind": "pending",
+          "id": "p_m2n4b6v8"
+        },
+        "status": "succeeded",
+        "detail": "écriture trouvée appliquée au redémarrage, opération confirmée sans réécriture"
+      }
+    ],
+    "result": {
+      "doc_rev_before": "d_4be0c9a1f2",
+      "doc_rev_after": "d_5f5f5f5f5f",
+      "backup": "EN_ATTENTE.20261118T080001.md",
+      "recovered": true
+    },
+    "undo": {
+      "available": false,
+      "until": null,
+      "reason": "fenêtre de 10 s dépassée pendant le redémarrage"
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZPD0004",
+      "events_url": "/api/operations/op_01HZPD0004/events"
+    }
+  }
+}

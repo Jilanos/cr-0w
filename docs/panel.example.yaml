@@ -1,0 +1,50 @@
+# Copy to local/panel.yaml and supply private paths. No build step is required.
+mode: dry_run
+host: 127.0.0.1
+port: 8790
+# Defaults for state_dir, locks_dir and runs_registry live under CROW_HOME/local/.
+# state_dir: /home/example/hub/local/state/panel
+# locks_dir: /home/example/hub/local/state/locks
+# runs_registry: /home/example/hub/local/state/runs.jsonl
+# real_home: /home/example
+pending_md: null
+pending:
+  label: En attente
+  sections:
+    - {prefix: Brouillons, key: drafts, kind: drafts}
+    - {prefix: Relances, key: followups, kind: followups}
+    - {prefix: Décisions, key: decisions, kind: decisions}
+    - {prefix: Dossiers, key: dossiers, kind: dossiers}
+    - {prefix: Rangement, key: filing, kind: filing}
+    - {prefix: Boîte de réception, key: inbox_note, kind: inbox_note}
+    - {prefix: Réglé récemment, key: done, kind: done}
+  root_map: []
+files:
+  roots: []
+work_handoff_dir: null
+mail:
+  triage_rules: null
+  style_rules: null
+  allowed_folders: []
+  body_prefetch: 50
+  proposals_per_sync: 100
+  stale_after_minutes: 120
+  internal_domains: []
+accounts:
+  claude: {provider: claude, kinds: [chat, mail_read, mail_skeleton, mail_triage]}
+  worka: {provider: codex, kinds: [chat, mail_style, files], power: high, model: gpt-5}
+  workb: {provider: codex, kinds: [chat, files], model: gpt-5}
+chat:
+  default_model: sonnet
+  default_account: claude
+  models: [haiku, sonnet, opus]
+  by_kind: {}
+projects: {}
+max_parallel: 2
+routines:
+  maj: {argv: []}
+  daily_update: {argv: []}
+  maj_schedule: []
+floors: {}
+# Action profiles use a deny-by-default PreToolUse hook. Unknown tools are refused.
+# Provide extra READ suffixes only after a headless probe proves the exact schema.

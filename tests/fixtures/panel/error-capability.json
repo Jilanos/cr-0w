@@ -1,0 +1,13 @@
+{
+  "http_status": 422,
+  "body": {
+    "error": {
+      "code": "capability_unavailable",
+      "message": "Corbeille indisponible : outil absent du profil.",
+      "retryable": false,
+      "details": {
+        "capability": "mail_trash"
+      }
+    }
+  }
+}

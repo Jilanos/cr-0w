@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "mode": "dry_run",
+  "counts": {
+    "pending": 14,
+    "overdue": 3,
+    "due_week": 4,
+    "decisions": 3,
+    "inbox": 57,
+    "inbox_unread": 9,
+    "triage_proposals": 21,
+    "drafts": 4,
+    "runs_active": 1,
+    "runs_queued": 0,
+    "afk_decisions": 2
+  },
+  "alerts": [
+    {
+      "level": "error",
+      "text": "Relance Fournisseur Alpha dépassée de 16 jours ouvrés",
+      "ref": {
+        "kind": "pending",
+        "id": "p_k3m9x2qa"
+      }
+    },
+    {
+      "level": "warn",
+      "text": "worka : 9 % restant sur la fenêtre 5 h",
+      "ref": {
+        "kind": "account",
+        "id": "worka"
+      }
+    },
+    {
+      "level": "warn",
+      "text": "Instantané mail vieux de 3 h",
+      "ref": {
+        "kind": "view",
+        "id": "mail"
+      }
+    },
+    {
+      "level": "info",
+      "text": "Mode essai : aucune action mail réelle",
+      "ref": {
+        "kind": "view",
+        "id": "settings"
+      }
+    }
+  ],
+  "locks": {
+    "pending": null,
+    "maj": null,
+    "maintenance": null
+  },
+  "admissions": {
+    "open": true,
+    "reason": null
+  },
+  "mail": {
+    "synced_at": "2026-11-18T05:31:40+01:00",
+    "stale": true,
+    "coverage": "complete"
+  },
+  "since_last_visit": null
+}

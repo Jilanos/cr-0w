@@ -1,0 +1,90 @@
+{
+  "comment": "Mode fixtures du front : route → fichier. Une valeur sans http_status vaut 200. Les fichiers avec http_status/body simulent le code HTTP. ?scenario=<nom> remplace les routes listées.",
+  "now": "2026-11-18T08:31:00+01:00",
+  "routes": {
+    "GET /api/session": "session.json",
+    "GET /api/config": "config-public.json",
+    "GET /api/state": "state.json",
+    "GET /api/capabilities": "capabilities.json",
+    "GET /api/pending": "pending.json",
+    "POST /api/pending/{id}/done": "operation-pending-done.json",
+    "POST /api/pending/{id}/snooze": "operation-pending-snooze.json",
+    "POST /api/operations/{id}/undo": "operation-undone.json",
+    "GET /api/operations/{id}": "operation-reply-all-done.json",
+    "POST /api/operations/{id}/cancel": "operation-chat-queued.json",
+    "GET /api/mail": "mail-list.json",
+    "GET /api/mail/folders": "mail-folders.json",
+    "GET /api/mail/{id}": "mail-detail.json",
+    "POST /api/mail/{id}/fetch": "operation-sync.json",
+    "POST /api/mail/sync": "operation-sync.json",
+    "POST /api/mail/triage/plan": "triage-plan.json",
+    "POST /api/mail/triage/execute": "operation-triage-partial.json",
+    "POST /api/mail/{id}/reply-all": "operation-reply-all.json",
+    "GET /api/drafts": "drafts.json",
+    "GET /api/topics": "topics.json",
+    "GET /api/topics/{id}/messages": "topic-messages.json",
+    "POST /api/topics/{id}/messages": "operation-chat.json",
+    "GET /api/runs": "runs.json",
+    "GET /api/runs/{id}": "run-detail.json",
+    "GET /api/runs/{id}/events": "run-events.json",
+    "GET /api/operations/{id}/events": "run-events.json",
+    "GET /api/routines": "routines.json",
+    "POST /api/routines/{name}": "operation-routine.json",
+    "GET /api/accounts": "accounts.json",
+    "GET /api/dues": "dues.json",
+    "GET /api/dossiers": "dossiers.json",
+    "GET /api/dossiers/{slug}": "dossier-detail.json",
+    "GET /api/afk": "afk.json",
+    "POST /api/files/{id}/open": "files-open.json"
+  },
+  "scenarios": {
+    "empty": {
+      "GET /api/pending": "pending-empty.json",
+      "GET /api/mail": "mail-list-empty.json"
+    },
+    "locked": {
+      "GET /api/state": "state-locked.json",
+      "GET /api/pending": "pending-locked.json",
+      "POST /api/pending/{id}/done": "error-locked.json",
+      "POST /api/routines/{name}": "error-locked.json"
+    },
+    "partial": {
+      "GET /api/mail": "mail-list-partial.json",
+      "GET /api/operations/{id}": "operation-unknown.json"
+    },
+    "conflict": {
+      "POST /api/pending/{id}/done": "error-conflict.json",
+      "POST /api/pending/{id}/snooze": "error-ambiguous.json",
+      "POST /api/operations/{id}/undo": "error-undo-expired.json"
+    },
+    "consumed": {
+      "POST /api/mail/triage/execute": "error-plan-consumed.json"
+    },
+    "expired": {
+      "POST /api/mail/triage/execute": "error-plan-expired.json"
+    },
+    "nobody": {
+      "GET /api/mail/{id}": "mail-detail-not-fetched.json"
+    },
+    "queued": {
+      "POST /api/topics/{id}/messages": "operation-chat-queued.json"
+    },
+    "policy": {
+      "POST /api/topics/{id}/messages": "error-policy.json",
+      "POST /api/mail/triage/plan": "error-capability.json"
+    },
+    "upstream": {
+      "GET /api/runs": "error-upstream.json",
+      "POST /api/topics/{id}/messages": "error-upstream.json"
+    },
+    "recovered": {
+      "GET /api/operations/{id}": "operation-recovered.json"
+    },
+    "forbidden": {
+      "POST /api/pending/{id}/done": "error-forbidden.json"
+    },
+    "idempotency": {
+      "POST /api/pending/{id}/done": "error-idempotency.json"
+    }
+  }
+}

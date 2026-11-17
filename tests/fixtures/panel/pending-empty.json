@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "file_label": "En attente",
+  "doc_rev": "d_000000000e",
+  "writable": true,
+  "lock": null,
+  "updated_note": null,
+  "sections": [
+    {
+      "key": "drafts",
+      "title": "✉️ Brouillons Outlook à relire et envoyer",
+      "kind": "drafts",
+      "columns": null,
+      "items": []
+    },
+    {
+      "key": "followups",
+      "title": "📌 Relances : retours attendus",
+      "kind": "followups",
+      "columns": null,
+      "items": []
+    },
+    {
+      "key": "decisions",
+      "title": "🎯 Décisions et actions de ta part",
+      "kind": "decisions",
+      "columns": null,
+      "items": []
+    },
+    {
+      "key": "done",
+      "title": "✅ Réglé récemment",
+      "kind": "done",
+      "columns": null,
+      "items": []
+    }
+  ],
+  "free_blocks": [],
+  "unparsed": []
+}

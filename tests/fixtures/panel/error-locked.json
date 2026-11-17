@@ -1,0 +1,15 @@
+{
+  "http_status": 423,
+  "body": {
+    "error": {
+      "code": "locked",
+      "message": "Mise à jour en cours depuis 08:15. Réessaie après la fin.",
+      "retryable": true,
+      "details": {
+        "holder": "maj",
+        "since": "2026-11-18T08:15:02+01:00",
+        "run_id": "scr_20261118T081500"
+      }
+    }
+  }
+}

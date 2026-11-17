@@ -1,0 +1,14 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "undo_expired",
+      "message": "Fenêtre d'annulation de 10 s dépassée. Sauvegarde disponible.",
+      "retryable": false,
+      "details": {
+        "operation_id": "op_01HZPD0001",
+        "backup": "EN_ATTENTE.20261118T083102.md"
+      }
+    }
+  }
+}
