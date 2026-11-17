@@ -1,0 +1,42 @@
+{
+  "http_status": 200,
+  "body": {
+    "operation_id": "op_01HZPD0003",
+    "kind": "pending.undo",
+    "status": "succeeded",
+    "request_id": "req_FAKE_0002",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Annulé : Fournisseur Alpha (J. Martin) remis dans Relances",
+    "topic_id": null,
+    "dry_run": false,
+    "steps": [],
+    "items": [
+      {
+        "ref": {
+          "kind": "pending",
+          "id": "p_k3m9x2qa"
+        },
+        "status": "succeeded",
+        "detail": "ligne remise à sa place, entrée Réglé retirée"
+      }
+    ],
+    "result": {
+      "undoes": "op_01HZPD0001",
+      "doc_rev_before": "d_9c2e11ab70",
+      "doc_rev_after": "d_77e1f0b3c2",
+      "backup": "EN_ATTENTE.20261118T083108.md"
+    },
+    "undo": {
+      "available": false,
+      "until": null,
+      "reason": null
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZPD0003",
+      "events_url": "/api/operations/op_01HZPD0003/events"
+    }
+  }
+}

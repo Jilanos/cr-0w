@@ -1,0 +1,9 @@
+{
+  "http_status": 200,
+  "body": {
+    "file_id": "f_3b9e1c44",
+    "opened": true,
+    "dry_run": false,
+    "method": "windows_shell"
+  }
+}

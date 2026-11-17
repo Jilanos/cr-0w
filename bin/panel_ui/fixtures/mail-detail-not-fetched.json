@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "id": "AAMkAGFAKE0009==",
+  "conversation_id": "AAQkAGFAKECONV0009==",
+  "snapshot_rev": "s_20261118T051540",
+  "subject": "Point série A jeudi",
+  "from": {
+    "name": "Marie Leroy",
+    "address": "m.leroy@example.com"
+  },
+  "to": [
+    {
+      "name": "Moi",
+      "address": "moi@example.com"
+    }
+  ],
+  "cc": [],
+  "received": "2026-11-13T10:40:00+01:00",
+  "owa_link": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0009%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+  "body_status": "not_fetched",
+  "body_text": null,
+  "body_truncated": null,
+  "body_chars": null,
+  "attachments": [],
+  "thread": [],
+  "proposal": {
+    "action": "keep",
+    "folder_id": null,
+    "folder_path": null,
+    "reason": "demande de planning, réponse attendue de ta part",
+    "confidence": "low",
+    "allowed": true,
+    "disabled_reason": null
+  },
+  "pending_ref": null,
+  "draft_ref": null,
+  "topic_id": "t_mail000009",
+  "actions": [
+    "fetch_body",
+    "reply_all",
+    "triage",
+    "chat",
+    "open_owa"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "http_status": 202,
+  "body": {
+    "operation_id": "op_01HZCH0002",
+    "kind": "chat.message",
+    "status": "queued",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Chat : Outillage (en file, 2 runs déjà actifs)",
+    "topic_id": "t_3c4d5e6f7a",
+    "dry_run": false,
+    "steps": [
+      {
+        "name": "run",
+        "status": "queued",
+        "account": "claude",
+        "model": "opus",
+        "run_id": null,
+        "started_at": null,
+        "ended_at": null,
+        "error": null
+      }
+    ],
+    "items": [],
+    "result": {
+      "queue_position": 1,
+      "waiting_for": "slot"
+    },
+    "undo": {
+      "available": false,
+      "until": null,
+      "reason": null
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZCH0002",
+      "events_url": "/api/operations/op_01HZCH0002/events"
+    }
+  }
+}

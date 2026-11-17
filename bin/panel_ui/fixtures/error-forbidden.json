@@ -1,0 +1,13 @@
+{
+  "http_status": 403,
+  "body": {
+    "error": {
+      "code": "forbidden",
+      "message": "Jeton ou origine invalide.",
+      "retryable": false,
+      "details": {
+        "reason": "csrf"
+      }
+    }
+  }
+}

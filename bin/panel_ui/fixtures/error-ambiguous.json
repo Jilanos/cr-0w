@@ -1,0 +1,14 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "ambiguous",
+      "message": "Deux lignes identiques après une modification externe. Rien n'a été écrit.",
+      "retryable": false,
+      "details": {
+        "item_id": "p_m2n4b6v8",
+        "matches": 2
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "run_id": "scr_20261118T061500",
+  "kind": "script",
+  "label": "routine:maj",
+  "status": "succeeded",
+  "account": "claude",
+  "model": "sonnet",
+  "started_at": "2026-11-18T06:15:00+01:00",
+  "ended_at": "2026-11-18T06:31:12+01:00",
+  "duration_s": 972,
+  "exit_code": 0,
+  "cost_usd": 0.84,
+  "cost_status": "measured",
+  "operation_id": "op_01HZMJ0001",
+  "report_sections": [
+    {
+      "title": "Livré",
+      "segments": [
+        {
+          "t": "text",
+          "v": "12 mails triés, 3 brouillons, 2 relances ouvertes."
+        }
+      ]
+    },
+    {
+      "title": "Vérifié",
+      "segments": [
+        {
+          "t": "text",
+          "v": "Brouillons présents dans Brouillons."
+        }
+      ]
+    },
+    {
+      "title": "Non vérifié",
+      "segments": [
+        {
+          "t": "text",
+          "v": "PJ du mail Câbles Beta non rangée."
+        }
+      ]
+    },
+    {
+      "title": "Décisions pour le propriétaire",
+      "segments": [
+        {
+          "t": "text",
+          "v": "Aucune."
+        }
+      ]
+    }
+  ],
+  "shots": [],
+  "log_file_id": "f_1a2b3c4d",
+  "events_url": "/api/runs/scr_20261118T061500/events"
+}

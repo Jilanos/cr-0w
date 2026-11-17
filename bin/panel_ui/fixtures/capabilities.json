@@ -1,0 +1,276 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "probed_at": "2026-11-18T01:12:00+01:00",
+  "capabilities": [
+    {
+      "name": "mail_read",
+      "label": "Lire la boîte de réception",
+      "state": "available",
+      "allowed": true,
+      "mode": "live",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "outlook_email_search présent"
+        },
+        "headless_probe": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "1 page Inbox lue, 25 éléments"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "outils d'écriture refusés dans le run de lecture"
+        },
+        "live_trial": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "lecture réelle"
+        }
+      },
+      "reason": null
+    },
+    {
+      "name": "mail_move",
+      "label": "Ranger un mail dans un dossier",
+      "state": "limited",
+      "allowed": true,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "outlook_modify_labels avec moveToFolderId, un message"
+        },
+        "headless_probe": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "liste des dossiers lue"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:14:00+01:00",
+          "detail": "garde de tri : ID hors manifeste refusé"
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": "premier déplacement réel à faire par toi"
+        }
+      },
+      "reason": "Mode essai. Premier déplacement réel en attente de ton clic."
+    },
+    {
+      "name": "mail_archive",
+      "label": "Archiver un mail",
+      "state": "limited",
+      "allowed": true,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "déplacement vers le dossier Archive"
+        },
+        "headless_probe": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "dossier Archive trouvé"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:14:00+01:00",
+          "detail": "même garde que mail_move"
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": "non essayé"
+        }
+      },
+      "reason": "Mode essai. Premier archivage réel en attente de ton clic."
+    },
+    {
+      "name": "mail_trash",
+      "label": "Mettre un mail à la corbeille",
+      "state": "unavailable",
+      "allowed": false,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": false,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "aucun outil de corbeille par message dans le profil"
+        },
+        "headless_probe": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "permissions": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        }
+      },
+      "reason": "Outil absent. Décision du propriétaire attendue."
+    },
+    {
+      "name": "mail_triage_undo",
+      "label": "Annuler un rangement",
+      "state": "limited",
+      "allowed": true,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "redéplacement vers le dossier source"
+        },
+        "headless_probe": {
+          "ok": null,
+          "at": null,
+          "detail": "non sondé"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:14:00+01:00",
+          "detail": "manifeste inverse"
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": "non essayé"
+        }
+      },
+      "reason": "Résultat incertain si le message a changé d'identifiant."
+    },
+    {
+      "name": "draft_skeleton",
+      "label": "Créer le brouillon de réponse à tous",
+      "state": "limited",
+      "allowed": true,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "outlook_create_reply_all_draft"
+        },
+        "headless_probe": {
+          "ok": null,
+          "at": null,
+          "detail": "écriture non sondée cette nuit"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:12:00+01:00",
+          "detail": "aucun outil d'envoi"
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": "non essayé"
+        }
+      },
+      "reason": "Mode essai."
+    },
+    {
+      "name": "draft_style",
+      "label": "Mise en forme du brouillon (worka)",
+      "state": "limited",
+      "allowed": true,
+      "mode": "dry_run",
+      "evidence": {
+        "schema": {
+          "ok": null,
+          "at": null,
+          "detail": "profil worka non sondé depuis WORK"
+        },
+        "headless_probe": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "permissions": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        }
+      },
+      "reason": "Profil worka à sonder."
+    },
+    {
+      "name": "run_stop",
+      "label": "Arrêter un run en cours",
+      "state": "unavailable",
+      "allowed": false,
+      "mode": "live",
+      "evidence": {
+        "schema": {
+          "ok": false,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "aucun arrêt cdx documenté"
+        },
+        "headless_probe": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "permissions": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        },
+        "live_trial": {
+          "ok": null,
+          "at": null,
+          "detail": null
+        }
+      },
+      "reason": "Mécanisme d'arrêt non prouvé. Retirer de la file reste possible."
+    },
+    {
+      "name": "tool_deny_passthrough",
+      "label": "Refus d'outils transmis aux runs",
+      "state": "available",
+      "allowed": true,
+      "mode": "live",
+      "evidence": {
+        "schema": {
+          "ok": true,
+          "at": "2026-11-18T01:10:00+01:00",
+          "detail": "--extra-args accepté"
+        },
+        "headless_probe": {
+          "ok": true,
+          "at": "2026-11-18T01:13:00+01:00",
+          "detail": "outil refusé bien bloqué"
+        },
+        "permissions": {
+          "ok": true,
+          "at": "2026-11-18T01:13:00+01:00",
+          "detail": null
+        },
+        "live_trial": {
+          "ok": true,
+          "at": "2026-11-18T01:13:00+01:00",
+          "detail": null
+        }
+      },
+      "reason": null
+    }
+  ]
+}

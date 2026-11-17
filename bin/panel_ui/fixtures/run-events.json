@@ -1,0 +1,68 @@
+{
+  "comment": "Rejeu SSE pour le mode fixtures. Chaque entrée = un événement : id, event, data.",
+  "run_id": "5d1e2f3a4b5c6d7e8f90a1b2c3d4e5f6",
+  "events": [
+    {
+      "id": 1,
+      "event": "status",
+      "data": {
+        "status": "running",
+        "at": "2026-11-18T08:33:01+01:00"
+      }
+    },
+    {
+      "id": 2,
+      "event": "text",
+      "data": {
+        "text": "Je relis le fil Câbles Beta et la ligne de relance."
+      }
+    },
+    {
+      "id": 3,
+      "event": "tool",
+      "data": {
+        "name": "outlook_email_search",
+        "summary": "Sent, conversation plans révision C, 5 derniers"
+      }
+    },
+    {
+      "id": 4,
+      "event": "text",
+      "data": {
+        "text": "Aucune réponse envoyée depuis le 17/11. Je prépare le texte de relance."
+      }
+    },
+    {
+      "id": 5,
+      "event": "step",
+      "data": {
+        "operation_id": "op_01HZCH0001",
+        "name": "run",
+        "status": "succeeded"
+      }
+    },
+    {
+      "id": 6,
+      "event": "cost",
+      "data": {
+        "cost_usd": null,
+        "cost_status": "unknown",
+        "tokens": 64000
+      }
+    },
+    {
+      "id": 7,
+      "event": "done",
+      "data": {
+        "status": "succeeded",
+        "exit_code": 0,
+        "final_segments": [
+          {
+            "t": "text",
+            "v": "Relance prête dans le chat. Dis « go » pour créer le brouillon."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "topics": [
+    {
+      "topic_id": "t_6a7b8c9d0e",
+      "ref": {
+        "kind": "pending",
+        "id": "p_7hd2lw0e"
+      },
+      "title": "Câbles Beta : plans révision C",
+      "kind": "pending",
+      "last_message_at": "2026-11-18T08:32:00+01:00",
+      "default_model": "sonnet",
+      "default_account": "claude",
+      "active_operation_id": "op_01HZCH0001",
+      "orphan": false,
+      "messages": 2
+    },
+    {
+      "topic_id": "t_dossFA0001",
+      "ref": {
+        "kind": "dossier",
+        "id": "faisceau-serie-a"
+      },
+      "title": "Faisceau série A",
+      "kind": "dossier",
+      "last_message_at": "2026-11-17T18:10:00+01:00",
+      "default_model": "sonnet",
+      "default_account": "worka",
+      "active_operation_id": null,
+      "orphan": false,
+      "messages": 6
+    },
+    {
+      "topic_id": "t_projX00001",
+      "ref": {
+        "kind": "project",
+        "id": "projet-x"
+      },
+      "title": "projet-x",
+      "kind": "project",
+      "last_message_at": null,
+      "default_model": "sonnet",
+      "default_account": "claude",
+      "active_operation_id": null,
+      "orphan": false,
+      "messages": 0
+    },
+    {
+      "topic_id": "t_0rph000001",
+      "ref": {
+        "kind": "pending",
+        "id": "p_old00001"
+      },
+      "title": "Outillage : ancienne ligne modifiée hors panneau",
+      "kind": "pending",
+      "last_message_at": "2026-11-16T11:00:00+01:00",
+      "default_model": "sonnet",
+      "default_account": "claude",
+      "active_operation_id": null,
+      "orphan": true,
+      "messages": 3
+    }
+  ]
+}

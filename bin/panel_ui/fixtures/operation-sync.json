@@ -1,0 +1,39 @@
+{
+  "http_status": 202,
+  "body": {
+    "operation_id": "op_01HZMS0001",
+    "kind": "mail.sync",
+    "status": "running",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Synchronisation de la boîte",
+    "topic_id": null,
+    "dry_run": false,
+    "steps": [
+      {
+        "name": "collect",
+        "status": "running",
+        "account": "claude",
+        "model": "sonnet",
+        "run_id": "3d4e5f60718293a4b5c6d7e8f90a1b2c",
+        "started_at": "2026-11-18T08:31:05+01:00",
+        "ended_at": null,
+        "error": null
+      }
+    ],
+    "items": [],
+    "result": null,
+    "undo": {
+      "available": false,
+      "until": null,
+      "reason": null
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZMS0001",
+      "events_url": "/api/operations/op_01HZMS0001/events"
+    }
+  }
+}
