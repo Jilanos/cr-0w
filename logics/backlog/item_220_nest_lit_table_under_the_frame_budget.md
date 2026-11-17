@@ -1,10 +1,10 @@
 ## item_220_nest_lit_table_under_the_frame_budget - Nest lit table under the frame budget
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 80%
+> Status: In progress
+> Understanding: 90%
 > Confidence: 70%
-> Progress: 0%
+> Progress: 70%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -47,6 +47,24 @@
 # Notes
 - Measure on an idle machine: check `ps -eo pcpu,args --sort=-pcpu | head` first. Stuck image viewers once doubled the numbers.
 - Headless scripts need `PLAYWRIGHT_BROWSERS_PATH` set to the local Playwright browser cache.
+
+# Outcome (2026-11-17)
+- Profile (`hero-table.mjs prof a`, new mode): fillText and the canvas flush (drawImage) were ~40% of the lit frame. With no glyph drawing at all the frame was 6.4 ms.
+- Changes, lit table only, pixel-identical (lit hash and pixel diff unchanged, default hash unchanged):
+  - `paint`: neighbour ASCII glyphs of one style go out as one fillText, letter-spaced to the cell width (avg run 1.8 cells).
+  - `hexOnPlane`: corners projected once, samples lerp x*z, y*z, z (feet fill was the top JS cost).
+- Tried, no gain, reverted: glyph atlas (drawImage per cell, slower), per-row batched sphere backdrops.
+- `perf a`, median/max ms, back to back on the same machine:
+
+| Size | Before | After | Budget | Default |
+|---|---|---|---|---|
+| 1440x900 | 16.3/42 | 12.4/21 | 10 | 7.5 |
+| 707x691 | 14.6/30 | 11.3/23 | 16 | 6.9 |
+| 368x812 | 14.6/32 | 11.3/24 | 16 | 7.0 |
+
+- AC1: fold passes, laptop misses by 2.4 ms (reported to the owner, item_159 AC4). Bench spins every frame (drag worst case); at rest spin is fixed.
+- Left to reach 10 ms: cache the board and feet per spin value (helps rest, not drag), or look trims (owner pick).
+- AC3: drawScene frames are bit-identical to before, so the real app look is unchanged. AC4: tsc clean, vitest 200 green.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |

@@ -134,10 +134,17 @@ function ringOnPlane(g: Grid, cam: Cam, c: V3, R: number, ch: string, col: RGB, 
   }
 }
 // Hex outline on the table plane, same orientation as the etched grid (turned with the table).
+// Corners are projected once: x*z, y*z and z are linear along an edge, so each sample is a lerp and a divide.
 function hexOnPlane(g: Grid, cam: Cam, c: V3, e: number, spin: number, ch: string, col: RGB, a = 1, dt = 0.05) {
+  const P = []
+  for (let s = 0; s <= 6; s++) { const q = cam.proj(add(c, rotY(V(e * Math.cos((s * Math.PI) / 3), 0, e * Math.sin((s * Math.PI) / 3)), spin))); P.push([q.x * q.z, q.y * q.z, q.z]) }
   for (let s = 0; s < 6; s++) {
-    const a0 = (s * Math.PI) / 3, a1 = a0 + Math.PI / 3
-    for (let t = 0; t < 1; t += dt) splat(g, cam, add(c, rotY(V(e * ((1 - t) * Math.cos(a0) + t * Math.cos(a1)), 0, e * ((1 - t) * Math.sin(a0) + t * Math.sin(a1))), spin)), ch, col, a)
+    const [x0, y0, z0] = P[s], [x1, y1, z1] = P[s + 1]
+    for (let t = 0; t < 1; t += dt) {
+      const z = z0 + (z1 - z0) * t
+      if (z <= 0.1) continue
+      put(g, Math.floor((x0 + (x1 - x0) * t) / z / CW), Math.floor((y0 + (y1 - y0) * t) / z / CH), z, ch, col, a)
+    }
   }
 }
 function octa(g: Grid, cam: Cam, c: V3, s: number, col: RGB, gain = 1) {
@@ -477,7 +484,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     head = { x: w / 2, y: top + HH / 2, top, left: w / 2 - hw / 2, right: w / 2 + hw / 2, cw, ch: chh, font: FONT * k, hw, hh: HH }
   }
 
-  paint(cv, g, dpr, layer)
+  paint(cv, g, dpr, layer, T)
 
   const gaps = new Map<PlanetLabel, number>(), depths = new Map<PlanetLabel, number>()
   const out: SceneOut = {
@@ -560,7 +567,7 @@ const rgba = (col: RGB, a: number) => {
   return v
 }
 const BLOOM_DIV = 4
-function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer) {
+function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, runs = false) {
   const ctx = cv.getContext('2d')
   if (!ctx) return
   const L = (offscreen ??= document.createElement('canvas'))
@@ -576,22 +583,40 @@ function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer) {
     // Blank cells clear what is behind them; a run of blanks on a row is one clear (thousands per frame).
     let run = -1
     const flush = (r: number, c: number) => { if (run >= 0) { l.clearRect(run * CW - 0.5, r * CH - 0.5, (c - run) * CW + 1, CH + 1); run = -1 } }
+    // Lit table: neighbour ASCII glyphs with one style go out as one fillText, spaced to the cell width
+    // (fillText dominates its frame; the default keeps one call per cell, pixel for pixel).
+    const adv = l.measureText('M').width, ls = CW - adv
+    // Spacing is set once per pass (each set re-resolves the font); centred glyphs shift by half of it to match.
+    if (runs) l.letterSpacing = `${ls}px`
+    const dx = runs ? ls / 2 : 0
+    let txt = '', tc = -1, ts = ''
+    const emit = (r: number) => {
+      if (!txt) return
+      l.fillStyle = ts; l.textAlign = 'left'; l.fillText(txt, tc * CW + ls / 2, r * CH + CH / 2 + 0.5)
+      txt = ''
+    }
     for (let r = 0; r < gr.rows; r++) {
       for (let c = 0; c < gr.cols; c++) {
         const i = r * gr.cols + c, ch = gr.ch[i]
-        if (!ch || !keep(gr.z[i])) { flush(r, c); continue }
-        if (ch === ' ') { if (run < 0) run = c; continue }
+        if (!ch || !keep(gr.z[i])) { emit(r); flush(r, c); continue }
+        if (ch === ' ') { emit(r); if (run < 0) run = c; continue }
         flush(r, c)
-        draw(gr, i, ch, c, r, CW, CH)
+        const bg = gr.bg?.[i] ?? 0
+        if (!runs || bg > 0 || ch.length !== 1 || ch.charCodeAt(0) > 126) { emit(r); draw(gr, i, ch, c, r, CW, CH, dx); continue }
+        const st = rgba(gr.col[i], gr.a[i])
+        if (txt && st === ts && tc + txt.length === c) txt += ch
+        else { emit(r); txt = ch; tc = c; ts = st }
       }
+      emit(r)
       flush(r, gr.cols)
     }
+    if (runs) l.letterSpacing = '0px'
   }
-  const draw = (gr: Grid, i: number, ch: string, c: number, r: number, CW: number, CH: number) => {
+  const draw = (gr: Grid, i: number, ch: string, c: number, r: number, CW: number, CH: number, dx = 0) => {
     const col = gr.col[i], bg = gr.bg?.[i] ?? 0
     if (bg > 0) { l.fillStyle = rgba(col, bg); l.fillRect(c * CW, r * CH, CW, CH) }
-    l.fillStyle = rgba(col, gr.a[i])
-    l.fillText(ch, c * CW + CW / 2, r * CH + CH / 2 + 0.5)
+    l.fillStyle = rgba(col, gr.a[i]); l.textAlign = 'center'
+    l.fillText(ch, c * CW + CW / 2 + dx, r * CH + CH / 2 + 0.5)
   }
   // Behind the lens, then the head (its silhouette hides the table back), then the front.
   cells(g, (z) => !head || z > head.zSplit)
