@@ -56,12 +56,21 @@ function litBody(p: { name: string; planet: HeroProject['planet']; state: UiStat
   const h = nameHash(p.name)
   const ags = p.members || p.hk > 0 ? [] : p.agents.slice(0, 3)
   const moons = ags.map((a, i) => {
-    const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28, R = p.r * 1.55
-    return { c: add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))), r: p.r * 0.2, col: SC[a.state] }
+    const t = (i / ags.length) * Math.PI * 2 + tt * 0.0004 + h * 6.28
+    return { c: moonAt(p, t), r: p.r * 0.32, col: SC[a.state], t }
   })
   return {
     c: p.c, r: p.r, col, planet: p.planet, tilt: (h - 0.5) * 0.8, spin: h * 6.28 + tt * 0.00025,
     ring: p.state === 'working' ? { phase: -tt * 0.0008 } : undefined, moons, sel: p.hk > 0, quiet, glow, fade,
+  }
+}
+const moonAt = (p: { c: V3; r: number }, t: number) => { const R = p.r * 1.55; return add(p.c, V(R * Math.cos(t), R * 0.35 * Math.sin(t), R * 0.8 * Math.sin(t))) }
+// Orbit trail behind each session moon in its state colour, fading out over ~70 degrees.
+function moonTrails(g: Grid, cam: Cam, b: Body) {
+  const f = b.fade ?? 1
+  for (const m of b.moons) for (let k = 0; k < 40; k++) {
+    const q = k / 40
+    splat(g, cam, moonAt(b, m.t! - 1.2 * (1 - q)), q > 0.6 ? ':' : '.', m.col, (0.3 + 0.7 * q) * Math.max(0.4, f))
   }
 }
 const rampCh = (L: number) => RAMP[clamp(Math.floor(L * 12), 0, 11)]
@@ -347,7 +356,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     const emit = (quiet ? 0.12 : 0.45) + (p.state === 'working' ? 0.25 * pulse : 0) + 0.25 * p.hk + 0.35 * p.ping ** 2
     // Quiet planets go grey so only live states carry a colour; the working one glows a bit more (item_200 pick B).
     const qcol = mix(pal.dim, [128, 128, 128], 0.6), wemit = p.state === 'working' ? 0.25 : 0
-    if (opts.table) bodies.push(litBody(p, quiet ? pal.quiet ?? QUIET : col, quiet, tt, (pulse * (p.state === 'working' ? 0.25 : 0)) + 0.25 * p.hk + 0.35 * p.ping ** 2, fade, SC))
+    if (opts.table) { const b = litBody(p, quiet ? pal.quiet ?? QUIET : col, quiet, tt, (pulse * (p.state === 'working' ? 0.25 : 0)) + 0.25 * p.hk + 0.35 * p.ping ** 2, fade, SC); bodies.push(b); moonTrails(g, cam, b) }
     else spheres.push({ c: p.c, r: p.r, col: quiet && p.state !== 'done' ? qcol : p.state === 'failed' ? mix(col, WHITE, 0.2) : col, emit: emit + wemit, dimf: (quiet ? 0.5 : 1) * fade })
     if (p.state === 'failed') brokenRing(g, cam, p.c, col)
     // Running planets wear a turning ring around their equator, so work reads without relying on colour.

@@ -110,7 +110,7 @@ export function shadePlanet(kind: Planet, P: ShadeIn, n: V3, ln: V3, view: V3, s
 }
 
 export interface Cast { pos: V3; f: V3; focal: number; proj(p: V3): { x: number; y: number; z: number }; ray(sx: number, sy: number): V3 }
-export interface Moon { c: V3; r: number; col: RGB }
+export interface Moon { c: V3; r: number; col: RGB; t?: number } // t: orbit angle, for the trail
 // spin: surface turn in radians. ring.phase: angle of the bright arc on the run ring.
 // fade: depth and hover dimming (1 = full), floored at A_MIN.
 export interface Body {
@@ -180,8 +180,9 @@ export function castPlanets(cam: Cast, cols: number, rows: number, cw: number, c
         const t2 = hitSphere(cam.pos, d, m.c, m.r)
         if (t2 > 0 && t2 < best) {
           best = t2; solid = false
+          // Full state colour with a bright '@' rim so the session state reads at table size.
           const n = norm(sub(add(cam.pos, mul(d, t2)), m.c)), L = clamp(Math.max(0, dot(n, LIGHT)) * 0.9 + 0.1, 0, 1)
-          o = [RAMP[clamp(Math.floor(L * 12), 0, 11)], mix(mix(m.col, DARK, 0.5), WHITE, L * 0.7), 0.5 + 0.5 * L]
+          o = Math.abs(dot(n, d)) < 0.4 ? ['@', mix(m.col, WHITE, 0.45), 1] : [RAMP[clamp(Math.floor(L * 12), 0, 11)], mix(m.col, WHITE, L * 0.4), 0.7 + 0.3 * L]
         }
       }
       if (o) {
