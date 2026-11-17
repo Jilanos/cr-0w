@@ -47,7 +47,7 @@
 - AC2 -> bin/crow-runs report ends with a token line (crow_lib.transcript_tokens). Proof: f470e845 prints `15.0M context read · peak 117k · 89k output · 181 calls · opus-5-5`.
 - AC3 -> runbooks/dispatch-background-runs.md (steps 4-7: one scope, live capture, batched rounds, kind pick); crow_lib.run_brief adds the stop-and-report footer (task 60 calls, mech 40) to every task/mech prompt. Proof: dry-run wrapper file, tests.
 - AC4 -> `--context day` adds nothing to a prompt (it is the usage-limit policy). Measured instead: run start context median 28k (7 runs), plus owner-prefs 6.6k read by every run; bin/crow-cost-audit now prints run start context. Trim not done: owner-prefs slicing saves about 5% on a long run, left as an owner choice. Proof: runbooks/cost-audit.md.
-- AC5 -> bin/crow-cost-audit (context read totals per model and kind). Proof: pending, needs a comparable day after the change. Baseline 92.4M on 2026-11-16.
+- AC5 -> bin/crow-cost-audit (context read totals per model and kind). Proof: pending, needs a comparable day after the change. Baseline 92.4M on 2026-11-16. Interim 2026-11-17 (`--days 1`, window mixes before and after the savers): 59.3M, -36%, $36.14, 99% Opus interactive. Re-run on a full day after 2026-11-17.
 
 # Decision framing
 - Product framing: Not needed

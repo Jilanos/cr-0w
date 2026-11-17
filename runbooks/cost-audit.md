@@ -50,3 +50,4 @@ After the owner trims the profile (plugins or MCP are profile settings outside t
 - Hub start context: 33.7k to 30.0k tokens per call (headless measure). Design skills and figma/playwright moved to the disabled `crow-design` plugin (runbooks/design-sessions.md).
 - owner-prefs split into a core plus `local/prefs/` topic files; 14 duplicated memories pruned (MEMORY.md 7.3 KB to 5.4 KB).
 - Ritual models: forked skills (brief, daily, weekly) and `crow brief|daily|weekly` oneshots run on Sonnet. Skills that run in the live session (wrap, eod) keep the session model: the prompt cache is per model, so a switch re-reads the whole session uncached.
+- Interim re-measure 2026-11-17 (`--days 1`, half before the savers): 59.3M context read vs 92.4M baseline (-36%), $36.14, 99% Opus interactive, hub start context median 51k. Not a comparable day yet.
