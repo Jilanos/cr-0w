@@ -4,7 +4,7 @@
 > Status: Ready
 > Understanding: 80%
 > Confidence: 70%
-> Progress: 35%
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -55,3 +55,5 @@
 # Decisions
 - 2026-11-16 AC1: sketches for A (projector table) and B (war table) approved for static renders. Sketches and compare page in the vault crow folder under `Research/nest-design/item_212/board-sketch/`.
 - B change: no raised 3D hex tile under each planet (reads crowded). The board stays a flat hex etch; priority and state move off the tile (next pass shows how, e.g. a flat lit hex patch and a light thread).
+- 2026-11-17 AC2: owner picked C2 (hex grid plus radar centre) over A1 clockwork, A2 radar, B1 honeycomb edge and B2 bezel. Real-size renders for phone 366x400 and laptop 652x816, composited into the page, in `Research/nest-design/item_212/board-real/` (source `board-real.html?dev=phone|laptop&b=c&x=2`, compare page `compare.html`).
+- 2026-11-17 AC3: C2 spec recorded in item_212 notes and the vault `design-notes.md`.

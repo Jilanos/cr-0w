@@ -4,10 +4,11 @@
 > Status: Ready
 > Understanding: 85%
 > Confidence: 75%
-> Progress: 40%
+> Progress: 55%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-17 10:44:07
 
 # AI Context
 - Summary: Explore richer 3D looks for the hero holotable and its planets (holographic war table, holochess board, galaxy map table) as switchable options next to the current table, which stays as is.
@@ -81,6 +82,13 @@
     - System planet (item_200): takes the type of its most urgent member.
     - Size/age rule rejected: almost every personal repo committed this month, so recency does not spread them.
   - Next: the board under the planets, planned in req_062 (items 214-218). This item stays the design record.
+- 2026-11-17 board picked (item_215, renders in vault `item_212/board-real/`): C2, hex grid plus radar centre.
+  - Hex grid etched in ':' glyphs, faint, fading with distance; planets sit on hex centres.
+  - Rim, spokes and rotating sweep from the A projector table; detailed edge with neutral ticks, no per-project colours.
+  - Centre: radar rings with '+' marks every 30 degrees, crosshair, sweep wedge, one blip per project at half radius.
+  - Under each planet: thin stem plus outline shadow ring, no cone; failed planets get a broken stem; needs-you adds a ring at 1.7r.
+  - Planet size by type (banded .44, terrain .34, ice .30, rock .26), quiet planets violet #a88cff. No raised 3D hex tiles.
+  - The head's projection beam stays visible down to the lens.
   - Earlier next: detailed lit planets (A sphere base: terminator, bands, rings for runs, moons for sessions) at R1 size, then the B board under them.
 
 # Executions
