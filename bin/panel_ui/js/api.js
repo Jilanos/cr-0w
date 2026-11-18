@@ -162,9 +162,34 @@ const fake = {
 
   ddmm(d) { return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'); },
 
+  search(qs) {
+    const query = (new URLSearchParams(qs).get('q') || '').trim();
+    const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+    const terms = fold(query).split(/\s+/).filter(Boolean);
+    const groups = ['mail', 'pending', 'decision', 'dossier', 'run'].map((kind, i) => ({ kind, label: ['Mails', 'En attente', 'Décisions', 'Dossiers', 'Runs'][i], total: 0, items: [] }));
+    const add = (kind, key, title, subtitle, view, text = '') => {
+      if (!terms.length || !terms.every(t => fold(`${title} ${subtitle || ''} ${text}`).includes(t))) return;
+      const group = groups.find(g => g.kind === kind); group.total++;
+      if (group.items.length < 20) group.items.push({ key, title, subtitle: subtitle || '', view });
+    };
+    const mail = this.doc('GET', '/api/mail');
+    for (const m of mail.items) add('mail', m.id, m.subject, m.from.name, 'mail', `${m.preview} ${m.from.address || ''}`);
+    for (const s of this.doc('GET', '/api/pending').sections) for (const row of s.items) {
+      const decision = s.kind === 'decisions';
+      add(decision ? 'decision' : 'pending', row.id, row.title, s.title, decision ? 'decisions' : 'pending',
+        Object.values(row.cells).flat().map(s => s.v).join(' '));
+    }
+    for (const d of this.doc('GET', '/api/afk').decisions) add('decision', 'afk:' + d.n, d.question, d.job, 'decisions', d.options.join(' '));
+    for (const d of this.doc('GET', '/api/dossiers').dossiers) add('dossier', d.slug, d.title, `${d.open_count} lignes`, 'dossiers');
+    const runs = this.doc('GET', '/api/runs');
+    for (const r of runs?.runs || []) add('run', 'run:' + r.run_id, r.label, r.status, 'jobs', `${r.run_id} ${r.account} ${r.project} ${r.model}`);
+    return { status: 200, data: { query, groups, sources: { mail: { coverage: mail.coverage.status, synced_at: mail.synced_at, stale: mail.stale }, runs: runs?.source_status } } };
+  },
+
   async request(method, rawPath, body) {
     await new Promise((r) => setTimeout(r, 60));
     const [path, qs] = rawPath.split('?');
+    if (method === 'GET' && path === '/api/search') return this.search(qs);
     if (method === 'GET' && path === '/api/operations') return { status: 200, data: { operations: [...this.ops.values()].map(e => clone(e.done ? e.final : e.op)) } };
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
     const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
@@ -205,6 +230,8 @@ const fake = {
     const data = clone(res.data);
     switch (route.pattern) {
       case '/api/mail': {
+        const id = new URLSearchParams(qs || '').get('id');
+        if (id) data.items = data.items.filter(m => m.id === id);
         const q = new URLSearchParams(qs || '').get('q');
         if (q) {
           const n = q.toLowerCase();

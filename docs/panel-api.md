@@ -58,6 +58,7 @@ fixture. Supply one when retrying it.
 | `/api/operations`, `/api/operations/{id}` | GET |
 | `/api/operations/{id}/undo`, `/cancel`, `/reconcile` | POST |
 | `/api/operations/{id}/events`, `/api/runs/{id}/events` | GET, SSE |
+| `/api/search?q=...&limit=20` | GET |
 | `/api/mail`, `/api/mail/{id}`, `/api/mail/folders`, `/api/drafts` | GET |
 | `/api/mail/sync`, `/api/mail/{id}/fetch`, `/api/mail/{id}/reply-all` | POST |
 | `/api/mail/triage/plan`, `/api/mail/triage/execute` | POST |
@@ -78,6 +79,24 @@ tokens are masked before event persistence.
 Nested JSON values and displayed run reports are also redacted. Raw subprocess
 logs remain private source artifacts and can retain credentials. Do not include
 their directory in file roots until a redacting script runner is available.
+
+## Global search
+
+`GET /api/search?q=...&limit=20` requires the session cookie. The query has at most
+200 characters. Each group returns at most `limit` items (1 to 50) and an exact
+`total` for the local data searched. Empty queries return empty groups. All words
+must match, with case and accents ignored. Groups are `mail`, `pending`,
+`decision`, `dossier` and `run`. Each result has `key`, `view`, `title` and
+`subtitle` for opening the existing view. Decision rows appear only in the
+decision group. Completed pending rows remain searchable.
+
+`sources.mail` reports snapshot coverage, timestamp and staleness. Search reads
+published subjects, sender names/addresses and previews, across all mailbox
+pages. It never requests a body or starts a sync. `GET /api/mail?id=...` resolves
+an exact published row when opening a result beyond the first page. Run search
+covers a year of local registry entries and up to 200 recent cdx rows;
+`sources.runs` reports availability. No query is written to access logs or browser
+storage.
 
 ## Actions and evidence
 

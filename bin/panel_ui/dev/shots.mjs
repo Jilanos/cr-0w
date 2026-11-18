@@ -195,6 +195,56 @@ const VIEWS = ['today', 'mail', 'pending', 'decisions', 'drafts', 'dossiers', 'j
 const SCENARIOS = [];
 const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });
 
+for (const [theme, viewport] of [['light', DESK], ['dark', { ...DESK, dark: true }], ['mobile', MOBILE]]) {
+  add(`search-${theme}`, viewport, async (page, base) => {
+    await open(page, base);
+    await page.key('/');
+    await expect(page, '#dialog[open]', 'Recherche globale');
+    await page.type('a'); await sleep(600);
+    for (const kind of ['Mails', 'En attente', 'Décisions', 'Dossiers', 'Runs']) await expect(page, '.search-group', kind);
+    await page.shot(`search-${theme}`);
+    await page.key('Enter', 700);
+    await expect(page, '.view-title', 'Mails');
+    if (await has(page, '#dialog[open]')) throw new Error('Recherche encore ouverte');
+    await page.eval(`document.querySelector('.chat-input')?.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key:'k', ctrlKey:true, bubbles:true, cancelable:true })); true`);
+    if (await page.eval('document.activeElement.id') !== 'global-search') throw new Error('Ctrl+K ne donne pas le focus à la recherche');
+    await page.type('corbeille'); await sleep(600);
+    await page.key('Enter', 700);
+    await expect(page, '.detail', 'quelle suite');
+    await page.click('#search-open'); await page.type('atelier'); await sleep(600);
+    await page.click('.search-result', 'Faisceau série A'); await sleep(500);
+    await expect(page, '.view-title', 'Dossiers');
+    await page.click('#search-open'); await page.type('routine:maj'); await sleep(600);
+    await page.key('Enter', 600); await expect(page, '.report', 'Livré');
+  });
+}
+
+add('search-filter-empty-stale', DESK, async (page, base) => {
+  await open(page, base, { view: 'pending' });
+  await page.key('j'); await page.key('/');
+  if (await page.eval('document.activeElement.id') !== 'filter') throw new Error('Filtre de liste perdu');
+  await page.key('Escape');
+  await page.click('.segmented button', 'Échéances 14 j');
+  await page.click('#search-open'); await page.type('Alpha'); await sleep(600);
+  await page.click('.search-result', 'Fournisseur Alpha (J. Martin)'); await sleep(600);
+  await expect(page, '.detail h2', 'Fournisseur Alpha (J. Martin)');
+  await expect(page, '.segmented button.active', 'Liste');
+  await page.click('#search-open'); await page.type('zzzz-unmatched'); await sleep(600);
+  await expect(page, '#search-results', 'Aucun résultat');
+  await page.key('Enter'); await expect(page, '#dialog[open]', 'Recherche globale');
+  await page.key('Escape');
+  await page.click('#search-open');
+  await page.eval(`(async () => { const {api} = await import('./js/api.js'); const get = api.get.bind(api);
+    api.get = async p => { if(p.includes('/api/search?q=old')) { await new Promise(r=>setTimeout(r,600)); return { groups:[{label:'Mails',total:1,items:[{key:'old',title:'Obsolete',view:'mail'}]}],sources:{} }; } return get(p); }; })()`);
+  await page.type('old'); await sleep(200);
+  await page.eval(`document.getElementById('global-search').value='atelier'; document.getElementById('global-search').dispatchEvent(new Event('input',{bubbles:true})); true`);
+  await sleep(900); await expect(page, '.search-result', 'Faisceau série A');
+  if (await has(page, '.search-result', 'Obsolete')) throw new Error('Réponse ancienne affichée');
+  await page.key('ArrowDown'); await page.key('ArrowUp');
+  const active = await page.eval(`document.getElementById('global-search').getAttribute('aria-activedescendant')`);
+  if (!active) throw new Error('Résultat clavier absent');
+});
+
 add('flow-since-visit', DESK, async (page, base) => {
   await open(page, base, { scenario: 'visit' });
   await expect(page, '.card', 'Depuis ta dernière visite');

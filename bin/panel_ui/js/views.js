@@ -1138,7 +1138,7 @@ export function makeViews(ctx) {
             detail: () => queueDetail(q),
           });
         }
-        if (recent.length) { out.push(groupHeader('Récents (24 h)', recent.length)); recent.forEach((r) => out.push(runEntry(r))); }
+        if (recent.length) { out.push(groupHeader('Récents', recent.length)); recent.forEach((r) => out.push(runEntry(r))); }
       }
       return out;
     },

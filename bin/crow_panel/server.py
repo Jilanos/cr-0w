@@ -23,6 +23,7 @@ from .security import CSP, Files
 from .visits import Visits
 from .afk import Decisions
 from .followups import Followups
+from .search import Search
 
 
 class App:
@@ -67,7 +68,7 @@ class App:
                  else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
             "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Mise à jour"}, {"name": "daily_update", "label": "Mise à jour machine"}],
             "views": ["today", "mail", "pending", "decisions", "drafts", "dossiers", "jobs", "accounts"],
-            "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter", "x": "toggle_select", "?": "help", "Escape": "close"}}
+            "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
 
     def topic(self, key):
         topic = self.store.get("topics", key)
@@ -91,6 +92,8 @@ class App:
             return routes[path]()
         if path == "/api/mail":
             return self.mail.list(query)
+        if path == "/api/search":
+            return Search(self).view(query)
         if path == "/api/runs":
             return self.readers.runs(int(query.get("since_hours", [24])[0]))
         if path == "/api/dues":

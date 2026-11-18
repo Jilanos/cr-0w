@@ -60,6 +60,8 @@ class Mail:
                 raise Problem(409, "conflict", "La boîte a changé. Recharge la liste.")
         text = query.get("q", [""])[0].casefold()
         items = [row for row in snapshot["items"] if text in (row["subject"] + " " + row["from"]["name"] + " " + row["preview"]).casefold()]
+        if query.get("id"):
+            items = [row for row in items if row["id"] == query["id"][0]]
         end = offset + limit
         active = next((o["operation_id"] for o in self.store.all("operations") if o["kind"] == "mail.sync" and o["status"] in ("queued", "running")), None)
         return {"generated_at": now(), "snapshot_rev": snapshot["snapshot_rev"], "synced_at": snapshot["synced_at"],

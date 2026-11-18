@@ -8,6 +8,7 @@ import {
 } from './ui.js';
 import { makeViews } from './views.js';
 import { renderChat, focusComposer, setChatDraft } from './chat.js';
+import { openSearch } from './search.js';
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('crow.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -343,6 +344,34 @@ async function setView(name, key) {
 
 function go(view, key) { return setView(view, key); }
 
+async function openSearchResult(entry) {
+  store.filter = ''; document.getElementById('filter').value = '';
+  if (entry.view === 'pending') store.pendingTab = 'list';
+  if (entry.view === 'mail') {
+    store.mailMode = 'inbox'; LS.set('mailMode', 'inbox');
+    await load('mail', null, { force: true });
+    if (!(cached('mail')?.items || []).some(row => row.id === entry.key)) {
+      const found = await api.get('/api/mail?id=' + encodeURIComponent(entry.key));
+      if (!found.items.length) throw new Error('Ce mail a quitté l’instantané. Relance la recherche.');
+      if (found.snapshot_rev !== cached('mail')?.snapshot_rev) throw new Error('La boîte a changé. Relance la recherche.');
+      cached('mail').items.push(found.items[0]);
+    }
+  } else if (entry.view === 'jobs') {
+    await load('runs', '/api/runs?since_hours=8760', { force: true });
+  } else {
+    await refresh(entry.view === 'decisions' ? ['pending', 'afk'] : [entry.view]);
+  }
+  await setView(entry.view, entry.key);
+  if (!selectedEntry()) throw new Error('Cet élément a changé. Relance la recherche.');
+  document.getElementById('pane-detail').focus({ preventScroll: true });
+}
+
+function searchGlobal() {
+  const dialog = document.getElementById('dialog');
+  if (dialog.open) { document.getElementById('global-search')?.focus(); return; }
+  openSearch(api, openSearchResult);
+}
+
 function move(delta) {
   const rows = listEntries.filter((e) => !e.header);
   if (!rows.length) return;
@@ -503,7 +532,8 @@ function showHelp() {
     ['e', 'Réglé (liste Relances et Décisions seulement)'],
     ['r', 'ouvrir la consigne de réponse à tous (mail), ne lance rien'],
     ['c', 'aller au chat'],
-    ['/', 'filtrer la liste'],
+    ['/', 'filtrer si la liste a le focus, sinon rechercher partout'],
+    ['Ctrl+K', 'recherche globale'],
     ['x', 'cocher la proposition (vue Propositions)'],
     ['?', 'cette aide'],
     ['Échap', 'fermer, quitter le champ'],
@@ -516,7 +546,10 @@ let gPending = false;
 const GO = { t: 'today', m: 'mail', p: 'pending', d: 'decisions', b: 'drafts', f: 'dossiers', j: 'jobs', a: 'accounts' };
 
 function onKey(e) {
-  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.defaultPrevented) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !e.altKey) { e.preventDefault(); searchGlobal(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.getElementById('dialog').open) return;
   const t = e.target;
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   if (e.key === 'Escape') {
@@ -556,7 +589,11 @@ function onKey(e) {
     case 'r': if (v.onReplyKey) { e.preventDefault(); v.onReplyKey(); } break;
     case 'x': if (v.onToggleKey) { e.preventDefault(); v.onToggleKey(); } break;
     case 'c': e.preventDefault(); openChat(); break;
-    case '/': if (!v.wide) { e.preventDefault(); document.getElementById('filter').focus(); } break;
+    case '/':
+      e.preventDefault();
+      if (!v.wide && t?.closest('#pane-list')) document.getElementById('filter').focus();
+      else searchGlobal();
+      break;
     case '?': e.preventDefault(); showHelp(); break;
     case 'g': gPending = true; setTimeout(() => { gPending = false; }, 1200); break;
     default: break;
@@ -568,6 +605,8 @@ function onKey(e) {
 async function boot() {
   initRail();
   initDrawer();
+  document.getElementById('search-open').append(icon('search'));
+  document.getElementById('search-open').addEventListener('click', searchGlobal);
   setFileOpener(openFile);
   document.getElementById('drawer-close').append(icon('close'));
   document.getElementById('dialog-close').append(icon('close'));

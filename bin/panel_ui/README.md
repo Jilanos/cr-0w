@@ -48,4 +48,4 @@ The script serves this folder with the server's CSP headers, opens every view in
 
 ## Keyboard
 
-`j`/`k` move, `Entrée` opens, `e` Réglé (pending lists only), `r` opens the reply-all instructions box (never sends), `c` chat, `/` filter, `x` check a triage proposal, `?` help, `Échap` closes, `g` then a letter switches view (`t m p d b f j a`).
+`j`/`k` move, `Entrée` opens, `e` Réglé (pending lists only), `r` opens the reply-all instructions box (never sends), `c` chat, `/` filters the focused list or opens global search elsewhere, Ctrl+K opens global search, `x` checks a triage proposal, `?` opens help, `Échap` closes, `g` then a letter switches view (`t m p d b f j a`).

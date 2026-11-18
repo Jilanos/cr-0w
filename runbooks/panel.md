@@ -66,6 +66,15 @@ them. Messages the sync cannot find in Drafts or Sent appear apart, under
 quota resets by default; **Comptes** shows them and a toggle brings them back.
 **Mails à ranger** counts move, archive and trash proposals only.
 
+The search button or Ctrl+K opens global search. `/` opens it when the list has
+no focus; within the list, `/` focuses its filter. Search matches all words,
+ignoring case and accents. It groups local mail subjects, senders and previews,
+pending rows, decisions, dossiers and runs. Arrow keys choose a result; Enter
+opens it. Mail search covers the complete published snapshot, including rows
+beyond the first page. Runs cover the past year in the registry and up to 200
+recent cdx runs. Source warnings and result limits remain visible. Searching
+never fetches mail bodies or launches an agent. Queries are not saved.
+
 The home page retains changes since the previous page visit. Pending clicks made
 during an update join a durable queue. Rows stay visible until applied; remove a
 queued click from its toast or Jobs. Changed rows fail without editing the file.

@@ -98,6 +98,8 @@ class Readers:
         if not row:
             row = next((r for r in self.launcher.rows("7d") if r["run_id"] == key), None)
         if not row:
+            row = next((r for r in self.registry() if r["run_id"] == key), None)
+        if not row:
             raise Problem(404, "not_found", "Run introuvable.")
         report = row.get("task_report")
         text = ""

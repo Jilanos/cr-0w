@@ -530,6 +530,15 @@ body.drawer-open .toasts { bottom: calc(min(42vh, 380px) + 16px); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px 24px; }
 .dialog-head h2 { font-size: 16px; }
 .dialog-body { padding: 8px 24px 24px; }
+.dialog.dialog-wide { width: min(680px, calc(100vw - 24px)); }
+.search-box { display: grid; gap: 12px; }
+.search-box > input { width: 100%; min-width: 0; }
+#search-results { max-height: min(55vh, 540px); overflow-y: auto; }
+.search-group { padding: 12px 8px 4px; font-weight: 600; color: var(--muted); }
+.search-result { display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%; min-height: 44px; padding: 8px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); }
+.search-result[aria-selected="true"] { background: var(--pane); outline: 1px solid var(--accent); outline-offset: -1px; }
+.search-title { font-weight: 600; overflow-wrap: anywhere; }
+.search-result .small { overflow-wrap: anywhere; }
 .keys { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; margin: 0; align-items: center; }
 .keys dd { margin: 0; color: var(--muted); }
 
