@@ -81,6 +81,7 @@ Yield when a signal flips back:
 Wake-on-LAN:
 - Mechanism: `ethtool -s <iface> wol g` enables the magic packet; `ethtool` options are listed in its [man page](https://man.archlinux.org/man/ethtool.8), read 2026-11-07, which does not say if the setting survives reboot (persist with a NetworkManager or systemd `.link` setting; not checked). BIOS must allow wake from the soft-off state. Wired only in practice.
 - A magic packet is a link-layer broadcast. Something on the tower's LAN must send it: the homelab (always on) or the router.
+- Superseded 2026-11-18 (owner, req_056): wake from sleep is in scope, sender the router's WOL proxy; see item_242 and item_243.
 - Owner decision 2026-11-07: no wake-on-LAN in v1 (later, not a priority). The tower takes work only when already on and idle. Add WoL when the homelab exists and scheduled night jobs want the tower. Decision D3.
 
 ## 5. Antigravity and Google free usage

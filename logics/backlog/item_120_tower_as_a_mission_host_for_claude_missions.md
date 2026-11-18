@@ -8,7 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-07 11:22:08
+> Indicators reviewed: 2026-11-18 11:14:28
 
 # AI Context
 - Summary: The tower becomes a second mission host that also runs Claude missions. It needs cdx config, accounts and worktrees on the tower, and run records gathered from both hosts.
@@ -27,7 +27,7 @@
   - Gather run records from both hosts into the mission record.
   - Cold-run resume on the tower from the brief and version files.
 - Out:
-  - Wake-on-LAN (later, none in v1).
+  - Wake and sleep (item_242, item_243; Wake-on-LAN back in scope 2026-11-18).
   - Homelab control host (later).
 
 # Acceptance criteria
@@ -46,7 +46,8 @@
 # Links
 - Product brief(s): (none yet)
 - Architecture decision(s): (none yet)
-- Request: `req_029_spike_hosts_model_sources_and_local_ai_benchmarks`
+- Request: `req_029_spike_hosts_model_sources_and_local_ai_benchmarks`, `req_056_crow_on_the_windows_tower`
+- Task: `task_022_orchestrate_crow_on_the_windows_tower` step 6. Owner 2026-11-18: missions start from Nest; recheck remote `--continue-run` in the current cdx before building.
 - Primary task(s): (none yet)
 
 # Priority
