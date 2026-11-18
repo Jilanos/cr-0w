@@ -31,7 +31,7 @@ describe('Nest-started sessions (item_188)', () => {
     expect(a).toBeDefined()
   })
 
-  it('shows Terminal on a headless session only', async () => {
+  it('shows Terminal on every session, Log on background runs', async () => {
     const src = fixtureSource()
     const r = await src.actions.start({ project: 'demo' })
     const s = await snapshot(src)
@@ -42,14 +42,16 @@ describe('Nest-started sessions (item_188)', () => {
       return renderToStaticMarkup(<DataContext.Provider value={src}><Desk snap={s} refresh={refresh} /></DataContext.Provider>)
     }
     expect(render(`?pid=${pid}`)).toContain('>Terminal</button>')
-    const other = agents.find((x) => x.kind === 'session' && !x.tmux)!.pid
-    expect(render(`?pid=${other}`)).not.toContain('>Terminal</button>')
-    expect(render(`?pid=${other}`)).toContain('>Log</button>')
+    const kitty = agents.find((x) => x.kind === 'session' && !x.tmux)!.pid
+    expect(render(`?pid=${kitty}`)).toContain('>Terminal</button>')
+    const run = agents.find((x) => x.kind === 'run')!.pid
+    expect(render(`?pid=${run}`)).not.toContain('>Terminal</button>')
+    expect(render(`?pid=${run}`)).toContain('>Log</button>')
   })
 })
 
 describe('Terminal tab and setup sessions (item_240)', () => {
-  it('reads, types into and sizes a tmux session; refuses one outside tmux', async () => {
+  it('reads, types into and sizes a session; refuses a background run', async () => {
     const src = fixtureSource()
     const r = await src.actions.start({ project: 'demo' })
     const s = await snapshot(src)
@@ -60,8 +62,10 @@ describe('Terminal tab and setup sessions (item_240)', () => {
     expect(scr.cursor.shown).toBe(true)
     await expect(src.actions.keys(pid, [{ text: 'hi' }, { key: 'Enter' }])).resolves.toBeTruthy()
     await expect(src.actions.resize(pid, 100, 30)).resolves.toBeTruthy()
-    const other = agents.find((x) => x.kind === 'session' && !x.tmux)!.pid
-    await expect(src.actions.screen(other)).rejects.toMatchObject({ status: 409 })
+    const kitty = agents.find((x) => x.kind === 'session' && !x.tmux)!.pid
+    await expect(src.actions.screen(kitty)).resolves.toBeTruthy()
+    const run = agents.find((x) => x.kind === 'run')!.pid
+    await expect(src.actions.screen(run)).rejects.toMatchObject({ status: 409 })
   })
 
   it('shows a setup session as waiting on setup, without the attach button', async () => {

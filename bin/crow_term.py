@@ -19,6 +19,7 @@ import glob
 import json
 import os
 import pwd
+import re
 import shlex
 import shutil
 import subprocess
@@ -352,6 +353,51 @@ def resize_args(pane, cols, rows):
     if not (20 <= cols <= 400 and 5 <= rows <= 200):
         raise ValueError("size: cols 20 to 400, rows 5 to 200")
     return ["tmux", "resize-window", "-t", pane, "-x", str(cols), "-y", str(rows)]
+
+
+# kitty windows (sessions started from a terminal): same screen and keys, read with
+# `kitten @ get-text` and typed with send-text / send-key. The window keeps its own size.
+KITTY_KEYS = {"Enter": "enter", "Escape": "escape", "BSpace": "backspace", "Tab": "tab", "BTab": "shift+tab",
+              "Up": "up", "Down": "down", "Left": "left", "Right": "right", "Home": "home", "End": "end",
+              "PPage": "page_up", "NPage": "page_down", "DC": "delete", "IC": "insert", "Space": "space",
+              **{f"C-{c}": f"ctrl+{c}" for c in "abcdefghijklmnopqrstuvwxyz"}}
+# --add-cursor ends the text with the cursor shown/hidden, its position (1-based) and its blink mode.
+KITTY_CURSOR = re.compile(r"\x1b\[\?25([hl])\x1b\[(\d+);(\d+)H(?:\x1b\[\?12[hl])?\n?$")
+
+
+def kitty_screen_of(sock, wid, run=subprocess.run):
+    """{lines (ANSI), cols, rows, cursor: {x, y, shown}} of a kitty window, else None."""
+    to = ["kitten", "@", "--to", sock]
+    txt = run([*to, "get-text", "--match", f"id:{wid}", "--ansi", "--add-cursor", "--extent", "screen"],
+              capture_output=True, text=True, timeout=5)
+    ls = run([*to, "ls", "--match", f"id:{wid}"], capture_output=True, text=True, timeout=5)
+    if txt.returncode or ls.returncode:
+        return None
+    try:
+        win = next(w for o in json.loads(ls.stdout) for t in o.get("tabs", []) for w in t.get("windows", []) if w.get("id") == wid)
+    except (ValueError, StopIteration):
+        return None
+    text, cursor = txt.stdout, {"x": 0, "y": 0, "shown": False}
+    if m := KITTY_CURSOR.search(text):
+        text = text[:m.start()]
+        cursor = {"x": int(m.group(3)) - 1, "y": int(m.group(2)) - 1, "shown": m.group(1) == "h"}
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return {"lines": lines, "cols": win.get("columns", 0), "rows": win.get("lines", 0), "cursor": cursor}
+
+
+def kitty_keys_args(sock, wid, keys):
+    """kitten commands for keys (same items as keys_args). Text is sent literally: send-text reads
+    Python escapes, so backslashes are doubled."""
+    to = ["kitten", "@", "--to", sock]
+    out = []
+    for k in keys_args("-", keys):
+        if k[-2] == "-l":
+            out.append([*to, "send-text", "--match", f"id:{wid}", "--", k[-1].replace("\\", "\\\\")])
+        else:
+            out.append([*to, "send-key", "--match", f"id:{wid}", KITTY_KEYS[k[-1]]])
+    return out
 
 
 def focus(pid, backend=None):

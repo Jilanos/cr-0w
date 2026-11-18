@@ -1139,7 +1139,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   --tty-bg: #1e2030; --tty-fg: #cad3f5; --tty-pad: 10px;
   --ansi-0: #494d64; --ansi-1: #ed8796; --ansi-2: #a6da95; --ansi-3: #eed49f; --ansi-4: #8aadf4; --ansi-5: #f5bde6; --ansi-6: #8bd5ca; --ansi-7: #b8c0e0;
   --ansi-8: #5b6078; --ansi-9: #ed8796; --ansi-10: #a6da95; --ansi-11: #eed49f; --ansi-12: #8aadf4; --ansi-13: #f5bde6; --ansi-14: #8bd5ca; --ansi-15: #a5adcb;
-  position: relative; flex: 1; min-height: 240px; overflow: hidden; padding: var(--tty-pad); box-sizing: border-box;
+  position: relative; flex: 1; min-height: 240px; overflow: auto; padding: var(--tty-pad); box-sizing: border-box;
   background: var(--tty-bg); color: var(--tty-fg); border: 1px solid var(--line); border-radius: 10px;
   font: 13px/1.25 'Fira Code', ui-monospace, monospace; font-variant-ligatures: none; white-space: pre; cursor: text; outline: none;
 }

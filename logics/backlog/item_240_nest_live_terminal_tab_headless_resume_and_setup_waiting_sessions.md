@@ -14,7 +14,7 @@
 - Keywords: nest, terminal, tmux, capture-pane, send-keys, resume, headless, setup
 - Use when: changing the Desk chat pane's Terminal tab or how Nest resumes sessions.
 - Skip when: background runs or remote hosts.
-- Built: core `routeTerminal` (terminal.go) over `bin/crow-screen`; Nest `ui/Terminal.tsx` + `ui/ansi.ts`; crow-runs `setup` state; crow-focus resumes with `cdx resume <account> --project <cwd> --conversation <id>` (the old `cdx <account> --dir --resume` form had stopped working). Log stays on rows without tmux; the attach route is kept with no button.
+- Built: core `routeTerminal` (terminal.go) over `bin/crow-screen`; Nest `ui/Terminal.tsx` + `ui/ansi.ts`; crow-runs `setup` state; crow-focus resumes with `cdx resume <account> --project <cwd> --conversation <id>` (the old `cdx <account> --dir --resume` form had stopped working). Sessions started in kitty get the same tab through kitty remote control (owner ask 2026-11-18); Log stays only on background runs. The attach route is kept with no button.
 
 # Problem
 - Resume from Nest still opens a kitty window.
@@ -56,3 +56,4 @@
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | hub session | - | Terminal tab, headless resume, setup state | Done | - | Live check on lazytf: start, screen, keys (pong), resize, resume headless, stop. Pytest 684, Go 221, vitest 211. |
+| 2026-11-18 | hub session | - | Terminal tab on kitty sessions | Done | - | crow-screen falls back to the kitty window; live check: keys into a throwaway kitty window, screen of a kitty session through core. |

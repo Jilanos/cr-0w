@@ -1,9 +1,9 @@
 package api
 
-// Terminal tab of a Nest session (item_240): the screen of the tmux pane holding the
-// session, keys typed into it, and its size, through `crow-screen`. These calls poll
-// about once a second, so they read the cached dispatch view (no refresh) and are not
-// logged in actions.jsonl. Only agents with a tmux session are served.
+// Terminal tab of a Nest session (item_240): the screen of the tmux pane or kitty window
+// holding the session, keys typed into it, and its size, through `crow-screen`. These
+// calls poll about once a second, so they read the cached dispatch view (no refresh) and
+// are not logged in actions.jsonl. Only interactive sessions are served, not runs.
 
 import (
 	"encoding/json"
@@ -29,8 +29,9 @@ type Resize struct {
 	Rows int `json:"rows"`
 }
 
-// tmuxAgent is the agent with pid in the cached dispatch view, when it runs in tmux.
-func (s *Server) tmuxAgent(pid string) (map[string]any, int, error) {
+// termAgent is the agent with pid in the cached dispatch view, when it is an interactive
+// session (a background run has no screen).
+func (s *Server) termAgent(pid string) (map[string]any, int, error) {
 	if n, err := strconv.Atoi(pid); err != nil || n <= 0 {
 		return nil, http.StatusNotFound, fmt.Errorf("bad pid %q", pid)
 	}
@@ -57,15 +58,15 @@ func (s *Server) tmuxAgent(pid string) (map[string]any, int, error) {
 			return nil, http.StatusNotFound, err
 		}
 	}
-	if str(a, "tmux") == "" {
-		return nil, http.StatusConflict, fmt.Errorf("session %s runs in no tmux session", pid)
+	if str(a, "kind") != "session" && str(a, "tmux") == "" {
+		return nil, http.StatusConflict, fmt.Errorf("%s is a background run, it has no screen", pid)
 	}
 	return a, 0, nil
 }
 
 // screenCall runs crow-screen and replies with its JSON line: 200 ok, 409 refused, 502 failed.
 func (s *Server) screenCall(w http.ResponseWriter, pid string, args ...string) {
-	if _, code, err := s.tmuxAgent(pid); err != nil {
+	if _, code, err := s.termAgent(pid); err != nil {
 		fail(w, code, err.Error())
 		return
 	}

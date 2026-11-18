@@ -27,6 +27,9 @@ func TestTerminalRoutes(t *testing.T) {
 		{"resize", post("/api/sessions/4242/resize", `{"cols":100,"rows":30}`),
 			`{"ok":true,"code":0,"message":"100x30"}`, nil, 200,
 			[]string{"resize", "--pid", "4242", "--cols", "100", "--rows", "30"}},
+		{"kitty session", call{method: http.MethodGet, path: "/api/sessions/6161/screen"},
+			`{"ok":true,"code":0,"message":"screen","lines":[],"cols":114,"rows":53,"cursor":{"x":0,"y":0,"shown":false}}`, nil, 200,
+			[]string{"show", "--pid", "6161"}},
 		{"refused", post("/api/sessions/4242/keys", `{"keys":[{"key":"F99"}]}`),
 			`{"ok":false,"code":1,"message":"unknown key F99"}`, errors.New("exit status 1"), 409, nil},
 		{"tmux failed", call{method: http.MethodGet, path: "/api/sessions/4242/screen"},
@@ -52,13 +55,13 @@ func TestTerminalRoutes(t *testing.T) {
 	}
 }
 
-// Sessions outside tmux, unknown pids and bad bodies never reach crow-screen.
+// Background runs, unknown pids and bad bodies never reach crow-screen.
 func TestTerminalRefusals(t *testing.T) {
 	cases := []struct {
 		c    call
 		code int
 	}{
-		{call{method: http.MethodGet, path: "/api/sessions/6161/screen"}, 409},
+		{call{method: http.MethodGet, path: "/api/sessions/5151/screen"}, 409},
 		{call{method: http.MethodGet, path: "/api/sessions/9999/screen"}, 404},
 		{post("/api/sessions/4242/keys", `{"keys":"Enter"}`), 400},
 		{post("/api/sessions/4242/keys", `{}`), 400},

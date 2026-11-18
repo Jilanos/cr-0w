@@ -19,7 +19,7 @@ import { Terminal } from '../ui/Terminal'
 // chat-cover-ask): every word of the conversation, tool calls folded to one line,
 // what waits on the owner docked above the reply box. With `log`, the same chat is the
 // right pane of Desk inner (board chat-inner): header, Chat|Terminal toggle, Pause and Stop.
-// Terminal is the session's tmux screen (item_240); agents outside tmux (runs) keep Log.
+// Terminal is the session's screen, its tmux pane or kitty window (item_240); background runs keep Log.
 
 const Mic = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -122,6 +122,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
   }, [blocks.length, waits, tab, sent.length])
   useEffect(() => { pinned.current = true }, [target])
   // A session stuck on a first-run dialog (setup) is answered in its terminal.
+  const screenable = !!agent && (agent.kind === 'session' || !!agent.tmux)
   const setup = agent?.state === 'setup' && !!agent.tmux
   useEffect(() => { if (setup) setTab('side') }, [setup, tkey])
 
@@ -229,7 +230,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
           <div className="ctl">
             <span className="seg2" role="group" aria-label="View">
               <button type="button" className={`seg${tab === 'chat' ? ' on' : ''}`} aria-pressed={tab === 'chat'} onClick={() => setTab('chat')}>Chat</button>
-              <button type="button" className={`seg${tab === 'side' ? ' on' : ''}`} aria-pressed={tab === 'side'} onClick={() => setTab('side')}>{agent?.tmux ? 'Terminal' : 'Log'}</button>
+              <button type="button" className={`seg${tab === 'side' ? ' on' : ''}`} aria-pressed={tab === 'side'} onClick={() => setTab('side')}>{screenable ? 'Terminal' : 'Log'}</button>
             </span>
             <span className="f1" />
             {agent?.kind === 'session' && <button type="button" className="btn" onClick={pause}>Pause</button>}
@@ -254,7 +255,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
           )}
         </>
       )}
-      {inner && tab === 'side' ? (agent?.tmux ? <Terminal key={agent.pid} pid={agent.pid} /> : log) : (<>
+      {inner && tab === 'side' ? (screenable ? <Terminal key={agent.pid} pid={agent.pid} /> : log) : (<>
       <div className="chat" ref={box} onScroll={(e) => {
         const el = e.currentTarget
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40

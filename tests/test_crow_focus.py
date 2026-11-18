@@ -290,10 +290,33 @@ def test_resize_args_bound_the_size():
             ct.resize_args("%4", c, r)
 
 
-def test_crow_screen_refuses_a_pid_without_tmux(tmp_path):
+def test_kitty_screen_of_reads_lines_and_strips_the_cursor():
+    import json
+    class R:
+        def __init__(self, out, rc=0):
+            self.stdout, self.returncode = out, rc
+    ls = json.dumps([{"tabs": [{"windows": [{"id": 3, "columns": 114, "lines": 53}]}]}])
+    def run(cmd, **kw):
+        return R("a\n\x1b[31mb\x1b[m\n\x1b[?25h\x1b[2;5H\x1b[?12h\n") if "get-text" in cmd else R(ls)
+    assert ct.kitty_screen_of("unix:s", 3, run=run) == {
+        "lines": ["a", "\x1b[31mb\x1b[m"], "cols": 114, "rows": 53, "cursor": {"x": 4, "y": 1, "shown": True}}
+    assert ct.kitty_screen_of("unix:s", 9, run=run) is None
+
+
+def test_kitty_keys_args_map_names_and_keep_text_literal():
+    to = ["kitten", "@", "--to", "unix:s"]
+    assert ct.kitty_keys_args("unix:s", 3, [{"text": "a\\e"}, {"key": "Enter"}, {"key": "C-c"}, {"key": "BTab"}]) == [
+        [*to, "send-text", "--match", "id:3", "--", "a\\\\e"], [*to, "send-key", "--match", "id:3", "enter"],
+        [*to, "send-key", "--match", "id:3", "ctrl+c"], [*to, "send-key", "--match", "id:3", "shift+tab"]]
+    assert set(ct.KITTY_KEYS) == ct.KEYS
+    with pytest.raises(ValueError):
+        ct.kitty_keys_args("unix:s", 3, [{"key": "run-shell"}])
+
+
+def test_crow_screen_refuses_a_pid_without_a_window(tmp_path):
     import json, subprocess
     r = subprocess.run([sys.executable, str(BIN / "crow-screen"), "show", "--pid", "1"], capture_output=True, text=True,
-                       env={**os.environ, "TMUX_TMPDIR": str(tmp_path)})
+                       env={**os.environ, "TMUX_TMPDIR": str(tmp_path), "XDG_RUNTIME_DIR": str(tmp_path)})
     assert r.returncode == 1 and json.loads(r.stdout)["ok"] is False
 
 
