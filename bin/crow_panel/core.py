@@ -70,6 +70,17 @@ def read_json(path, default=None):
         return default
 
 
+def shared_locks(home):
+    """Use the panel's configured locks for every participating command."""
+    if os.environ.get("CROW_LOCKS_DIR"):
+        return Path(os.environ["CROW_LOCKS_DIR"])
+    try:
+        value = yaml.safe_load((Path(home) / "local/panel.yaml").read_text()) or {}
+    except (OSError, ValueError, yaml.YAMLError):
+        value = {}
+    return Path(value.get("locks_dir", Path(home) / "local/state/locks"))
+
+
 class Config(dict):
     def __init__(self, path=None, overrides=None):
         home = Path(crow_lib.data_home()).resolve()

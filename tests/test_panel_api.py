@@ -1,0 +1,319 @@
+import copy
+import http.client
+import json
+from pathlib import Path
+import sys
+import threading
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
+from crow_panel.core import Config, Problem, canonical, lock
+from crow_panel.server import App, Server
+from test_panel_pending import DOCUMENT
+
+FIXTURES = Path(__file__).parent / "fixtures/panel"
+
+
+class FakeCdx:
+    def __init__(self, root):
+        self.root, self.active, self.calls, self.rows = root, 0, [], {}
+        self.unavailable = False
+
+    def __call__(self, argv):
+        self.calls.append(argv)
+        if self.unavailable:
+            raise Problem(503, "upstream_unavailable", "cdx indisponible")
+        if argv[1] == "runs":
+            return {"ok": True, "runs": [{"run_id": str(i), "status": "running", "cwd": str(self.root)} for i in range(self.active)] if "--running" in argv else []}
+        if argv[1] == "status":
+            return {"ok": True, "rows": []}
+        if argv[1] == "run":
+            key = "fake" + str(len(self.rows))
+            output = self.root / (key + ".jsonl")
+            output.write_text(json.dumps({"type": "result", "result": "Réponse locale"}) + "\n")
+            self.rows[key] = {"run_id": key, "status": "running", "started_at": "2026-11-18T00:00:00+00:00", "ended_at": None,
+                              "artifacts": {"stdout_path": str(output)}, "model": "claude-sonnet-5-5", "exit_code": None}
+            return {"ok": True, **self.rows[key]}
+        if argv[1] == "run-status":
+            return {"ok": True, "run": self.rows[argv[2]]}
+        if argv[1] == "run-report":
+            return {"ok": True, "final_message": "# Livré\nRéponse locale"}
+        raise AssertionError(argv)
+
+
+@pytest.fixture
+def panel(tmp_path):
+    pending = tmp_path / "pending.md"
+    pending.write_text(DOCUMENT)
+    fake = FakeCdx(tmp_path)
+    cfg = Config(overrides={"crow_home": str(tmp_path), "state_dir": str(tmp_path / "state"), "locks_dir": str(tmp_path / "locks"),
+                            "runs_registry": str(tmp_path / "runs.jsonl"), "pending_md": str(pending), "port": 0,
+                            "files": {"roots": [str(tmp_path)]}, "routines": {"maj": {"argv": ["example-maj", "night"]}, "daily_update": {"argv": ["example-update"]}},
+                            "accounts": {"claude": {"provider": "claude", "kinds": ["chat", "mail_read"]}, "workb": {"provider": "codex", "kinds": ["chat"], "models": ["gpt-5"]}}})
+    app = App(cfg, fake)
+    yield app, fake
+    app.launcher.close()
+    app.store.db.close()
+
+
+def pending_item(app):
+    return app.pending.view()["sections"][0]["items"][0]
+
+
+def post(app, path, body):
+    return app.mutate("POST", path, body)
+
+
+def snapshot():
+    mail = json.loads((FIXTURES / "mail-list.json").read_text())
+    mail["folders"] = json.loads((FIXTURES / "mail-folders.json").read_text())["folders"]
+    mail["exhausted"] = True
+    mail["coverage"]["collected"] = len(mail["items"])
+    return mail
+
+
+def test_fixture_view_shapes_and_empty_example(panel):
+    app, _ = panel
+    for route, name in (("/api/config", "config-public.json"), ("/api/pending", "pending-empty.json"), ("/api/state", "state.json"),
+                        ("/api/mail", "mail-list-empty.json"), ("/api/mail/folders", "mail-folders.json"), ("/api/runs", "runs.json"),
+                        ("/api/drafts", "drafts.json"), ("/api/accounts", "accounts.json"), ("/api/dues", "dues.json"), ("/api/dossiers", "dossiers.json"),
+                        ("/api/routines", "routines.json"), ("/api/afk", "afk.json"), ("/api/capabilities", "capabilities.json"), ("/api/topics", "topics.json")):
+        result = app.get(route, {})
+        expected = json.loads((FIXTURES / name).read_text())
+        assert set(result) == set(expected), route
+    public = canonical(app.public_config())
+    assert str(app.cfg.state) not in public and "real_home" not in public
+
+
+def test_idempotence_and_mismatch(panel):
+    app, _ = panel
+    item = pending_item(app)
+    path = "/api/pending/" + item["id"] + "/done"
+    body = {"request_id": "same", "item_rev": item["item_rev"]}
+    status, op = post(app, path, body)
+    assert status == 200 and op["status"] == "succeeded"
+    assert post(app, path, body) == (status, op)
+    with pytest.raises(Problem) as err:
+        post(app, path, {**body, "note": "different"})
+    assert err.value.body["error"]["code"] == "idempotency_mismatch"
+    assert len(list((app.cfg.state / "backups").glob("*"))) == 1
+
+
+def test_lock_blocks_display_and_mutation(panel):
+    app, _ = panel
+    item = pending_item(app)
+    with lock(app.cfg.locks, "pending"):
+        assert app.pending.view()["writable"] is False
+        with pytest.raises(Problem) as err:
+            post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "locked", "item_rev": item["item_rev"]})
+        assert err.value.status == 423
+
+
+def test_chat_queue_cancel_admission_and_continuation(panel):
+    app, fake = panel
+    topic = pending_item(app)["topic_id"]
+    path = "/api/topics/" + topic + "/messages"
+    fake.active = 2
+    _, op = post(app, path, {"request_id": "a", "text": "Un résumé"})
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["status"] == "queued"
+    assert len(app.readers.runs()["queue"]) == 1
+    _, cancelled = post(app, op["links"]["status_url"] + "/cancel", {"request_id": "cancel"})
+    assert cancelled["status"] == "cancelled"
+    fake.active = 0
+    _, op = post(app, path, {"request_id": "b", "text": "Un résumé"})
+    app.launcher.tick()
+    live = app.operation(op["operation_id"])
+    rid = live["steps"][0]["run_id"]
+    assert rid
+    fake.rows[rid].update(status="succeeded", ended_at="2026-11-18T00:01:00+00:00", exit_code=0)
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["status"] == "succeeded"
+    _, second = post(app, path, {"request_id": "c", "text": "Encore"})
+    app.launcher.tick()
+    cmd = next(c for c in reversed(fake.calls) if c[1] == "run")
+    assert cmd[cmd.index("--continue-run") + 1] == rid
+    assert "--model" not in cmd  # cdx pins the measured parent model.
+    registry = [json.loads(line) for line in Path(app.cfg["runs_registry"]).read_text().splitlines()]
+    assert all(r["source"] == "panel" and r["operation_id"] and r["topic_id"] == topic for r in registry)
+
+
+def test_upstream_suspends_new_runs_and_preserves_cache(panel):
+    app, fake = panel
+    app.launcher.running()
+    fake.unavailable = True
+    topic = pending_item(app)["topic_id"]
+    with pytest.raises(Problem) as err:
+        post(app, "/api/topics/" + topic + "/messages", {"request_id": "no", "text": "Hi"})
+    assert err.value.status == 503
+    assert app.launcher.running() == []
+    assert app.get("/api/pending", {})["sections"]
+
+
+def test_mail_policy_and_model_validation(panel):
+    app, _ = panel
+    topic = app.launcher.topic("mail", "conversation", "Example")
+    with pytest.raises(Problem) as err:
+        post(app, "/api/topics/" + topic + "/messages", {"request_id": "a", "text": "Hi", "account": "workb", "model": "gpt-5"})
+    assert err.value.body["error"]["code"] == "policy_denied"
+    with pytest.raises(Problem) as err:
+        post(app, "/api/topics/" + topic + "/messages", {"request_id": "a", "text": "Hi", "model": "invalid"})
+    assert err.value.body["error"]["code"] == "invalid_model"
+
+
+def test_snapshot_pagination_partial_and_reintroduced_old_mail(panel):
+    app, _ = panel
+    value = snapshot()
+    template = value["items"][0]
+    value["items"] = [{**template, "id": "message" + str(i)} for i in range(1300)]
+    assert app.mail.publish(value)["coverage"]["collected"] == 1300
+    ids, cursor = [], ""
+    while True:
+        page = app.mail.list({"limit": ["50"], "cursor": [cursor]})
+        ids.extend(i["id"] for i in page["items"])
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert len(set(ids)) == 1300
+    before = app.mail.snapshot_path.read_bytes()
+    broken = copy.deepcopy(value)
+    broken["coverage"]["status"] = "partial"
+    broken["items"] = broken["items"][:100]
+    assert app.mail.publish(broken)["published"] is False
+    assert app.mail.snapshot_path.read_bytes() == before
+    value["items"] = [{**template, "id": "old-restored", "received": "2024-01-01T00:00:00+00:00"}]
+    app.mail.publish(value)
+    assert app.mail.list({})["items"][0]["id"] == "old-restored"
+
+
+def test_hostile_mail_is_text_and_missing_draft_not_sent(panel):
+    app, _ = panel
+    value = snapshot()
+    value["items"][0]["preview"] = '<script>evil()</script><b>Hello</b>'
+    value["items"][0]["body_text"] = '<img src=x onerror=evil()>Safe'
+    value["items"][0]["owa_link"] = 'javascript:evil()'
+    value["drafts"] = [{"id": "draft", "state": "sent", "subject": "Example"}]
+    app.mail.publish(value)
+    assert app.mail.list({})["items"][0]["preview"] == "Hello"
+    detail = app.mail.detail(value["items"][0]["id"])
+    assert detail["body_text"] == "Safe" and detail["owa_link"] is None
+    assert app.mail.drafts()["items"][0]["state"] == "missing"
+
+
+def test_triage_immutable_plan_consumption_expiry_undo_and_dry_reply(panel):
+    app, fake = panel
+    app.mail.publish(snapshot())
+    rows = app.mail.list({})["items"]
+    _, plan = post(app, "/api/mail/triage/plan", {"request_id": "plan", "snapshot_rev": app.mail.raw()["snapshot_rev"],
+                    "items": [{"message_id": rows[0]["id"], "action": "archive"}, {"message_id": rows[1]["id"], "action": "trash"}]})
+    assert plan["summary"]["rejected"] == 1
+    body = {"request_id": "execute", "plan_id": plan["plan_id"], "plan_hash": plan["plan_hash"], "confirm": True}
+    _, op = post(app, "/api/mail/triage/execute", body)
+    with pytest.raises(Problem) as err:
+        post(app, "/api/mail/triage/execute", {**body, "request_id": "again"})
+    assert err.value.body["error"]["code"] == "plan_consumed"
+    app.launcher.tick()
+    op = app.operation(op["operation_id"])
+    assert op["status"] == "succeeded" and op["result"]["simulated"]
+    _, undo = post(app, op["links"]["status_url"] + "/undo", {"request_id": "undo"})
+    app.launcher.tick()
+    assert app.operation(undo["operation_id"])["status"] == "succeeded"
+    _, reply = post(app, "/api/mail/" + rows[0]["id"] + "/reply-all", {"request_id": "reply", "instructions": "Réponse concise"})
+    app.launcher.tick()
+    reply = app.operation(reply["operation_id"])
+    assert [s["name"] for s in reply["steps"]] == ["skeleton", "style", "verify"]
+    assert reply["steps"][1]["account"] == "worka"
+    assert all(s["run_id"] == "simulated" for s in reply["steps"])
+    assert not any(c[1] == "run" for c in fake.calls)
+    another = app.mail.plan({"snapshot_rev": app.mail.raw()["snapshot_rev"], "items": [{"message_id": rows[0]["id"], "action": "archive"}]})
+    app.mail.publish(snapshot())
+    with pytest.raises(Problem) as err:
+        app.mail.execute({"plan_id": another["plan_id"], "plan_hash": another["plan_hash"], "confirm": True}, "/execute")
+    assert err.value.body["error"]["code"] == "plan_expired"
+
+
+def test_routine_dry_run_never_executes_command(panel):
+    app, fake = panel
+    _, op = post(app, "/api/routines/daily_update", {"request_id": "routine"})
+    assert app.launcher.maintenance()
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["result"]["simulated"]
+    assert not app.launcher.maintenance()
+    assert not any(c[1] == "run" for c in fake.calls)
+
+
+def test_file_escape_symlink_and_segments(panel, tmp_path):
+    app, _ = panel
+    outside = tmp_path.parent / "panel-outside"
+    outside.write_text("private")
+    symlink = tmp_path / "escape"
+    symlink.symlink_to(outside)
+    assert app.files.register(symlink) is None
+    assert app.files.register(tmp_path / ".." / "panel-outside") is None
+    allowed = tmp_path / "inside.html"
+    allowed.write_text("<script>evil()</script>")
+    key = app.files.register(allowed)
+    allowed.unlink()
+    allowed.symlink_to(outside)
+    with pytest.raises(Problem):
+        app.files.resolve(key)
+    segments = app.files.segments("[bad](javascript:evil) [ok](https://example.org/)")
+    assert all(s.get("href", "https:").startswith("https:") for s in segments)
+    outside.unlink()
+
+
+@pytest.fixture
+def http_panel(panel):
+    app, fake = panel
+    server = Server(app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield app, server
+    server.shutdown()
+    server.server_close()
+    thread.join()
+
+
+def request(server, method, path, data=None, headers=None):
+    conn = http.client.HTTPConnection(*server.server_address, timeout=5)
+    body = json.dumps(data) if data is not None else None
+    conn.request(method, path, body, headers or {})
+    response = conn.getresponse()
+    status, hdr, raw = response.status, dict(response.getheaders()), response.read()
+    conn.close()
+    return status, hdr, raw
+
+
+def auth(app):
+    return {"Cookie": "crow_session=" + app.session, "X-Crow-Token": app.csrf, "Origin": "http://127.0.0.1:" + str(app.port), "Content-Type": "application/json"}
+
+
+def test_http_security_cookie_csrf_host_origin_and_size(http_panel):
+    app, server = http_panel
+    status, headers, _ = request(server, "GET", "/")
+    assert status == 200 and "HttpOnly; SameSite=Strict" in headers["Set-Cookie"]
+    assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
+    assert request(server, "GET", "/api/session")[0] == 403
+    assert request(server, "GET", "/api/session", headers=auth(app))[0] == 200
+    for changes in ({"Origin": "http://evil.example"}, {"Host": "evil.example"}, {"X-Crow-Token": "bad"}, {"Cookie": ""}, {"Origin": ""}):
+        assert request(server, "POST", "/api/mail/sync", {"request_id": "x"}, {**auth(app), **changes})[0] == 403
+    assert request(server, "POST", "/api/mail/sync", {"text": "x" * 300000}, auth(app))[0] == 413
+    path = app.cfg.state / "test.html"
+    path.write_text("<b>text</b>")
+    key = app.files.register(path)
+    assert request(server, "GET", "/api/files/" + key, headers=auth(app))[1]["Content-Type"].startswith("text/plain")
+    assert request(server, "GET", "/api/files/../../etc/passwd", headers=auth(app))[0] == 404
+
+
+def test_sse_persistent_replay_without_duplicates(http_panel):
+    app, server = http_panel
+    item = pending_item(app)
+    _, op = post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "sse", "item_rev": item["item_rev"]})
+    key = op["operation_id"]
+    events = app.store.events(key)
+    assert events[-1]["event"] == "done"
+    status, headers, raw = request(server, "GET", op["links"]["events_url"], headers=auth(app))
+    assert status == 200 and b"event: done" in raw
+    status, _, raw = request(server, "GET", op["links"]["events_url"], headers={**auth(app), "Last-Event-ID": str(events[-1]["id"])})
+    assert status == 200 and raw == b""

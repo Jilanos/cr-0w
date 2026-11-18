@@ -119,7 +119,7 @@ def status_of(text):
 
 
 def split_row(line):
-    cells = line.strip().strip("|").split("|")
+    cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
     return [c.strip() for c in cells]
 
 

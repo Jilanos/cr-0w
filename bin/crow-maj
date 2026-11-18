@@ -71,7 +71,7 @@ def relay_start():
     return m, p
 
 
-def night():
+def _night():
     log("start")
     manifest, relay = relay_start()
     log(f"relay on {manifest}")
@@ -93,6 +93,18 @@ def night():
     b = board()
     log(f"board {'ok' if b.returncode == 0 else 'failed: ' + b.stderr[-200:]}")
     log("end")
+    panel_config = HOME / "local/panel.yaml"
+    if panel_config.is_file():
+        sync = subprocess.run([str(ENGINE / "bin/crow-panel"), "sync", "--config", str(panel_config)],
+                              capture_output=True, text=True, env=env)
+        log(f"panel sync queued={sync.returncode == 0}")
+
+
+def night():
+    from crow_panel.core import lock, shared_locks
+    locks = shared_locks(HOME)
+    with lock(locks, "maj", False), lock(locks, "pending"):
+        _night()
 
 
 def main(argv):
