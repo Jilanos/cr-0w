@@ -291,7 +291,8 @@ export function makeViews(ctx) {
       const cardRow = (onclick, ...kids) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick }, ...kids));
 
       const visit = store.sinceVisit === undefined ? st?.since_last_visit : store.sinceVisit;
-      if (visit) grid.append(card('Depuis ta dernière visite', h('span', { class: 'muted', text: ago(visit.visited_at) }),
+      // An empty "since last visit" card would take the first slot for nothing.
+      if (visit && visit.items.length) grid.append(card('Depuis ta dernière visite', h('span', { class: 'muted', text: ago(visit.visited_at) }),
         cardList(visit.items.map((it) => cardRow(() => openRef(it.ref),
           chip({ added: 'Nouveau', changed: 'Modifié', removed: 'Retiré' }[it.change] || it.change),
           h('span', { class: 'grow', text: it.text }))), 'Aucun changement depuis ta dernière visite.')));
@@ -353,10 +354,11 @@ export function makeViews(ctx) {
 
       // Décisions AFK
       const afk = cached('afk');
-      const decs = (afk && afk.decisions) || [];
+      // Answered decisions stay in Décisions; the card lists the open ones.
+      const decs = ((afk && afk.decisions) || []).filter((d) => !d.answered);
       grid.append(card('Décisions AFK', linkBtn('Décisions', () => ctx.go('decisions')),
         cardList(decs.map((d) => cardRow(() => ctx.go('decisions', 'afk:' + d.n), h('span', { class: 'grow', text: d.question }),
-          chip(d.answered ? 'répondu' : d.job, d.answered ? 'ok' : 'quiet'))), 'Aucune décision en attente.')));
+          d.job ? chip(d.job, 'quiet') : null)), 'Aucune décision en attente.')));
       return wrap;
     },
   };
