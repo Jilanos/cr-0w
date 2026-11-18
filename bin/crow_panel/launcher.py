@@ -232,7 +232,7 @@ class Launcher:
             prompt = folder / "prompt.md"
             atomic(prompt, job["prompt"])
             job["prompt_file"] = str(prompt)
-            extra = write_policy(self.cfg, op_id, job.get("profile", "read"), Path(job["output"]) if job.get("output") else None, job.get("manifest"), job.get("deny_tools"))
+            extra = write_policy(self.cfg, op_id, job.get("profile", "read"), Path(job["output"]) if job.get("output") else None, job.get("manifest"), job.get("deny_tools"), job["cwd"])
             continuation = job.get("continue_run")
             if job.get("profile") == "style":
                 # The private profile is proven by the read-only probe before activation.
@@ -247,7 +247,7 @@ class Launcher:
                 if continuation:
                     # cdx continuation permits only permissions in --settings. Drop MCP entirely.
                     settings = folder / "resume-permissions.json"
-                    atomic(settings, canonical({"permissions": {"deny": ["Bash", "Write", "Edit", "NotebookEdit", "Task", "Agent", "WebFetch", "WebSearch"]}}))
+                    atomic(settings, canonical({"permissions": {"deny": ["Bash", "Read", "Grep", "Glob", "Write", "Edit", "NotebookEdit", "Task", "Agent", "WebFetch", "WebSearch"]}}))
                     extra = "--strict-mcp-config --settings " + shlex.quote(str(settings))
             cmd = ["cdx", "run", job["account"], "--cwd", job["cwd"], "--permission", permission,
                    "--prompt-file", str(prompt), "--label", "panel:" + op["kind"], "--max-parallel", str(self.cfg["max_parallel"])]

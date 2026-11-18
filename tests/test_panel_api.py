@@ -263,6 +263,11 @@ def test_chat_queue_cancel_admission_and_continuation(panel):
     cmd = next(c for c in reversed(fake.calls) if c[1] == "run")
     assert cmd[cmd.index("--continue-run") + 1] == rid
     assert "--model" not in cmd  # cdx pins the measured parent model.
+    import shlex
+    extra = shlex.split(cmd[cmd.index("--extra-args") + 1])
+    settings = json.loads(Path(extra[extra.index("--settings") + 1]).read_text())
+    assert {"Read", "Grep", "Glob", "Bash", "Write"}.issubset(settings["permissions"]["deny"])
+    assert "--strict-mcp-config" in extra
     registry = [json.loads(line) for line in Path(app.cfg["runs_registry"]).read_text().splitlines()]
     assert all(r["source"] == "panel" and r["operation_id"] and r["topic_id"] == topic for r in registry)
 

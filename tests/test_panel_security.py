@@ -49,3 +49,29 @@ def test_triage_guard_rejects_null_targets_and_unchecked_batch_arguments():
     assert not tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed], "categories": ["unconfirmed"]}, manifest)
     assert not tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed], "messages": [allowed]}, manifest)
     assert tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed]}, manifest)
+
+
+def test_read_profile_cannot_extract_credentials_outside_document_roots(tmp_path):
+    from crow_panel.core import Config
+    from crow_panel.security import write_policy
+    documents = tmp_path / "documents"
+    documents.mkdir()
+    preferences = documents / "preferences.md"
+    preferences.write_text("Preferences")
+    secrets = tmp_path / "credentials"
+    secrets.mkdir()
+    secret = secrets / "private-key"
+    secret.write_text("fixture credential")
+    (documents / "escape").symlink_to(secrets, target_is_directory=True)
+    cfg = Config(overrides={"crow_home": str(documents), "state_dir": str(tmp_path / "state"), "files": {"roots": []}})
+    write_policy(cfg, "read-probe")
+    policy = json.loads((cfg.state / "ops/read-probe/policy.json").read_text())
+    assert hook_input(policy, {"tool_name": "Read", "tool_input": {"file_path": str(preferences)}})
+    for name, args in [
+        ("Read", {"file_path": str(secret)}),
+        ("Read", {"file_path": str(documents / "escape/private-key")}),
+        ("Grep", {"path": str(secrets), "pattern": "."}),
+        ("Glob", {"path": str(tmp_path), "pattern": "**/*"}),
+        ("Glob", {"path": str(documents), "pattern": "../credentials/*"}),
+    ]:
+        assert not hook_input(policy, {"tool_name": name, "tool_input": args}), (name, args)

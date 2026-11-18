@@ -168,13 +168,33 @@ def hook_input(policy, payload):
     if name in ("Write", "Edit"):
         path = Path(args.get("file_path", "")).resolve()
         return str(path) in policy.get("write_paths", [])
+    if name in ("Read", "Grep", "Glob"):
+        if policy.get("profile") == "triage":
+            return False
+        value = args.get("file_path") if name == "Read" else args.get("path", policy.get("cwd"))
+        if not isinstance(value, str) or not value:
+            return False
+        path = Path(value)
+        if not path.is_absolute():
+            path = Path(policy["cwd"]) / path
+        path = path.resolve()
+        roots = [Path(p) for p in policy.get("read_roots", [])]
+        if not (str(path) in policy.get("write_paths", []) or any(path == p or path.is_relative_to(p) for p in roots)):
+            return False
+        if name == "Glob":
+            pattern = args.get("pattern", "")
+            if not isinstance(pattern, str) or Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+                return False
+        return True
     return tool_allowed(policy["profile"], name, args, policy.get("manifest"))
 
 
-def write_policy(cfg, op_id, profile="read", output=None, manifest=None, deny_tools=None):
+def write_policy(cfg, op_id, profile="read", output=None, manifest=None, deny_tools=None, cwd=None):
     directory = cfg.state / "ops" / op_id
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    policy = {"profile": profile, "manifest": manifest, "deny_tools": deny_tools or [], "write_paths": [str(output.resolve())] if output else []}
+    roots = [cfg.home, *cfg["files"].get("roots", []), *(p["path"] for p in cfg["projects"].values() if p.get("path"))]
+    policy = {"profile": profile, "manifest": manifest, "deny_tools": deny_tools or [], "write_paths": [str(output.resolve())] if output else [],
+              "cwd": str(Path(cwd or cfg.home).resolve()), "read_roots": [str(Path(p).resolve()) for p in roots]}
     atomic(directory / "policy.json", canonical(policy))
     import shlex
     command = shlex.join([str(Path(__file__).resolve().parents[1] / "crow-panel"), "tool-guard", str(directory / "policy.json")])
