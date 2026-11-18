@@ -5,6 +5,7 @@ export interface Box {
   scrollTop: number
   readonly scrollHeight: number
   readonly clientHeight: number
+  readonly children?: ArrayLike<unknown>
   addEventListener(t: 'scroll', f: () => void): void
   removeEventListener(t: 'scroll', f: () => void): void
 }
@@ -18,12 +19,14 @@ export function stickBottom(el: Box, Observer: ROCtor | undefined = globalThis.R
   const toEnd = () => { el.scrollTop = el.scrollHeight }
   const onScroll = () => { stuck = el.scrollHeight - el.clientHeight - el.scrollTop <= SLACK }
   const ro = Observer ? new Observer(() => { if (stuck) toEnd() }) : null
-  ro?.observe(el as never)
+  // The box and each message: a message that grows late (fonts, chips wrapping) moves the end too.
+  const watch = () => { ro?.observe(el as never); for (const c of Array.from(el.children ?? [])) ro?.observe(c as never) }
+  watch()
   el.addEventListener('scroll', onScroll)
   toEnd()
   return {
     // New content: follow it only when the box was at the bottom.
-    follow: () => { if (stuck) toEnd() },
+    follow: () => { watch(); if (stuck) toEnd() },
     stop: () => { ro?.disconnect(); el.removeEventListener('scroll', onScroll) },
   }
 }

@@ -59,6 +59,17 @@ describe('butler chat log stays on its last message (item_176)', () => {
     expect(gap(el)).toBe(0)
   })
 
+  it('watches each message, so one that grows late (fonts, chips) keeps the end in view', () => {
+    const seen: unknown[] = []
+    class RO { constructor(_: () => void) {} observe(x: unknown) { seen.push(x) } disconnect() {} }
+    const el = Object.assign(box(2000, 700), { children: ['m1', 'm2'] })
+    const s = stickBottom(el, RO)
+    expect(seen).toEqual([el, 'm1', 'm2'])
+    el.children = ['m1', 'm2', 'm3']
+    s.follow()
+    expect(seen).toContain('m3')
+  })
+
   it('stop detaches the observer and the scroll listener', () => {
     const el = box(2000, 700)
     const o = observer()
