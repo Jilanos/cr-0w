@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "synced_at": "2026-11-18T05:15:40+01:00",
+  "folders": [
+    {
+      "id": "AQMkFAKEINBOX",
+      "path": "Boîte de réception",
+      "well_known": "inbox",
+      "allowed_target": false
+    },
+    {
+      "id": "AQMkFAKEARCH",
+      "path": "Archive",
+      "well_known": "archive",
+      "allowed_target": true
+    },
+    {
+      "id": "AQMkFAKEF001",
+      "path": "Fournisseurs/Alpha",
+      "well_known": null,
+      "allowed_target": true
+    },
+    {
+      "id": "AQMkFAKEF002",
+      "path": "Projets/Série A",
+      "well_known": null,
+      "allowed_target": true
+    },
+    {
+      "id": "AQMkFAKEDRAFTS",
+      "path": "Brouillons",
+      "well_known": "drafts",
+      "allowed_target": false
+    },
+    {
+      "id": "AQMkFAKESENT",
+      "path": "Éléments envoyés",
+      "well_known": "sentitems",
+      "allowed_target": false
+    }
+  ]
+}

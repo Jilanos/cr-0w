@@ -1,0 +1,14 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "plan_consumed",
+      "message": "Ce lot a déjà été exécuté.",
+      "retryable": false,
+      "details": {
+        "plan_id": "plan_01HZTP0001",
+        "operation_id": "op_01HZTR0001"
+      }
+    }
+  }
+}

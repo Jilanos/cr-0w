@@ -1,0 +1,58 @@
+{
+  "http_status": 200,
+  "body": {
+    "plan_id": "plan_01HZTP0001",
+    "plan_hash": "sha256:5e1f0c7a2b9d4e3f",
+    "snapshot_rev": "s_20261118T051540",
+    "created_at": "2026-11-18T08:34:40+01:00",
+    "expires_at": "2026-11-18T08:49:40+01:00",
+    "status": "ready",
+    "dry_run": true,
+    "summary": {
+      "move": 2,
+      "archive": 1,
+      "trash": 0,
+      "rejected": 1
+    },
+    "items": [
+      {
+        "message_id": "AAMkAGFAKE0005==",
+        "subject": "Facture 2026-118",
+        "from": "Fournisseur Alpha",
+        "received": "2026-11-17T15:02:00+01:00",
+        "action": "move",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEF001",
+        "folder_path": "Fournisseurs/Alpha"
+      },
+      {
+        "message_id": "AAMkAGFAKE0006==",
+        "subject": "Newsletter salon",
+        "from": "Salon Pro",
+        "received": "2026-11-16T09:00:00+01:00",
+        "action": "archive",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEARCH",
+        "folder_path": "Archive"
+      },
+      {
+        "message_id": "AAMkAGFAKE0007==",
+        "subject": "Plans série A",
+        "from": "Câbles Beta",
+        "received": "2026-11-15T11:20:00+01:00",
+        "action": "move",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEF002",
+        "folder_path": "Projets/Série A"
+      }
+    ],
+    "rejected": [
+      {
+        "message_id": "AAMkAGFAKE0008==",
+        "action": "trash",
+        "code": "capability_unavailable",
+        "message": "Corbeille indisponible : outil absent"
+      }
+    ]
+  }
+}

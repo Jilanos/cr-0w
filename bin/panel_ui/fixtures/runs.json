@@ -1,0 +1,81 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "source_status": {
+    "cdx_runs": "ok",
+    "registry": "ok"
+  },
+  "runs": [
+    {
+      "run_id": "5d1e2f3a4b5c6d7e8f90a1b2c3d4e5f6",
+      "kind": "agent",
+      "label": "panel:chat",
+      "project": "crow",
+      "topic_id": "t_6a7b8c9d0e",
+      "operation_id": "op_01HZCH0001",
+      "account": "claude",
+      "provider": "claude",
+      "model": "sonnet",
+      "status": "running",
+      "started_at": "2026-11-18T08:33:01+01:00",
+      "ended_at": null,
+      "duration_s": 30,
+      "cost_usd": null,
+      "cost_status": "unknown",
+      "tokens": null,
+      "report_file_id": null,
+      "owned_by_panel": true
+    },
+    {
+      "run_id": "scr_20261118T061500",
+      "kind": "script",
+      "label": "routine:maj",
+      "project": "crow",
+      "topic_id": null,
+      "operation_id": "op_01HZMJ0001",
+      "account": "claude",
+      "provider": "claude",
+      "model": "sonnet",
+      "status": "succeeded",
+      "started_at": "2026-11-18T06:15:00+01:00",
+      "ended_at": "2026-11-18T06:31:12+01:00",
+      "duration_s": 972,
+      "cost_usd": 0.84,
+      "cost_status": "measured",
+      "tokens": 412000,
+      "report_file_id": "f_9e8d7c6b",
+      "owned_by_panel": true,
+      "exit_code": 0
+    },
+    {
+      "run_id": "82c957fb0a1b4c2d9e3f405162738495",
+      "kind": "agent",
+      "label": "fiche-alpha",
+      "project": "work",
+      "topic_id": null,
+      "operation_id": null,
+      "account": "workb",
+      "provider": "codex",
+      "model": "gpt-5",
+      "status": "failed",
+      "started_at": "2026-11-18T02:10:00+01:00",
+      "ended_at": "2026-11-18T02:41:00+01:00",
+      "duration_s": 1860,
+      "cost_usd": null,
+      "cost_status": "unknown",
+      "tokens": 1250000,
+      "report_file_id": null,
+      "owned_by_panel": false,
+      "error": "limite 5 h atteinte"
+    }
+  ],
+  "queue": [
+    {
+      "operation_id": "op_01HZCH0002",
+      "label": "chat : Outillage",
+      "account": "claude",
+      "waiting_for": "slot",
+      "position": 1,
+      "cancel_url": "/api/operations/op_01HZCH0002/cancel"
+    }
+  ]
+}

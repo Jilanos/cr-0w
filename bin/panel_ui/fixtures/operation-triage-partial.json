@@ -1,0 +1,84 @@
+{
+  "http_status": 200,
+  "body": {
+    "operation_id": "op_01HZTR0001",
+    "kind": "mail.triage.execute",
+    "status": "partial",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Rangement de 3 mails : 2 faits, 1 échec",
+    "topic_id": null,
+    "dry_run": true,
+    "steps": [
+      {
+        "name": "execute",
+        "status": "partial",
+        "account": "claude",
+        "model": "sonnet",
+        "run_id": "simulated",
+        "started_at": "2026-11-18T08:35:00+01:00",
+        "ended_at": "2026-11-18T08:35:20+01:00",
+        "error": null
+      }
+    ],
+    "items": [
+      {
+        "ref": {
+          "kind": "mail",
+          "id": "AAMkAGFAKE0005=="
+        },
+        "status": "succeeded",
+        "action": "move",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEF001",
+        "folder_path": "Fournisseurs/Alpha",
+        "new_message_id": "AAMkAGFAKE0005b==",
+        "detail": null
+      },
+      {
+        "ref": {
+          "kind": "mail",
+          "id": "AAMkAGFAKE0006=="
+        },
+        "status": "succeeded",
+        "action": "archive",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEARCH",
+        "folder_path": "Archive",
+        "new_message_id": "AAMkAGFAKE0006b==",
+        "detail": null
+      },
+      {
+        "ref": {
+          "kind": "mail",
+          "id": "AAMkAGFAKE0007=="
+        },
+        "status": "failed",
+        "action": "move",
+        "source_folder_id": "AQMkFAKEINBOX",
+        "folder_id": "AQMkFAKEF002",
+        "folder_path": "Projets/Série A",
+        "new_message_id": null,
+        "detail": "not_found : le message n'est plus dans la boîte"
+      }
+    ],
+    "result": {
+      "plan_id": "plan_01HZTP0001",
+      "succeeded": 2,
+      "failed": 1,
+      "unknown": 0
+    },
+    "undo": {
+      "available": true,
+      "until": null,
+      "reason": "Annuler remet les 2 mails rangés dans la boîte s'ils n'ont pas été reclassés"
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZTR0001",
+      "events_url": "/api/operations/op_01HZTR0001/events"
+    }
+  }
+}

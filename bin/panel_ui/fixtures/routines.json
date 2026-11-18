@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "routines": [
+    {
+      "name": "maj",
+      "label": "Mise à jour",
+      "description": "Mails, Teams, brouillons, relances, fichier en attente",
+      "running": false,
+      "operation_id": null,
+      "blocked_reason": null,
+      "last": {
+        "at": "2026-11-18T06:31:12+01:00",
+        "status": "succeeded",
+        "exit_code": 0,
+        "run_id": "scr_20261118T061500"
+      },
+      "dry_run": true
+    },
+    {
+      "name": "daily_update",
+      "label": "Mise à jour machine",
+      "description": "Outils, cdx, dépôts, sauvegarde. Attend la fin des runs en cours.",
+      "running": false,
+      "operation_id": null,
+      "blocked_reason": "Mise à jour prévue à 08:15 : lancer après",
+      "last": {
+        "at": "2026-11-17T19:02:00+01:00",
+        "status": "succeeded",
+        "exit_code": 0,
+        "run_id": "scr_20261117T190200"
+      },
+      "dry_run": true
+    }
+  ]
+}

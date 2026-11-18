@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "snapshot_rev": null,
+  "synced_at": null,
+  "stale": true,
+  "stale_after_minutes": 120,
+  "sync_operation_id": null,
+  "coverage": {
+    "status": "none",
+    "collected": 0,
+    "total_known": null,
+    "started_at": null,
+    "ended_at": null,
+    "oldest": null,
+    "errors": []
+  },
+  "folder": "inbox",
+  "items": [],
+  "next_cursor": null
+}

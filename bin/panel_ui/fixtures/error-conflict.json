@@ -1,0 +1,15 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "conflict",
+      "message": "La ligne a changé depuis l'affichage. Liste rechargée.",
+      "retryable": false,
+      "details": {
+        "item_id": "p_k3m9x2qa",
+        "expected_rev": "r_0f3a77",
+        "current_rev": "r_0f3a78"
+      }
+    }
+  }
+}

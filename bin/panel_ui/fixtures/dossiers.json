@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "dossiers": [
+    {
+      "slug": "faisceau-serie-a",
+      "title": "Faisceau série A : contrôle à l'atelier",
+      "folder_file_id": "f_0d1e2f3a",
+      "folder_label": "WORK/20_Faisceau/serie-a/",
+      "item_ids": [
+        "p_b2c4e6g8"
+      ],
+      "open_count": 1,
+      "topic_id": "t_dossFA0001",
+      "last_activity": "2026-11-17T18:10:00+01:00",
+      "recent_files": null
+    }
+  ]
+}
