@@ -65,6 +65,7 @@
 - Rationale: the main surface the owner asked for.
 
 # Notes
+- 2026-11-18: slice 3 merged to main 03b4ef8 (owner OK), dist built. Home rail folds again (owner: chat hideable), folded while the chat is empty, 10377fe. Remaining: head inside the Desk Ask box.
 - 2026-11-18 boards approved (vault `Research/nest-design/item_176/design-notes.md`, pages `options/round2.html`, `options/round3.html`):
   - Laptop: rail A, hero on top (320px rail, 240px hero block) showing the whole droid with no background box. The Desk "Ask CR-0W" panel goes; Live sessions takes its space. Alt+B folds to a 56px strip. Home rail has no hero.
   - Phone: badge top left before the wordmark. Typing in the bottom Ask box opens the chat sheet; on other tabs the badge opens it.

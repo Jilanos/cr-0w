@@ -60,6 +60,7 @@
 - Rationale: daily surface; follows the rail build.
 
 # Notes
+- 2026-11-18: owner feedback: Ready list 5 rows max, 2 per project, follows the scope chip; session rows open on click (79e2a53). Work-side sprint tickets moved to item_247.
 - Owner 2026-11-18: page has a lot to take in; rework for day to day use. Keep the rail pushing. Open session 2/3, not 50/50.
 - Owner 2026-11-18: picked B (sessions on top of the left column) "this way when a work task is launched it goes up into sessions (animation later)".
 - Design: vault `Research/nest-design/item_246/desk-B.png` is the approved layout (annotated sketch, not a pixel board); `sketch.html?v=B` is its source. Decisions in `design-notes.md` there.
