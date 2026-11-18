@@ -17,8 +17,22 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "tool-guard":
         from crow_panel.security import hook_input
         try:
-            policy = json.loads(Path(sys.argv[2]).read_text())
-            allowed = hook_input(policy, json.load(sys.stdin))
+            policy_path = Path(sys.argv[2])
+            policy = json.loads(policy_path.read_text())
+            payload = json.load(sys.stdin)
+            allowed = hook_input(policy, payload)
+            if allowed and payload.get("tool_name", "").rsplit("__", 1)[-1] == "outlook_create_reply_all_draft":
+                # Reserve before the remote effect. A failed or lost attempt requires reconciliation.
+                fd = os.open(policy_path.parent / "skeleton-attempt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+                directory = os.open(policy_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
         except Exception:
             allowed = False
         if not allowed:

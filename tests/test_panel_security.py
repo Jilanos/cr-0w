@@ -84,3 +84,17 @@ def test_reply_skeleton_is_bound_to_the_clicked_message():
     assert not tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "one", "cc": ["unrequested"]}, manifest)
     assert not tool_allowed("skeleton", "outlook_update_draft", {"draftId": "outside"}, manifest)
     assert not tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "one"})
+
+
+def test_skeleton_guard_allows_only_one_creation_attempt(tmp_path):
+    from crow_panel.core import Config
+    from crow_panel.security import write_policy
+    cfg = Config(overrides={"crow_home": str(tmp_path), "state_dir": str(tmp_path / "state")})
+    write_policy(cfg, "once", "skeleton", manifest={"reply_message_id": "one"})
+    tool = Path(__file__).resolve().parents[1] / "bin/crow-panel"
+    policy = cfg.state / "ops/once/policy.json"
+    payload = json.dumps({"tool_name": "mcp__M365__outlook_create_reply_all_draft", "tool_input": {"messageId": "one"}})
+    first = subprocess.run([sys.executable, str(tool), "tool-guard", str(policy)], input=payload, text=True, capture_output=True)
+    second = subprocess.run([sys.executable, str(tool), "tool-guard", str(policy)], input=payload, text=True, capture_output=True)
+    assert first.returncode == 0
+    assert second.returncode == 2
