@@ -974,6 +974,7 @@ def test_routine_exit_code_survives_server_restart(panel, tmp_path):
     app, fake = panel
     app.cfg["routines"]["daily_update"]["argv"] = [sys.executable, "-c", "raise SystemExit(0)"]
     app.cfg["routines"]["daily_update"]["wait_runs"] = False
+    fake.active = 2
     _, op = post(app, "/api/routines/daily_update", {"request_id": "restart-exit"})
     assert [s["name"] for s in app.operation(op["operation_id"])["steps"]] == ["script"]
     app.launcher.tick()

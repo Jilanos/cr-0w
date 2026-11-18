@@ -450,11 +450,12 @@ class Launcher:
             self.held[key] = stack
         if op["kind"] == "routine.maj" and len(self.running(fresh=True)) >= self.cfg["max_parallel"]:
             return
-        if op["kind"] == "routine.daily_update" and self.running(fresh=True):
+        waits = op["kind"] == "routine.daily_update" and op["steps"][0]["name"] == "wait_runs"
+        if waits and self.running(fresh=True):
             op["steps"][0].update(status="running", started_at=op["steps"][0]["started_at"] or now())
             self.store.save_op(op)
             return
-        if op["kind"] == "routine.daily_update" and op["steps"][0]["name"] == "wait_runs":
+        if waits:
             op["steps"][0].update(status="succeeded", ended_at=now())
         rid = uid("scr_")
         path = self.cfg.state / "scripts" / (rid + ".log")
