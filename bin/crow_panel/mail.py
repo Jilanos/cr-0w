@@ -436,6 +436,8 @@ class Mail:
         return op
 
     def complete(self, op, job, row, text):
+        if op["status"] not in ("queued", "running", "succeeded"):
+            return
         if not op["kind"].startswith("mail."):
             return
         if op["kind"].startswith("mail.followup") and op["steps"][-1]["name"] == "check_followup" and not job.get("simulated"):

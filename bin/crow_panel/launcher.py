@@ -270,7 +270,7 @@ class Launcher:
             except Problem:
                 op["status"] = "unknown"
                 op["error"] = {"code": "launch_unknown", "message": "Lancement incertain. Vérification requise.", "retryable": False, "details": {}}
-                self.store.save_op(op)
+                self.finish(op, job, {}, "")
                 return
             if not result.get("run_id"):
                 raise Problem(503, "upstream_unavailable", "Le lancement ne contient aucun identifiant.")
@@ -480,7 +480,7 @@ class Launcher:
                     rid = op["steps"][-1].get("run_id")
                     if not rid:
                         op["status"] = "unknown"
-                        self.store.save_op(op)
+                        self.finish(op, job, {}, "")
                         continue
                     if job.get("kind") == "script":
                         row = self.store.get("runs", rid, {})
@@ -523,12 +523,10 @@ class Launcher:
                     if exc.status == 503:
                         continue
                     op.update(status="failed", error=exc.body["error"])
-                    self.store.save_op(op)
-                    self.release(op["operation_id"])
+                    self.finish(op, job, {}, "")
                 except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
                     op.update(status="unknown", error={"code": "worker_error", "message": "Résultat incertain : " + type(exc).__name__, "retryable": False, "details": {}})
-                    self.store.save_op(op)
-                    self.release(op["operation_id"])
+                    self.finish(op, job, {}, "")
 
     def start(self):
         def work():

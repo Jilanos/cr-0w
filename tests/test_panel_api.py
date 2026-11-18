@@ -797,3 +797,15 @@ def test_run_reports_do_not_expose_credentials(panel, tmp_path):
     app.store.put("runs", "report-run", {"run_id": "report-run", "task_report": str(report)})
     rendered = canonical(app.readers.run("report-run"))
     assert "credential-secret" not in rendered and "cookie-secret" not in rendered
+
+
+
+def test_worker_failure_closes_the_operation_event_stream(panel):
+    app, _ = panel
+    app.cfg["mode"] = "live"
+    app.cfg["routines"]["maj"]["argv"] = ["missing-panel-review-executable"]
+    _, op = post(app, "/api/routines/maj", {"request_id": "missing-command"})
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["status"] == "unknown"
+    events = app.store.events(op["operation_id"])
+    assert events[-1]["event"] == "done" and events[-1]["data"]["status"] == "unknown"
