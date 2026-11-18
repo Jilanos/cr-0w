@@ -758,7 +758,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .desk .in.ask { padding: 10px 12px; }
 .desk .mic { all: unset; display: inline-grid; place-items: center; color: var(--dim); padding: 0 4px; opacity: 0.55; }
 .desk .term { background: #181926; border: 1px solid #363a4f; border-radius: 8px; padding: 10px 12px; font: 12.5px / 1.55 var(--font-body); display: flex; flex-direction: column; overflow: hidden; }
-.desk .term > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk .term > div { overflow-wrap: anywhere; }
 .desk .tls { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
 .desk .tl { display: flex; gap: 10px; font-size: 12px; align-items: baseline; }
 .desk .tl b { font-weight: 500; color: var(--sub); width: 40px; flex: none; }
