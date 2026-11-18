@@ -203,7 +203,8 @@ node bin/panel_ui/dev/integration.mjs --url http://127.0.0.1:8790 \
 ```
 
 The integration driver requires a real server in dry-run mode. It checks views,
-pending inverses, simulated mail actions, routines and responsive layouts.
+pending inverses, simulated mail actions and responsive layouts. Routines execute
+for real: `--routines` clicks them, only with `simulate_in_trial: true` set.
 `--chat` spends one real Sonnet message. `--sync` performs a real read-only scan.
 Review results JSON and captures. Keep the real pending document's checksum and
 compare the copy before and after testing. Run the affected Python tests with
