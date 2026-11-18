@@ -9,7 +9,8 @@
     "inbox": 57,
     "inbox_unread": 9,
     "triage_proposals": 21,
-    "drafts": 4,
+    "drafts": 1,
+    "drafts_unverified": 1,
     "runs_active": 1,
     "runs_queued": 0,
     "afk_decisions": 2

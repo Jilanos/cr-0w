@@ -252,6 +252,9 @@ class Readers:
         pending = self.app.pending.view()
         items = [i for s in pending["sections"] if s["kind"] != "done" for i in s["items"]]
         decisions = [i for s in pending["sections"] if s["kind"] == "decisions" for i in s["items"]]
+        # Drafts to send are the rows of the pending drafts section; the mail sync only checks them.
+        draft_rows = [i for s in pending["sections"] if s["kind"] == "drafts" for i in s["items"]]
+        synced_drafts = self.app.mail.drafts()["items"]
         overdue = [i for i in items if i["overdue_workdays"]]
         mail = self.app.mail.list({})
         try:
@@ -265,7 +268,7 @@ class Readers:
         afk = self.afk()
         counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items) + sum(i["date"] < limit for i in calendar), "decisions": len(decisions),
                   "inbox": len(self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None, "inbox_unread": sum(i["unread"] for i in self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None,
-                  "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": sum(i["state"] == "draft" for i in self.app.mail.drafts()["items"]),
+                  "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": len(draft_rows), "drafts_unverified": sum(i["state"] == "missing" for i in synced_drafts),
                   "runs_active": active, "runs_queued": queued, "afk_decisions": sum(not d["answered"] for d in afk["decisions"])}
         alerts = [{"level": "error", "text": "Relance dépassée : " + i["title"], "ref": {"kind": "pending", "id": i["id"]}} for i in overdue]
         if self.cfg.dry:

@@ -186,7 +186,7 @@ class Mail:
                            "updated": row.get("updated"), "state": state, "signature_ok": row.get("signature_ok"),
                            "attachments_missing": row.get("attachments_missing", []), "owa_link": https(row.get("owa_link")), "pending_ref": None,
                            "topic_id": self.launcher.topic("mail", row.get("conversation_id", row["id"]), clean_text(row.get("subject", ""))),
-                           "evidence": clean_text(row.get("evidence", "État incertain."))})
+                           "evidence": clean_text(row.get("evidence") or "Aucune preuve rapportée par la synchro.")})
         return result
 
     def drafts(self):

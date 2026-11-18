@@ -12,7 +12,7 @@ const ACTION_LABEL = { reply: 'Répondre', keep: 'Garder', move: 'Ranger', archi
 const RUN_STATE = { running: 'en cours', succeeded: 'terminé', failed: 'échec', queued: 'en file', partial: 'partiel',
   unknown: 'inconnu', cancelled: 'retiré', cancel_requested: 'retrait demandé' };
 const CAP_STATE = { available: 'disponible', limited: 'limité', unavailable: 'indisponible' };
-const DRAFT_STATE = { draft: 'À relire', sent: 'Envoyé (prouvé)', missing: 'Incertain' };
+const DRAFT_STATE = { draft: 'Dans Brouillons Outlook', sent: 'Envoyé (prouvé)', missing: 'À vérifier dans Outlook' };
 
 export function makeViews(ctx) {
   const { store, cached, cacheErr, load } = ctx;
@@ -298,12 +298,13 @@ export function makeViews(ctx) {
           h('span', { class: 'grow', text: d.text }), chip(d.kind === 'reset' ? 'reset' : d.kind === 'calendar' ? 'calendrier' : 'relance', 'quiet'))), 'Aucune échéance cette semaine.'))));
 
       // Brouillons
-      const drafts = ((cached('drafts') || {}).items || []).filter((d) => d.state !== 'sent');
+      const draftRows = allPending().filter((it) => it._section.kind === 'drafts');
+      const unverified = c.drafts_unverified || 0;
       grid.append(card('Brouillons à envoyer', linkBtn('Ouvrir', () => ctx.go('drafts')),
-        cardList(drafts.map((d) => cardRow(() => ctx.go('drafts', d.id), h('span', { class: 'grow', text: d.subject }),
-          d.state === 'missing' ? chip('incertain', 'warn') : null,
-          d.signature_ok === false ? chip('signature', 'warn') : null,
-          d.attachments_missing && d.attachments_missing.length ? chip('PJ manquante', 'warn') : null)), 'Aucun brouillon en attente.')));
+        h('div', null, cardList(draftRows.map((it) => cardRow(() => ctx.go('drafts', it.id), prioDot(it.prio), h('span', { class: 'grow', text: it.title }),
+          segText(it.cells.Depuis) ? h('span', { class: 'muted small', text: segText(it.cells.Depuis) }) : null)), 'Aucun brouillon à envoyer.'),
+        unverified ? h('button', { type: 'button', class: 'link-btn small card-foot', onclick: () => ctx.go('drafts'),
+          text: `${plural(unverified, 'mail', 'mails')} à vérifier dans Outlook` }) : null)));
 
       // Propositions de tri
       const mail = cached('mail');
@@ -960,8 +961,13 @@ export function makeViews(ctx) {
     reload: () => ctx.refresh(['drafts']).then(ctx.render),
     status: () => status(['drafts']),
     items() {
-      const list = (cached('drafts') || {}).items || [];
       const out = [];
+      const rows = allPending().filter((it) => it._section.kind === 'drafts');
+      if (rows.length) {
+        out.push(groupHeader('À relire et envoyer', rows.length));
+        rows.forEach((it) => out.push(pendingEntry(it)));
+      }
+      const list = (cached('drafts') || {}).items || [];
       for (const st of ['draft', 'missing', 'sent']) {
         const items = list.filter((d) => d.state === st);
         if (!items.length) continue;
@@ -970,8 +976,9 @@ export function makeViews(ctx) {
           key: d.id, text: `${d.subject} ${d.to.join(' ')}`, dim: st === 'sent',
           topic: { topic_id: d.topic_id, title: d.subject, kind: 'mail', mailOnly: true },
           row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, h('span', { class: ['state-dot', 'sd-' + d.state] }),
-            h('span', { class: 'row-title', text: d.subject }), h('time', { class: 'row-time', text: fmtDate(d.updated) })),
-          h('div', { class: 'row-sub', text: `à ${d.to.join(', ')}` }),
+            h('span', { class: 'row-title', text: d.subject }), d.updated ? h('time', { class: 'row-time', text: fmtDate(d.updated) }) : null),
+          d.to.length ? h('div', { class: 'row-sub', text: `à ${d.to.join(', ')}` })
+            : st === 'missing' ? h('div', { class: 'row-sub', text: 'Ni dans Brouillons ni dans Envoyés' }) : null,
           h('div', { class: 'row-chips' }, d.signature_ok === false ? chip('signature à vérifier', 'warn') : null,
             d.attachments_missing && d.attachments_missing.length ? chip(`PJ manquante : ${d.attachments_missing.join(', ')}`, 'warn') : null)),
           detail: () => draftDetail(d),
@@ -979,7 +986,7 @@ export function makeViews(ctx) {
       }
       return out;
     },
-    empty: () => emptyState('Aucun brouillon', 'Les brouillons préparés par crow apparaissent ici.'),
+    empty: () => emptyState('Aucun brouillon', 'Les brouillons du fichier en attente et ceux vus par la synchro apparaissent ici.'),
   };
 
   function draftDetail(d) {
@@ -988,7 +995,7 @@ export function makeViews(ctx) {
     const stateKind = { draft: 'accent', sent: 'ok', missing: 'warn' }[d.state];
     return h('article', { class: 'detail' },
       h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, chip(DRAFT_STATE[d.state] || d.state, stateKind)),
-        h('h2', { text: d.subject }), h('p', { class: 'muted', text: `Modifié ${ago(d.updated)} (${fmtDate(d.updated)})` })),
+        h('h2', { text: d.subject }), d.updated ? h('p', { class: 'muted', text: `Modifié ${ago(d.updated)} (${fmtDate(d.updated)})` }) : null),
       h('div', { class: 'actions' },
         owa ? h('a', { class: 'btn btn-primary', href: owa, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Relire dans Outlook' })) : null,
         linked ? btn('Ligne liée', { icon: 'pending', onclick: () => ctx.go(linked.section === 'decisions' ? 'decisions' : 'pending', linked.id) }) : null,
@@ -996,10 +1003,10 @@ export function makeViews(ctx) {
       h('dl', { class: 'fields' },
         h('dt', { text: 'À' }), h('dd', { text: d.to.join(', ') || '–' }),
         h('dt', { text: 'Cc' }), h('dd', { text: d.cc.length ? d.cc.join(', ') : '–' }),
-        h('dt', { text: 'Preuve' }), h('dd', { text: d.evidence }),
-        h('dt', { text: 'Signature' }), h('dd', { text: d.signature_ok == null ? 'inconnue' : d.signature_ok ? 'présente' : 'à vérifier' }),
+        h('dt', { text: 'Contrôle' }), h('dd', { text: d.evidence }),
+        h('dt', { text: 'Signature' }), h('dd', { text: d.signature_ok == null ? 'non contrôlée' : d.signature_ok ? 'présente' : 'à vérifier' }),
         h('dt', { text: 'PJ manquantes' }), h('dd', { text: d.attachments_missing.length ? d.attachments_missing.join(', ') : 'aucune' })),
-      d.state === 'missing' ? h('p', { class: 'callout callout-warn', text: 'Absent de Brouillons et d\'Éléments envoyés. État incertain : rien n\'est marqué Réglé automatiquement.' }) : null,
+      d.state === 'missing' ? h('p', { class: 'callout callout-warn', text: 'La synchro ne trouve ce mail ni dans Brouillons ni dans Éléments envoyés. Rien n\'est marqué Réglé. Vérifie dans Outlook s\'il a été envoyé, supprimé ou déplacé.' }) : null,
       d.state === 'sent' && linked ? h('p', { class: 'callout', text: 'Envoi prouvé. La ligne liée peut être réglée depuis Relances.' }) : null);
   }
 

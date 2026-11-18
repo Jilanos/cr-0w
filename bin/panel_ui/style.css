@@ -426,6 +426,7 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
 }
 .card-row:hover { background: var(--hover); }
 .card-empty { padding: 8px 4px 12px; font-size: 13px; }
+.card-foot { display: block; margin: 4px 4px 8px; }
 .card-gauges { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
 .gauge-btn { border: 0; background: transparent; text-align: left; padding: 8px 4px; border-radius: 4px; }
 .gauge-btn:hover { background: var(--hover); }

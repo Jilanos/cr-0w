@@ -334,6 +334,21 @@ def test_hostile_mail_is_text_and_missing_draft_not_sent(panel):
     assert app.mail.drafts()["items"][0]["state"] == "missing"
 
 
+def test_draft_counts_follow_pending_rows_and_sync_checks(panel):
+    app, _ = panel
+    pending = Path(app.cfg["pending_md"])
+    pending.write_text(pending.read_text() + "\n## ✉️ Brouillons à relire\n\n| Sujet | Attendu | Depuis |\n|---|---|---|\n| Example A | Relire | 17/11 |\n| Example B | Relire | 16/11 |\n")
+    rows = [i for s in app.pending.view()["sections"] if s["kind"] == "drafts" for i in s["items"]]
+    assert len(rows) == 2
+    value = snapshot()
+    value["drafts"] = [{"id": "a", "state": "missing", "subject": "A"}, {"id": "b", "state": "draft", "subject": "B"}]
+    app.mail.publish(value)
+    counts = app.readers.state()["counts"]
+    assert counts["drafts"] == len(rows)
+    assert counts["drafts_unverified"] == 1
+    assert app.mail.drafts()["items"][0]["evidence"] == "Aucune preuve rapportée par la synchro."
+
+
 def test_triage_immutable_plan_consumption_expiry_undo_and_dry_reply(panel):
     app, fake = panel
     app.mail.publish(snapshot())
