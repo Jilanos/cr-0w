@@ -134,3 +134,21 @@ def test_crlf_and_dossier_restore_stay_in_original_block(tmp_path):
     op = writer.mutate(first["id"], "done", {"request_id": "a", "item_rev": first["item_rev"]}, "/a")
     writer.undo(op, {"request_id": "ua"}, "/ua")
     assert writer.path.read_bytes() == data
+
+
+def test_same_bytes_with_concurrent_mtime_change_are_rejected(tmp_path, monkeypatch):
+    import os
+    import crow_panel.pending as module
+    writer, _, _ = setup(tmp_path)
+    item = items(writer)[0]
+    original = module.atomic
+    def racing_backup(path, data):
+        original(path, data)
+        if Path(path).parent.name == "backups":
+            stamp = writer.path.stat()
+            os.utime(writer.path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns + 1000000))
+    monkeypatch.setattr(module, "atomic", racing_backup)
+    with pytest.raises(Problem) as err:
+        writer.mutate(item["id"], "done", {"request_id": "race", "item_rev": item["item_rev"]}, "/done")
+    assert err.value.body["error"]["code"] == "conflict"
+    assert writer.path.read_text() == DOCUMENT

@@ -75,7 +75,8 @@ def shared_locks(home):
     if os.environ.get("CROW_LOCKS_DIR"):
         return Path(os.environ["CROW_LOCKS_DIR"])
     try:
-        value = yaml.safe_load((Path(home) / "local/panel.yaml").read_text()) or {}
+        path = Path(os.environ.get("CROW_PANEL_CONFIG", Path(home) / "local/panel.yaml"))
+        value = yaml.safe_load(path.read_text()) or {}
     except (OSError, ValueError, yaml.YAMLError):
         value = {}
     return Path(value.get("locks_dir", Path(home) / "local/state/locks"))

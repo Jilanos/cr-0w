@@ -30,6 +30,8 @@ mail:
   proposals_per_sync: 100
   stale_after_minutes: 120
   internal_domains: []
+  draft_app_id: null
+  probe_deny_tool: get_me
 accounts:
   claude: {provider: claude, kinds: [chat, mail_read, mail_skeleton, mail_triage]}
   worka: {provider: codex, kinds: [chat, mail_style, files], power: high, model: gpt-5}
@@ -40,6 +42,7 @@ chat:
   models: [haiku, sonnet, opus]
   by_kind: {}
 projects: {}
+dossiers: {}
 max_parallel: 2
 routines:
   maj: {argv: []}
@@ -47,4 +50,4 @@ routines:
   maj_schedule: []
 floors: {}
 # Action profiles use a deny-by-default PreToolUse hook. Unknown tools are refused.
-# Provide extra READ suffixes only after a headless probe proves the exact schema.
+# Missing tools remain unavailable until their schemas and permissions are verified.

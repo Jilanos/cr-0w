@@ -351,12 +351,15 @@ class Mail:
         self.store.save_op(original)
         return op
 
-    def transcript_ok(self, op, job, row, require_remote=False):
+    def transcript_source(self, row):
         path = (row.get("artifacts") or row).get("stdout_path")
         import crow_lib
         sid = row.get("conversation_id") or row.get("provider_session_id")
         transcripts = crow_lib.find_transcripts(sid) if sid else []
-        path = next((p for _, p in transcripts if Path(p).is_file()), path)
+        return next((p for _, p in transcripts if Path(p).is_file()), path)
+
+    def transcript_ok(self, op, job, row, require_remote=False):
+        path = self.transcript_source(row)
         policy = read_json(self.cfg.state / "ops" / op["operation_id"] / "policy.json", {})
         if not path or not policy:
             return False
@@ -368,7 +371,11 @@ class Mail:
                         value = json.loads(line)
                     except ValueError:
                         continue
-                    for block in (value.get("message") or {}).get("content", []):
+                    message = value.get("message") if isinstance(value.get("message"), dict) else {}
+                    blocks = message.get("content", [])
+                    for block in blocks if isinstance(blocks, list) else []:
+                        if not isinstance(block, dict):
+                            continue
                         if block.get("type") == "tool_use":
                             name = block.get("name", "")
                             if not hook_input(policy, {"tool_name": name, "tool_input": block.get("input", {})}):
@@ -385,7 +392,7 @@ class Mail:
         probe = output.get("probe", {})
         tools = probe.get("tools", [])
         tools = [t for t in tools if isinstance(t, str)]
-        path = (row.get("artifacts") or row).get("stdout_path")
+        path = self.transcript_source(row)
         transcript = Path(path).read_text(errors="replace")[-2_000_000:] if path and Path(path).is_file() else ""
         denial = probe.get("denied_tool", {})
         blocked = (denial.get("name", "").rsplit("__", 1)[-1] in job.get("deny_tools", []) and denial.get("blocked") is True

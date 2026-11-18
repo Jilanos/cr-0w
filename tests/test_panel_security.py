@@ -33,3 +33,10 @@ def test_hook_cli_missing_manifest_fails_closed(tmp_path):
 def test_redaction_before_event_persistence():
     text = redact('Bearer SECRET https://example.org/?sig=abc&x=1 {"access_token":"private"}')
     assert "SECRET" not in text and "abc" not in text and "private" not in text
+
+
+def test_m365_resource_reads_are_bounded_to_mail():
+    assert tool_allowed("read", "mcp__M365__read_resource", {"uri": "mail:///messages/example"})
+    assert tool_allowed("read", "mcp__M365__read_resource", {"uri": "mail:///folders/inbox"})
+    assert not tool_allowed("read", "mcp__M365__read_resource", {"uri": "file:///etc/passwd"})
+    assert not tool_allowed("triage", "mcp__M365__read_resource", {"uri": "mail:///folders/inbox"}, {"items": []})

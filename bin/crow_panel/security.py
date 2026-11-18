@@ -123,7 +123,7 @@ def tool_allowed(profile, name, args, manifest=None):
     short = name.rsplit("__", 1)[-1]
     if any(x in short.lower() for x in ("send", "forward", "delete", "thread_labels", "calendar", "sharepoint", "teams")):
         return False
-    if name in ("Read", "Grep", "Glob", "ToolSearch") or short == "search_tools":
+    if name in ("Read", "Grep", "Glob", "ToolSearch", "ListMcpResourcesTool") or short == "search_tools":
         return profile != "triage"
     if name in ("Write", "Edit"):
         return profile in ("read", "skeleton", "style")  # file paths checked by the hook

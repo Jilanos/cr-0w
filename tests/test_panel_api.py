@@ -417,3 +417,73 @@ def test_utf8_tail_waits_for_complete_line_and_redacts(panel, tmp_path):
     assert len(events) == 1 and "Été" in events[0]["data"]["text"] and "secret" not in canonical(events)
     app.launcher.tail(op, row)
     assert app.store.events("tail") == events
+
+
+def test_maintenance_waits_then_streams_failed_script_and_legacy_reader(panel, tmp_path, monkeypatch):
+    import runpy
+    import time
+    app, fake = panel
+    app.cfg["mode"] = "live"
+    app.cfg["routines"]["daily_update"]["argv"] = [sys.executable, "-u", "-c", 'print("script progress"); raise SystemExit(3)']
+    fake.active = 1
+    _, op = post(app, "/api/routines/daily_update", {"request_id": "maintenance-live"})
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["steps"][0]["status"] == "running"
+    assert app.launcher.maintenance()
+    fake.active = 0
+    for _ in range(50):
+        app.launcher.tick()
+        op = app.operation(op["operation_id"])
+        if op["status"] not in ("queued", "running"):
+            break
+        time.sleep(0.01)
+    assert op["status"] == "failed" and op["result"]["exit_code"] == 3
+    assert not app.launcher.maintenance()
+    assert any("script progress" in e["data"].get("text", "") for e in app.store.events(op["operation_id"]))
+    monkeypatch.setenv("CROW_ACCOUNT", "claude")
+    monkeypatch.setenv("CROW_HOME", str(tmp_path))
+    legacy = runpy.run_path(str(Path(__file__).resolve().parents[1] / "bin/crow-runs"), run_name="panel_reader_test")
+    legacy["ledger"].__globals__["LEDGER"] = Path(app.cfg["runs_registry"])
+    rows = legacy["ledger"]()
+    assert rows[-1]["kind"] == "script" and rows[-1]["status"] == "failed"
+
+
+def test_example_config_alone_and_non_loopback_rejected(tmp_path):
+    fake = FakeCdx(tmp_path)
+    cfg = Config(Path(__file__).resolve().parents[1] / "docs/panel.example.yaml", overrides={
+        "crow_home": str(tmp_path), "state_dir": str(tmp_path / "state"), "locks_dir": str(tmp_path / "locks"), "runs_registry": str(tmp_path / "runs.jsonl")})
+    app = App(cfg, fake)
+    assert app.pending.view()["sections"] == []
+    assert app.readers.state()["counts"]["pending"] == 0
+    assert app.mail.list({})["coverage"]["status"] == "none"
+    app.store.db.close()
+    with pytest.raises(ValueError):
+        Config(overrides={"host": "0.0.0.0"})
+
+
+def test_real_transcript_shapes_and_intentional_probe_denial(panel):
+    app, fake = panel
+    _, op = post(app, "/api/mail/sync", {"request_id": "probe-shapes", "probe": True})
+    app.launcher.tick()
+    live = app.operation(op["operation_id"])
+    job = app.store.get("jobs", op["operation_id"])
+    rid = live["steps"][-1]["run_id"]
+    log = Path(fake.rows[rid]["artifacts"]["stdout_path"])
+    entries = [
+        {"type": "user", "message": {"content": "The actual provider stores prompts as strings."}},
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "mcp__M365__outlook_email_search", "input": {}}]}},
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "mcp__M365__get_me", "input": {}}]}},
+        {"type": "user", "message": {"content": [{"type": "tool_result", "content": "Panel action policy denied this tool."}]}},
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "ListMcpResourcesTool", "input": {"server": "M365"}}]}},
+    ]
+    log.write_text("".join(json.dumps(v) + "\n" for v in entries))
+    value = snapshot()
+    value["probe"] = {"tools": ["mcp__M365__outlook_email_search"], "denied_tool": {"name": "get_me", "blocked": True}}
+    Path(job["output"]).write_text(json.dumps(value))
+    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["status"] == "succeeded"
+    caps = app.mail.capabilities()
+    read = next(c for c in caps["capabilities"] if c["name"] == "mail_read")
+    assert read["allowed"] and read["evidence"]["permissions"]["ok"]
+    assert all("actual provider stores" not in e["data"].get("text", "") for e in app.store.events(rid))

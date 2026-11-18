@@ -314,8 +314,11 @@ class Launcher:
                         continue
                 except (TypeError, ValueError):
                     pass
-            blocks = (obj.get("message") or {}).get("content", []) if obj.get("type") in (None, "assistant") else []
+            message = obj.get("message") if isinstance(obj.get("message"), dict) else {}
+            blocks = message.get("content", []) if obj.get("type") in (None, "assistant") else []
             for block in blocks if isinstance(blocks, list) else []:
+                if not isinstance(block, dict):
+                    continue
                 if block.get("type") == "text":
                     self.emit(op, stream, "text", {"text": block["text"]})
                 elif block.get("type") == "tool_use":
@@ -511,7 +514,7 @@ class Launcher:
                     op.update(status="failed", error=exc.body["error"])
                     self.store.save_op(op)
                     self.release(op["operation_id"])
-                except (OSError, ValueError, KeyError, TypeError) as exc:
+                except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
                     op.update(status="unknown", error={"code": "worker_error", "message": "Résultat incertain : " + type(exc).__name__, "retryable": False, "details": {}})
                     self.store.save_op(op)
                     self.release(op["operation_id"])
