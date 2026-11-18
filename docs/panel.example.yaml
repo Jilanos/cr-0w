@@ -83,3 +83,14 @@ dossiers_discover:
   days: 14
   limit: 40
   exclude: []          # e.g. ["00_admin/tmp-*", "90_archive/*"]
+
+# Classic Outlook is primary when its running COM application can be reached.
+# The bridge never starts or closes Outlook. An unavailable application falls
+# back to the existing connector runs. Values below contain no mailbox identity.
+# mail.outlook_com:
+#   enabled: true
+#   powershell_exe: powershell.exe
+#   timeout_seconds: 90
+#   inbox_limit: 5000
+#   history_scan_cap: 500
+#   history_index_cap: 100000

@@ -219,3 +219,31 @@ worker failures emit a terminal event and that the browser leaves its waiting st
 Read tools resolve paths against the configured data home, file roots and projects.
 Test symlink escapes and out-of-root credential reads. Native resumed chat disables
 local read tools as well as MCP because continuation settings cannot carry hooks.
+
+## Classic Outlook bridge
+
+Keep classic Outlook open on the Windows desktop. The Python bridge invokes the
+shipped PowerShell helper with `-STA -File`; request values are UTF-8 JSON in a
+private temporary file. The file is removed after each call. No command text is
+built from mailbox content. A timeout on a write produces an uncertain result;
+inspect the mailbox before another attempt. The helper only attaches to an
+existing application and never closes it.
+
+The fixed action list provides a read-only probe, folder tree, inbox, body,
+conversation table across stores, calendar occurrences, incremental filing scan,
+verified move, reply-all draft, draft read-back and deletion restricted to Drafts.
+It exposes no sending action. Moves use EntryID and StoreID and return the new
+EntryID. Undo must use that returned identity and verify the current source folder.
+
+The filing index lives under the private panel state. Each scan has a message cap,
+a round-robin folder cursor, and a modification-time checkpoint including all ids
+at the timestamp boundary. A periodic full sweep removes obsolete entries. The
+index has its own retention cap; it is evidence for suggestions, not an exhaustive
+mailbox inventory. Conversation lookup uses the native conversation table before
+sender/domain statistics.
+
+Outlook's supported methods are documented in
+[ReplyAll](https://learn.microsoft.com/en-us/office/vba/api/outlook.mailitem.replyall(method)),
+[Move](https://learn.microsoft.com/en-us/office/vba/api/outlook.mailitem.move),
+[conversation tables](https://learn.microsoft.com/en-us/office/vba/api/outlook.conversation.gettable)
+and [recurring instances](https://learn.microsoft.com/en-us/office/vba/api/outlook.items.includerecurrences).
