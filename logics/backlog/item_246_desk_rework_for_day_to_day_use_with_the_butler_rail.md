@@ -65,7 +65,7 @@
 - Design: vault `Research/nest-design/item_246/desk-B.png` is the approved layout (annotated sketch, not a pixel board); `sketch.html?v=B` is its source. Decisions in `design-notes.md` there.
 
 - Build 2026-11-18 (a1e0a77, core retry route c8541ae): layout B on laptop. Sessions block (runs, sessions with Open, queue line), filter chips Needs/Running/Ready/All (Needs by default), one action per row (Retry, Open MR, Allow, Answer), Ready to run = Logics Ready + at most 3 sessions parked in the last 24h (owner 18/11), KPIs working/need you·oldest/failed/done today/ok rate 7d. Shots in vault `Research/nest-design/item_246/build/`.
-- Left: owner check vs desk-B.png. A running item still shows under the Running chip (it is not removed from Work, only from the default Needs view). Ready ▶ dispatches with account auto.
+- Owner 2026-11-18: a launched item leaving Needs for Running is right; Ready ▶ keeps account auto. Left: owner check vs desk-B.png on the live app.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
