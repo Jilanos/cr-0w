@@ -33,7 +33,14 @@ const unitName = "crow-core.service"
 // serve proxies to, and the unix socket for local clients.
 func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 	owner := ownerLogin(cfg.Serve.Owner)
+	bm, err := butlerManager(cfg)
+	if err != nil {
+		log.Printf("butler disabled: %v", err)
+	} else {
+		defer bm.Close()
+	}
 	srv := api.New(api.Options{
+		Butler:    bm,
 		Env:       env,
 		Owner:     owner,
 		Nest:      cfg.Serve.Nest,

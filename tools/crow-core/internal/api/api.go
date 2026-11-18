@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"crow-core/contract"
+	"crow-core/internal/butler"
 	"crow-core/internal/eventlog"
 	"crow-core/internal/mission"
 )
@@ -46,8 +47,9 @@ type Options struct {
 	Nest      string        // built Nest dir served at /; empty serves no app
 	Sources   []Source      // sections outside the store, refreshed in the background
 	Now       func() time.Time
-	Script    Script // runs the bin/ scripts of the live actions (live.go); nil refuses them
-	ActionLog string // core action log the live actions append to
+	Script    Script          // runs the bin/ scripts of the live actions (live.go); nil refuses them
+	ActionLog string          // core action log the live actions append to
+	Butler    *butler.Manager // butler chat (item_176); nil disables it
 }
 
 // Server answers the routes. It is safe for concurrent use.
@@ -115,6 +117,7 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	s.routeLive(mux)
 	s.routeConversation(mux)
 	s.routeTerminal(mux)
+	s.routeButler(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "no route")
 	})
