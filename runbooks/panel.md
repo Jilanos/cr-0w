@@ -40,9 +40,17 @@ runs_registry: /path/to/private/local/state/runs.jsonl
 ```
 
 Copy the pending document before starting. In dry-run mode, **Réglé**, **Reporter**
-and **Annuler** write that copy and save backups. Mail replies, triage, file opens
-and both routines are simulated. Chat and mailbox synchronisation use real,
-recorded read-only runs. A simulated routine log prints its exact command.
+and **Annuler** write that copy and save backups. Mail replies, triage and file
+opens are simulated. Chat and mailbox synchronisation use real, recorded read-only
+runs.
+
+Both routines execute for real in every mode. They run one at a time; the log
+streams live and the end line shows the real exit code and duration. A shell
+wrapper writes the exit code next to the log, so a restarted server still reads
+it. Set `routines.<name>.simulate_in_trial: true` to print the command instead in
+dry-run mode. `routines.daily_update.wait_runs: false` skips the wait for active
+runs; keep the default outside tests. `maj_schedule` still blocks the machine
+update during the 30 minutes before a scheduled update.
 
 Use **Réglé**, then **Annuler** within the displayed ten seconds. A date-stamped
 entry appears under recently completed items. Backups are in `state_dir/backups`.
@@ -137,7 +145,7 @@ locks_dir: /path/to/private/local/state/locks
 ```
 
 Restart with the same explicit config path. The **Mode essai** badge disappears.
-Live pending edits affect the real document. Live routines execute their commands.
+Live pending edits affect the real document.
 Mail writers remain blocked until their schema, headless probe and permission
 proofs are present. Switching the mode alone does not prove those capabilities.
 A fresh state directory requires a new read-only probe and synchronisation:

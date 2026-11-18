@@ -127,8 +127,9 @@ class Readers:
 
     def routines(self):
         result = []
+        waits = self.cfg["routines"].get("daily_update", {}).get("wait_runs", True)
         for name, label, description in (("maj", "Mise à jour", "Mails, brouillons, relances, fichier en attente"),
-                                         ("daily_update", "Mise à jour machine", "Outils et dépôts. Attend la fin des runs.")):
+                                         ("daily_update", "Mise à jour machine", "Outils et dépôts." + (" Attend la fin des runs." if waits else ""))):
             ops = [o for o in self.store.all("operations") if o["kind"] == "routine." + name]
             active = next((o for o in reversed(ops) if o["status"] in ACTIVE), None)
             last = next((o for o in reversed(ops) if o["status"] not in ACTIVE), None)
@@ -137,7 +138,8 @@ class Readers:
                 blocked = "Commande non configurée."
             result.append({"name": name, "label": label, "description": description, "running": bool(active), "operation_id": active["operation_id"] if active else None,
                            "blocked_reason": blocked, "last": {"at": last["updated_at"], "status": last["status"], "exit_code": (last["result"] or {}).get("exit_code"),
-                           "run_id": last["steps"][-1].get("run_id")} if last else None, "dry_run": self.cfg.dry})
+                           "duration_s": (last["result"] or {}).get("duration_s"), "simulated": bool(last.get("dry_run")),
+                           "run_id": last["steps"][-1].get("run_id")} if last else None, "dry_run": self.launcher.routine_simulated(name)})
         return {"generated_at": now(), "routines": result}
 
     def dossiers(self):

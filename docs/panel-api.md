@@ -81,6 +81,15 @@ Nested JSON values and displayed run reports are also redacted. Raw subprocess
 logs remain private source artifacts and can retain credentials. Do not include
 their directory in file roots until a redacting script runner is available.
 
+## Routines
+
+`POST /api/routines/{name}` executes the configured argv for real in both modes,
+unless `simulate_in_trial` is true in dry-run mode. One routine runs at a time
+(423 or 409 otherwise). A finished routine operation has `result: {exit_code,
+duration_s, started_at, ended_at}`; its `done` event carries `exit_code` and
+`duration_s`. `GET /api/routines` reports `dry_run` per routine (true only when
+simulated) and `last: {at, status, exit_code, duration_s, simulated, run_id}`.
+
 ## Global search
 
 `GET /api/search?q=...&limit=20` requires the session cookie. The query has at most

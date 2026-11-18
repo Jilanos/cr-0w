@@ -137,6 +137,9 @@ class Config(dict):
             argv = self["routines"].get(name, {}).get("argv", [])
             if not isinstance(argv, list) or any(not isinstance(x, str) or not x for x in argv):
                 raise ValueError("routine argv must be a list of strings")
+            for flag in ("simulate_in_trial", "wait_runs"):
+                if type(self["routines"].get(name, {}).get(flag, False)) is not bool:
+                    raise ValueError("routine " + flag + " must be a boolean")
         self.state = Path(self["state_dir"]).resolve()
         self.locks = Path(self["locks_dir"]).resolve()
 

@@ -384,6 +384,7 @@ def test_triage_immutable_plan_consumption_expiry_undo_and_dry_reply(panel):
 
 def test_routine_dry_run_never_executes_command(panel):
     app, fake = panel
+    app.cfg["routines"]["daily_update"]["simulate_in_trial"] = True
     _, op = post(app, "/api/routines/daily_update", {"request_id": "routine"})
     assert app.launcher.maintenance()
     app.launcher.tick()
@@ -740,6 +741,7 @@ def test_trial_routine_never_becomes_live_after_restart(panel, tmp_path):
     app, fake = panel
     marker = tmp_path / "executed"
     app.cfg["routines"]["maj"]["argv"] = [sys.executable, "-c", "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()"]
+    app.cfg["routines"]["maj"]["simulate_in_trial"] = True
     _, op = post(app, "/api/routines/maj", {"request_id": "trial-routine"})
     app.cfg["mode"] = "live"
     restarted = App(app.cfg, fake)
@@ -826,10 +828,10 @@ def test_worker_failure_closes_the_operation_event_stream(panel):
     app.cfg["mode"] = "live"
     app.cfg["routines"]["maj"]["argv"] = ["missing-panel-review-executable"]
     _, op = post(app, "/api/routines/maj", {"request_id": "missing-command"})
-    app.launcher.tick()
-    assert app.operation(op["operation_id"])["status"] == "unknown"
+    op = wait_routine(app, op)
+    assert op["status"] == "failed" and op["result"]["exit_code"] == 127
     events = app.store.events(op["operation_id"])
-    assert events[-1]["event"] == "done" and events[-1]["data"]["status"] == "unknown"
+    assert events[-1]["event"] == "done" and events[-1]["data"]["status"] == "failed"
 
 
 @pytest.mark.parametrize("evidence", ["none", "error", "wrapped_error", "success"])
@@ -930,3 +932,63 @@ def test_duplicate_host_header_is_rejected_before_file_or_run_access(http_panel)
         assert json.loads(response.read())["error"]["details"]["reason"] == "host"
     finally:
         conn.close()
+
+
+def wait_routine(app, op, seconds=10):
+    import time
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        app.launcher.tick()
+        op = app.operation(op["operation_id"])
+        if op["status"] not in ("queued", "running"):
+            return op
+        time.sleep(0.05)
+    raise AssertionError("routine still running")
+
+
+def test_routines_execute_for_real_in_trial_mode_by_default(panel, tmp_path):
+    app, fake = panel
+    assert app.cfg.dry
+    marker = tmp_path / "ran"
+    script = "import time, pathlib; print('step one', flush=True); time.sleep(1.2); pathlib.Path(%r).touch(); print('step two'); raise SystemExit(4)" % str(marker)
+    app.cfg["routines"]["maj"]["argv"] = [sys.executable, "-u", "-c", script]
+    _, op = post(app, "/api/routines/maj", {"request_id": "real-trial"})
+    assert op["dry_run"] is False
+    with pytest.raises(Problem) as err:
+        post(app, "/api/routines/daily_update", {"request_id": "second-routine"})
+    assert err.value.status == 423
+    op = wait_routine(app, op)
+    assert marker.exists()
+    assert op["status"] == "failed" and op["result"]["exit_code"] == 4
+    assert op["result"]["duration_s"] >= 1
+    texts = "".join(e["data"].get("text", "") for e in app.store.events(op["operation_id"]))
+    assert "step one" in texts and "step two" in texts
+    done = app.store.events(op["operation_id"])[-1]
+    assert done["event"] == "done" and done["data"]["exit_code"] == 4 and done["data"]["duration_s"] >= 1
+    routine = next(r for r in app.readers.routines()["routines"] if r["name"] == "maj")
+    assert routine["dry_run"] is False and routine["last"]["exit_code"] == 4 and routine["last"]["duration_s"] >= 1
+    assert routine["last"]["simulated"] is False
+
+
+def test_routine_exit_code_survives_server_restart(panel, tmp_path):
+    app, fake = panel
+    app.cfg["routines"]["daily_update"]["argv"] = [sys.executable, "-c", "raise SystemExit(0)"]
+    app.cfg["routines"]["daily_update"]["wait_runs"] = False
+    _, op = post(app, "/api/routines/daily_update", {"request_id": "restart-exit"})
+    assert [s["name"] for s in app.operation(op["operation_id"])["steps"]] == ["script"]
+    app.launcher.tick()
+    for proc in app.launcher.processes.values():
+        proc.wait(timeout=5)
+    app.launcher.close()
+    restarted = App(app.cfg, fake)
+    try:
+        op = wait_routine(restarted, op)
+        assert op["status"] == "succeeded" and op["result"]["exit_code"] == 0
+    finally:
+        restarted.launcher.close()
+        restarted.store.db.close()
+
+
+def test_routine_flags_must_be_booleans(tmp_path):
+    with pytest.raises(ValueError):
+        Config(overrides={"crow_home": str(tmp_path), "routines": {"maj": {"argv": ["x"], "simulate_in_trial": "no"}}})

@@ -1118,7 +1118,7 @@ export function makeViews(ctx) {
         for (const r of routines) out.push({
           key: 'routine:' + r.name, text: r.label, topic: null,
           row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, runDot(r.running ? 'running' : r.last ? r.last.status : 'none'),
-            h('span', { class: 'row-title', text: r.label }), r.dry_run ? chip('essai', 'warn') : null,
+            h('span', { class: 'row-title', text: r.label }), r.dry_run ? chip('simulée', 'warn') : null,
             h('span', { class: 'row-time', text: r.last ? fmtDate(r.last.at) : 'jamais' })),
           h('div', { class: 'row-sub', text: r.blocked_reason || r.description })),
           detail: () => routineDetail(r),
@@ -1212,15 +1212,17 @@ export function makeViews(ctx) {
     const lock = st && st.locks && (st.locks.maj || st.locks.pending);
     const reason = r.running ? 'Déjà en cours' : lock ? `Mise à jour en cours depuis ${fmtDate(lock.since)}` : null;
     return h('article', { class: 'detail' },
-      h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, h('span', { text: 'Routine' }), r.dry_run ? chip('mode essai', 'warn') : null),
+      h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, h('span', { text: 'Routine' }), r.dry_run ? chip('simulée', 'warn') : null),
         h('h2', { text: r.label }), h('p', { class: 'muted', text: r.description })),
       h('div', { class: 'actions' },
         btn('Lancer', { icon: 'bolt', primary: true, disabled: reason, onclick: () => ctx.runRoutine(r.name, r.label, r.blocked_reason) }),
         r.operation_id ? btn('Journal', { icon: 'log', onclick: () => followLog(r.operation_id, r.label, `/api/operations/${encodeURIComponent(r.operation_id)}/events`) }) : null),
       r.blocked_reason ? h('p', { class: 'callout callout-warn', text: r.blocked_reason }) : null,
-      r.dry_run ? h('p', { class: 'muted small', text: 'Mode essai : le journal affiche la commande exacte, sans l\'exécuter.' }) : null,
+      h('p', { class: 'muted small', text: r.dry_run ? 'Simulée : le journal affiche la commande exacte, sans l\'exécuter.' : 'Exécution réelle, même en mode essai. Journal en direct, code de sortie et durée réels.' }),
       h('dl', { class: 'fields' },
-        h('dt', { text: 'Dernier passage' }), h('dd', { text: r.last ? [fmtDate(r.last.at), RUN_STATE[r.last.status] || r.last.status, r.last.exit_code != null ? `code ${r.last.exit_code}` : null].filter(Boolean).join(' · ') : 'jamais' })),
+        h('dt', { text: 'Dernier passage' }), h('dd', { text: r.last ? [fmtDate(r.last.at), RUN_STATE[r.last.status] || r.last.status,
+          r.last.simulated ? 'simulé' : r.last.exit_code != null ? `code ${r.last.exit_code}` : null,
+          r.last.duration_s != null ? duration(r.last.duration_s) : null].filter(Boolean).join(' · ') : 'jamais' })),
       r.last && r.last.run_id ? h('button', { type: 'button', class: 'link-btn', text: 'Voir le dernier run', onclick: () => ctx.go('jobs', 'run:' + r.last.run_id) }) : null);
   }
 

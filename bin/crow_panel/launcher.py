@@ -14,6 +14,11 @@ from .core import ACTIVE, ENGINE, Problem, atomic, canonical, digest, lock, lock
 from .security import redact, write_policy
 
 
+def format_duration(seconds):
+    seconds = int(round(seconds))
+    return (str(seconds // 60) + " min " if seconds >= 60 else "") + str(seconds % 60) + " s"
+
+
 def step(name, account=None, model=None):
     return {"name": name, "status": "queued", "account": account, "model": model, "run_id": None,
             "started_at": None, "ended_at": None, "error": None}
@@ -357,7 +362,7 @@ class Launcher:
                 topic.update(active_operation_id=None, last_message_at=now(), messages=len(messages))
                 self.store.put("topics", topic["topic_id"], topic)
         self.store.save_op(op)
-        self.store.event(op["operation_id"], "done", {"status": op["status"], "exit_code": row.get("exit_code"), "final_segments": [{"t": "text", "v": redact(text)}] if text else []})
+        self.store.event(op["operation_id"], "done", {"status": op["status"], "exit_code": row.get("exit_code"), "duration_s": row.get("duration_seconds"), "final_segments": [{"t": "text", "v": redact(text)}] if text else []})
         if row.get("run_id"):
             self.store.event(row["run_id"], "done", {"status": op["status"], "exit_code": row.get("exit_code"), "final_segments": [{"t": "text", "v": redact(text)}] if text else []})
         self.release(op["operation_id"])
@@ -381,12 +386,35 @@ class Launcher:
         argv = self.cfg["routines"].get(name, {}).get("argv", [])
         if not argv:
             raise Problem(422, "capability_unavailable", "Commande non configurée.")
-        op = self.store.operation("routine." + name, body, "Mise à jour" if name == "maj" else "Mise à jour machine", dry=self.cfg.dry)
-        self.enqueue(op, {"kind": "script", "argv": argv, "cwd": str(self.cfg.home)}, route, body, "wait_runs" if name == "daily_update" else "script")
-        if name == "daily_update":
+        op = self.store.operation("routine." + name, body, "Mise à jour" if name == "maj" else "Mise à jour machine", dry=self.routine_simulated(name))
+        wait = name == "daily_update" and self.cfg["routines"].get(name, {}).get("wait_runs", True)
+        self.enqueue(op, {"kind": "script", "argv": argv, "cwd": str(self.cfg.home)}, route, body, "wait_runs" if wait else "script")
+        if wait:
             op["steps"].append(step("script"))
             self.store.save_op(op)
         return op
+
+    def routine_simulated(self, name):
+        # Routines execute for real by default, even in trial mode. A routine opts into simulation per config.
+        return self.cfg.dry and self.cfg["routines"].get(name, {}).get("simulate_in_trial", False)
+
+    def exit_file(self, rid):
+        return self.cfg.state / "scripts" / (rid + ".exit")
+
+    def read_exit(self, rid):
+        try:
+            return int(self.exit_file(rid).read_text().strip())
+        except (OSError, ValueError):
+            return None
+
+    @staticmethod
+    def duration(row):
+        try:
+            begins = dt.datetime.fromisoformat(row["started_at"].replace("Z", "+00:00"))
+            ends = dt.datetime.fromisoformat(row["ended_at"].replace("Z", "+00:00"))
+            return round((ends - begins).total_seconds(), 1)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
 
     def scheduled_reason(self):
         current = dt.datetime.now().astimezone()
@@ -406,8 +434,8 @@ class Launcher:
 
     def _start_script(self, op, job):
         key = op["operation_id"]
-        if self.cfg.dry:
-            row = {"run_id": uid("scr_"), "status": "succeeded", "started_at": now(), "ended_at": now(), "exit_code": 0}
+        if op["dry_run"]:
+            row = {"run_id": uid("scr_"), "status": "succeeded", "started_at": now(), "ended_at": now(), "exit_code": None}
             self.record(op, job, row)
             for s in op["steps"]:
                 s.update(status="succeeded", started_at=now(), ended_at=now(), run_id=row["run_id"])
@@ -426,16 +454,21 @@ class Launcher:
             op["steps"][0].update(status="running", started_at=op["steps"][0]["started_at"] or now())
             self.store.save_op(op)
             return
-        if op["kind"] == "routine.daily_update":
+        if op["kind"] == "routine.daily_update" and op["steps"][0]["name"] == "wait_runs":
             op["steps"][0].update(status="succeeded", ended_at=now())
         rid = uid("scr_")
         path = self.cfg.state / "scripts" / (rid + ".log")
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd = path.open("wb")
         path.chmod(0o600)
         env = {**self.cfg.env, "CROW_PANEL_OPERATION_ID": key, "CROW_PANEL_PARENT_RUN": rid,
                "CROW_PANEL_RUNS_REGISTRY": self.cfg["runs_registry"], "CROW_MAX_RUNS": str(self.cfg["max_parallel"])}
-        proc = subprocess.Popen(job["argv"], cwd=job["cwd"], env=env, stdin=subprocess.DEVNULL, stdout=fd, stderr=subprocess.STDOUT, start_new_session=True)
-        fd.close()
+        # A small shell wrapper writes the real exit code, so a restarted server still reads it.
+        wrapper = ["/bin/sh", "-c", '"$@"; code=$?; printf "%s\\n" "$code" > "$0.tmp" && mv "$0.tmp" "$0"; exit "$code"', str(self.exit_file(rid)), *job["argv"]]
+        try:
+            proc = subprocess.Popen(wrapper, cwd=job["cwd"], env=env, stdin=subprocess.DEVNULL, stdout=fd, stderr=subprocess.STDOUT, start_new_session=True)
+        finally:
+            fd.close()
         self.processes[rid] = proc
         row = {"run_id": rid, "started_at": now(), "ended_at": None, "status": "running", "stdout_path": str(path), "pid": proc.pid,
                "process_identity": self.process_identity(proc.pid)}
@@ -495,11 +528,18 @@ class Launcher:
                                     self.held[op["operation_id"]] = stack
                                 self.tail(op, row, True)
                                 continue
-                            op["status"] = "unknown"
-                            self.store.save_op(op)
-                            self.release(op["operation_id"])
-                            continue
-                        exit_code = proc.poll()
+                            exit_code = self.read_exit(rid)
+                            if exit_code is None:
+                                op["status"] = "unknown"
+                                self.store.save_op(op)
+                                self.release(op["operation_id"])
+                                continue
+                        else:
+                            exit_code = proc.poll()
+                            if exit_code is not None:
+                                # The wrapper's own code equals the script's; the exit file confirms it.
+                                exit_code = self.read_exit(rid) if self.read_exit(rid) is not None else exit_code
+                                self.processes.pop(rid, None)
                         row.update(exit_code=exit_code, ended_at=now() if exit_code is not None else None,
                                    status="running" if exit_code is None else "succeeded" if exit_code == 0 else "failed")
                     else:
@@ -517,8 +557,10 @@ class Launcher:
                                 f.seek(max(0, Path(path).stat().st_size - 2_000_000))
                                 text = crow_lib.final_text(f.read().decode("utf-8", "replace"), job.get("provider", "claude"))
                         if job.get("kind") == "script":
-                            text = "Terminé, code " + str(exit_code) + "."
-                            op["result"] = {"exit_code": exit_code}
+                            row["duration_seconds"] = self.duration(row)
+                            self.store.put("runs", rid, {**self.store.get("runs", rid, {}), **row})
+                            text = "Terminé, code " + str(exit_code) + (" en " + format_duration(row["duration_seconds"]) if row["duration_seconds"] is not None else "") + "."
+                            op["result"] = {"exit_code": exit_code, "duration_s": row["duration_seconds"], "started_at": row.get("started_at"), "ended_at": row.get("ended_at")}
                         self.finish(op, job, row, text)
                 except Problem as exc:
                     if exc.status == 503:

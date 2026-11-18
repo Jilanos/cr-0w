@@ -4,7 +4,7 @@
 import { api, ApiError } from './api.js';
 import {
   h, clear, icon, btn, disable, chip, toast, toastError, emptyState, loadingState, errorState,
-  initDrawer, followLog, openDialog, closeDialog, closeMenus, setFileOpener, segText, fmtDate, ago,
+  initDrawer, followLog, openDialog, closeDialog, closeMenus, setFileOpener, segText, fmtDate, ago, duration,
 } from './ui.js';
 import { makeViews } from './views.js';
 import { renderChat, focusComposer, setChatDraft } from './chat.js';
@@ -162,7 +162,7 @@ function renderHeader() {
   const cfg = cached('config');
   const status = clear(document.getElementById('topbar-status'));
   const mode = (st && st.mode) || (cfg && cfg.mode);
-  if (mode === 'dry_run') status.append(h('span', { class: 'badge-mode', title: 'Aucune action mail réelle, routines affichées sans exécution', text: 'Mode essai' }));
+  if (mode === 'dry_run') status.append(h('span', { class: 'badge-mode', title: 'Aucune action mail réelle. Les routines s\'exécutent pour de vrai.', text: 'Mode essai' }));
   if (api.fixtures) status.append(h('span', { class: 'badge-fixtures', title: 'Données de fixtures, aucun serveur', text: api.scenario ? `fixtures · ${api.scenario}` : 'fixtures' }));
   if (st) {
     const adm = st.admissions || {};
@@ -508,14 +508,18 @@ async function runRoutine(name, label, blocked) {
   if (blocked && !window.confirm(`${blocked}\n\nLancer quand même ?`)) return;
   try {
     const op = await api.post(`/api/routines/${encodeURIComponent(name)}`, {});
-    toast(op.summary || `${label} lancée`, { kind: 'info', detail: op.dry_run ? 'mode essai : commande affichée, non exécutée' : null });
+    toast(op.summary || `${label} lancée`, { kind: 'info', detail: op.dry_run ? 'simulée : commande affichée, non exécutée' : 'exécution réelle, journal en direct' });
     await refresh(['routines', 'state']);
     render();
     trackOp(op, async (final) => {
       await refresh(['routines', 'state', 'runs', 'pending']);
       render();
-      if (final) toast(final.summary || `${label} terminée`, { kind: final.status === 'succeeded' ? 'ok' : 'warn',
-        detail: `état : ${final.status}` });
+      if (final) {
+        const res = final.result || {};
+        const detail = res.simulated ? 'simulée, non exécutée'
+          : [`code ${res.exit_code ?? 'inconnu'}`, res.duration_s != null ? duration(res.duration_s) : null, final.status].filter(Boolean).join(' · ');
+        toast(final.summary || `${label} terminée`, { kind: final.status === 'succeeded' ? 'ok' : 'warn', detail });
+      }
     }, { log: label });
   } catch (err) {
     if (err.code === 'locked') toast(err.message, { kind: 'warn' });

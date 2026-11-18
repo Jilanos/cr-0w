@@ -12,9 +12,11 @@
         "at": "2026-11-18T06:31:12+01:00",
         "status": "succeeded",
         "exit_code": 0,
-        "run_id": "scr_20261118T061500"
+        "run_id": "scr_20261118T061500",
+        "simulated": false,
+        "duration_s": 1325.4
       },
-      "dry_run": true
+      "dry_run": false
     },
     {
       "name": "daily_update",
@@ -27,9 +29,11 @@
         "at": "2026-11-17T19:02:00+01:00",
         "status": "succeeded",
         "exit_code": 0,
-        "run_id": "scr_20261117T190200"
+        "run_id": "scr_20261117T190200",
+        "simulated": false,
+        "duration_s": 291.8
       },
-      "dry_run": true
+      "dry_run": false
     }
   ]
 }

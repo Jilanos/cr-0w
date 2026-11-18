@@ -373,7 +373,7 @@ export function followLog(id, title, url, onDone) {
       else if (type === 'cost') add(type, `${money(data.cost_usd, data.cost_status)}${data.tokens ? ' · ' + data.tokens.toLocaleString('fr-FR') + ' jetons' : ''}`);
       else if (type === 'status') add(type, data.status || '');
       else if (type === 'error') add(type, data.message || data.text || 'erreur');
-      else if (type === 'done') add(type, `terminé, code ${data.exit_code ?? 'inconnu'} (${data.status || '?'})`);
+      else if (type === 'done') add(type, `terminé, code ${data.exit_code ?? 'inconnu'}${data.duration_s != null ? ' en ' + duration(data.duration_s) : ''} (${data.status || '?'})`);
     },
     end(data) {
       s.live = false;

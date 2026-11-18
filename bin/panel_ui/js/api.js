@@ -482,12 +482,12 @@ const fake = {
       case '/api/routines/{name}': {
         const routines = this.files.get('routines.json');
         const r = routines && routines.routines.find((x) => x.name === p.name);
-        const op = this.newOp(base, { request_id: body.request_id, kind: `routine.${p.name}`,
-          summary: `${r ? r.label : p.name} : mode essai, commande affichée sans exécution`, status: 'running' });
+        const op = this.newOp(base, { request_id: body.request_id, kind: `routine.${p.name}`, dry_run: false,
+          summary: `${r ? r.label : p.name}`, status: 'running' });
         if (p.name === 'maj') op.steps = [{ name: 'script', status: 'running', account: null, model: null, run_id: `scr_fx${this.seq}`,
           started_at: op.created_at, ended_at: null, error: null }];
         if (r) { r.running = true; r.operation_id = op.operation_id; }
-        this.track(op, () => { if (r) { r.running = false; r.operation_id = null; r.last = { at: this.now().toISOString(), status: 'succeeded', exit_code: 0, run_id: 'simulated' }; } });
+        this.track(op, () => { if (r) { r.running = false; r.operation_id = null; r.last = { at: this.now().toISOString(), status: 'succeeded', exit_code: 0, duration_s: 4.2, simulated: false, run_id: 'simulated' }; } });
         return { status: res.status, data: op };
       }
       default:
