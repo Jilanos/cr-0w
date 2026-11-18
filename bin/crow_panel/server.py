@@ -24,6 +24,7 @@ from .visits import Visits
 from .afk import Decisions
 from .followups import Followups
 from .search import Search
+from .notifications import Notifications
 
 
 class App:
@@ -57,6 +58,8 @@ class App:
         self.pending.view()
         for name, project in cfg["projects"].items():
             self.launcher.topic("project", name, project.get("title", name), project)
+        self.notifications = Notifications(self)
+        self.launcher.observe = self.notifications.tick
 
     def public_config(self):
         # Values are an explicit allowlist. Private paths and action profiles never leave the server.
@@ -88,6 +91,7 @@ class App:
         routes = {"/api/config": self.public_config, "/api/state": self.readers.state, "/api/pending": self.pending.view,
                   "/api/capabilities": self.mail.capabilities, "/api/mail/folders": self.mail.folders, "/api/drafts": self.mail.drafts,
                   "/api/accounts": self.readers.accounts, "/api/routines": self.readers.routines, "/api/dossiers": self.readers.dossiers, "/api/afk": self.readers.afk}
+        routes["/api/notifications"] = self.notifications.status
         if path in routes:
             return routes[path]()
         if path == "/api/mail":

@@ -75,6 +75,38 @@ beyond the first page. Runs cover the past year in the registry and up to 200
 recent cdx runs. Source warnings and result limits remain visible. Searching
 never fetches mail bodies or launches an agent. Queries are not saved.
 
+## Windows notifications
+
+Set `notifications.enabled: true` in the private config and restart. The example
+keeps notifications off. Run completions and newly overdue pending dates produce
+silent native Windows toasts through `powershell.exe`. These toasts also work in
+trial mode. Their text contains counts only. The first poll establishes a silent
+baseline for existing completed runs and overdue rows.
+
+`run_finished` and `pending_overdue` enable each source. `poll_seconds` defaults
+to 30. `min_interval_seconds` defaults to 120. Events arriving during that interval
+join one durable batch. SQLite deduplication survives restarts. A postponed row
+can notify again when its new date passes. Missing run data never implies a
+completion. Run observation uses the past year's registry and up to 200 recent
+cdx rows. A source failure leaves the other source available.
+
+With `app_id: null`, the first delivery registers the `Crow.Panel` application
+with display name `crow` under the current Windows user's
+`Software\Classes\AppUserModelId` key. It needs no administrator rights and does
+not change Windows notification preferences. A custom `app_id` must already be
+registered. The implementation uses the native
+[ToastNotificationManager](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotificationmanager)
+API. No package or PowerShell module is installed. Toasts share one group and tag,
+so a later toast replaces the previous notification in the notification center.
+The latest notification expires after one day.
+
+Inspect `GET /api/notifications` with the session cookie for delivery status,
+queued counts and source errors. `accepted` means Windows accepted the native
+call; display still follows the user's focus and notification settings. A timeout,
+failure or interrupted delivery is consumed and never retried automatically.
+New events can attempt delivery after the configured interval. Set `enabled: false`
+and restart to stop notifications. Registration preserves the user's settings.
+
 The home page retains changes since the previous page visit. Pending clicks made
 during an update join a durable queue. Rows stay visible until applied; remove a
 queued click from its toast or Jobs. Changed rows fail without editing the file.

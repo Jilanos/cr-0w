@@ -50,6 +50,7 @@ def panel(tmp_path):
     cfg = Config(overrides={"crow_home": str(tmp_path), "state_dir": str(tmp_path / "state"), "locks_dir": str(tmp_path / "locks"),
                             "runs_registry": str(tmp_path / "runs.jsonl"), "pending_md": str(pending), "port": 0,
                             "files": {"roots": [str(tmp_path)]}, "routines": {"maj": {"argv": ["example-maj", "night"]}, "daily_update": {"argv": ["example-update"]}},
+                            "notifications": {"enabled": False},
                             "accounts": {"claude": {"provider": "claude", "kinds": ["chat", "mail_read"]}, "workb": {"provider": "codex", "kinds": ["chat"], "models": ["gpt-5"]}}})
     app = App(cfg, fake)
     yield app, fake

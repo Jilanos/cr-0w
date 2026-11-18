@@ -112,6 +112,21 @@ class Config(dict):
         self.setdefault("accounts", {"claude": {"provider": "claude", "kinds": ["chat", "mail_read"]}})
         self.setdefault("routines", {})
         self.setdefault("real_home", crow_lib.real_home())
+        notifications = self.get("notifications", {})
+        if not isinstance(notifications, dict):
+            raise ValueError("notifications must be a mapping")
+        self["notifications"] = {"enabled": False, "run_finished": True, "pending_overdue": True, "poll_seconds": 30,
+                                 "min_interval_seconds": 120, "powershell_exe": "powershell.exe", "app_id": None, **notifications}
+        for key in ("enabled", "run_finished", "pending_overdue"):
+            if type(self["notifications"][key]) is not bool:
+                raise ValueError("notification switches must be booleans")
+        for key, low, high in (("poll_seconds", 5, 3600), ("min_interval_seconds", 30, 86400)):
+            value = self["notifications"][key]
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError("invalid notification interval")
+        executable, app_id = self["notifications"]["powershell_exe"], self["notifications"]["app_id"]
+        if not isinstance(executable, str) or not executable or app_id is not None and (not isinstance(app_id, str) or not 1 <= len(app_id) <= 256):
+            raise ValueError("invalid Windows notification configuration")
         if self["host"] != "127.0.0.1" or self["mode"] not in ("dry_run", "live"):
             raise ValueError("host must be 127.0.0.1; mode must be dry_run or live")
         if not isinstance(self["port"], int) or not 0 <= self["port"] <= 65535:

@@ -59,6 +59,7 @@ fixture. Supply one when retrying it.
 | `/api/operations/{id}/undo`, `/cancel`, `/reconcile` | POST |
 | `/api/operations/{id}/events`, `/api/runs/{id}/events` | GET, SSE |
 | `/api/search?q=...&limit=20` | GET |
+| `/api/notifications` | GET |
 | `/api/mail`, `/api/mail/{id}`, `/api/mail/folders`, `/api/drafts` | GET |
 | `/api/mail/sync`, `/api/mail/{id}/fetch`, `/api/mail/{id}/reply-all` | POST |
 | `/api/mail/triage/plan`, `/api/mail/triage/execute` | POST |

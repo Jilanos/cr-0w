@@ -26,6 +26,7 @@ class Launcher:
         self.cache = {}
         self.stop_event = threading.Event()
         self.thread = None
+        self.observe = lambda: None
         self.processes = {}
         self.held = {}
         self.complete = lambda op, job, row, text: None
@@ -532,6 +533,7 @@ class Launcher:
         def work():
             while not self.stop_event.wait(1):
                 self.tick()
+                self.observe()
         self.thread = threading.Thread(target=work, name="panel-queue", daemon=True)
         self.thread.start()
 

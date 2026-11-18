@@ -55,6 +55,14 @@ calendar:
   snapshot: null
   time_zone: null  # Use the snapshot's IANA time zone.
   stale_after_minutes: 120
+notifications:
+  enabled: false
+  run_finished: true
+  pending_overdue: true
+  poll_seconds: 30
+  min_interval_seconds: 120
+  powershell_exe: powershell.exe
+  app_id: null  # Use/register crow for the current Windows user. No admin rights.
 max_parallel: 2
 routines:
   maj: {argv: []}

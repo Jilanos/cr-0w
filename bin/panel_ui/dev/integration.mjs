@@ -52,6 +52,27 @@ try {
       if(await page.eval(`!!document.querySelector('.state-error')`)) throw new Error('view error: '+label);
     }
   });
+  await check('global-search', async()=>{
+    const pending = await api("api.get('/api/pending')");
+    const row = pending.sections.filter(s=>s.kind==='followups').flatMap(s=>s.items)[0];
+    if(!row) throw new Error('A copied pending followup is needed');
+    const query = row.title.slice(0,80);
+    const found = await api(`api.get('/api/search?q='+encodeURIComponent(${JSON.stringify(query)}))`);
+    const target = found.groups.find(g=>g.kind==='pending').items[0];
+    if(!target) throw new Error('Pending row absent from global search');
+    await page.click('#search-open'); await page.type(query);
+    await poll(`!!document.querySelector('#search-results [role=group][aria-label="En attente"] .search-result')`);
+    await page.shot('real-global-search');
+    await page.click('#search-results [role=group][aria-label="En attente"] .search-result');
+    await poll(`!document.querySelector('#dialog[open]') && document.querySelector('#pane-list .row.selected')?.dataset.key===${JSON.stringify(target.key)}`);
+    return {groups:found.groups.map(g=>({kind:g.kind,total:g.total})),opened:target.key};
+  });
+  await check('notifications-status', async()=>{
+    const status = await api("api.get('/api/notifications')");
+    if(typeof status.enabled !== 'boolean' || status.poll_seconds < 5 || status.min_interval_seconds < 30) throw new Error('Invalid notification status');
+    if('powershell_exe' in status || 'app_id' in status) throw new Error('Private notification config exposed');
+    return status;
+  });
   await check('done-undo',async()=>{
     await go('Relances & échéances');
     await selectFirst();
@@ -83,6 +104,8 @@ try {
     await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
     await page.shot('real-followup');
     await page.goto(base+'/', 1600);
+    await poll(`!!document.querySelector('.followup-last')`);
+    await page.click('.followup-last button','Voir le détail');
     await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
     await page.shot('real-followup-after-reload');
   });
