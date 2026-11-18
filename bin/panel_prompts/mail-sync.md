@@ -9,7 +9,10 @@ deduplicate by message id, and verify progress. If a group at the same timestamp
 cannot be fully paginated, report partial coverage. Never claim a complete snapshot
 without reaching the end. A failed page makes coverage partial. Keep total_known
 null unless the connector proves the total. Re-check older messages restored to Inbox.
-Read folders and their real ids. Do not invent a destination folder. Propose triage
+Read the full folder tree and its real ids. Traverse every child folder and every
+folder page, including empty parents. Include parent_id and full slash-separated
+paths. Set folders_complete true only after exhaustive traversal. Never invent ids.
+Do not invent a destination folder. Propose triage
 for the most recent messages using the local rules. Fetch the most recent bodies
 up to body_prefetch. Use plain text only. Keep preview_truncated explicit.
 Read Drafts and Sent read-only. A disappeared draft is missing unless a matching
@@ -21,7 +24,8 @@ Write UTF-8 JSON to the configured output path with this schema:
   "coverage": {"status":"complete|partial|none", "collected":0,
     "total_known":null,"started_at":"ISO with timezone","ended_at":"ISO with timezone",
     "oldest":null,"errors":[]},
-  "folders":[{"id":"real id","path":"folder path","well_known":"inbox|archive|drafts|sentitems or null"}],
+  "folders_complete": true,
+  "folders":[{"id":"real id","path":"folder path","parent_id":null,"well_known":"inbox|archive|drafts|sentitems or null"}],
   "items":[{"id":"real id","conversation_id":"real id","subject":"text",
     "from":{"name":"text","address":"text"},"received":"ISO with timezone",
     "to_count":1,"preview":"text","preview_truncated":false,"unread":false,

@@ -33,12 +33,31 @@ class Mail:
 
     def folders(self):
         snapshot = self.raw()
+        cached = read_json(self.cfg.state / "mail/folders.json", {})
+        rows = cached.get("folders", snapshot.get("folders", []))
         allowed = self.cfg["mail"].get("allowed_folders", [])
+        by_path = {r["path"]: r["id"] for r in rows}
         folders = []
-        for row in snapshot.get("folders", []):
+        for row in rows:
             permitted = row.get("well_known") not in ("inbox", "drafts", "sentitems", "deleteditems", "outbox", "junkemail") and (not allowed or row["id"] in allowed)
-            folders.append({"id": row["id"], "path": row["path"], "well_known": row.get("well_known"), "allowed_target": permitted})
-        return {"generated_at": now(), "synced_at": snapshot["synced_at"], "folders": folders}
+            parent = row.get("parent_id") or by_path.get(row["path"].rsplit("/", 1)[0])
+            folders.append({"id": row["id"], "path": row["path"], "well_known": row.get("well_known"), "allowed_target": permitted,
+                            "parent_id": parent if parent != row["id"] else None,
+                            "name": row["path"].rsplit("/", 1)[-1], "depth": row["path"].count("/")})
+        return {"generated_at": now(), "synced_at": cached.get("synced_at", snapshot["synced_at"]), "folders": folders,
+                "expires_at": cached.get("expires_at"), "stale": not cached.get("expires_at") or cached["expires_at"] < now(),
+                "complete": cached.get("complete", False),
+                "recent_targets": self.store.get("meta", "mail_recent_targets", [])}
+
+    def cache_folders(self, rows, complete=False):
+        # A failed traversal must not replace a previously complete tree.
+        saved = read_json(self.cfg.state / "mail/folders.json", {})
+        if not complete and saved.get("complete"):
+            return saved["folders"]
+        ttl = max(1, int(self.cfg["mail"].get("folders_ttl_minutes", 60)))
+        atomic(self.cfg.state / "mail/folders.json", canonical({"synced_at": now(), "complete": complete, "folders": rows,
+               "expires_at": (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=ttl)).isoformat() if complete else None}))
+        return rows
 
     def stale(self, snapshot):
         try:
@@ -108,6 +127,8 @@ class Mail:
         folder_map = {f["id"]: f for f in folders}
         if len(folder_map) != len(folders):
             raise ValueError("duplicate folder")
+        if any(f.get("parent_id") and f["parent_id"] == f["id"] for f in folders):
+            raise ValueError("invalid folder parent")
         items, seen, bodies, invalid, contexts = [], set(), {}, 0, {}
         for row in value["items"]:
             if not isinstance(row, dict) or any(not isinstance(row.get(k), str) or not row[k] for k in ("id", "subject", "received")):
@@ -154,6 +175,7 @@ class Mail:
         if coverage["status"] != "complete" and self.raw()["snapshot_rev"]:
             self.store.put("meta", "last_mail_attempt", coverage)
             return {"published": False, "coverage": coverage, "invalid_proposals": invalid}
+        folders = self.cache_folders(folders, value.get("folders_complete") is True)
         snapshot = {"snapshot_rev": digest(canonical([items, folders, now()]), "s_"), "synced_at": now(), "coverage": coverage,
                     "items": sorted(items, key=lambda r: dt.datetime.fromisoformat(r["received"]), reverse=True), "folders": folders,
                     "drafts": self.valid_drafts(value.get("drafts", []))}
@@ -162,7 +184,6 @@ class Mail:
         for _, ref, title, context in contexts.values():
             self.launcher.topic("mail", ref, title, context)
         atomic(self.snapshot_path, canonical(snapshot))
-        atomic(self.cfg.state / "mail/folders.json", canonical(self.folders()))
         return {"published": True, "coverage": coverage, "invalid_proposals": invalid}
 
     def validate_body(self, value):
@@ -228,6 +249,8 @@ class Mail:
         prompt = prompt_file.read_text() + "\nConfiguration: " + canonical({"output": str(output), "message_id": key, "probe": probe,
                  "body_prefetch": self.cfg["mail"].get("body_prefetch", 50), "proposals_per_sync": self.cfg["mail"].get("proposals_per_sync", 100),
                  "triage_rules": self.cfg["mail"].get("triage_rules"), "preferences": str(self.cfg.home / "local/owner-prefs.md")})
+        if kind == "mail.sync":
+            prompt += "\nRefresh the entire folder tree now, regardless of its cache TTL. Include every nested folder and its parent_id. folders_complete must be false if any folder page or child traversal fails."
         denied = self.cfg["mail"].get("probe_deny_tool", "get_me")
         if probe:
             prompt += ("\nAlso run a read-only capability probe. Enumerate the exact M365 tool names and parameter schemas you can discover. "

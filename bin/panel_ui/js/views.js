@@ -6,6 +6,7 @@ import {
   fmtDate, fmtDay, ago, until, duration, money, bytes, plural, daysFromNow, isoDay, gauge, popMenu, closeMenus,
   followLog, safeHref, parseDate,
 } from './ui.js';
+import { folderPicker } from './folder-picker.js';
 
 const PRIO = { red: 'Urgent', yellow: 'Normal', green: 'Bas', blue: 'Info' };
 const ACTION_LABEL = { reply: 'Répondre', keep: 'Garder', move: 'Ranger', archive: 'Archiver', trash: 'Corbeille' };
@@ -640,8 +641,11 @@ export function makeViews(ctx) {
         if (a === c.action) o.selected = true;
         return o;
       }));
-    const folderSel = c.action === 'move' ? h('select', { class: 'select select-small', 'aria-label': 'Dossier cible', onchange: () => setChoice(m, { action: 'move', folder_id: folderSel.value }) },
-      folders.map((f) => { const o = h('option', { value: f.id, text: f.path }); if (f.id === c.folder_id) o.selected = true; return o; })) : null;
+    const target = ((cached('folders') || {}).folders || []).find((f) => f.id === c.folder_id);
+    const folderSel = c.action === 'move' ? btn(target?.path || 'Choisir un dossier', { small: true, ghost: true, class: 'folder-change', onclick: (e) => {
+      const picker = folderPicker(cached('folders'), c.folder_id, (id) => { closeMenus(); setChoice(m, { action: 'move', folder_id: id }); });
+      popMenu(e.currentTarget, picker.element); picker.focus();
+    } }) : null;
     return h('div', { class: ['row-body', 'triage-row', reason && 'blocked'] },
       h('label', { class: 'check-wrap', title: reason || 'Cocher (x)' }, cb),
       h('div', { class: 'triage-main' },
@@ -825,10 +829,8 @@ export function makeViews(ctx) {
       if (a === (actionable(p) ? p.action : 'move')) o.selected = true;
       return o;
     }));
-    const fold = h('select', { class: 'select', 'aria-label': 'Dossier' }, folders.filter((f) => f.well_known !== 'archive').map((f) => {
-      const o = h('option', { value: f.id, text: f.path }); if (f.id === p.folder_id) o.selected = true; return o;
-    }));
-    const sync = () => { fold.disabled = act.value !== 'move'; };
+    const fold = folderPicker(cached('folders'), p.folder_id);
+    const sync = () => { fold.setDisabled(act.value !== 'move'); };
     act.addEventListener('change', sync); sync();
     const form = h('form', { class: 'menu-form menu-form-col', onsubmit: (e) => {
       e.preventDefault(); closeMenus();
@@ -836,7 +838,7 @@ export function makeViews(ctx) {
       makePlan([{ message_id: d.id, action: act.value, folder_id: act.value === 'move' ? fold.value : undefined }]);
     } },
     h('div', { class: 'menu-label', text: p.action && actionable(p) ? `Proposition de crow : ${p.reason}` : 'Classer ce mail' }),
-    act, fold, h('button', { type: 'submit', class: 'btn btn-primary btn-small', text: 'Préparer le lot' }),
+    act, fold.element, h('button', { type: 'submit', class: 'btn btn-primary btn-small', text: 'Préparer le lot' }),
     h('p', { class: 'muted small', text: 'Le lot s\'affiche avant toute exécution.' }));
     popMenu(anchor, form);
   }

@@ -387,6 +387,13 @@ add('flow-classer', DESK, async (page, base) => {
   await page.click('.detail .btn', 'Classer');
   await expect(page, '.menu', 'Proposition de crow');
   await page.shot('flow-classer-menu');
+  await page.click('.folder-picker input');
+  await page.type('serie');
+  await expect(page, '.folder-option', 'Série A', 'recherche sans accent');
+  if (await has(page, '.folder-option', 'Fournisseurs')) throw new Error('Dossier hors recherche');
+  await page.click('.folder-option', 'Série A');
+  await expect(page, '.folder-chosen', 'Série A');
+  await page.shot('flow-classer-search');
   await page.click('.menu .btn-primary', 'Préparer le lot');
   await sleep(400);
   await expect(page, '.detail h2', '1 action');
