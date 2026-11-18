@@ -325,3 +325,36 @@ frozen manifest and guarded tool profile. Only successful tool results for both
 the move and its undo record `headless_probe`, `permissions` and `live_trial`.
 A missing result remains unknown and cannot unlock the capability. Later
 read-only probes preserve proven trials while the required schema remains present.
+
+## Native Outlook operations
+
+Set `mail.outlook_com.enabled: true` privately to prefer the running classic
+Outlook profile. Native mail and calendar jobs run locally without model admission.
+The durable job records its running intent before COM; interrupted writes become
+unknown and are never replayed. A connector snapshot and a native snapshot use
+different identities. Switching backend requires sync before fetching or writing.
+
+Native sync publishes EntryID/StoreID identities and a full folder tree. It reads
+the native conversation for each Inbox message, then the capped filing history.
+Conversation, sender/domain and configured rules precede model proposals. The
+model receives only the unresolved messages. A failed history scan is reported;
+its previous index is retained. Non-mail folders cannot be filing targets.
+
+Native replies have `compose`, `create_draft`, `verify` steps. The drafting account
+runs at high effort with apps and shell tools disabled, with the private owner
+preferences and mail-style text included. It returns the response HTML only. COM
+calls ReplyAll on the selected latest message and prepends that HTML to its
+original quoted body. Draft and newer-message checks run before composition and
+again before creation. A draft or a newer message stops creation.
+
+Private `reply_closing_internal` and `reply_closing_external` are arrays of closing
+lines. `signature_image` is an allowed local file, embedded as a CID only for an
+external To/Cc recipient. The response wrapper uses Times New Roman, 12 pt and
+rgb(0,36,81). The reply endpoint also accepts explicit `cc`, `attachments` (local
+paths), and `inline_images` (`{path,cid}`); files must resolve inside allowed roots.
+The model cannot choose recipients or attachment paths. Original quoted inline
+images are preserved. A separate COM read verifies recipients, closing, images,
+attachments, size, quoted text and continued presence in Drafts.
+
+Links can be HTTPS or `outlook:` followed solely by a hexadecimal EntryID. Only
+mail-specific links accept that native protocol. No sending action is exposed.

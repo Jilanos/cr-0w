@@ -130,6 +130,11 @@ class CalendarSync:
         running = self.active()
         if running:
             return running
+        if self.app.mail.com_ready():
+            op = self.store.operation(self.KIND, body, "Lecture de l'agenda Outlook classique")
+            start, end, zone = self.window(days)
+            self.launcher.enqueue(op, {"kind": "outlook_com", "window_start": start.isoformat(), "window_end": end.isoformat(), "time_zone": str(zone)}, route, body, "collect")
+            return op
         self.launcher.running(fresh=True)  # Fail before accepting when admission cannot be measured.
         op = self.store.operation(self.KIND, body, "Lecture de l'agenda")
         output = self.cfg.state / "calendar/incoming" / (op["operation_id"] + ".json")
@@ -147,7 +152,18 @@ class CalendarSync:
                                    "prompt": prompt, "output": str(output)}, route, body, "collect")
         return op
 
+    def native(self, op, job):
+        try:
+            output = self.app.mail.com.call("calendar", **{k: job[k] for k in ("window_start", "window_end", "time_zone")})
+            result = publish(Calendar(self.cfg).path, output)
+            op.update(status="succeeded" if result["status"] == "complete" else "partial", result={**result, "events": len(output["events"]), "backend": "outlook_com"})
+            op["steps"][-1].update(status=op["status"], ended_at=now())
+        except Exception as exc:
+            op.update(status="failed", error={"code": "calendar_com_failed", "message": "Agenda Outlook indisponible : " + str(exc)[:200], "retryable": True, "details": {}})
+
     def complete(self, op, job, row, text):
+        if job.get("kind") == "outlook_com":
+            return
         if op["kind"] != self.KIND or op["status"] != "succeeded":
             return
         output = read_json(job.get("output", ""))

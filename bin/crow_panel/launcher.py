@@ -35,6 +35,7 @@ class Launcher:
         self.processes = {}
         self.held = {}
         self.complete = lambda op, job, row, text: None
+        self.native = lambda op, job: None
 
     def _command(self, argv):
         try:
@@ -497,11 +498,20 @@ class Launcher:
                     continue
                 try:
                     if op["status"] == "queued":
-                        writer = job.get("profile") in ("skeleton", "triage", "style")
+                        writer = job.get("profile") in ("skeleton", "triage", "style") or job.get("native_write", False)
                         mutation = writer or job.get("kind") in ("pending", "script") or job.get("simulated")
                         if mutation and (job.get("accepted_mode") != self.cfg["mode"] or writer and self.cfg.dry):
                             raise Problem(422, "policy_denied", "Le mode a changé depuis ce clic. Relance l'action dans le mode actuel.")
-                        if job.get("kind") == "pending":
+                        if job.get("kind") == "outlook_com":
+                            if self.maintenance():
+                                continue
+                            op["status"] = "running"
+                            op["steps"][-1].update(status="running", started_at=now())
+                            self.store.save_op(op)
+                            self.native(op, job)
+                            if op["status"] not in ACTIVE:
+                                self.finish(op, job, {}, "")
+                        elif job.get("kind") == "pending":
                             self.pending(op, job)
                         elif job.get("simulated"):
                             self.complete(op, job, {}, "")

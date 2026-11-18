@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$RequestFile)
+﻿param([Parameter(Mandatory=$true)][string]$RequestFile)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -56,6 +56,81 @@ function Body($mail) {
     $row.outlook_link = 'outlook:' + [string]$mail.EntryID
     return $row
 }
+function QuotedThread([string]$html) {
+    # Word inserts the user's automatic signature before its original-message bookmark.
+    # Preserve the original header and all its ancestors; drop only that reply prefix.
+    $signature = [regex]::Match($html, '(?is)\bname\s*=\s*["'']?_MailAutoSig\b')
+    if (-not $signature.Success) { return $html }
+    $original = [regex]::Match($html, '(?is)\bname\s*=\s*["'']?_MailOriginal\b')
+    if (-not $original.Success -or $original.Index -lt $signature.Index) {
+        throw 'Signature automatique non isolable. Configure une réponse sans signature automatique dans Outlook.'
+    }
+    $stack = New-Object 'System.Collections.Generic.List[object]'
+    $bodyEnd = 0
+    foreach ($tag in [regex]::Matches($html.Substring(0,$original.Index), '(?is)<!--.*?-->|<[^>]+>')) {
+        $name = [regex]::Match($tag.Value, '^<\s*(/?)\s*([a-z0-9:]+)', 'IgnoreCase')
+        if (-not $name.Success) { continue }
+        $kind = $name.Groups[2].Value.ToLowerInvariant()
+        if ($name.Groups[1].Value -eq '/') {
+            for ($i=$stack.Count-1; $i -ge 0; $i--) {
+                if ($stack[$i].kind -eq $kind) { $stack.RemoveRange($i,$stack.Count-$i); break }
+            }
+        } elseif ($kind -notin @('img','br','hr','meta','link','input','area','base','wbr') -and -not $tag.Value.EndsWith('/>')) {
+            $stack.Add(@{kind=$kind; tag=$tag.Value; index=$tag.Index})
+            if ($kind -eq 'body') { $bodyEnd = $tag.Index + $tag.Length }
+        }
+    }
+    $header = -1
+    for ($i=$stack.Count-1; $i -ge 0; $i--) {
+        if ($stack[$i].kind -eq 'div' -and $stack[$i].tag -match 'border-top\s*:') { $header = $i; break }
+    }
+    if ($header -lt 0 -or $bodyEnd -eq 0) { throw 'En-tête du fil non isolable. Ouvre le message dans Outlook.' }
+    $prefix = $html.Substring(0,$bodyEnd)
+    $inside = $false
+    for ($i=0; $i -lt $header; $i++) {
+        if ($stack[$i].kind -eq 'body') { $inside = $true; continue }
+        if ($inside) { $prefix += $stack[$i].tag }
+    }
+    return $prefix + $html.Substring($stack[$header].index)
+}
+function InlineCids([string]$html) {
+    $ids = @()
+    foreach ($image in [regex]::Matches($html, '(?is)<img\b[^>]*>')) {
+        $cid = [regex]::Match($image.Value, '(?is)\bsrc\s*=\s*["'']?cid:([^"''\s>]+)')
+        if ($cid.Success -and $cid.Groups[1].Value -notin $ids) { $ids += $cid.Groups[1].Value }
+    }
+    return ,$ids
+}
+function PreserveInline($source, $draft, [string]$quoted) {
+    $sourceCids = InlineCids ([string]$source.HTMLBody)
+    $quoteCids = InlineCids $quoted
+    if ($sourceCids.Count -ne $quoteCids.Count) { throw 'Images du fil non associables. Ouvre le message dans Outlook.' }
+    $directory = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName())
+    $null = [IO.Directory]::CreateDirectory($directory)
+    try {
+        for ($i=$draft.Attachments.Count; $i -ge 1; $i--) {
+            $a = $draft.Attachments.Item($i); $cid = ''
+            try { $cid = [string]$a.PropertyAccessor.GetProperty('http://schemas.microsoft.com/mapi/proptag/0x3712001F') } catch {}
+            if ($cid -and ($cid -notin $quoteCids -or $a.Size -eq 0)) { $a.Delete() }
+        }
+        for ($i=0; $i -lt $quoteCids.Count; $i++) {
+            $existing = @(Attachments $draft | Where-Object { $_.cid -eq $quoteCids[$i] -and $_.size -gt 0 })
+            if ($existing.Count) { continue }
+            $original = $null
+            foreach ($a in $source.Attachments) {
+                $cid = ''; try { $cid = [string]$a.PropertyAccessor.GetProperty('http://schemas.microsoft.com/mapi/proptag/0x3712001F') } catch {}
+                if ($cid -eq $sourceCids[$i]) { $original = $a; break }
+            }
+            if ($null -eq $original) { throw 'Image originale indisponible. Télécharge le message dans Outlook.' }
+            $path = Join-Path $directory ([IO.Path]::GetFileName([string]$original.FileName))
+            $original.SaveAsFile($path)
+            if ((Get-Item -LiteralPath $path).Length -eq 0) { throw 'Image originale vide. Télécharge le message dans Outlook.' }
+            $a = $draft.Attachments.Add($path, 1)
+            $a.PropertyAccessor.SetProperty('http://schemas.microsoft.com/mapi/proptag/0x3712001F', [string]$quoteCids[$i])
+            $a.PropertyAccessor.SetProperty('http://schemas.microsoft.com/mapi/proptag/0x7FFE000B', $true)
+        }
+    } finally { Remove-Item -LiteralPath $directory -Recurse -Force }
+}
 function Tree {
     $rows = New-Object 'System.Collections.Generic.List[object]'
     $errors = New-Object 'System.Collections.Generic.List[string]'
@@ -104,7 +179,7 @@ function Conversation($mail, $limit) {
 }
 try {
     $request = [IO.File]::ReadAllText($RequestFile, [Text.Encoding]::UTF8) | ConvertFrom-Json
-    $allowed = @('probe','folders','inbox','calendar','body','conversation','history','move','reply_all','draft','delete_draft')
+    $allowed = @('probe','folders','inbox','drafts','calendar','body','conversation','history','move','reply_all','draft','delete_draft')
     if ($request.action -notin $allowed) { throw 'Action Outlook non autorisée.' }
     $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Outlook.Application')
     $script:ns = $app.GetNamespace('MAPI')
@@ -128,13 +203,27 @@ try {
             $result = @{items=$rows; exhausted=$complete; coverage=@{status=$(if ($complete) {'complete'} else {'partial'}); total_known=$count; errors=$errors}}
         }
         'body' { $result = Body (Item $request.entry_id $request.store_id) }
+        'drafts' {
+            $rows = @(); $items = $script:ns.GetDefaultFolder(16).Items
+            $items.Sort('[LastModificationTime]', $true)
+            for ($i=1; $i -le [Math]::Min(1000,$items.Count); $i++) {
+                $mail = $items.Item($i)
+                if ($mail.Class -eq 43) {
+                    $recipients = Recipients $mail
+                    $rows += @{id=[string]$mail.EntryID; subject=[string]$mail.Subject; conversation_id=[string]$mail.ConversationID;
+                        to=@($recipients | Where-Object { $_.type -eq 1 }); cc=@($recipients | Where-Object { $_.type -eq 2 });
+                        updated=(Stamp $mail.LastModificationTime); state='draft'; evidence='Relecture du dossier Brouillons par COM.'}
+                }
+            }
+            $result = @{items=$rows; complete=($items.Count -le 1000)}
+        }
         'conversation' { $result = Conversation (Item $request.entry_id $request.store_id) ([int]$request.limit) }
         'calendar' {
             $start = [datetimeoffset]::Parse($request.window_start).LocalDateTime
             $end = [datetimeoffset]::Parse($request.window_end).LocalDateTime
             $items = $script:ns.GetDefaultFolder(9).Items
             $items.Sort('[Start]'); $items.IncludeRecurrences = $true
-            $filter = "[Start] < '" + $end.ToString('g', [cultureinfo]::GetCultureInfo('en-US')) + "' AND [End] > '" + $start.ToString('g', [cultureinfo]::GetCultureInfo('en-US')) + "'"
+            $filter = "[Start] < '" + $end.ToString('g') + "' AND [End] > '" + $start.ToString('g') + "'"
             $items = $items.Restrict($filter)
             $events = @(); $event = $items.GetFirst()
             while ($null -ne $event -and $events.Count -lt 5000) {
@@ -184,12 +273,17 @@ try {
             if (-not $request.html -or $request.html.Length -gt 200000) { throw 'Texte de réponse vide ou trop long.' }
             $mail = Item $request.entry_id $request.store_id
             if ($mail.Class -ne 43) { throw 'Choisis un message de courrier.' }
-            $draft = $mail.ReplyAll()
-            $quote = [string]$draft.HTMLBody
-            $quotedText = [string]$draft.Body
-            $expected = Recipients $draft
             foreach ($address in $request.cc) {
                 if ($address -notmatch '^[^\s<>@;]+@[^\s<>@;]+\.[^\s<>@;]+$') { throw 'Adresse Cc invalide.' }
+            }
+            $script:wrote = $true
+            $draft = $mail.ReplyAll()
+            $quote = QuotedThread ([string]$draft.HTMLBody)
+            # Source text is the immutable quoted message; native automatic signatures are excluded.
+            $quotedText = [string]$mail.Body
+            $expected = Recipients $draft
+            PreserveInline $mail $draft $quote
+            foreach ($address in $request.cc) {
                 $r = $draft.Recipients.Add([string]$address); $r.Type = 2
             }
             if (-not $draft.Recipients.ResolveAll()) { throw 'Destinataire non résolu. Vérifie les adresses dans Outlook.' }

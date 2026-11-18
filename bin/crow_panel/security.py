@@ -69,6 +69,12 @@ def https(value):
     return None
 
 
+def mail_link(value):
+    if isinstance(value, str) and re.fullmatch(r"outlook:[0-9a-fA-F]{16,8192}", value):
+        return value
+    return https(value)
+
+
 class Files:
     def __init__(self, cfg, store):
         self.cfg, self.store = cfg, store

@@ -43,6 +43,7 @@ class App:
         self.mail.followups = self.followups
         self.calendar = CalendarSync(self)
         self.launcher.complete = self.complete
+        self.launcher.native = self.native
         self.readers = Readers(self)
         self.dossiers = Dossiers(self)
         self.visits = Visits(self)
@@ -51,6 +52,10 @@ class App:
         self.decisions.recover()
         self.visits.recover()
         for op in self.store.all("operations"):
+            job = self.store.get("jobs", op["operation_id"], {})
+            if op["status"] == "running" and job.get("kind") == "outlook_com":
+                op.update(status="unknown", error={"code": "com_interrupted", "message": "Appel Outlook interrompu. Vérifie Outlook avant toute nouvelle action.", "retryable": False, "details": {}})
+                self.store.save_op(op)
             if op["status"] in ACTIVE and not op["kind"].startswith("pending.") and not self.store.get("jobs", op["operation_id"]):
                 op.update(status="unknown", error={"code": "interrupted_acceptance", "message": "Opération interrompue avant sa mise en file. Vérification requise.", "retryable": False, "details": {}})
                 self.store.save_op(op)
@@ -81,6 +86,12 @@ class App:
         if op["kind"] == CalendarSync.KIND:
             return self.calendar.complete(op, job, row, text)
         return self.mail.complete(op, job, row, text)
+
+    def native(self, op, job):
+        if op["kind"] == CalendarSync.KIND:
+            return self.calendar.native(op, job)
+        from .outlook_pipeline import run_job
+        return run_job(self.mail, op, job)
 
     def sync_calendar_with_mail(self, body, route):
         # Synchroniser also refreshes the calendar. Its failure never blocks the mail sync.

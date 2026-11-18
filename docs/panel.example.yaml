@@ -23,6 +23,10 @@ files:
   roots: []
 work_handoff_dir: null
 mail:
+  outlook_com: {enabled: false, timeout_seconds: 90, inbox_limit: 5000, history_scan_cap: 500, history_folder_cap: 12, history_index_cap: 100000}
+  reply_closing_internal: []
+  reply_closing_external: []
+  signature_image: null
   triage_rules: null
   style_rules: null
   allowed_folders: []

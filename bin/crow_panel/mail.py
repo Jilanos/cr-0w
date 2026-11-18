@@ -9,7 +9,7 @@ import unicodedata
 
 from .core import ENGINE, Problem, atomic, canonical, digest, now, read_json, uid
 from .launcher import step
-from .security import clean_text, hook_input, https, tool_allowed
+from .security import clean_text, hook_input, https, mail_link, tool_allowed
 
 
 def tool_result_failed(value):
@@ -29,6 +29,17 @@ class Mail:
         self.cfg, self.store, self.launcher = cfg, store, launcher
         self.snapshot_path = cfg.state / "mail/snapshot.json"
         self.history_path = cfg.state / "mail/filing-index.json"
+        from .outlook_com import OutlookCom
+        self.com = OutlookCom(cfg) if cfg["mail"].get("outlook_com", {}).get("enabled", False) else None
+
+    def com_ready(self):
+        return bool(self.com and self.com.probe().get("connected"))
+
+    def com_snapshot(self):
+        native = self.raw().get("backend") == "outlook_com"
+        if native != self.com_ready():
+            raise Problem(422, "backend_changed", "Le backend Outlook a changé. Synchronise la boîte avant cette action.")
+        return native
 
     def history(self):
         return read_json(self.history_path, {"version": 1, "messages": {}, "folders": {}})
@@ -212,9 +223,10 @@ class Mail:
         by_path = {r["path"]: r["id"] for r in rows}
         folders = []
         for row in rows:
-            permitted = row.get("well_known") not in ("inbox", "drafts", "sentitems", "deleteditems", "outbox", "junkemail") and (not allowed or row["id"] in allowed)
+            permitted = row.get("mail_folder", True) and row.get("well_known") not in ("inbox", "drafts", "sentitems", "deleteditems", "outbox", "junkemail") and (not allowed or row["id"] in allowed)
             parent = row.get("parent_id") or by_path.get(row["path"].rsplit("/", 1)[0])
             folders.append({"id": row["id"], "path": row["path"], "well_known": row.get("well_known"), "allowed_target": permitted,
+                            **({"store_id": row["store_id"]} if row.get("store_id") else {}),
                             "parent_id": parent if parent != row["id"] else None,
                             "name": row["path"].rsplit("/", 1)[-1], "depth": row["path"].count("/")})
         return {"generated_at": now(), "synced_at": cached.get("synced_at", snapshot["synced_at"]), "folders": folders,
@@ -276,7 +288,7 @@ class Mail:
         body_text = body.get("body_text")
         return {"generated_at": now(), "id": key, "conversation_id": row["conversation_id"], "snapshot_rev": self.raw()["snapshot_rev"],
                 "subject": row["subject"], "from": row["from"], "to": body.get("to", []), "cc": body.get("cc", []),
-                "received": row["received"], "owa_link": https(body.get("owa_link")), "body_status": "cached" if body_text is not None else "not_fetched",
+                "received": row["received"], "owa_link": mail_link(body.get("owa_link")), "body_status": "cached" if body_text is not None else "not_fetched",
                 "body_text": clean_text(body_text) if body_text is not None else None,
                 "body_truncated": body.get("body_truncated") if body_text is not None else None,
                 "body_chars": len(body_text) if body_text is not None else None, "attachments": body.get("attachments", []),
@@ -335,6 +347,7 @@ class Mail:
                 contexts[topic] = (received, ref, title, {"message_id": row["id"], "subject": title, "preview": clean_text(row.get("preview", "")),
                                                        "body_text": clean_text(row["body_text"]) if row.get("body_text") is not None else read_json(self.body_path(row["id"]), {}).get("body_text")})
             items.append({"id": row["id"], "conversation_id": row["conversation_id"], "folder_id": row["folder_id"], "from": {"name": clean_text(row["from"].get("name", "")), "address": clean_text(row["from"].get("address", ""))},
+                          **({"store_id": row["store_id"]} if row.get("store_id") else {}),
                           "to_count": row.get("to_count"), "subject": clean_text(row["subject"]), "received": row["received"],
                           "preview": clean_text(row.get("preview", ""))[:1000], "preview_truncated": bool(row.get("preview_truncated", False)),
                           "has_attachments": bool(row.get("has_attachments", False)), "unread": bool(row.get("unread", False)), "proposal": proposal,
@@ -354,6 +367,8 @@ class Mail:
         snapshot = {"snapshot_rev": digest(canonical([items, folders, now()]), "s_"), "synced_at": now(), "coverage": coverage,
                     "items": sorted(items, key=lambda r: dt.datetime.fromisoformat(r["received"]), reverse=True), "folders": folders,
                     "drafts": self.valid_drafts(value.get("drafts", []))}
+        if value.get("backend"):
+            snapshot["backend"] = value["backend"]
         for key, body in bodies.items():
             atomic(self.body_path(key), canonical(body))
         for _, ref, title, context in contexts.values():
@@ -366,7 +381,7 @@ class Mail:
             raise ValueError("body_text required")
         # Mail HTML is never returned to the browser.
         return {"body_text": clean_text(value["body_text"]), "body_truncated": bool(value.get("body_truncated", False)),
-                "to": value.get("to", []), "cc": value.get("cc", []), "owa_link": https(value.get("owa_link")),
+                "to": value.get("to", []), "cc": value.get("cc", []), "owa_link": mail_link(value.get("owa_link") or value.get("outlook_link")),
                 "attachments": [{"name": clean_text(a.get("name", "")), "size": a.get("size"), "type": a.get("type")} for a in value.get("attachments", [])],
                 "thread": [{"id": t.get("id"), "from": clean_text(t.get("from", "")), "date": t.get("date"), "kind": t.get("kind"), "subject": clean_text(t.get("subject", ""))} for t in value.get("thread", [])]}
 
@@ -446,6 +461,12 @@ class Mail:
             raise Problem(409, "already_running", "Une synchronisation est déjà en cours.")
         if key:
             self.find(key)
+        if self.com_ready() and (not key or self.com_snapshot()):
+            op = self.store.operation(kind, body, "Synchronisation Outlook classique" if not key else "Lecture Outlook classique")
+            self.launcher.enqueue(op, {"kind": "outlook_com", "message_id": key, "probe": probe}, route, body, "collect" if not key else "fetch")
+            return op
+        if key:
+            self.com_snapshot()
         self.launcher.running(fresh=True)
         op = self.store.operation(kind, body, "Synchronisation de la boîte" if not key else "Lecture du mail")
         output = self.cfg.state / "mail/incoming" / (op["operation_id"] + ".json")
@@ -541,6 +562,8 @@ class Mail:
             items.append({"message_id": key, "subject": row["subject"], "from": row["from"]["name"], "received": row["received"], "action": action,
                           "source_folder_id": source, "folder_id": target, "folder_path": folders[target]["path"],
                           "learning": {"sender": row["from"]["address"], "suggested_folder_id": (row.get("proposal") or {}).get("folder_id")}})
+            if snapshot.get("backend") == "outlook_com":
+                items[-1].update(store_id=row.get("store_id"), folder_store_id=folders[target].get("store_id"), snapshot_item=row)
         plan = {"plan_id": uid("plan_"), "plan_hash": None, "snapshot_rev": snapshot["snapshot_rev"], "created_at": now(),
                 "expires_at": (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).isoformat(), "status": "ready", "dry_run": self.cfg.dry,
                 "summary": {"move": sum(i["action"] == "move" for i in items), "archive": sum(i["action"] == "archive" for i in items), "trash": 0, "rejected": len(rejected)},
@@ -560,6 +583,7 @@ class Mail:
             raise Problem(409, "plan_expired", "Lot expiré ou boîte resynchronisée depuis. Refaire la sélection.")
         if body.get("confirm") is not True or body.get("plan_hash") != plan["plan_hash"] or not plan["items"]:
             raise Problem(400, "bad_request", "Confirmation du manifeste requise.")
+        native = not self.cfg.dry and self.com_snapshot()
         trial = not self.cfg.dry and self.connector_trial(body, plan["items"])
         if not trial:
             self.require("mail_move")
@@ -567,12 +591,14 @@ class Mail:
         if not self.cfg.dry:
             if not (getattr(self, "com", None) and self.com.probe().get("connected")):
                 self.require("tool_deny_passthrough")
-            self.launcher.running(fresh=True)
+            if not native:
+                self.launcher.running(fresh=True)
         op = self.store.operation("mail.triage.execute", body, "Rangement de " + str(len(plan["items"])) + " mails", dry=self.cfg.dry)
         plan.update(status="consumed", operation_id=op["operation_id"])
         self.store.put("plans", plan["plan_id"], plan)
         self.record_choices(plan, op["operation_id"])
-        job = {"simulated": True, "manifest": plan} if self.cfg.dry else self.triage_job(op, plan)
+        job = ({"simulated": True, "manifest": plan} if self.cfg.dry else
+               {"kind": "outlook_com", "native_write": True, "manifest": plan} if native else self.triage_job(op, plan))
         self.launcher.enqueue(op, job, route, body, "execute")
         return op
 
@@ -599,6 +625,9 @@ class Mail:
         model = body.get("model", "sonnet")
         if model not in self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]):
             raise Problem(422, "invalid_model", "Modèle invalide.")
+        if not self.cfg.dry and self.com_snapshot():
+            from .outlook_pipeline import reply_job
+            return reply_job(self, row, body, route)
         if not self.cfg.dry:
             self.require("draft_skeleton")
             self.require("draft_style")
@@ -641,12 +670,20 @@ class Mail:
             raise Problem(422, "capability_unavailable", "Une action réelle exige le mode réel pour son annulation.")
         rows = [i for i in original["items"] if i["status"] == "succeeded" and i.get("new_message_id")]
         original_job = self.store.get("jobs", original["operation_id"], {})
+        native = (original.get("result") or {}).get("backend") == "outlook_com"
+        if native and not self.com_ready():
+            raise Problem(422, "capability_unavailable", "Ouvre Outlook classique pour annuler ce rangement.")
         trial = original_job.get("full_manifest", original_job.get("manifest", {})).get("owner_trial", False)
         manifest = {"undoes": original["operation_id"], "owner_trial": trial, "items": [{"message_id": i["new_message_id"], "original_message_id": i["ref"]["id"],
                     "folder_id": i["source_folder_id"], "source_folder_id": i["folder_id"], "action": "move", "folder_path": None} for i in rows]}
+        if native:
+            for target, item in zip(manifest["items"], rows):
+                target.update(store_id=item.get("store_id"), folder_store_id=item.get("source_store_id"), snapshot_item=item.get("snapshot_item"))
         op = self.store.operation("mail.triage.undo", body, "Annulation du rangement", dry=original["dry_run"])
         if original["dry_run"]:
             job = {"simulated": True, "undoes": original["operation_id"], "manifest": manifest}
+        elif native:
+            job = {"kind": "outlook_com", "native_write": True, "manifest": manifest}
         else:
             if not trial:
                 self.require("mail_triage_undo")
@@ -776,6 +813,14 @@ class Mail:
     def reconcile(self, original, body, route):
         if original["status"] != "unknown":
             raise Problem(409, "conflict", "Seule une opération incertaine peut être vérifiée.")
+        original_job = self.store.get("jobs", original["operation_id"], {})
+        if original_job.get("kind") == "outlook_com" or original_job.get("backend") == "outlook_com":
+            if not self.com_ready():
+                raise Problem(422, "capability_unavailable", "Ouvre Outlook classique pour vérifier cette action.")
+            op = self.store.operation("mail.triage.reconcile", body, "Vérification Outlook en lecture seule")
+            self.launcher.enqueue(op, {"kind": "outlook_com", "action": "reconcile", "original": original,
+                                      "manifest": original_job.get("manifest", {})}, route, body, "reconcile")
+            return op
         self.launcher.running(fresh=True)
         if original["kind"] == "mail.followup":
             return self.followups.reconcile(original, body, route)
@@ -787,6 +832,11 @@ class Mail:
         return op
 
     def complete(self, op, job, row, text):
+        if job.get("backend") == "outlook_com":
+            from .outlook_pipeline import complete_reply
+            return complete_reply(self, op, job, row, text)
+        if job.get("kind") == "outlook_com":
+            return
         if op["status"] not in ("queued", "running", "succeeded"):
             return
         if not op["kind"].startswith("mail."):

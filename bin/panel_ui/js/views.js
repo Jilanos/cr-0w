@@ -4,7 +4,7 @@
 import {
   h, icon, btn, disable, chip, toast, toastError, emptyState, loadingState, errorState, segments, segText,
   fmtDate, fmtDay, ago, until, duration, money, bytes, plural, daysFromNow, isoDay, gauge, popMenu, closeMenus,
-  followLog, safeHref, parseDate, openDialog, closeDialog,
+  followLog, safeHref, safeMailHref, parseDate, openDialog, closeDialog,
 } from './ui.js';
 import { loadFilters, filterDues, filterBar, timeline, legend, dayCards, calendarLine, activeCount } from './timeline.js';
 import { folderPicker } from './folder-picker.js';
@@ -232,7 +232,7 @@ export function makeViews(ctx) {
 
   function opSteps(op) {
     const ul = h('ol', { class: 'steps' });
-    const names = { skeleton: 'Squelette du brouillon', style: 'Mise en forme', verify: 'Vérification', execute: 'Exécution', collect: 'Collecte',
+    const names = { compose: 'Rédaction', create_draft: 'Brouillon Outlook', skeleton: 'Squelette du brouillon', style: 'Mise en forme', verify: 'Vérification', execute: 'Exécution', collect: 'Collecte',
       run: 'Run', wait_runs: 'Attente des runs', script: 'Script', check_followup: 'Contrôle Brouillons et Envoyés', wait_pending: 'Attente de la mise à jour' };
     for (const s of op.steps || []) {
       const out = s.output || {};
@@ -748,6 +748,7 @@ export function makeViews(ctx) {
     triage.busy = true; ctx.renderList();
     try {
       triage.plan = await ctx.api.post('/api/mail/triage/plan', { snapshot_rev: list ? list.snapshot_rev : null, items });
+      triage.ownerTrial = false;
       triage.op = null;
     } catch (err) { toastError(err, 'Préparation du lot'); }
     triage.busy = false;
@@ -759,7 +760,7 @@ export function makeViews(ctx) {
     if (!plan) return;
     triage.busy = true; ctx.renderDetail();
     try {
-      const op = await ctx.api.post('/api/mail/triage/execute', { plan_id: plan.plan_id, plan_hash: plan.plan_hash, confirm: true });
+      const op = await ctx.api.post('/api/mail/triage/execute', { plan_id: plan.plan_id, plan_hash: plan.plan_hash, confirm: true, ...(triage.ownerTrial ? { owner_trial: true } : {}) });
       triage.op = op;
       triage.plan = null;
       triage.checked.clear();
@@ -791,6 +792,8 @@ export function makeViews(ctx) {
     const s = plan.summary || {};
     const byId = new Map(mailItems().map((m) => [m.id, m]));
     const exp = parseDate(plan.expires_at);
+    const move = capability('mail_move');
+    const trial = !plan.dry_run && !move?.allowed && plan.items.length === 1;
     return h('article', { class: 'detail' },
       h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, h('span', { text: 'Lot de rangement figé' }), plan.dry_run ? chip('mode essai', 'warn') : null),
         h('h2', { text: `${plan.items.length} action${plan.items.length > 1 ? 's' : ''} à exécuter` }),
@@ -802,9 +805,12 @@ export function makeViews(ctx) {
       plan.rejected && plan.rejected.length ? h('div', null, h('h3', { class: 'h3', text: 'Refusés' }),
         h('ul', { class: 'plan-list' }, plan.rejected.map((r) => h('li', { class: 'rejected' },
           h('span', { class: 'grow', text: (byId.get(r.message_id) || {}).subject || r.message_id }), h('span', { class: 'small late', text: r.message }))))) : null,
+      trial ? h('label', { class: 'callout' }, h('input', { type: 'checkbox', checked: !!triage.ownerTrial,
+        onchange: (event) => { triage.ownerTrial = event.target.checked; ctx.renderDetail(); } }),
+      ' Je confirme ce premier déplacement connecteur. Je vérifierai le déplacement puis son Annuler dans Outlook.') : null,
       h('div', { class: 'actions' },
         btn(`Exécuter ${plan.items.length} action${plan.items.length > 1 ? 's' : ''}`, { icon: 'check', primary: true,
-          disabled: !plan.items.length ? 'Aucune action exécutable' : triage.busy ? 'En cours' : null, onclick: executePlan }),
+          disabled: !plan.items.length ? 'Aucune action exécutable' : triage.busy ? 'En cours' : trial && !triage.ownerTrial ? 'Confirme le premier essai' : null, onclick: executePlan }),
         btn('Modifier la sélection', { ghost: true, onclick: () => { triage.plan = null; ctx.render(); } })),
       h('p', { class: 'muted small', text: 'Second clic : exécution par crow sous garde, seulement les mails listés.' }));
   }
@@ -864,14 +870,14 @@ export function makeViews(ctx) {
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Fermer', onclick: () => { rs.open = false; ctx.renderDetail(); } }, icon('close'))),
       ta,
       h('div', { class: 'box-foot' }, h('label', { class: 'inline-label' }, h('span', { class: 'muted small', text: 'Modèle' }), sel), go),
-      h('p', { class: 'muted small', text: 'Squelette (claude) → mise en forme (worka) → vérification (claude). Brouillon seulement, aucun envoi.' }),
+      h('p', { class: 'muted small', text: 'Le texte suit tes consignes. Le brouillon reste dans Outlook pour ta relecture.' }),
       cap && cap.state !== 'available' ? h('p', { class: 'small warn-text', text: `Capacité limitée : ${cap.reason || CAP_STATE[cap.state]}` }) : null);
   }
 
   function replyOp(d, rs) {
     const op = rs.op;
     const r = op.result || {};
-    const link = safeHref(r.draft_link);
+    const link = safeMailHref(r.draft_link);
     return h('section', { class: 'box reply-box' },
       h('header', { class: 'box-head' }, h('h3', { class: 'h3', text: op.summary || 'Réponse à tous' }),
         chip(RUN_STATE[op.status] || op.status, op.status === 'succeeded' ? 'ok' : op.status === 'failed' ? 'late' : 'run'),
@@ -882,7 +888,7 @@ export function makeViews(ctx) {
       rs.log.length && op.status !== 'succeeded' ? h('ol', { class: 'mini-log' }, rs.log.slice(-4).map((t) => h('li', { text: t }))) : null,
       r.checks ? h('ul', { class: 'checks' }, r.checks.map((c) => h('li', { class: c.ok === true ? 'ok' : c.ok === false ? 'ko' : 'muted' },
         h('span', { class: ['status-icon', c.ok === true ? 'st-succeeded' : c.ok === false ? 'st-failed' : 'st-unknown'] }, icon(c.ok === true ? 'check' : c.ok === false ? 'close' : 'help')),
-        h('span', { text: { body_present: 'Texte présent', signature: 'Signature', size: 'Taille', attachments: 'Pièces jointes', no_send: 'Aucun envoi' }[c.name] || c.name }),
+        h('span', { text: { body_present: 'Texte présent', signature: 'Signature', recipients: 'Destinataires', images: 'Images inline', quoted_thread: 'Fil conservé', size: 'Taille', attachments: 'Pièces jointes', no_send: 'Dans Brouillons' }[c.name] || c.name }),
         c.detail ? h('span', { class: 'muted small', text: ' · ' + c.detail }) : null))) : null,
       h('div', { class: 'actions' },
         op.kind === 'mail.followup' && op.status === 'unknown' ? btn('Vérifier', { onclick: async () => {
@@ -942,7 +948,7 @@ export function makeViews(ctx) {
     }
     const rs = replyState(d.id);
     const acts = d.actions || [];
-    const owa = safeHref(d.owa_link);
+    const owa = safeMailHref(d.owa_link);
     const bar = h('div', { class: 'actions' });
     if (acts.includes('reply_all')) bar.append(btn('Répondre à tous', { icon: 'reply', primary: true, key: 'r', onclick: () => { rs.open = true; ctx.renderDetail(); focusReply(); } }));
     if (acts.includes('triage')) { const b = btn('Classer', { icon: 'folder' }); b.addEventListener('click', () => classerMenu(b, d)); bar.append(b); }
@@ -1111,7 +1117,7 @@ export function makeViews(ctx) {
   };
 
   function draftDetail(d) {
-    const owa = safeHref(d.owa_link);
+    const owa = safeMailHref(d.owa_link);
     const linked = d.pending_ref ? findPending(d.pending_ref.id) : null;
     const stateKind = { draft: 'accent', sent: 'ok', missing: 'warn' }[d.state];
     return h('article', { class: 'detail' },

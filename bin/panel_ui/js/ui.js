@@ -182,6 +182,10 @@ export function safeHref(href) {
   } catch { return null; }
 }
 
+export function safeMailHref(href) {
+  return typeof href === 'string' && /^outlook:[0-9a-f]{16,8192}$/i.test(href) ? href : safeHref(href);
+}
+
 export function segments(list) {
   const frag = document.createDocumentFragment();
   for (const s of list || []) {

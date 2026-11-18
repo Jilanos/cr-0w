@@ -19,7 +19,7 @@ class ComError(Problem):
 
 
 class OutlookCom:
-    ACTIONS = frozenset({"probe", "folders", "inbox", "calendar", "body", "conversation", "history", "move", "reply_all", "draft", "delete_draft"})
+    ACTIONS = frozenset({"probe", "folders", "inbox", "drafts", "calendar", "body", "conversation", "history", "move", "reply_all", "draft", "delete_draft"})
     WRITES = frozenset({"move", "reply_all", "delete_draft"})
     _lock = threading.Lock()
 
@@ -58,7 +58,7 @@ class OutlookCom:
             if result.returncode:
                 raise ValueError("process failed")
             return value["result"]
-        except (OSError, ValueError, subprocess.SubprocessError):
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             raise ComError("com_result_missing", "Réponse Outlook classique absente. Vérifie Outlook avant toute nouvelle action.", action in self.WRITES)
         finally:
             Path(path).unlink(missing_ok=True)
@@ -96,7 +96,7 @@ class OutlookCom:
         remaining = max(1, int(self.options.get("history_scan_cap", 500)))
         start = saved.get("next_folder", 0) % max(1, len(targets))
         ordered = targets[start:] + targets[:start]
-        for index, folder in enumerate(ordered):
+        for index, folder in enumerate(ordered[:max(1, int(self.options.get("history_folder_cap", 12)))]):
             checkpoint = saved["checkpoints"].get(folder["id"], {})
             # A periodic full scan removes stale moved/deleted messages.
             full_at = checkpoint.get("full_at")
