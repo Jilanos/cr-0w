@@ -1,0 +1,9 @@
+.folder-picker { width: min(420px, 72vw); max-width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.folder-picker[hidden] { display: none; }
+.folder-options { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.folder-option { display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 8px; border: 0; text-align: left; background: transparent; color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.folder-option:hover, .folder-option:focus-visible, .folder-option[aria-selected="true"] { background: var(--hover); }
+.folder-option:disabled { opacity: .45; cursor: default; }
+.folder-branch { color: var(--muted); flex-shrink: 0; }
+.folder-chosen { overflow-wrap: anywhere; }
+.triage-controls .folder-change { max-width: 100%; white-space: normal; text-align: left; }

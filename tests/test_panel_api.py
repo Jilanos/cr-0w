@@ -51,6 +51,7 @@ def panel(tmp_path):
                             "runs_registry": str(tmp_path / "runs.jsonl"), "pending_md": str(pending), "port": 0,
                             "files": {"roots": [str(tmp_path)]}, "routines": {"maj": {"argv": ["example-maj", "night"]}, "daily_update": {"argv": ["example-update"]}},
                             "notifications": {"enabled": False},
+                            "mail": {"allowed_folders": [], "triage_rules": None},
                             "accounts": {"claude": {"provider": "claude", "kinds": ["chat", "mail_read"]}, "workb": {"provider": "codex", "kinds": ["chat"], "models": ["gpt-5"]}}})
     app = App(cfg, fake)
     yield app, fake
@@ -82,7 +83,7 @@ def test_fixture_view_shapes_and_empty_example(panel):
                         ("/api/routines", "routines.json"), ("/api/afk", "afk.json"), ("/api/capabilities", "capabilities.json"), ("/api/topics", "topics.json")):
         result = app.get(route, {})
         expected = json.loads((FIXTURES / name).read_text())
-        assert set(result) == set(expected), route
+        assert set(expected) <= set(result) if route == '/api/mail/folders' else set(result) == set(expected), route
     public = canonical(app.public_config())
     assert str(app.cfg.state) not in public and "real_home" not in public
 

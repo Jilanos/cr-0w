@@ -426,9 +426,9 @@ add('flow-reply-all', DESK, async (page, base) => {
 add('flow-triage', DESK, async (page, base) => {
   await open(page, base, { view: 'mail', mailMode: 'triage' });
   await expect(page, '.triage-row', null, 'propositions');
-  await page.click('.list-foot .link-btn', 'propositions sûres');
+  await expect(page, '#pane-list', 'Confiance haute');
   await page.shot('flow-triage-checked');
-  await page.click('.list-foot .btn-primary', 'Valider');
+  await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
   await sleep(300);
   await expect(page, '.detail h2', 'action', 'récapitulatif du lot');
   await page.shot('flow-triage-plan');
@@ -446,6 +446,13 @@ add('flow-classer', DESK, async (page, base) => {
   await page.click('.detail .btn', 'Classer');
   await expect(page, '.menu', 'Proposition de crow');
   await page.shot('flow-classer-menu');
+  await page.click('.folder-picker input');
+  await page.type('serie');
+  await expect(page, '.folder-option', 'Série A', 'recherche sans accent');
+  if (await has(page, '.folder-option', 'Fournisseurs')) throw new Error('Dossier hors recherche');
+  await page.click('.folder-option', 'Série A');
+  await expect(page, '.folder-chosen', 'Série A');
+  await page.shot('flow-classer-search');
   await page.click('.menu .btn-primary', 'Préparer le lot');
   await sleep(400);
   await expect(page, '.detail h2', '1 action');
@@ -616,16 +623,14 @@ const SCEN = {
   },
   consumed: async (page, base) => {
     await open(page, base, { view: 'mail', scenario: 'consumed', mailMode: 'triage' });
-    await page.click('.list-foot .link-btn', 'propositions sûres');
-    await page.click('.list-foot .btn-primary', 'Valider');
+    await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
     await page.click('.detail .btn-primary', 'Exécuter');
     await sleep(400);
     await expect(page, '.toast', 'déjà été exécuté');
   },
   expired: async (page, base) => {
     await open(page, base, { view: 'mail', scenario: 'expired', mailMode: 'triage' });
-    await page.click('.list-foot .link-btn', 'propositions sûres');
-    await page.click('.list-foot .btn-primary', 'Valider');
+    await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
     await page.click('.detail .btn-primary', 'Exécuter');
     await sleep(400);
     await expect(page, '.toast', 'expiré');
