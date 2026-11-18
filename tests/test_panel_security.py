@@ -75,3 +75,12 @@ def test_read_profile_cannot_extract_credentials_outside_document_roots(tmp_path
         ("Glob", {"path": str(documents), "pattern": "../credentials/*"}),
     ]:
         assert not hook_input(policy, {"tool_name": name, "tool_input": args}), (name, args)
+
+
+def test_reply_skeleton_is_bound_to_the_clicked_message():
+    manifest = {"reply_message_id": "one"}
+    assert tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "one"}, manifest)
+    assert not tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "outside"}, manifest)
+    assert not tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "one", "cc": ["unrequested"]}, manifest)
+    assert not tool_allowed("skeleton", "outlook_update_draft", {"draftId": "outside"}, manifest)
+    assert not tool_allowed("skeleton", "outlook_create_reply_all_draft", {"messageId": "one"})

@@ -157,7 +157,9 @@ def tool_allowed(profile, name, args, manifest=None):
     if short in READ_SUFFIXES or any(short.startswith(prefix) for prefix in ("outlook_email_search_", "outlook_email_get_")):
         return True
     if profile == "skeleton" and short in ("outlook_create_reply_all_draft", "outlook_update_draft"):
-        return True
+        return (short == "outlook_create_reply_all_draft" and isinstance(manifest, dict)
+                and isinstance(manifest.get("reply_message_id"), str) and bool(manifest["reply_message_id"])
+                and set(args) == {"messageId"} and args["messageId"] == manifest["reply_message_id"])
     return False
 
 
