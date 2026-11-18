@@ -2,6 +2,82 @@
   "generated_at": "2026-11-18T08:31:00+01:00",
   "dossiers": [
     {
+      "slug": "auto-work-70-code-analyse-ids-bus",
+      "title": "analyse_ids_bus",
+      "folder_file_id": "f_7c1a2b3c",
+      "folder_label": "WORK/70_Code/analyse_ids_bus/",
+      "item_ids": [
+        "p_k3m9x2qa"
+      ],
+      "open_count": 1,
+      "topic_id": "t_dossAU0001",
+      "last_activity": null,
+      "recent_files": null,
+      "source": "auto",
+      "mail_ids": [
+        "m_01"
+      ],
+      "mail_count": 1,
+      "keywords": [
+        "ids",
+        "bus"
+      ],
+      "links": {
+        "p_k3m9x2qa": "chemin"
+      },
+      "files_active_at": "2026-11-18T07:43:00+01:00",
+      "recent_count": 47,
+      "pinned": false,
+      "hidden": false,
+      "active": true
+    },
+    {
+      "slug": "auto-work-30-procurement-suppliers-alpha",
+      "title": "Alpha",
+      "folder_file_id": "f_7c1a2b3d",
+      "folder_label": "WORK/30_Procurement/Suppliers/Alpha/",
+      "item_ids": [],
+      "open_count": 0,
+      "topic_id": "t_dossAU0002",
+      "last_activity": null,
+      "recent_files": null,
+      "source": "auto",
+      "mail_ids": [],
+      "mail_count": 0,
+      "keywords": [
+        "alpha"
+      ],
+      "links": {},
+      "files_active_at": "2026-11-17T15:34:00+01:00",
+      "recent_count": 12,
+      "pinned": false,
+      "hidden": false,
+      "active": true
+    },
+    {
+      "slug": "auto-work-10-batterie-essais",
+      "title": "essais",
+      "folder_file_id": "f_7c1a2b3e",
+      "folder_label": "WORK/10_Batterie/essais/",
+      "item_ids": [],
+      "open_count": 0,
+      "topic_id": "t_dossAU0003",
+      "last_activity": null,
+      "recent_files": null,
+      "source": "auto",
+      "mail_ids": [],
+      "mail_count": 0,
+      "keywords": [
+        "essais"
+      ],
+      "links": {},
+      "files_active_at": "2026-11-12T14:59:00+01:00",
+      "recent_count": 3,
+      "pinned": false,
+      "hidden": false,
+      "active": true
+    },
+    {
       "slug": "faisceau-serie-a",
       "title": "Faisceau série A : contrôle à l'atelier",
       "folder_file_id": "f_0d1e2f3a",
@@ -12,7 +88,29 @@
       "open_count": 1,
       "topic_id": "t_dossFA0001",
       "last_activity": "2026-11-17T18:10:00+01:00",
-      "recent_files": null
+      "recent_files": null,
+      "source": "pending",
+      "mail_ids": [],
+      "mail_count": 0,
+      "keywords": [
+        "faisceau"
+      ],
+      "links": {},
+      "files_active_at": "2026-11-17T18:10:00+01:00",
+      "recent_count": 4,
+      "pinned": false,
+      "hidden": false,
+      "active": false
     }
-  ]
+  ],
+  "discovery": {
+    "roots": [
+      "WORK/"
+    ],
+    "days": 14,
+    "scanned_at": "2026-11-18T08:30:00+01:00",
+    "partial": false,
+    "hidden_count": 1,
+    "enabled": true
+  }
 }

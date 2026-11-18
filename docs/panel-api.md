@@ -81,6 +81,18 @@ Nested JSON values and displayed run reports are also redacted. Raw subprocess
 logs remain private source artifacts and can retain credentials. Do not include
 their directory in file roots until a redacting script runner is available.
 
+## Dossiers
+
+`GET /api/dossiers[?hidden=1]` returns `dossiers` and `discovery: {enabled, roots,
+days, scanned_at, partial, hidden_count}`. Each row adds `source` (`pending`,
+`custom`, `auto`), `pinned`, `hidden`, `keywords`, `links` (row id to `chemin` or
+`mots-clés`), `mail_ids`, `mail_count`, `files_active_at` and `recent_count`.
+`GET /api/dossiers/{slug}` adds `mails: [{id, subject, from, received}]`.
+`POST /api/dossiers/{slug}/pin` and `/hide` take `{on: bool}`.
+`GET /api/dossiers/directories?q=` searches folders (depth 4) and returns
+`{file_id, label}`; `POST /api/dossiers/create {file_id, title?}` creates and pins a
+dossier. A file or a path outside the roots is refused.
+
 ## Routines
 
 `POST /api/routines/{name}` executes the configured argv for real in both modes,

@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "query": "",
+  "truncated": false,
+  "directories": [
+    {
+      "file_id": "f_dir0001",
+      "label": "WORK/10_Batterie/"
+    },
+    {
+      "file_id": "f_dir0002",
+      "label": "WORK/70_Code/"
+    },
+    {
+      "file_id": "f_dir0003",
+      "label": "WORK/70_Code/analyse_ids_bus/"
+    },
+    {
+      "file_id": "f_dir0004",
+      "label": "WORK/30_Procurement/Suppliers/Alpha/"
+    },
+    {
+      "file_id": "f_dir0005",
+      "label": "WORK/20_Faisceau/serie-a/"
+    }
+  ]
+}

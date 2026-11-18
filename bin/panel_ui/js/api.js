@@ -209,6 +209,8 @@ const fake = {
       row.answered = true; row.answer = body.answer; this.counts({ afk_decisions: -1 });
       return { status: 200, data: { dry_run: true, status: 'succeeded' } };
     }
+    const dossier = this.dossierFake(method, path, qs, body);
+    if (dossier) return dossier;
     const m = this.match(method, path);
     if (!m && method === 'PUT' && /^\/api\/topics\/[^/]+$/.test(path)) return this.putTopic(path.split('/')[3], body);
     if (!m) throw new ApiError(404, { error: { code: 'not_found', message: `Route absente des fixtures : ${method} ${path}` } });
@@ -224,6 +226,58 @@ const fake = {
     if (res.status >= 400) throw new ApiError(res.status, res.data);
     if (method === 'GET') return this.get(route, p, res, qs);
     return this.mutate(route, p, res, body || {});
+  },
+
+  // Dossiers: hidden rows, pin/hide, creation from a directory and details of discovered folders.
+  dossierFake(method, path, qs, body) {
+    if (!/^\/api\/dossiers(\/|$)/.test(path)) return null;
+    const doc = this.files.get('dossiers.json');
+    if (!doc) return null;
+    const pref = /^\/api\/dossiers\/([^/]+)\/(pin|hide)$/.exec(path);
+    if (method === 'POST' && pref) {
+      const row = doc.dossiers.find((d) => d.slug === decodeURIComponent(pref[1]));
+      if (!row) throw new ApiError(404, { error: { code: 'not_found', message: 'Dossier introuvable.' } });
+      if (pref[2] === 'pin') { row.pinned = !!body.on; if (body.on) row.hidden = false; } else { row.hidden = !!body.on; if (body.on) row.pinned = false; }
+      doc.discovery.hidden_count = doc.dossiers.filter((d) => d.hidden).length;
+      return { status: 200, data: clone(row) };
+    }
+    if (method === 'POST' && path === '/api/dossiers/create') {
+      const dir = (this.files.get('dossier-directories.json')?.directories || []).find((d) => d.file_id === body.file_id);
+      if (!dir) throw new ApiError(404, { error: { code: 'not_found', message: 'Fichier introuvable.' } });
+      const name = dir.label.replace(/\/$/, '').split('/').pop();
+      const slug = 'dir-' + dir.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      let row = doc.dossiers.find((d) => d.slug === slug || d.folder_label === dir.label);
+      if (!row) {
+        row = { slug, title: body.title || name, folder_file_id: dir.file_id, folder_label: dir.label, item_ids: [], open_count: 0, topic_id: null,
+          last_activity: null, recent_files: null, source: 'custom', mail_ids: [], mail_count: 0, keywords: [], links: {}, files_active_at: null, recent_count: 0, pinned: true, hidden: false };
+        doc.dossiers.unshift(row);
+      }
+      row.pinned = true; row.hidden = false;
+      return { status: 200, data: clone(row) };
+    }
+    if (method !== 'GET') return null;
+    if (path === '/api/dossiers') {
+      const data = clone(doc);
+      if (new URLSearchParams(qs || '').get('hidden') !== '1') data.dossiers = data.dossiers.filter((d) => !d.hidden);
+      return { status: 200, data };
+    }
+    if (path === '/api/dossiers/directories') {
+      const data = clone(this.files.get('dossier-directories.json'));
+      const words = (new URLSearchParams(qs || '').get('q') || '').toLowerCase().split(/\s+/).filter(Boolean);
+      data.directories = data.directories.filter((d) => words.every((w) => d.label.toLowerCase().includes(w)));
+      return { status: 200, data };
+    }
+    const one = /^\/api\/dossiers\/([^/]+)$/.exec(path);
+    const row = one && doc.dossiers.find((d) => d.slug === decodeURIComponent(one[1]));
+    if (!row) return null;
+    const base = clone(this.files.get('dossier-detail.json'));
+    if (row.slug === base.slug) return { status: 200, data: Object.assign(base, { source: row.source, pinned: row.pinned, hidden: row.hidden, keywords: row.keywords, links: row.links, files_active_at: row.files_active_at, recent_count: row.recent_count, mails: [] }) };
+    const pending = this.files.get('pending.json');
+    const items = pending.sections.flatMap((s) => s.items).filter((i) => row.item_ids.includes(i.id));
+    const mails = (this.files.get('mail-list.json')?.items || []).slice(0, row.mail_count).map((m) => ({ id: m.id, subject: m.subject, from: m.from, received: m.received }));
+    return { status: 200, data: { generated_at: base.generated_at, slug: row.slug, title: row.title, folder_file_id: row.folder_file_id, folder_label: row.folder_label,
+      items: clone(items), topic_id: row.topic_id, recent_files: base.recent_files, recent_files_note: base.recent_files_note, source: row.source, pinned: row.pinned,
+      hidden: row.hidden, keywords: row.keywords, links: row.links, files_active_at: row.files_active_at, recent_count: row.recent_count, mails } };
   },
 
   get(route, p, res, qs) {

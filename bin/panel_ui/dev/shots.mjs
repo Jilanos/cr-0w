@@ -309,6 +309,33 @@ for (const [name, vp] of [['timeline', DESK], ['timeline-dark', { ...DESK, dark:
   });
 }
 
+add('flow-dossiers', DESK, async (page, base) => {
+  await open(page, base, { view: 'dossiers' });
+  await expect(page, '.list-group', 'Actifs sur 14 j');
+  await expect(page, '.row', 'analyse_ids_bus');
+  await page.click('.row', 'analyse_ids_bus'); await sleep(500);
+  await expect(page, '.detail', 'Mails liés (1)');
+  await expect(page, '.detail', 'Lignes liées (1)');
+  await page.shot('dossiers-auto');
+  await page.click('.detail button', 'Épingler'); await sleep(500);
+  await expect(page, '.list-group', 'Épinglés');
+  await page.click('.row', 'Alpha'); await sleep(400);
+  await page.click('.detail button', 'Masquer'); await sleep(500);
+  if (await has(page, '.row', 'Alpha')) throw new Error('dossier masqué encore listé');
+  await page.click('.toggle input'); await sleep(500);
+  await expect(page, '.list-group', 'Masqués');
+  await page.click('.list-head button', 'Créer un dossier'); await sleep(500);
+  await expect(page, '#dialog[open]', 'Créer un dossier depuis un répertoire');
+  await page.click('#dialog input[type=search]'); await page.type('faisceau'); await sleep(700);
+  await expect(page, '.dir-item', 'WORK/20_Faisceau/serie-a/');
+  if (await has(page, '.dir-item', '70_Code')) throw new Error('recherche de répertoire sans effet');
+  await page.shot('dossiers-create');
+  await page.click('.dir-item', 'serie-a'); await sleep(200);
+  await page.click('#dialog button', 'Créer'); await sleep(700);
+  await expect(page, '.detail', 'WORK/20_Faisceau/serie-a/');
+  await page.shot('dossiers-pinned');
+});
+
 // Every view, light and dark, desktop.
 for (const dark of [false, true]) {
   for (const v of VIEWS) {

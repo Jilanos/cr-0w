@@ -12,7 +12,27 @@
       "open_count": 1,
       "topic_id": "t_dossFA0001",
       "last_activity": "2026-11-17T18:10:00+01:00",
-      "recent_files": null
+      "recent_files": null,
+      "source": "pending",
+      "mail_ids": [],
+      "mail_count": 0,
+      "keywords": [
+        "faisceau"
+      ],
+      "links": {},
+      "files_active_at": "2026-11-17T18:10:00+01:00",
+      "recent_count": 4,
+      "pinned": false,
+      "hidden": false,
+      "active": false
     }
-  ]
+  ],
+  "discovery": {
+    "roots": [],
+    "days": 14,
+    "scanned_at": "2026-11-18T08:30:00+01:00",
+    "partial": false,
+    "hidden_count": 0,
+    "enabled": false
+  }
 }

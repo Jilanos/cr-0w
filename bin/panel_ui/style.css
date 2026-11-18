@@ -678,3 +678,10 @@ body.drawer-open .toasts { bottom: calc(min(42vh, 380px) + 16px); }
 .list-head .fchip { height: 26px; padding: 0 8px; }
 .list-head .fbar-sep { display: none; }
 .list-head .fselect { height: 26px; max-width: 158px; }
+.dir-dialog { display: flex; flex-direction: column; gap: 10px; }
+.dir-results { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.dir-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; font-size: 13px; }
+.dir-item:hover { background: var(--hover); }
+.dir-item.sel { background: var(--accent-soft); color: var(--accent); }
+.dir-results li:last-child .dir-item { border-bottom: 0; }
+.dir-results > li.muted { padding: 8px 10px; }

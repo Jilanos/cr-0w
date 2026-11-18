@@ -142,7 +142,7 @@ class Readers:
                            "run_id": last["steps"][-1].get("run_id")} if last else None, "dry_run": self.launcher.routine_simulated(name)})
         return {"generated_at": now(), "routines": result}
 
-    def dossiers(self):
+    def dossiers(self, include_hidden=False):
         document = self.app.pending.view()
         dossiers = []
         for section in document["sections"]:
@@ -157,16 +157,30 @@ class Readers:
                 dossiers.append({"slug": block["key"], "title": block["title"], "folder_file_id": file_id, "folder_label": config.get("label"),
                                  "item_ids": [i["id"] for i in items], "open_count": len(items), "topic_id": topic,
                                  "last_activity": self.store.get("topics", topic)["last_message_at"], "recent_files": None})
-        return {"generated_at": now(), "dossiers": dossiers}
+        items = [i for s in document["sections"] if s["kind"] != "done" for i in s["items"]]
+        dossiers, discovery = self.app.dossiers.extend(dossiers, items)
+        rows = []
+        for row in dossiers:
+            if row["hidden"] and not include_hidden:
+                continue
+            if not include_hidden:
+                row = {k: v for k, v in row.items() if not k.startswith("_")}
+            rows.append(row)
+        return {"generated_at": now(), "dossiers": rows, "discovery": discovery}
 
     def dossier(self, slug):
-        row = next((r for r in self.dossiers()["dossiers"] if r["slug"] == slug), None)
+        row = next((r for r in self.dossiers(include_hidden=True)["dossiers"] if r["slug"] == slug), None)
         if not row:
             raise Problem(404, "not_found", "Dossier introuvable.")
         items = [i for s in self.app.pending.view()["sections"] for i in s["items"] if i["id"] in row["item_ids"]]
         recent, note = self.recent_files(row["folder_file_id"], self.cfg.get("dossiers", {}).get(slug, {}))
+        mails = {m["id"]: m for m in self.app.mail.raw()["items"]}
+        linked = [{"id": key, "subject": mails[key].get("subject"), "from": mails[key].get("from"), "received": mails[key].get("received")}
+                  for key in row.get("mail_ids", []) if key in mails]
         return {"generated_at": now(), "slug": slug, "title": row["title"], "folder_file_id": row["folder_file_id"], "folder_label": row["folder_label"],
-                "items": items, "topic_id": row["topic_id"], "recent_files": recent, "recent_files_note": note}
+                "items": items, "topic_id": row["topic_id"], "recent_files": recent, "recent_files_note": note,
+                "source": row.get("source"), "pinned": row.get("pinned", False), "hidden": row.get("hidden", False), "keywords": row.get("keywords", []),
+                "links": row.get("links", {}), "files_active_at": row.get("files_active_at"), "recent_count": row.get("recent_count"), "mails": linked}
 
     def recent_files(self, file_id, config):
         if not file_id:

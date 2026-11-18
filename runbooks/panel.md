@@ -139,6 +139,19 @@ steps. An existing draft, proven reply or uncertain check prevents a new draft.
 All four steps are simulated in trial mode. Structured AFK questions offer option
 buttons. Trial answers write an overlay and backups under the panel state folder.
 
+**Dossiers** lists pinned dossiers, then every dossier active in the window
+(pending blocks and discovered folders, newest file first), then the other
+pending blocks. `dossiers_discover.roots` (inside the allowed
+file roots) enables discovery: folders at depth 2, or 3 when a depth-2 folder holds
+only subfolders, with a file modified in the last `days` days, newest first.
+`exclude` removes work folders by glob. A pending row links to a dossier when its
+text contains the folder path, or the folder-name keywords: one word of six
+letters or more, or two shorter words. Mails link on subject and preview with the
+same rule. **Épingler** and **Masquer** persist in the panel state; **Afficher
+les masqués** brings hidden ones back. **Créer un dossier depuis un répertoire**
+searches folders by path words and pins the new dossier. Paths never leave the
+server; the browser only sees opaque file ids and labels relative to the root.
+
 Configure `dossiers.<slug>.path` within allowed roots to show ten recent files at
 two subdirectory levels. Set `last_crow_at` or `crow_version_file` to enable the
 modified-since signal. An absent reference remains unknown. Calendar events enter

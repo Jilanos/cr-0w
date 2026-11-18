@@ -73,3 +73,13 @@ routines:
 floors: {}
 # Action profiles use a deny-by-default PreToolUse hook. Unknown tools are refused.
 # Missing tools remain unavailable until their schemas and permissions are verified.
+# Dossier discovery: folders under these roots with file activity in the last
+# `days` days appear under Dossiers, ranked by activity. depth [2, 3]: a folder at
+# depth 2 is one dossier unless it holds only subfolders. exclude: glob patterns on
+# the path relative to the root. Empty roots disable discovery.
+dossiers_discover:
+  roots: []            # e.g. [/home/example/work]
+  depth: [2, 3]
+  days: 14
+  limit: 40
+  exclude: []          # e.g. ["00_admin/tmp-*", "90_archive/*"]

@@ -34,6 +34,7 @@
     "GET /api/accounts": "accounts.json",
     "GET /api/dues": "dues.json",
     "GET /api/dossiers": "dossiers.json",
+    "GET /api/dossiers/directories": "dossier-directories.json",
     "GET /api/dossiers/{slug}": "dossier-detail.json",
     "GET /api/afk": "afk.json",
     "POST /api/files/{id}/open": "files-open.json"

@@ -4,7 +4,7 @@
 import {
   h, icon, btn, disable, chip, toast, toastError, emptyState, loadingState, errorState, segments, segText,
   fmtDate, fmtDay, ago, until, duration, money, bytes, plural, daysFromNow, isoDay, gauge, popMenu, closeMenus,
-  followLog, safeHref, parseDate,
+  followLog, safeHref, parseDate, openDialog, closeDialog,
 } from './ui.js';
 import { loadFilters, filterDues, filterBar, timeline, legend, dayCards, calendarLine, activeCount } from './timeline.js';
 
@@ -1102,25 +1102,102 @@ export function makeViews(ctx) {
 
   const dossiers = {
     title: 'Dossiers', icon: 'dossiers',
-    count: () => { const d = cached('dossiers'); return { n: d ? d.dossiers.length : null }; },
-    load: () => Promise.all([load('dossiers'), load('pending', null, { quiet: true })]),
+    count: () => { const d = cached('dossiers'); return { n: d ? d.dossiers.filter((x) => !x.hidden).length : null }; },
+    load: () => Promise.all([load('dossiers', dossierPath()), load('pending', null, { quiet: true })]),
     reload: () => {
       for (const key of store.cache.keys()) if (key.startsWith('dossier:')) store.cache.delete(key);
-      return ctx.refresh(['dossiers']).then(ctx.render);
+      return ctx.load('dossiers', dossierPath(), { force: true }).then(ctx.render);
     },
     status: () => status(['dossiers']),
-    items() {
-      return ((cached('dossiers') || {}).dossiers || []).map((d) => ({
-        key: d.slug, text: `${d.title} ${d.folder_label}`, topic: { topic_id: d.topic_id, title: d.title, kind: 'dossier' },
-        row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, icon('folder', 'icon-sm muted'), h('span', { class: 'row-title', text: d.title }),
-          d.open_count ? chip(plural(d.open_count, 'ligne', 'lignes'), 'quiet') : null),
-        h('div', { class: 'row-sub mono', text: d.folder_label }),
-        h('div', { class: 'row-sub', text: d.last_activity ? `activité ${ago(d.last_activity)}` : '' })),
-        detail: () => dossierDetail(d),
-      }));
+    listHead() {
+      const doc = cached('dossiers');
+      const disc = doc && doc.discovery;
+      return h('div', { class: 'list-head' },
+        btn('Créer un dossier depuis un répertoire', { icon: 'folder', small: true, onclick: createDossierDialog }),
+        disc ? h('p', { class: 'muted small list-note', text: disc.enabled
+          ? `Découverte : ${disc.roots.join(', ')} · activité sur ${disc.days} j${disc.partial ? ' · lecture partielle' : ''}`
+          : 'Découverte automatique désactivée (dossiers_discover.roots).' }) : null,
+        disc && (disc.hidden_count || store.showHiddenDossiers) ? h('label', { class: 'toggle small list-note' },
+          h('input', { type: 'checkbox', checked: !!store.showHiddenDossiers, onchange: (e) => { store.showHiddenDossiers = e.target.checked; ctx.load('dossiers', dossierPath(), { force: true }).then(ctx.render); } }),
+          h('span', { text: `Afficher les masqués (${disc.hidden_count})` })) : null);
     },
-    empty: () => emptyState('Aucun dossier', 'Les dossiers viennent de la section Dossiers du fichier en attente.'),
+    items() {
+      const rows = (cached('dossiers') || {}).dossiers || [];
+      const out = [];
+      const days = ((cached('dossiers') || {}).discovery || {}).days || 14;
+      const active = (d) => d.active ?? d.source === 'auto';
+      const groups = [['Épinglés', (d) => d.pinned && !d.hidden], [`Actifs sur ${days} j`, (d) => !d.pinned && !d.hidden && active(d)],
+        ['Autres dossiers', (d) => !d.pinned && !d.hidden && !active(d)], ['Masqués', (d) => d.hidden]];
+      for (const [title, test] of groups) {
+        const list = rows.filter(test);
+        if (!list.length) continue;
+        out.push(groupHeader(title, list.length));
+        list.forEach((d) => out.push(dossierEntry(d)));
+      }
+      return out;
+    },
+    empty: () => emptyState('Aucun dossier', 'Les dossiers viennent du fichier en attente et des répertoires actifs.'),
   };
+
+  function dossierPath() { return store.showHiddenDossiers ? '/api/dossiers?hidden=1' : '/api/dossiers'; }
+
+  function dossierEntry(d) {
+    return {
+      key: d.slug, text: `${d.title} ${d.folder_label} ${(d.keywords || []).join(' ')}`, topic: { topic_id: d.topic_id, title: d.title, kind: 'dossier' }, dim: d.hidden,
+      row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, icon(d.pinned ? 'pin' : 'folder', 'icon-sm muted'), h('span', { class: 'row-title', text: d.title }),
+        d.open_count ? chip(plural(d.open_count, 'ligne', 'lignes'), 'quiet') : null,
+        d.mail_count ? chip(plural(d.mail_count, 'mail', 'mails'), 'quiet') : null),
+      h('div', { class: 'row-sub mono', text: d.folder_label || '' }),
+      h('div', { class: 'row-sub', text: [d.files_active_at ? `fichiers modifiés ${ago(d.files_active_at)}` : null,
+        d.recent_count ? plural(d.recent_count, 'fichier récent', 'fichiers récents') : null,
+        d.last_activity ? `chat ${ago(d.last_activity)}` : null].filter(Boolean).join(' · ') })),
+      detail: () => dossierDetail(d),
+    };
+  }
+
+  async function dossierPref(d, kind, on) {
+    try {
+      await ctx.api.post(`/api/dossiers/${encodeURIComponent(d.slug)}/${kind}`, { on });
+      store.cache.delete('dossier:' + d.slug);
+      await ctx.load('dossiers', dossierPath(), { force: true });
+      toast(kind === 'pin' ? (on ? 'Dossier épinglé' : 'Dossier désépinglé') : (on ? 'Dossier masqué' : 'Dossier affiché'), { kind: 'ok' });
+      ctx.render();
+    } catch (err) { toastError(err, 'Dossier'); }
+  }
+
+  function createDossierDialog() {
+    let chosen = null;
+    let timer = null;
+    const results = h('ul', { class: 'dir-results', role: 'listbox', 'aria-label': 'Répertoires' });
+    const title = h('input', { class: 'input', type: 'text', placeholder: 'Titre (nom du répertoire par défaut)', 'aria-label': 'Titre du dossier', maxlength: 200 });
+    const create = btn('Créer', { icon: 'check', primary: true, disabled: 'Choisis un répertoire', onclick: async () => {
+      if (!chosen) return;
+      try {
+        const row = await ctx.api.post('/api/dossiers/create', { file_id: chosen.file_id, title: title.value.trim() || null });
+        closeDialog();
+        await ctx.load('dossiers', dossierPath(), { force: true });
+        toast('Dossier créé et épinglé', { kind: 'ok', detail: row.folder_label });
+        ctx.go('dossiers', row.slug);
+      } catch (err) { toastError(err, 'Création du dossier'); }
+    } });
+    const search = async (q) => {
+      try {
+        const res = await ctx.api.get('/api/dossiers/directories?q=' + encodeURIComponent(q));
+        results.replaceChildren(...[...res.directories.map((dir) => h('li', null, h('button', { type: 'button', class: ['dir-item', chosen && chosen.file_id === dir.file_id && 'sel'], role: 'option',
+          onclick: (e) => { chosen = dir; results.querySelectorAll('.dir-item').forEach((b) => b.classList.remove('sel')); e.currentTarget.classList.add('sel');
+            if (!title.value) title.placeholder = dir.label.replace(/\/$/, '').split('/').pop(); create.disabled = false; create.removeAttribute('title'); } },
+        icon('folder', 'icon-sm muted'), h('span', { class: 'mono', text: dir.label })))),
+        res.directories.length ? null : h('li', { class: 'muted small', text: 'Aucun répertoire.' }),
+        res.truncated ? h('li', { class: 'muted small', text: 'Liste tronquée : précise la recherche.' }) : null].filter(Boolean));
+      } catch (err) { toastError(err, 'Recherche de répertoires'); }
+    };
+    const input = h('input', { class: 'input', type: 'search', placeholder: 'Chercher un répertoire (mots du chemin)', 'aria-label': 'Chercher un répertoire', autocomplete: 'off',
+      oninput: (e) => { clearTimeout(timer); timer = setTimeout(() => search(e.target.value), 200); } });
+    openDialog('Créer un dossier depuis un répertoire', h('div', { class: 'dir-dialog' }, input, results, title,
+      h('p', { class: 'muted small', text: 'Le dossier est épinglé. Les lignes et mails liés suivent le chemin et les mots du répertoire.' }), h('div', { class: 'actions' }, create)), { wide: true });
+    search('');
+    setTimeout(() => input.focus(), 0);
+  }
 
   function dossierDetail(d) {
     const key = 'dossier:' + d.slug;
@@ -1131,15 +1208,28 @@ export function makeViews(ctx) {
       return loadingState();
     }
     const items = (full.items || []).filter((it) => !store.hidden.has(it.id));
+    const links = full.links || {};
+    const SOURCE = { pending: 'Fichier en attente', custom: 'Créé depuis un répertoire', auto: 'Actif récemment' };
     return h('article', { class: 'detail' },
-      h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow', text: 'Dossier' }), h('h2', { text: full.title }),
-        h('p', { class: 'muted mono', text: full.folder_label })),
+      h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, h('span', { text: 'Dossier' }), full.source ? chip(SOURCE[full.source] || full.source, 'quiet') : null,
+        full.pinned ? chip('épinglé', 'accent') : null, full.hidden ? chip('masqué', 'warn') : null), h('h2', { text: full.title }),
+        h('p', { class: 'muted mono', text: full.folder_label }),
+        full.files_active_at ? h('p', { class: 'muted small', text: `Fichiers modifiés ${ago(full.files_active_at)}${full.recent_count ? ' · ' + plural(full.recent_count, 'fichier récent', 'fichiers récents') : ''}` }) : null),
       h('div', { class: 'actions' },
         full.folder_file_id ? btn('Ouvrir le dossier', { icon: 'folder', primary: true, onclick: () => ctx.openFile(full.folder_file_id, full.title) }) : null,
-        full.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null),
+        full.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null,
+        btn(full.pinned ? 'Désépingler' : 'Épingler', { icon: 'pin', ghost: true, onclick: () => dossierPref(d, 'pin', !full.pinned) }),
+        btn(full.hidden ? 'Afficher' : 'Masquer', { icon: full.hidden ? 'eye' : 'eye-off', ghost: true, onclick: () => dossierPref(d, 'hide', !full.hidden) })),
       h('h3', { class: 'h3', text: `Lignes liées (${items.length})` }),
       items.length ? h('ul', { class: 'linked' }, items.map((it) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.go('pending', it.id) },
-        prioDot(it.prio), h('span', { class: 'grow' }, segments(it.cells.Sujet || it.cells.text)), h('span', { class: 'muted small', text: segText(it.cells.Attendu) }))))) : h('p', { class: 'muted', text: 'Aucune ligne ouverte.' }),
+        prioDot(it.prio), h('span', { class: 'grow' }, segments(it.cells.Sujet || it.cells.Qui || it.cells.text)), links[it.id] ? chip(links[it.id], 'quiet') : null,
+        h('span', { class: 'muted small', text: segText(it.cells.Attendu) }))))) : h('p', { class: 'muted', text: 'Aucune ligne ouverte.' }),
+      full.mails ? h('h3', { class: 'h3', text: `Mails liés (${full.mails.length})` }) : null,
+      full.mails && full.mails.length ? h('ul', { class: 'linked' }, full.mails.map((m) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => openRef({ kind: 'mail', id: m.id }) },
+        icon('mail', 'icon-sm'), h('span', { class: 'grow', text: m.subject || '(sans objet)' }),
+        h('span', { class: 'muted small', text: [m.from && (m.from.name || m.from.address), m.received ? fmtDate(m.received) : null].filter(Boolean).join(' · ') })))))
+        : full.mails ? h('p', { class: 'muted small', text: 'Aucun mail de la boîte synchronisée ne correspond.' }) : null,
+      full.keywords && full.keywords.length ? h('p', { class: 'muted small', text: `Mots-clés : ${full.keywords.join(', ')}` }) : null,
       h('h3', { class: 'h3', text: 'Fichiers récents' }),
       full.recent_files_note ? h('p', { class: 'muted small', text: full.recent_files_note }) : null,
       full.recent_files?.length ? h('ul', { class: 'linked' }, full.recent_files.map((f) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.openFile(f.file_id, f.name) },

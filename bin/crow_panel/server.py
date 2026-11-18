@@ -26,6 +26,7 @@ from .followups import Followups
 from .search import Search
 from .notifications import Notifications
 from .calendar import CalendarSync
+from .dossiers import Dossiers
 
 
 class App:
@@ -43,6 +44,7 @@ class App:
         self.calendar = CalendarSync(self)
         self.launcher.complete = self.complete
         self.readers = Readers(self)
+        self.dossiers = Dossiers(self)
         self.visits = Visits(self)
         self.decisions = Decisions(self)
         self.pending.recover()
@@ -114,6 +116,10 @@ class App:
             return Search(self).view(query)
         if path == "/api/runs":
             return self.readers.runs(int(query.get("since_hours", [24])[0]))
+        if path == "/api/dossiers":
+            return self.readers.dossiers(include_hidden=query.get("hidden", ["0"])[0] == "1")
+        if path == "/api/dossiers/directories":
+            return self.dossiers.directories(query.get("q", [""])[0][:200])
         if path == "/api/dues":
             return self.readers.dues(int(query.get("days", [14])[0]))
         if path == "/api/topics":
@@ -186,6 +192,11 @@ class App:
             if body.get("probe") is not True:
                 self.sync_calendar_with_mail(body, route)
             return 202, op
+        if path == "/api/dossiers/create":
+            return 200, self.dossiers.create(body)
+        match = re.fullmatch(r'/api/dossiers/([^/]+)/(pin|hide)', path)
+        if match:
+            return 200, self.dossiers.set_pref(match[1], "pinned" if match[2] == "pin" else "hidden", body.get("on"))
         if path == "/api/calendar/sync":
             return 202, self.calendar.sync(body, route)
         if path == "/api/mail/triage/plan":
