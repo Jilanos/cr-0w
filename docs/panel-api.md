@@ -173,3 +173,29 @@ mtimes. No date is inferred from a filename. `recent_files_note` explains the
 reference or its absence. A scan inspects at most 10,000 entries and reports
 partial access or truncation. An unavailable folder returns null; an empty one
 returns an empty array. Dossier lists do not recursively scan directories.
+
+## AFK decision answers
+
+`POST /api/afk/decisions/{n}/answer` accepts `request_id`, `night` (ISO date),
+`item_rev` and `answer` (one exact displayed option). It returns a completed
+`afk.answer` operation. A stale revision, duplicate number or previously answered
+question returns 409. A forged option or invalid date returns 400. Recording a
+choice performs no external action.
+
+Structured questions in `afk_dir/decisions-<date>.md` use this format. Keep numbers
+unique in the whole file. English and French field names are accepted for the
+recommendation and answer. Existing bullet logs remain displayed as answered.
+
+```markdown
+## 1. Which trial should run next?
+- Job: example
+- Option: Keep trial
+- Option: Review first
+- Recommendation: Keep trial
+```
+
+The writer appends `- Answer: <choice>` to that block, preserves all other bytes,
+and saves the previous file under `state_dir/afk/backups/`. In dry-run mode it
+reads the configured source and writes an overlay under `state_dir/afk/`; the
+original decision log stays untouched. Subsequent reads show that overlay.
+Interrupted writes are reconciled by the recorded content hash, without replay.

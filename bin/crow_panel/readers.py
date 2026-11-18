@@ -226,12 +226,7 @@ class Readers:
         jobs = []
         for path in sorted((root / "reports").glob("*.md")) if (root / "reports").is_dir() else []:
             jobs.append({"name": path.stem, "account": None, "status": "reported", "run_id": None, "report_file_id": self.app.files.register(path), "decisions": None})
-        decisions = []
-        source = root / ("decisions-" + date + ".md")
-        if source.is_file():
-            for line in source.read_text().splitlines():
-                if line.startswith("- "):
-                    decisions.append({"n": len(decisions) + 1, "job": None, "question": line[2:], "options": [], "recommendation": None, "answered": True, "topic_id": None})
+        decisions = self.app.decisions.view(date)
         return {"generated_at": now(), "night": date, "back_at": summary.get("back_at"), "jobs": jobs, "decisions": decisions}
 
     def dues(self, days=14):

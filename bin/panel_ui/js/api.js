@@ -166,6 +166,14 @@ const fake = {
     await new Promise((r) => setTimeout(r, 60));
     const [path, qs] = rawPath.split('?');
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
+    const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
+    if (method === 'POST' && decision) {
+      const afk = this.doc('GET', '/api/afk');
+      const row = afk.decisions.find(d => d.n === Number(decision[1]));
+      if (!row || !row.options.includes(body.answer)) throw new ApiError(400, { error: { message: 'Option inconnue' } });
+      row.answered = true; row.answer = body.answer; this.counts({ afk_decisions: -1 });
+      return { status: 200, data: { dry_run: true, status: 'succeeded' } };
+    }
     const m = this.match(method, path);
     if (!m && method === 'PUT' && /^\/api\/topics\/[^/]+$/.test(path)) return this.putTopic(path.split('/')[3], body);
     if (!m) throw new ApiError(404, { error: { code: 'not_found', message: `Route absente des fixtures : ${method} ${path}` } });

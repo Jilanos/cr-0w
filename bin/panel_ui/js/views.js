@@ -442,10 +442,25 @@ export function makeViews(ctx) {
       h('ol', { class: 'options' }, d.options.map((o) => h('li', { class: ['option', o === d.recommendation && 'option-reco'] },
         h('span', { text: o }), o === d.recommendation ? chip('recommandé', 'accent') : null))),
       h('div', { class: 'actions' },
+        !d.answered ? d.options.map((option) => btn(option, {
+          primary: option === d.recommendation, disabled: !d.item_rev ? 'Révision de décision indisponible' : store.afkBusy ? 'Enregistrement en cours' : null,
+          onclick: () => answerDecision(d, afk, option),
+        })) : null,
         d.topic_id ? btn('Répondre dans le chat', { icon: 'chat', primary: true, onclick: () => ctx.openChat({ prefill: `Décision ${d.n} : je choisis « ${d.recommendation} ».` }) }) : null,
         job && job.report_file_id ? btn('Rapport du job', { icon: 'file', onclick: () => ctx.openFile(job.report_file_id, `rapport ${job.name}`) }) : null),
-      h('p', { class: 'muted small', text: 'Réponse par boutons prévue en v1.1. Pour l\'instant, la réponse passe par le chat.' }),
+      h('p', { class: 'muted small', text: d.answered ? `Choix enregistré${d.answer ? ' : ' + d.answer : ''}`
+        : ctx.config?.mode === 'dry_run' ? 'Mode essai : la réponse est enregistrée sur une copie. Aucune action externe.' : 'Le choix est enregistré dans le journal. Aucune action externe.' }),
       job ? h('p', { class: 'meta mono', text: `${job.name} · ${job.account || 'compte inconnu'} · ${RUN_STATE[job.status] || job.status}` }) : null);
+  }
+
+  async function answerDecision(d, afk, answer) {
+    if (store.afkBusy) return;
+    store.afkBusy = true; ctx.renderDetail();
+    try {
+      const op = await ctx.api.post(`/api/afk/decisions/${d.n}/answer`, { night: afk.night, item_rev: d.item_rev, answer });
+      toast(op.dry_run ? 'Réponse enregistrée sur la copie' : 'Réponse enregistrée', { kind: 'ok' });
+    } catch (err) { toastError(err, 'Réponse à la décision'); }
+    finally { store.afkBusy = false; await ctx.refresh(['afk', 'state']); ctx.render(); }
   }
 
   // ------------------------------------------------------------ Mails

@@ -204,6 +204,16 @@ add('flow-since-visit', DESK, async (page, base) => {
   await expect(page, '.view-title', 'Mails');
 });
 
+add('flow-afk-answer', DESK, async (page, base) => {
+  await open(page, base, { view: 'decisions', sel: { decisions: 'afk:1' } });
+  await expect(page, '.detail', 'Corbeille');
+  await page.shot('decision-before');
+  await page.click('.detail .btn', 'attendre un outil compatible');
+  await expect(page, '.detail', 'Choix enregistré : attendre un outil compatible');
+  await expect(page, '.toast', 'sur la copie');
+  await page.shot('decision-answered');
+});
+
 // Every view, light and dark, desktop.
 for (const dark of [false, true]) {
   for (const v of VIEWS) {

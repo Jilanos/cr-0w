@@ -40,7 +40,8 @@
       ],
       "recommendation": "attendre un outil compatible",
       "answered": false,
-      "topic_id": "t_afkdec0001"
+      "topic_id": "t_afkdec0001",
+      "item_rev": "r_decision_example"
     }
   ]
 }

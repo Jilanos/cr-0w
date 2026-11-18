@@ -21,6 +21,7 @@ from .pending import Pending
 from .readers import Readers
 from .security import CSP, Files
 from .visits import Visits
+from .afk import Decisions
 
 
 class App:
@@ -36,7 +37,9 @@ class App:
         self.launcher.complete = self.mail.complete
         self.readers = Readers(self)
         self.visits = Visits(self)
+        self.decisions = Decisions(self)
         self.pending.recover()
+        self.decisions.recover()
         for op in self.store.all("operations"):
             if op["status"] in ACTIVE and not op["kind"].startswith("pending.") and not self.store.get("jobs", op["operation_id"]):
                 op.update(status="unknown", error={"code": "interrupted_acceptance", "message": "Opération interrompue avant sa mise en file. Vérification requise.", "retryable": False, "details": {}})
@@ -132,6 +135,9 @@ class App:
             raise Problem(404, "not_found", "Route introuvable.")
         if path == "/api/state/visit":
             return 200, self.visits.visit(body)
+        match = re.fullmatch(r'/api/afk/decisions/(\d+)/answer', path)
+        if match:
+            return 200, self.decisions.answer(int(match[1]), body, route)
         match = re.fullmatch(r'/api/pending/([^/]+)/(done|snooze)', path)
         if match:
             return self.pending.submit(match[1], match[2], body, route)
