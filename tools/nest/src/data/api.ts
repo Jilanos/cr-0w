@@ -103,6 +103,7 @@ export function apiActions(base = '/api', get: Fetch = (i, init) => fetch(i, ini
     start: (s) => post('/sessions', s),
     dispatch: (r) => post('/dispatch', r),
     stopRun: (run) => post(`/dispatch/${id(run)}/stop`),
+    retryRun: (run) => post(`/dispatch/${id(run)}/retry`),
     mail: (mail, verb) => post(`/today/${id(mail)}/${verb}`),
     missionAnswer: (mission, item, verb, text, version) =>
       post<unknown>(`/missions/${id(mission)}/answer`, { item, verb, ...(text.trim() ? { text } : {}), version }),

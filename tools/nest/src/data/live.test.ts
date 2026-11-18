@@ -30,12 +30,13 @@ describe('live actions over the core API', () => {
     await a.start({ project: 'demo', account: 'spare' })
     await a.dispatch({ project: 'demo', label: 'fix', prompt: 'Fix it.' })
     await a.stopRun('a1b2c3d4')
+    await a.retryRun('f00dfeed')
     await a.mail('mail-1', 'done')
     await a.attach(5151)
     expect(seen.map((s) => s.url)).toEqual([
       '/api/sessions/4242/send', '/api/sessions/4242/interrupt', '/api/sessions/5151/stop',
       '/api/sessions/c0ffee00-0000-4000-8000-000000000001/resume', '/api/sessions', '/api/dispatch',
-      '/api/dispatch/a1b2c3d4/stop', '/api/today/mail-1/done', '/api/sessions/5151/attach',
+      '/api/dispatch/a1b2c3d4/stop', '/api/dispatch/f00dfeed/retry', '/api/today/mail-1/done', '/api/sessions/5151/attach',
     ])
     for (const s of seen) {
       expect(s.init.method).toBe('POST')

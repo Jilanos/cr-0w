@@ -67,6 +67,7 @@ func newServer(t *testing.T) (*Server, string) {
 var scriptPayloads = []struct{ section, fixture string }{
 	{"sessions", "sessions"}, {"dispatch", "runs"}, {"usage", "usage"}, {"today", "today"},
 	{"mrs", "mrs"}, {"checks", "checks"}, {"projects", "registry"}, {"accounts", "accounts"},
+	{"ready", "ready"},
 }
 
 func scriptSources(t *testing.T) []Source {
@@ -153,6 +154,7 @@ func TestResponseFixtures(t *testing.T) {
 		"state-missions":      {path: "/api/state/missions"},
 		"state-runs":          {path: "/api/state/runs"},
 		"state-accounts":      {path: "/api/state/accounts"},
+		"state-ready":         {path: "/api/state/ready"},
 		"state-jobs":          {path: "/api/state/jobs"},
 		"state-sessions":      {path: "/api/state/sessions"},
 		"state-dispatch":      {path: "/api/state/dispatch"},

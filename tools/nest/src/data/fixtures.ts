@@ -104,6 +104,21 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       drop(a.pid)
       return reply('run-stop', run, { account: a.account, project: a.project })
     },
+    async retryRun(run) {
+      const d = dispatch()
+      const f = (d.finished ?? []).find((x) => x.run_id === run)
+      if (!f) throw new ApiError(404, `no finished run "${run}"`)
+      if (d.slots.busy >= d.slots.max) throw new ApiError(409, `too_many_runs: ${d.slots.busy} runs already running`)
+      const id = `r${String(d.agents.length).padStart(7, '0')}`
+      const account = f.account ?? 'work'
+      set('dispatch', {
+        ...d,
+        slots: { ...d.slots, busy: d.slots.busy + 1 },
+        finished: (d.finished ?? []).filter((x) => x !== f),
+        agents: [...d.agents, { kind: 'run', pid: 9500 + d.agents.length, account, project: f.project, cwd: `/src/${f.project}.wt/${f.label ?? run}`, run_id: id, label: f.label ?? run, title: f.label ?? run, state: 'working', started_at: now.toISOString() }],
+      })
+      return reply('run-retry', run, { account, project: f.project, run_id: id, message: `retried ${run} as ${id}` })
+    },
     async resume(id, account) {
       const rows = (data.sessions as { sessions: Array<{ conversation_id: string; account: string; project: string }> }).sessions
       const r = rows.find((x) => x.conversation_id === id)

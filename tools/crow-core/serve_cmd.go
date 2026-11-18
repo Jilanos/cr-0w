@@ -167,6 +167,7 @@ var scripts = []script{
 	{"checks", 30 * time.Second, nil, []string{"crow-checks", "json"}},
 	{"projects", 30 * time.Second, nil, []string{"crow-registry", "json"}},
 	{"accounts", 10 * time.Second, nil, []string{"crow-accounts", "json"}},
+	{"ready", 30 * time.Second, nil, []string{"crow-ready", "json"}},
 }
 
 // sources builds every external section with its configured TTL.

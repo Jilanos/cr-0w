@@ -216,3 +216,30 @@ def test_headless_session_without_id_is_listed_as_setup(cr, monkeypatch, tmp_pat
     monkeypatch.setattr(cr.crow_term, "tmux_session_for", lambda pid, panes: panes.get(pid))
     agents = cr.collect("today")["agents"]
     assert [(a["pid"], a["state"], a["tmux"]) for a in agents] == [(11, "setup", "crow-lazytf-101010")]
+
+
+def test_keep_prompt_copies_a_temp_prompt(cr, tmp_path):
+    f = tmp_path / "p.md"
+    f.write_text("do the thing")
+    a = type("A", (), {"prompt_file": str(f), "prompt": None})()
+    kept = cr.keep_prompt("abcd1234", a)
+    f.unlink()
+    assert open(kept).read() == "do the thing"
+
+
+def test_retry_args_rebuild_the_run(cr, tmp_path):
+    p = tmp_path / "kept.md"
+    p.write_text("x")
+    rec = {"run_id": "abcd1234ef", "project": "hub", "label": "fix", "prompt_file": "/gone.md", "prompt_copy": str(p),
+           "account": "spare", "kind": "task", "context": "day", "cwd": str(tmp_path), "logics_ref": "item_1"}
+    args, why = cr.retry_args(rec)
+    assert why == ""
+    assert args[:5] == ["dispatch", "hub", "fix", "--prompt-file", str(p)]
+    for pair in (["--resumes", "abcd1234ef"], ["--account", "spare"], ["--cwd", str(tmp_path)], ["--logics", "item_1"]):
+        i = args.index(pair[0])
+        assert args[i:i + 2] == pair
+
+
+def test_retry_args_refuse_without_prompt(cr):
+    args, why = cr.retry_args({"run_id": "x", "project": "hub", "label": "l", "prompt_file": "/gone.md"})
+    assert args is None and "no prompt" in why

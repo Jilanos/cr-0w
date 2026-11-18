@@ -54,6 +54,27 @@ export type AskAnswer = number[] | { other: string; options?: number[] }
 export interface Dispatch {
   slots: { busy: number; max: number }
   agents: Agent[]
+  // Runs that ended in the last days, newest first (crow-runs json).
+  finished?: FinishedRun[]
+}
+
+export interface FinishedRun {
+  run_id: string
+  project: string
+  label?: string | null
+  account?: string | null
+  status: string
+  ended_at?: string | null
+}
+
+// A Logics backlog item ready to build (crow-ready json).
+export interface ReadyItem {
+  project: string
+  ref: string
+  title: string
+  path: string
+  progress?: string
+  modified: string
 }
 
 // A resumable conversation of `crow-sessions json`.
@@ -135,6 +156,8 @@ export interface Actions {
   start(s: NewSession): Promise<LiveReply>
   dispatch(r: NewRun): Promise<LiveReply>
   stopRun(runId: string): Promise<LiveReply>
+  /** Start a finished run again on its prompt, account and worktree (crow-runs retry). */
+  retryRun(runId: string): Promise<LiveReply>
   mail(id: string, verb: 'done' | 'snooze'): Promise<LiveReply>
   // Mission actions (item_168, core internal/api/actions.go). Replies differ per route;
   // callers only refetch. version is the mission version the owner saw (409 when older).

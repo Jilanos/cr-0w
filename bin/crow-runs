@@ -934,6 +934,68 @@ def dispatch_fail(a, code, message):
     sys.exit(f"crow: {message}")
 
 
+PROMPTS = STATE / "prompts"
+
+
+def keep_prompt(run_id, a):
+    """Copy of the run's prompt under STATE/prompts (a caller's temp file is gone later): what `retry` restarts from."""
+    try:
+        text = Path(a.prompt_file).read_text() if a.prompt_file else a.prompt
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    PROMPTS.mkdir(parents=True, exist_ok=True)
+    f = PROMPTS / f"{run_id}.md"
+    f.write_text(text)
+    return str(f)
+
+
+def retry_args(rec):
+    """`crow-runs dispatch` arguments that start rec's run again on its prompt, or (None, why)."""
+    src = next((f for f in (rec.get("prompt_copy"), rec.get("prompt_file")) if f and Path(f).is_file()), None)
+    if not src:
+        return None, "no prompt file left to restart from"
+    args = ["dispatch", rec["project"], rec["label"], "--prompt-file", src, "--resumes", rec["run_id"],
+            "--kind", rec.get("kind") or "task", "--context", rec.get("context") or "day"]
+    for flag, key in (("--account", "account"), ("--model", "model"), ("--power", "power"), ("--logics", "logics_ref")):
+        if rec.get(key):
+            args += [flag, rec[key]]
+    if rec.get("cwd") and os.path.isdir(rec["cwd"]):
+        args += ["--cwd", rec["cwd"]]
+    if rec.get("permission") == "review":
+        args += ["--permission", "review"]
+    if rec.get("isolated"):
+        args.append("--isolate")
+    return args, ""
+
+
+def retry(run_id, as_json):
+    """Start a finished run again on the same prompt, project, account and worktree (--resumes hides the old one)."""
+    def out(code, target, msg):
+        if as_json:
+            sys.exit(crow_lib.action_result(code == 0, "retry", target, msg, code))
+        sys.exit(f"crow: {msg}" if code else print(msg))
+    recs = [r for r in ledger() if run_id.strip() and r["run_id"].startswith(run_id)]
+    if len({r["run_id"] for r in recs}) != 1:
+        out(1, run_id, f"{len(recs)} runs match {run_id!r}; give one run id")
+    rec = recs[-1]
+    if any(r.get("run_id") == rec["run_id"] for r in running_runs()):
+        out(1, rec["run_id"], f"run {rec['run_id'][:8]} is still running")
+    args, why = retry_args(rec)
+    if not args:
+        out(1, rec["run_id"], f"cannot retry {rec['run_id'][:8]}: {why}")
+    r = subprocess.run([sys.executable, os.path.realpath(__file__), *args, "--json"], capture_output=True, text=True)
+    try:
+        res = json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        res = {"ok": False, "error": {"message": (r.stderr or r.stdout).strip()[:200]}}
+    if not res.get("ok"):
+        err = res.get("error") or {}
+        out(1, rec["run_id"], f"retry failed: {err.get('message') if isinstance(err, dict) else err}")
+    out(0, rec["run_id"], f"retried {rec['run_id'][:8]} as {res['run_id'][:8]}")
+
+
 def dispatch(a):
     if a.continue_run and parent_run(a.continue_run).get("isolated"):
         a.isolate = True  # cdx continues an isolated run only inside its sandbox, read-only for a review
@@ -1039,6 +1101,9 @@ def dispatch(a):
             rec["linked_mission"] = linked
     if a.write_dir:
         rec["write_dir"] = a.write_dir
+    keep = keep_prompt(res["run_id"], a)
+    if keep:
+        rec["prompt_copy"] = keep
     if "--model" in flags:
         rec["model_id"] = flags[flags.index("--model") + 1]
     if "--budget" in flags:
@@ -1222,6 +1287,9 @@ def main():
     sp = sub.add_parser("stop")
     sp.add_argument("run_id")
     sp.add_argument("--json", action="store_true", help="print {schema, ok, action, target, message, code}; exit 0 stopped, 1 refused, 2 error")
+    rp = sub.add_parser("retry", help="start a finished run again on its prompt, account and worktree")
+    rp.add_argument("run_id")
+    rp.add_argument("--json", action="store_true", help="print {schema, ok, action, target, message, code}; exit 0 started, 1 refused")
     sub.add_parser("notify").add_argument("run_ids", nargs="+")
     cv = sub.add_parser("conversation", help="one page of a run's or session's conversation, as JSON (crow-core)")
     cv.add_argument("--run"); cv.add_argument("--account"); cv.add_argument("--conversation")
@@ -1243,6 +1311,8 @@ def main():
         wait(a.run_ids)
     elif a.cmd == "stop":
         stop(a.run_id, a.json)
+    elif a.cmd == "retry":
+        retry(a.run_id, a.json)
     elif a.cmd == "state":
         print(json.dumps(run_end_state(a.run_id)))
     elif a.cmd == "conversation":
