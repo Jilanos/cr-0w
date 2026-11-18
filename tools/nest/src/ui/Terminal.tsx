@@ -3,12 +3,15 @@ import type { Screen, TermKey } from '../data/live'
 import { useSource } from '../data/useData'
 import { keyOf, merge, runsOf, type Style } from './ansi'
 
-// Terminal tab of a session in tmux (item_240): the pane's screen polled about once a
-// second, keys typed while the box has focus sent through, the pane sized to the box.
+// Terminal tab of a session (item_240): the pane's screen polled about once a second, keys
+// typed while the box has focus sent through, the pane sized to the box. Lines above the
+// screen (history) scroll in the box; an app on the alternate screen (Claude Code) has none,
+// so the wheel sends Page Up / Page Down and the app scrolls itself.
 
 const POLL_MS = 1000
 const AFTER_KEYS_MS = 120
 const FLUSH_MS = 50
+const WHEEL_MS = 150
 
 const css = (s: Style): CSSProperties | undefined => {
   if (!s.fg && !s.bg && !s.bold && !s.dim && !s.italic && !s.underline && !s.reverse) return undefined
@@ -72,6 +75,18 @@ export function Terminal({ pid }: { pid: number }) {
   }, [act, pid, load])
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
+  // Follow the bottom unless the reader scrolled up; typing brings the bottom back.
+  const atBottom = useRef(true)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (el && atBottom.current) el.scrollTop = el.scrollHeight
+  }, [screen])
+  const toBottom = () => {
+    atBottom.current = true
+    if (box.current) box.current.scrollTop = box.current.scrollHeight
+  }
+  const wheelAt = useRef(0)
+
   // Size the pane to the box: whole cells, changes only, after the box settles.
   useLayoutEffect(() => {
     const p = probe.current
@@ -109,18 +124,31 @@ export function Terminal({ pid }: { pid: number }) {
         const k = keyOf(e)
         if (!k) return
         e.preventDefault()
+        toBottom()
         send(k)
+      }}
+      onScroll={(e) => {
+        const el = e.currentTarget
+        atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4
+      }}
+      onWheel={(e) => {
+        if (!screen || (screen.history ?? 0) > 0 || !e.deltaY) return
+        const now = Date.now()
+        if (now - wheelAt.current < WHEEL_MS) return
+        wheelAt.current = now
+        send({ key: e.deltaY < 0 ? 'PPage' : 'NPage' })
       }}
       onPaste={(e) => {
         const text = e.clipboardData.getData('text')
         e.preventDefault()
+        toBottom()
         if (text) send({ text: text.slice(0, 4000) })
       }}
     >
       <span ref={probe} className="probe" aria-hidden="true">MMMMMMMMMM</span>
       {screen ? <Lines screen={screen} /> : !error && <div className="sm">Loading the screen…</div>}
       {screen && c?.shown && focused && cell.w > 0 && (
-        <span className="cur" aria-hidden="true" style={{ left: `calc(var(--tty-pad) + ${c.x * cell.w}px)`, top: `calc(var(--tty-pad) + ${c.y * cell.h}px)`, width: cell.w, height: cell.h }} />
+        <span className="cur" aria-hidden="true" style={{ left: `calc(var(--tty-pad) + ${c.x * cell.w}px)`, top: `calc(var(--tty-pad) + ${(c.y + (screen.history ?? 0)) * cell.h}px)`, width: cell.w, height: cell.h }} />
       )}
       {error && <div className="msg cr f">{error}</div>}
       {!focused && screen && <span className="hint">Click to type</span>}

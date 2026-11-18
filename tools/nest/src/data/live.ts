@@ -108,6 +108,8 @@ export interface Screen {
   cols: number
   rows: number
   cursor: { x: number; y: number; shown: boolean }
+  // Lines above the screen at the start of lines (none on the alternate screen).
+  history?: number
 }
 
 // One key for the session's pane: a tmux key name (Enter, C-c, Up...) or literal text.

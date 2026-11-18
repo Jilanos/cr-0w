@@ -269,9 +269,17 @@ def test_screen_of_reads_lines_and_cursor():
         calls.append(cmd)
         return R("\x1b[1m❯\x1b[0m hi\nnext\n") if "capture-pane" in cmd else R("3 1 80 24 1\n")
     scr = ct.screen_of("%4", run=run)
-    assert scr == {"lines": ["\x1b[1m❯\x1b[0m hi", "next"], "cols": 80, "rows": 24, "cursor": {"x": 3, "y": 1, "shown": True}}
+    assert scr == {"lines": ["\x1b[1m❯\x1b[0m hi", "next"], "cols": 80, "rows": 24, "cursor": {"x": 3, "y": 1, "shown": True}, "history": 0}
+    assert "-S" in calls[0]
     assert calls[0][:4] == ["tmux", "capture-pane", "-p", "-e"] and calls[0][-2:] == ["-t", "%4"]
     assert ct.screen_of("%4", run=lambda cmd, **kw: R("", 1)) is None
+
+
+def test_with_history_counts_lines_above_the_screen_and_caps_them():
+    scr = ct.with_history({"rows": 2}, ["old", "a", "b"], 2)
+    assert scr["history"] == 1 and scr["lines"] == ["old", "a", "b"]
+    many = ct.with_history({"rows": 2}, [str(i) for i in range(ct.HISTORY + 10)], 2)
+    assert many["history"] == ct.HISTORY and len(many["lines"]) == ct.HISTORY + 2
 
 
 def test_keys_args_take_named_keys_and_literal_text_only():
@@ -299,7 +307,7 @@ def test_kitty_screen_of_reads_lines_and_strips_the_cursor():
     def run(cmd, **kw):
         return R("a\n\x1b[31mb\x1b[m\n\x1b[?25h\x1b[2;5H\x1b[?12h\n") if "get-text" in cmd else R(ls)
     assert ct.kitty_screen_of("unix:s", 3, run=run) == {
-        "lines": ["a", "\x1b[31mb\x1b[m"], "cols": 114, "rows": 53, "cursor": {"x": 4, "y": 1, "shown": True}}
+        "lines": ["a", "\x1b[31mb\x1b[m"], "cols": 114, "rows": 53, "cursor": {"x": 4, "y": 1, "shown": True}, "history": 0}
     assert ct.kitty_screen_of("unix:s", 9, run=run) is None
 
 

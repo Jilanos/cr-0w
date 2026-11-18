@@ -320,9 +320,20 @@ KEYS = {"Enter", "Escape", "BSpace", "Tab", "BTab", "Up", "Down", "Left", "Right
 SCREEN_FMT = "#{cursor_x} #{cursor_y} #{pane_width} #{pane_height} #{cursor_flag}"
 
 
+# Scrollback lines the Terminal tab gets above the screen.
+HISTORY = 500
+
+
+def with_history(scr, lines, rows):
+    """scr with lines cut to HISTORY lines of scrollback plus the screen, and history = how many
+    lines come before the screen (the cursor y counts from the screen's top)."""
+    lines = lines[-(HISTORY + rows):] if rows else lines
+    return {**scr, "lines": lines, "history": max(0, len(lines) - rows)}
+
+
 def screen_of(pane, run=subprocess.run):
-    """{lines (ANSI), cols, rows, cursor: {x, y, shown}} of a tmux pane, else None."""
-    cap = run(["tmux", "capture-pane", "-p", "-e", "-N", "-t", pane], capture_output=True, text=True, timeout=5)
+    """{lines (ANSI), history, cols, rows, cursor: {x, y, shown}} of a tmux pane, else None."""
+    cap = run(["tmux", "capture-pane", "-p", "-e", "-N", "-S", f"-{HISTORY}", "-t", pane], capture_output=True, text=True, timeout=5)
     meta = run(["tmux", "display-message", "-p", "-t", pane, SCREEN_FMT], capture_output=True, text=True, timeout=5)
     if cap.returncode or meta.returncode:
         return None
@@ -330,7 +341,7 @@ def screen_of(pane, run=subprocess.run):
     lines = cap.stdout.split("\n")
     if lines and lines[-1] == "":
         lines.pop()
-    return {"lines": lines, "cols": cols, "rows": rows, "cursor": {"x": x, "y": y, "shown": bool(shown)}}
+    return with_history({"cols": cols, "rows": rows, "cursor": {"x": x, "y": y, "shown": bool(shown)}}, lines, rows)
 
 
 def keys_args(pane, keys):
@@ -366,9 +377,9 @@ KITTY_CURSOR = re.compile(r"\x1b\[\?25([hl])\x1b\[(\d+);(\d+)H(?:\x1b\[\?12[hl])
 
 
 def kitty_screen_of(sock, wid, run=subprocess.run):
-    """{lines (ANSI), cols, rows, cursor: {x, y, shown}} of a kitty window, else None."""
+    """{lines (ANSI), history, cols, rows, cursor: {x, y, shown}} of a kitty window, else None."""
     to = ["kitten", "@", "--to", sock]
-    txt = run([*to, "get-text", "--match", f"id:{wid}", "--ansi", "--add-cursor", "--extent", "screen"],
+    txt = run([*to, "get-text", "--match", f"id:{wid}", "--ansi", "--add-cursor", "--extent", "all"],
               capture_output=True, text=True, timeout=5)
     ls = run([*to, "ls", "--match", f"id:{wid}"], capture_output=True, text=True, timeout=5)
     if txt.returncode or ls.returncode:
@@ -384,7 +395,8 @@ def kitty_screen_of(sock, wid, run=subprocess.run):
     lines = text.split("\n")
     if lines and lines[-1] == "":
         lines.pop()
-    return {"lines": lines, "cols": win.get("columns", 0), "rows": win.get("lines", 0), "cursor": cursor}
+    rows = win.get("lines", 0)
+    return with_history({"cols": win.get("columns", 0), "rows": rows, "cursor": cursor}, lines, rows)
 
 
 def kitty_keys_args(sock, wid, keys):
