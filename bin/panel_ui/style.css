@@ -48,7 +48,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
-  margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font);
+  margin: 0; background: var(--pane); color: var(--text); font: 14px/1.45 var(--font);
   -webkit-font-smoothing: antialiased; overflow: hidden;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -95,7 +95,7 @@ body.rail-collapsed { --rail-w: 56px; }
 }
 .rail-item:hover { background: var(--hover); color: var(--text); }
 .rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.rail-label { flex: 1; line-height: 1.25; overflow-wrap: anywhere; }
+.rail-label { flex: 1; line-height: 1.25; min-width: 0; }
 .rail-item kbd { margin-left: auto; }
 .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 500; }
 .rail-item.active .count { color: var(--accent); }
@@ -367,6 +367,9 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
 .evidence th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); }
 .evidence td { padding: 10px 8px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .report { display: flex; flex-direction: column; gap: 20px; }
+.detail > .link-btn { align-self: flex-start; }
+.checks li { align-items: flex-start; }
+.checks .status-icon { margin-top: 1px; }
 
 /* ---------------------------------------------------------------- gauges */
 
@@ -484,6 +487,7 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
 .log-done .log-text { font-weight: 600; }
 
 .toasts { position: fixed; left: calc(var(--rail-w) + 16px); bottom: calc(var(--drawer-h) + 16px); display: flex; flex-direction: column; gap: 8px; z-index: 40; max-width: min(440px, calc(100vw - 32px)); }
+body.drawer-open .toasts { bottom: calc(min(42vh, 380px) + 16px); }
 .toast {
   position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg);
   font-size: 13.5px; overflow: hidden; animation: rise 0.16s ease-out;
@@ -562,7 +566,7 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
   .topbar { padding: 0 8px; gap: 8px; }
   .view-title { font-size: 15px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .filter { display: none; }
-  .badge-fixtures { display: none; }
+  .badge-fixtures, .admission { display: none; }
   .panes { grid-template-columns: minmax(0, 1fr); }
   .pane-list { border-right: 0; }
   .pane-detail { display: none; }

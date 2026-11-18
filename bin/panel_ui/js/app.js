@@ -462,7 +462,7 @@ async function runRoutine(name, label, blocked) {
     const op = await api.post(`/api/routines/${encodeURIComponent(name)}`, {});
     toast(op.summary || `${label} lancée`, { kind: 'info', detail: op.dry_run ? 'mode essai : commande affichée, non exécutée' : null });
     await refresh(['routines', 'state']);
-    renderHeader();
+    render();
     trackOp(op, async (final) => {
       await refresh(['routines', 'state', 'runs', 'pending']);
       render();

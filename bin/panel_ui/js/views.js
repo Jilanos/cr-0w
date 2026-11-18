@@ -195,7 +195,7 @@ export function makeViews(ctx) {
 
   const today = {
     title: "Aujourd'hui", icon: 'today', wide: true,
-    count: (c) => ({ alert: c.overdue || null, alertTitle: 'en retard' }),
+    count: () => null,
     load: () => Promise.all(['state', 'pending', 'dues', 'drafts', 'mail', 'runs', 'accounts', 'afk'].map((k) => load(k, null, { quiet: true }))),
     dashboard() {
       const st = cached('state');
@@ -319,7 +319,7 @@ export function makeViews(ctx) {
 
   const pending = {
     title: 'Relances & échéances', icon: 'pending', allowDoneKey: true,
-    count: (c) => ({ n: c.pending, alert: c.overdue || null, alertTitle: 'en retard' }),
+    count: (c) => (c.overdue ? { alert: c.overdue, alertTitle: `${c.overdue} en retard sur ${c.pending ?? '?'} lignes` } : { n: c.pending ?? null }),
     load: () => Promise.all([load('pending'), load('dues', null, { quiet: true })]),
     reload: () => ctx.refresh(['pending', 'dues']).then(ctx.render),
     status: () => status(store.pendingTab === 'dues' ? ['dues'] : ['pending']),
@@ -456,7 +456,7 @@ export function makeViews(ctx) {
     if (!list) return null;
     const cov = list.coverage || {};
     const covLabel = { complete: 'complète', partial: 'partielle', none: 'aucune' }[cov.status] || 'inconnue';
-    const syncBtn = btn('Synchroniser', { icon: 'refresh', small: true, ghost: true, onclick: syncMail });
+    const syncBtn = h('button', { type: 'button', class: 'icon-btn', title: 'Synchroniser la boîte (lecture seule)', 'aria-label': 'Synchroniser la boîte', onclick: syncMail }, icon('refresh'));
     const line = h('div', { class: ['fresh', list.stale && 'fresh-stale', cov.status === 'partial' && 'fresh-partial'] },
       h('span', { class: 'fresh-dot' }),
       h('span', { class: 'fresh-text' }, h('span', { text: list.synced_at ? `Synchro ${ago(list.synced_at)}` : 'Jamais synchronisée' }),
@@ -1025,7 +1025,7 @@ export function makeViews(ctx) {
       topic: r.topic_id ? { topic_id: r.topic_id, title: r.label, kind: 'run' } : { topic_id: null, title: r.label },
       row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, runDot(r.status), h('span', { class: 'row-title', text: r.label }),
         r.owned_by_panel ? null : chip('hors panneau', 'quiet'), h('span', { class: 'row-time', text: fmtDate(r.started_at) })),
-      h('div', { class: 'row-sub', text: [r.project, `${r.account} · ${r.model}`, r.status === 'running' ? `depuis ${ago(r.started_at).replace('il y a ', '')}` : duration(r.duration_s),
+      h('div', { class: 'row-sub', text: [r.project, `${r.account} · ${r.model}`, r.status === 'running' ? `lancé ${fmtDate(r.started_at)}` : duration(r.duration_s),
         money(r.cost_usd, r.cost_status)].join(' · ') }),
       r.error ? h('div', { class: 'row-sub late', text: r.error }) : null),
       detail: () => runDetail(r),
