@@ -326,14 +326,20 @@ export function makeViews(ctx) {
       // Runs
       const runs = cached('runs');
       const runRows = [];
+      let moreRuns = 0;
       if (runs && runs.runs) {
-        for (const r of runs.runs) runRows.push(cardRow(() => ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
-          h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account} · ${RUN_STATE[r.status] || r.status}` })));
+        // Active runs first, then the five most recent ones; the rest stays in Jobs.
+        const active = runs.runs.filter((r) => r.status === 'running');
+        const recent = runs.runs.filter((r) => r.status !== 'running');
+        moreRuns = Math.max(0, recent.length - 5);
+        for (const r of [...active, ...recent.slice(0, 5)]) runRows.push(cardRow(() => ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
+          h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account || 'script'} · ${RUN_STATE[r.status] || r.status}` })));
         for (const q of runs.queue || []) runRows.push(cardRow(() => ctx.go('jobs', 'queue:' + q.operation_id), runDot('queued'),
           h('span', { class: 'grow', text: q.label }), h('span', { class: 'muted small', text: `en file · position ${q.position}` })));
       }
       grid.append(card('Runs', linkBtn('Jobs', () => ctx.go('jobs')),
-        cacheErr('runs') ? h('p', { class: 'late small', text: cacheErr('runs').message }) : cardList(runRows, 'Aucun run sur 24 h.')));
+        cacheErr('runs') ? h('p', { class: 'late small', text: cacheErr('runs').message }) : h('div', null, cardList(runRows, 'Aucun run sur 24 h.'),
+          moreRuns ? h('button', { type: 'button', class: 'link-btn small card-foot', onclick: () => ctx.go('jobs'), text: `${plural(moreRuns, 'autre run', 'autres runs')} dans Jobs` }) : null)));
 
       // Comptes
       const acc = cached('accounts');
@@ -1129,7 +1135,7 @@ export function makeViews(ctx) {
       topic: r.topic_id ? { topic_id: r.topic_id, title: r.label, kind: 'run' } : { topic_id: null, title: r.label },
       row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, runDot(r.status), h('span', { class: 'row-title', text: r.label }),
         r.owned_by_panel ? null : chip('hors panneau', 'quiet'), h('span', { class: 'row-time', text: fmtDate(r.started_at) })),
-      h('div', { class: 'row-sub', text: [r.project, `${r.account} · ${r.model}`, r.status === 'running' ? `lancé ${fmtDate(r.started_at)}` : duration(r.duration_s),
+      h('div', { class: 'row-sub', text: [r.project, [r.account, r.model].filter(Boolean).join(' · ') || 'script local', r.status === 'running' ? `lancé ${fmtDate(r.started_at)}` : duration(r.duration_s),
         money(r.cost_usd, r.cost_status)].join(' · ') }),
       r.error ? h('div', { class: 'row-sub late', text: r.error }) : null),
       detail: () => runDetail(r),
