@@ -857,3 +857,17 @@ def test_reply_pipeline_cannot_be_repeated_while_a_draft_is_uncertain(panel, sta
     with pytest.raises(Problem) as err:
         post(app, "/api/mail/" + key + "/reply-all", {"request_id": "second-reply", "instructions": "Another reply"})
     assert err.value.body["error"]["code"] == "already_running"
+
+
+def test_mail_chat_context_uses_the_latest_message_independent_of_snapshot_order(panel):
+    app, _ = panel
+    value = snapshot()
+    newest = copy.deepcopy(value["items"][0])
+    oldest = copy.deepcopy(newest)
+    newest.update(id="newest", conversation_id="same-thread", received="2026-11-18T10:00:00+00:00", body_text="Latest body")
+    oldest.update(id="oldest", conversation_id="same-thread", received="2026-11-17T10:00:00+00:00", body_text="Old body")
+    for rows in ([newest, oldest], [oldest, newest]):
+        value["items"] = rows
+        app.mail.publish(value)
+        context = app.store.get("contexts", app.mail.find("newest")["topic_id"])
+        assert context["message_id"] == "newest" and context["body_text"] == "Latest body"

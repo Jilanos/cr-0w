@@ -106,7 +106,7 @@ class Mail:
         folder_map = {f["id"]: f for f in folders}
         if len(folder_map) != len(folders):
             raise ValueError("duplicate folder")
-        items, seen, bodies, invalid = [], set(), {}, 0
+        items, seen, bodies, invalid, contexts = [], set(), {}, 0, {}
         for row in value["items"]:
             if not isinstance(row, dict) or any(not isinstance(row.get(k), str) or not row[k] for k in ("id", "subject", "received")):
                 raise ValueError("invalid message")
@@ -129,9 +129,12 @@ class Mail:
                                 "folder_path": folder_map.get(proposal.get("folder_id"), {}).get("path"),
                                 "reason": clean_text(proposal.get("reason", "")), "confidence": proposal["confidence"],
                                 "allowed": proposal["action"] != "trash", "disabled_reason": "Corbeille indisponible : outil absent." if proposal["action"] == "trash" else None}
-            topic = self.launcher.topic("mail", row["conversation_id"] or "message:" + row["id"], clean_text(row["subject"]),
-                                        {"message_id": row["id"], "subject": clean_text(row["subject"]), "preview": clean_text(row.get("preview", "")),
-                                         "body_text": clean_text(row["body_text"]) if row.get("body_text") is not None else None})
+            ref = row["conversation_id"] or "message:" + row["id"]
+            title = clean_text(row["subject"])
+            topic = self.launcher.topic("mail", ref, title)
+            if topic not in contexts or received > contexts[topic][0]:
+                contexts[topic] = (received, ref, title, {"message_id": row["id"], "subject": title, "preview": clean_text(row.get("preview", "")),
+                                                       "body_text": clean_text(row["body_text"]) if row.get("body_text") is not None else read_json(self.body_path(row["id"]), {}).get("body_text")})
             items.append({"id": row["id"], "conversation_id": row["conversation_id"], "from": {"name": clean_text(row["from"].get("name", "")), "address": clean_text(row["from"].get("address", ""))},
                           "to_count": row.get("to_count"), "subject": clean_text(row["subject"]), "received": row["received"],
                           "preview": clean_text(row.get("preview", ""))[:1000], "preview_truncated": bool(row.get("preview_truncated", False)),
@@ -154,6 +157,8 @@ class Mail:
                     "drafts": self.valid_drafts(value.get("drafts", []))}
         for key, body in bodies.items():
             atomic(self.body_path(key), canonical(body))
+        for _, ref, title, context in contexts.values():
+            self.launcher.topic("mail", ref, title, context)
         atomic(self.snapshot_path, canonical(snapshot))
         atomic(self.cfg.state / "mail/folders.json", canonical(self.folders()))
         return {"published": True, "coverage": coverage, "invalid_proposals": invalid}
