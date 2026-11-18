@@ -55,6 +55,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+.fields a, .prose a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 h1, h2, h3 { font-weight: 600; margin: 0; }
 p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }

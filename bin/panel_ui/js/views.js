@@ -119,6 +119,9 @@ export function makeViews(ctx) {
           if (['succeeded', 'partial', 'failed', 'cancelled'].includes(state.op?.status)) state.op = null;
           state.open = true; ctx.renderDetail(); } }));
     }
+    // The first column of a pending row often links to the Outlook message or draft.
+    const titleLink = ((it.cells[(it.columns || [])[0]] || []).find((x) => x && x.t === 'link' && safeHref(x.href)) || {}).href;
+    if (titleLink) bar.append(h('a', { class: 'btn', href: safeHref(titleLink), target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Ouvrir dans Outlook' })));
     if (it.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
     if (!w.ok) bar.append(h('span', { class: 'muted small', text: w.reason }));
 
