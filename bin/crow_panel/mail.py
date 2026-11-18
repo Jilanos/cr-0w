@@ -1,9 +1,11 @@
 """Read-only mailbox snapshots and confirmed immutable triage manifests."""
 import base64
+from collections import Counter, defaultdict
 import datetime as dt
 import json
 from pathlib import Path
 import shlex
+import unicodedata
 
 from .core import ENGINE, Problem, atomic, canonical, digest, now, read_json, uid
 from .launcher import step
@@ -26,6 +28,141 @@ class Mail:
     def __init__(self, cfg, store, launcher):
         self.cfg, self.store, self.launcher = cfg, store, launcher
         self.snapshot_path = cfg.state / "mail/snapshot.json"
+        self.history_path = cfg.state / "mail/filing-index.json"
+
+    def history(self):
+        return read_json(self.history_path, {"version": 1, "messages": {}, "folders": {}})
+
+    def update_history(self, value, folders):
+        """Merge proven folder scans. Partial scans never advance a watermark."""
+        if not isinstance(value, dict):
+            return
+        saved = self.history()
+        allowed = {f["id"] for f in folders if f["allowed_target"]}
+        messages = {k: v for k, v in saved["messages"].items() if v["folder_id"] in allowed}
+        for scan in value.get("folders", []):
+            folder = scan.get("folder_id")
+            if folder not in allowed or not isinstance(scan.get("messages"), list):
+                continue
+            records = {}
+            for row in scan["messages"]:
+                if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"]:
+                    raise ValueError("invalid history message")
+                sender = row.get("from", {}).get("address", row.get("sender", ""))
+                conversation = row.get("conversation_id")
+                if not isinstance(sender, str) or conversation is not None and not isinstance(conversation, str):
+                    raise ValueError("invalid history identity")
+                records[row["id"]] = {"id": row["id"], "folder_id": folder, "sender": sender.strip().casefold(),
+                                       "conversation_id": conversation if conversation not in ("", "unknown") else None}
+            if scan.get("complete") is True and scan.get("reset") is True:
+                messages = {k: v for k, v in messages.items() if v["folder_id"] != folder}
+            for key in scan.get("deleted_ids", []):
+                if key in messages and messages[key]["folder_id"] == folder:
+                    messages.pop(key)
+            messages.update(records)
+            if scan.get("complete") is True:
+                saved["folders"][folder] = {"watermark": scan.get("watermark"), "scanned_at": now(),
+                    "full_scan_at": now() if scan.get("reset") is True else saved["folders"].get(folder, {}).get("full_scan_at")}
+        saved.update(messages=messages, updated_at=now())
+        saved["folders"] = {k: v for k, v in saved["folders"].items() if k in allowed}
+        atomic(self.history_path, canonical(saved))
+
+    def filing_stats(self, exclude_ids=()):
+        conversations, senders, domains = defaultdict(Counter), defaultdict(Counter), defaultdict(Counter)
+        for row in self.history()["messages"].values():
+            if row["id"] in exclude_ids:
+                continue
+            folder, sender = row["folder_id"], row["sender"]
+            if row.get("conversation_id"):
+                conversations[row["conversation_id"]][folder] += 1
+            if sender:
+                senders[sender][folder] += 1
+                if "@" in sender:
+                    domains[sender.rsplit("@", 1)[1]][folder] += 1
+        return conversations, senders, domains
+
+    def rule_proposal(self, row, folders):
+        """Private predicates reference an actual rule in the owner's Markdown."""
+        def folded(text):
+            return "".join(c for c in unicodedata.normalize("NFD", text.casefold()) if not unicodedata.combining(c))
+
+        try:
+            rules = Path(self.cfg["mail"].get("triage_rules", "")).read_text()
+        except OSError:
+            return None
+        sender = row.get("from", {}).get("address", "").strip().casefold()
+        fields = {"sender": sender, "domain": sender.rsplit("@", 1)[-1], "subject_contains": folded(row.get("subject", "")),
+                  "preview_contains": folded(row.get("preview", ""))}
+        for rule in self.cfg["mail"].get("filing_rules", []):
+            quote, match = rule.get("rule", ""), rule.get("match", {})
+            if not quote or quote not in rules or not match or any(k not in fields for k in match):
+                continue
+            if not all(isinstance(values, list) and values and all(isinstance(v, str) and v for v in values)
+                       and any((folded(v) in fields[k] if k.endswith("_contains") else v.casefold() == fields[k]) for v in values)
+                       for k, values in match.items()):
+                continue
+            target = rule.get("folder_id") or next((f["id"] for f in folders.values() if f["path"] == rule.get("folder_path")), None)
+            proposal = self.normalized_proposal({"action": rule.get("action", "move"), "folder_id": target,
+                "reason": "Règle : " + quote, "source": "rules", "confidence": rule.get("confidence", "medium")}, folders, row.get("folder_id"))
+            if proposal:
+                return proposal
+        return None
+
+    def deterministic_proposal(self, row, folders, stats=None):
+        conversations, senders, domains = stats or self.filing_stats({row.get("id")})
+        allowed = {f["id"]: f for f in folders if f["allowed_target"]}
+        current = row.get("folder_id")
+
+        def best(counts):
+            counts = Counter({k: n for k, n in counts.items() if k in allowed})
+            winners = counts.most_common(2)
+            if not winners or len(winners) > 1 and winners[0][1] == winners[1][1]:
+                return None
+            folder, count = winners[0]
+            return folder, count, count / sum(counts.values())
+
+        def proposal(folder, reason, confidence, source):
+            return {"action": "move", "folder_id": folder, "folder_path": allowed[folder]["path"], "reason": reason,
+                    "confidence": confidence, "source": source, "allowed": True, "disabled_reason": None}
+
+        thread = best(conversations.get(row.get("conversation_id"), {}))
+        if thread:
+            folder, count, ratio = thread
+            if folder == current:
+                return None
+            return proposal(folder, f"{count} mails de cet échange dans {allowed[folder]['path']}", "high" if ratio == 1 else "medium", "conversation")
+        sender = row.get("from", {}).get("address", "").strip().casefold()
+        domain = sender.rsplit("@", 1)[-1] if "@" in sender else ""
+        for kind, identity, counts, minimum, threshold in (
+            ("sender", sender, senders.get(sender, {}), self.cfg["mail"].get("history_sender_min", 3), self.cfg["mail"].get("history_sender_ratio", .8)),
+            ("domain", domain, domains.get(domain, {}), self.cfg["mail"].get("history_domain_min", 6), self.cfg["mail"].get("history_domain_ratio", .85)),
+        ):
+            match = best(counts)
+            if not identity or not match:
+                continue
+            folder, count, ratio = match
+            if count < minimum or ratio < threshold:
+                continue
+            if folder == current:
+                return None
+            confidence = "high" if kind == "sender" and count >= 5 and ratio >= .9 else "medium"
+            return proposal(folder, f"Historique {identity} : {count} occurrences dans {allowed[folder]['path']} ({ratio:.0%})", confidence, kind)
+        return None
+
+    def normalized_proposal(self, value, folders, current=None):
+        if not isinstance(value, dict) or value.get("action") not in ("reply", "keep", "move", "archive", "trash") or value.get("confidence") not in ("low", "medium", "high") or not isinstance(value.get("reason"), str) or not value["reason"].strip():
+            return None
+        target = value.get("folder_id")
+        if value["action"] == "archive":
+            target = next((f["id"] for f in folders.values() if f.get("well_known") == "archive"), None)
+        if value["action"] in ("move", "archive") and (not target or target not in folders or not folders[target].get("allowed_target") or target == current):
+            return None
+        if target and target not in folders:
+            return None
+        return {"action": value["action"], "folder_id": target, "folder_path": folders.get(target, {}).get("path"),
+                "reason": clean_text(value.get("reason", "")), "confidence": value["confidence"],
+                "source": value.get("source") if value.get("source") in ("rules", "llm") else "llm",
+                "allowed": value["action"] != "trash", "disabled_reason": "Corbeille indisponible : outil absent." if value["action"] == "trash" else None}
 
     def raw(self):
         return read_json(self.snapshot_path, {"snapshot_rev": None, "synced_at": None, "items": [], "folders": [], "drafts": [],
@@ -129,6 +266,13 @@ class Mail:
             raise ValueError("duplicate folder")
         if any(f.get("parent_id") and f["parent_id"] == f["id"] for f in folders):
             raise ValueError("invalid folder parent")
+        roles = self.cfg["mail"].get("folder_roles", {})
+        folders = [{**f, "well_known": f.get("well_known") or roles.get(f["id"])} for f in folders]
+        folders = self.cache_folders(folders, value.get("folders_complete") is True)
+        folder_map = {f["id"]: f for f in self.folders()["folders"]}
+        self.update_history(value.get("history"), list(folder_map.values()))
+        stats = self.filing_stats({r.get("id") for r in value["items"] if isinstance(r, dict)})
+        inbox = next((f["id"] for f in folders if f.get("well_known") == "inbox"), None)
         items, seen, bodies, invalid, contexts = [], set(), {}, 0, {}
         for row in value["items"]:
             if not isinstance(row, dict) or any(not isinstance(row.get(k), str) or not row[k] for k in ("id", "subject", "received")):
@@ -143,22 +287,18 @@ class Mail:
             received = dt.datetime.fromisoformat(row["received"])
             if received.tzinfo is None or not isinstance(row.get("from"), dict):
                 raise ValueError("invalid sender/date")
-            proposal = row.get("proposal")
-            if proposal:
-                if proposal.get("action") not in ("reply", "keep", "move", "archive", "trash") or proposal.get("confidence") not in ("low", "medium", "high") or proposal.get("folder_id") and proposal["folder_id"] not in folder_map:
-                    proposal, invalid = None, invalid + 1
-                else:
-                    proposal = {"action": proposal["action"], "folder_id": proposal.get("folder_id"),
-                                "folder_path": folder_map.get(proposal.get("folder_id"), {}).get("path"),
-                                "reason": clean_text(proposal.get("reason", "")), "confidence": proposal["confidence"],
-                                "allowed": proposal["action"] != "trash", "disabled_reason": "Corbeille indisponible : outil absent." if proposal["action"] == "trash" else None}
+            row = {**row, "folder_id": row.get("folder_id") or inbox}
+            proposal = self.deterministic_proposal(row, list(folder_map.values()), stats)
+            if proposal is None and (not row["folder_id"] or row["folder_id"] == inbox):
+                proposal = self.rule_proposal(row, folder_map) or self.normalized_proposal(row.get("proposal"), folder_map, row["folder_id"])
+                invalid += bool(row.get("proposal") and not proposal)
             ref = row["conversation_id"] or "message:" + row["id"]
             title = clean_text(row["subject"])
             topic = self.launcher.topic("mail", ref, title)
             if topic not in contexts or received > contexts[topic][0]:
                 contexts[topic] = (received, ref, title, {"message_id": row["id"], "subject": title, "preview": clean_text(row.get("preview", "")),
                                                        "body_text": clean_text(row["body_text"]) if row.get("body_text") is not None else read_json(self.body_path(row["id"]), {}).get("body_text")})
-            items.append({"id": row["id"], "conversation_id": row["conversation_id"], "from": {"name": clean_text(row["from"].get("name", "")), "address": clean_text(row["from"].get("address", ""))},
+            items.append({"id": row["id"], "conversation_id": row["conversation_id"], "folder_id": row["folder_id"], "from": {"name": clean_text(row["from"].get("name", "")), "address": clean_text(row["from"].get("address", ""))},
                           "to_count": row.get("to_count"), "subject": clean_text(row["subject"]), "received": row["received"],
                           "preview": clean_text(row.get("preview", ""))[:1000], "preview_truncated": bool(row.get("preview_truncated", False)),
                           "has_attachments": bool(row.get("has_attachments", False)), "unread": bool(row.get("unread", False)), "proposal": proposal,
@@ -175,7 +315,6 @@ class Mail:
         if coverage["status"] != "complete" and self.raw()["snapshot_rev"]:
             self.store.put("meta", "last_mail_attempt", coverage)
             return {"published": False, "coverage": coverage, "invalid_proposals": invalid}
-        folders = self.cache_folders(folders, value.get("folders_complete") is True)
         snapshot = {"snapshot_rev": digest(canonical([items, folders, now()]), "s_"), "synced_at": now(), "coverage": coverage,
                     "items": sorted(items, key=lambda r: dt.datetime.fromisoformat(r["received"]), reverse=True), "folders": folders,
                     "drafts": self.valid_drafts(value.get("drafts", []))}
@@ -251,6 +390,9 @@ class Mail:
                  "triage_rules": self.cfg["mail"].get("triage_rules"), "preferences": str(self.cfg.home / "local/owner-prefs.md")})
         if kind == "mail.sync":
             prompt += "\nRefresh the entire folder tree now, regardless of its cache TTL. Include every nested folder and its parent_id. folders_complete must be false if any folder page or child traversal fails."
+            history = self.history()
+            prompt += "\nHistory scan configuration: " + canonical({"checkpoints": history["folders"],
+                "full_rescan_hours": self.cfg["mail"].get("history_rescan_hours", 168), "scan_started_at": op["created_at"]})
         denied = self.cfg["mail"].get("probe_deny_tool", "get_me")
         if probe:
             prompt += ("\nAlso run a read-only capability probe. Enumerate the exact M365 tool names and parameter schemas you can discover. "
@@ -264,6 +406,48 @@ class Mail:
             job["deny_tools"] = [denied]
             self.store.put("jobs", op["operation_id"], job)
         return op
+
+    def queue_proposals(self, op, remaining_ids=None):
+        snapshot = self.raw()
+        candidates = [r for r in snapshot["items"] if not r.get("proposal") and (remaining_ids is None or r["id"] in remaining_ids)]
+        if not candidates:
+            return False
+        limit = max(1, int(self.cfg["mail"].get("proposals_per_sync", 100)))
+        rest = [r["id"] for r in candidates[limit:]]
+        candidates = candidates[:limit]
+        output = self.cfg.state / "mail/incoming" / (op["operation_id"] + "-proposals.json")
+        prompt = (ENGINE / "bin/panel_prompts/mail-triage.md").read_text() + "\nConfiguration:\n" + canonical({
+            "output": str(output), "triage_rules": self.cfg["mail"].get("triage_rules"), "folders": self.folders()["folders"],
+            "items": [{k: r.get(k) for k in ("id", "conversation_id", "from", "subject", "preview", "folder_id")} for r in candidates]})
+        self.launcher.next_step(op, {"account": "claude", "model": "sonnet", "provider": "claude", "cwd": str(self.cfg.home),
+            "profile": "read", "prompt": prompt, "output": str(output), "snapshot_rev": snapshot["snapshot_rev"],
+            "candidate_ids": [r["id"] for r in candidates], "remaining_ids": rest}, "propose")
+        return True
+
+    def apply_proposals(self, job, output):
+        snapshot = self.raw()
+        if snapshot["snapshot_rev"] != job["snapshot_rev"] or not isinstance(output.get("items"), list):
+            raise ValueError("stale proposals")
+        folders = {f["id"]: f for f in self.folders()["folders"]}
+        candidates, proposals = set(job["candidate_ids"]), {}
+        for row in output["items"]:
+            if row["id"] not in candidates or row["id"] in proposals:
+                raise ValueError("unexpected proposal")
+            proposals[row["id"]] = row.get("proposal")
+        if set(proposals) != candidates:
+            raise ValueError("missing proposals")
+        for row in snapshot["items"]:
+            if row["id"] in candidates and not row.get("proposal"):
+                value = proposals.get(row["id"])
+                if isinstance(value, dict):
+                    value = {**value, "source": "llm", "confidence": "medium" if value.get("confidence") == "high" else value.get("confidence")}
+                row["proposal"] = self.normalized_proposal(value, folders, row.get("folder_id"))
+        snapshot["snapshot_rev"] = digest(canonical([snapshot["items"], now()]), "s_")
+        atomic(self.snapshot_path, canonical(snapshot))
+
+    def proposal_counts(self):
+        counts = Counter((r.get("proposal") or {}).get("source", "none") for r in self.raw()["items"])
+        return {k: counts[k] for k in ("conversation", "sender", "domain", "rules", "llm", "none")}
 
     def plan(self, body):
         snapshot = self.raw()
@@ -563,6 +747,14 @@ class Mail:
             stage = op["steps"][-1]["name"]
             op["steps"][-1]["output"] = output
             if op["kind"] == "mail.sync":
+                if stage == "propose":
+                    if not self.transcript_ok(op, job, row):
+                        raise ValueError("invalid proposal transcript")
+                    self.apply_proposals(job, output)
+                    op["result"]["proposals"] = self.proposal_counts()
+                    if job.get("remaining_ids"):
+                        self.queue_proposals(op, set(job["remaining_ids"]))
+                    return
                 if not self.transcript_ok(op, job, row, require_remote=True):
                     raise ValueError("mail read not proven")
                 if isinstance(output.get("coverage"), dict):
@@ -572,6 +764,9 @@ class Mail:
                     op["status"] = "partial"
                 if job.get("probe"):
                     self.probe_evidence(op, job, row, output)
+                if op["result"]["published"] and op["result"]["coverage"]["status"] == "complete" and not job.get("probe") and "history" in output:
+                    op["result"]["proposals"] = self.proposal_counts()
+                    self.queue_proposals(op)
             elif op["kind"] == "mail.fetch":
                 if not self.transcript_ok(op, job, row, require_remote=True):
                     raise ValueError("mail fetch not proven")
