@@ -997,6 +997,8 @@ def retry(run_id, as_json):
 
 
 def dispatch(a):
+    if a.continue_run:  # cdx only knows full run ids; `crow runs` prints the 8-char prefix
+        a.continue_run = parent_run(a.continue_run).get("run_id") or a.continue_run
     if a.continue_run and parent_run(a.continue_run).get("isolated"):
         a.isolate = True  # cdx continues an isolated run only inside its sandbox, read-only for a review
     rows = crow_lib.cdx_rows() if a.isolate else []

@@ -183,6 +183,25 @@ def test_dispatch_hub_runs_in_the_hub(cr, monkeypatch, capsys):
     assert cmd[cmd.index("--label") + 1] == "hub/t"
 
 
+def test_dispatch_continue_run_passes_the_full_id(cr, monkeypatch, capsys):
+    """`crow runs` shows 8-char ids; cdx only continues a run by its full id."""
+    import argparse
+    import subprocess
+    full = "6e3838e9e7d3426b9b438ab5939099c3"
+    monkeypatch.setattr(cr, "REG", REG)
+    monkeypatch.setattr(cr, "ledger", lambda: [{"run_id": full, "account": "main", "permission": "auto"}])
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr.crow_lib, "provider_of", lambda acct, status=None: "claude")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0))
+    a = argparse.Namespace(project="hub", label="t", prompt="go on", prompt_file=None, kind="task", power=None,
+                           model=None, budget=None, context="day", dry_run=True, permission=None, force=False,
+                           logics=None, resumes=None, cwd=None, account=None, isolate=False, continue_run="6e3838e9",
+                           write_dir=None, mission=None, end_state=None, timeout_min=None, json=False)
+    cr.dispatch(a)
+    cmd = capsys.readouterr().out.split()
+    assert cmd[cmd.index("--continue-run") + 1] == full
+
+
 def _codex_log(path, *texts):
     lines = [{"type": "item.completed", "item": {"id": f"i{n}", "type": "agent_message", "text": t}}
              for n, t in enumerate(texts)]
