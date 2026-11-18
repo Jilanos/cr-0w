@@ -844,7 +844,7 @@ export function makeViews(ctx) {
     if (owa) bar.append(h('a', { class: 'btn', href: owa, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Ouvrir dans Outlook' })));
     if (d.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
 
-    const people = (list) => (list || []).map((p) => `${p.name} <${p.address}>`).join(', ');
+    const people = (list) => (list || []).map((p) => typeof p === 'string' ? p : p.name && p.address ? `${p.name} <${p.address}>` : p.name || p.address || '').filter(Boolean).join(', ');
     let body;
     if (d.body_status === 'not_fetched' || d.body_text == null) {
       body = h('div', { class: 'state state-empty body-missing' }, h('div', { class: 'state-title', text: 'Texte non chargé' }),
@@ -860,7 +860,7 @@ export function makeViews(ctx) {
         h('h2', { text: d.subject }),
         h('div', { class: 'mail-meta' },
           h('div', null, h('strong', { text: d.from.name }), h('span', { class: 'muted', text: ` <${d.from.address}>` })),
-          h('div', { class: 'muted small', text: `à ${people(d.to)}${d.cc && d.cc.length ? ` · cc ${people(d.cc)}` : ''}` }),
+          people(d.to) || people(d.cc) ? h('div', { class: 'muted small', text: [people(d.to) && `à ${people(d.to)}`, people(d.cc) && `cc ${people(d.cc)}`].filter(Boolean).join(' · ') }) : null,
           h('div', { class: 'muted small', text: new Date(d.received).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' }) }))),
       bar,
       d.proposal ? h('div', { class: 'callout' }, h('span', { class: 'callout-label', text: 'crow propose' }), proposalChip(d.proposal),
