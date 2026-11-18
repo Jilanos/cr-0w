@@ -155,11 +155,19 @@ export function makeViews(ctx) {
     if (!store.followups[it.id]) {
       const previous = [...(cached('operations')?.operations || [])].reverse().find(o => o.kind === 'mail.followup' && o.topic_id === it.topic_id);
       if (previous) {
-        const restored = store.followups[it.id] = { open: true, op: previous, log: [] };
+        // A finished relance from an earlier visit shows as one line; a live one opens its trace.
+        const live = ['queued', 'running', 'cancel_requested'].includes(previous.status);
+        const restored = store.followups[it.id] = { open: live, op: previous, log: [] };
         if (['queued', 'running', 'cancel_requested'].includes(previous.status)) ctx.trackOp(previous, final => { restored.op = final; ctx.renderDetail(); });
       }
     }
     const state = store.followups[it.id];
+    if (!state?.open && state?.op) {
+      const op = state.op;
+      return h('p', { class: 'muted small followup-last' },
+        h('span', { text: [`Dernière relance préparée ${fmtDate(op.updated_at || op.created_at)}`, RUN_STATE[op.status] || op.status, op.dry_run ? 'mode essai' : null].filter(Boolean).join(' · ') }),
+        h('button', { type: 'button', class: 'link-btn', text: 'Voir le détail', onclick: () => { state.open = true; ctx.renderDetail(); } }));
+    }
     if (!state?.open) return null;
     if (state.op) return replyOp(it, state);
     const instructions = h('textarea', { class: 'input', rows: 3, 'aria-label': 'Consigne de relance',

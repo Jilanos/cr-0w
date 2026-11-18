@@ -215,6 +215,7 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
 .list-note { padding-left: 2px; }
 .toggle { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
 .toggle input { margin: 0; accent-color: var(--accent); }
+.followup-last { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
 .segmented { display: flex; gap: 2px; padding: 2px; background: var(--chip); border-radius: 8px; }
 .seg {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 28px; border: 0; background: transparent;
