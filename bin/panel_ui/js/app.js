@@ -31,6 +31,7 @@ const store = {
   triage: { checked: new Map(), plan: null, op: null, busy: false },
   reply: {},              // mail id -> {open, instructions, model, op, log[]}
   chatTopic: null,
+  sinceVisit: undefined,
   showDetail: false,
 };
 
@@ -579,6 +580,9 @@ async function boot() {
     return;
   }
   await Promise.all([load('state'), load('config'), load('routines', null, { quiet: true }), load('pending', null, { quiet: true })]);
+  store.sinceVisit = cached('state')?.since_last_visit;
+  try { await api.post('/api/state/visit', {}); }
+  catch (err) { toastError(err, 'Enregistrement de la visite'); }
   await setView(store.view, store.sel[store.view]);
   store.showDetail = false;
   layoutNarrow();

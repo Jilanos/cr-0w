@@ -195,6 +195,15 @@ const VIEWS = ['today', 'mail', 'pending', 'decisions', 'drafts', 'dossiers', 'j
 const SCENARIOS = [];
 const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });
 
+add('flow-since-visit', DESK, async (page, base) => {
+  await open(page, base, { scenario: 'visit' });
+  await expect(page, '.card', 'Depuis ta dernière visite');
+  await expect(page, '.card', 'Nouveau sujet');
+  await page.shot('since-visit');
+  await page.click('.card-row', 'Nouveau sujet');
+  await expect(page, '.view-title', 'Mails');
+});
+
 // Every view, light and dark, desktop.
 for (const dark of [false, true]) {
   for (const v of VIEWS) {

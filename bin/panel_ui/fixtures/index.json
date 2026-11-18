@@ -85,6 +85,9 @@
     },
     "idempotency": {
       "POST /api/pending/{id}/done": "error-idempotency.json"
+    },
+    "visit": {
+      "GET /api/state": "state-visit.json"
     }
   }
 }

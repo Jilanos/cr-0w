@@ -51,6 +51,7 @@ fixture. Supply one when retrying it.
 | Routes | Methods |
 | --- | --- |
 | `/api/session`, `/api/config`, `/api/state`, `/api/capabilities` | GET |
+| `/api/state/visit` | POST |
 | `/api/pending` | GET |
 | `/api/pending/{id}/done`, `/api/pending/{id}/snooze` | POST |
 | `/api/operations`, `/api/operations/{id}` | GET |
@@ -132,3 +133,16 @@ Private dossier paths can be configured in `dossiers.<slug>.path` with an option
 A maintenance script that outlives the server keeps admissions suspended after
 restart while its recorded process identity still exists. Its exit status is
 unknown if the original parent process was lost.
+
+## Visit checkpoint
+
+State returns `since_last_visit: null` before the first visit. Later it returns
+`visited_at`, `total`, `items` and `truncated`. Items carry `change`, `text` and
+`ref`. At most 100 changes are returned. Pending additions, revisions and removals,
+new snapshot mail and completed panel operations are compared with the last
+checkpoint. A missing mail never proves an action succeeded.
+
+`POST /api/state/visit` accepts `request_id` and saves the current checkpoint in
+SQLite. It returns a completed `state.visit` operation. Reads never move this
+checkpoint. The browser reads the delta before posting the new visit and retains
+that delta during the open page's lifetime. Reloading starts the next visit.

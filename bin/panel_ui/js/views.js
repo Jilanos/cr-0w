@@ -236,6 +236,12 @@ export function makeViews(ctx) {
       const cardList = (rows, empty) => rows.length ? h('ul', { class: 'card-list' }, rows) : h('p', { class: 'muted card-empty', text: empty });
       const cardRow = (onclick, ...kids) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick }, ...kids));
 
+      const visit = store.sinceVisit === undefined ? st?.since_last_visit : store.sinceVisit;
+      if (visit) grid.append(card('Depuis ta dernière visite', h('span', { class: 'muted', text: ago(visit.visited_at) }),
+        cardList(visit.items.map((it) => cardRow(() => openRef(it.ref),
+          chip({ added: 'Nouveau', changed: 'Modifié', removed: 'Retiré' }[it.change] || it.change),
+          h('span', { class: 'grow', text: it.text }))), 'Aucun changement depuis ta dernière visite.')));
+
       // En retard
       const overdue = allPending().filter((it) => it.overdue_workdays > 0).sort((a, b) => b.overdue_workdays - a.overdue_workdays);
       grid.append(card('En retard', linkBtn('Tout voir', () => ctx.go('pending')),

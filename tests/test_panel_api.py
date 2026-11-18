@@ -100,6 +100,26 @@ def test_idempotence_and_mismatch(panel):
     assert len(list((app.cfg.state / "backups").glob("*"))) == 1
 
 
+def test_visit_checkpoint_is_explicit_durable_and_idempotent(panel):
+    app, fake = panel
+    assert app.readers.state()["since_last_visit"] is None
+    body = {"request_id": "visit"}
+    response = post(app, "/api/state/visit", body)
+    baseline = app.store.get("meta", "visit")
+    assert post(app, "/api/state/visit", body) == response
+    assert app.readers.state()["since_last_visit"]["items"] == []
+    item = pending_item(app)
+    post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "visited-done", "item_rev": item["item_rev"]})
+    app.mail.publish(snapshot())
+    changes = app.readers.state()["since_last_visit"]
+    assert any(i["change"] == "removed" and i["text"] == item["title"] for i in changes["items"])
+    assert any(i["ref"]["kind"] == "mail" for i in changes["items"])
+    assert app.store.get("meta", "visit") == baseline
+    restarted = App(app.cfg, fake)
+    assert restarted.readers.state()["since_last_visit"] == changes
+    restarted.store.db.close()
+
+
 def test_lock_blocks_display_and_mutation(panel):
     app, _ = panel
     item = pending_item(app)

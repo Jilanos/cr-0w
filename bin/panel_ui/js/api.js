@@ -165,6 +165,7 @@ const fake = {
   async request(method, rawPath, body) {
     await new Promise((r) => setTimeout(r, 60));
     const [path, qs] = rawPath.split('?');
+    if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
     const m = this.match(method, path);
     if (!m && method === 'PUT' && /^\/api\/topics\/[^/]+$/.test(path)) return this.putTopic(path.split('/')[3], body);
     if (!m) throw new ApiError(404, { error: { code: 'not_found', message: `Route absente des fixtures : ${method} ${path}` } });

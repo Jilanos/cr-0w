@@ -214,4 +214,4 @@ class Readers:
         return {"generated_at": now(), "mode": self.cfg["mode"], "counts": counts, "alerts": alerts,
                 "locks": {"pending": pending["lock"], "maj": self.launcher.maj(), "maintenance": {"holder": "daily_update", "since": None, "run_id": None} if self.launcher.maintenance() else None},
                 "admissions": {"open": bool(admission), "reason": None if admission else "Maintenance ou état cdx indisponible."},
-                "mail": {"synced_at": mail["synced_at"], "stale": mail["stale"], "coverage": mail["coverage"]["status"]}, "since_last_visit": None}
+                "mail": {"synced_at": mail["synced_at"], "stale": mail["stale"], "coverage": mail["coverage"]["status"]}, "since_last_visit": self.app.visits.changes()}

@@ -20,6 +20,7 @@ from .mail import Mail
 from .pending import Pending
 from .readers import Readers
 from .security import CSP, Files
+from .visits import Visits
 
 
 class App:
@@ -33,6 +34,7 @@ class App:
         self.mail = Mail(cfg, self.store, self.launcher)
         self.launcher.complete = self.mail.complete
         self.readers = Readers(self)
+        self.visits = Visits(self)
         self.pending.recover()
         for op in self.store.all("operations"):
             if op["status"] in ACTIVE and not op["kind"].startswith("pending.") and not self.store.get("jobs", op["operation_id"]):
@@ -127,6 +129,8 @@ class App:
             return 200, topic
         if method != "POST":
             raise Problem(404, "not_found", "Route introuvable.")
+        if path == "/api/state/visit":
+            return 200, self.visits.visit(body)
         match = re.fullmatch(r'/api/pending/([^/]+)/(done|snooze)', path)
         if match:
             return 200, self.pending.mutate(match[1], match[2], body, route)
