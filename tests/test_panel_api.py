@@ -871,3 +871,46 @@ def test_mail_chat_context_uses_the_latest_message_independent_of_snapshot_order
         app.mail.publish(value)
         context = app.store.get("contexts", app.mail.find("newest")["topic_id"])
         assert context["message_id"] == "newest" and context["body_text"] == "Latest body"
+
+
+def test_file_open_metacharacters_are_passed_as_literal_arguments(panel, tmp_path, monkeypatch):
+    import subprocess
+    import crow_panel.server as module
+    app, _ = panel
+    app.cfg["mode"] = "live"
+    document = tmp_path / "report; $(touch marker).md"
+    document.write_text("Document")
+    file_id = app.files.register(document)
+    calls = []
+
+    def convert(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, stdout="C:\\Docs\\report; $(touch marker).md\n")
+
+    def launch(argv, **kwargs):
+        calls.append((argv, kwargs))
+
+    monkeypatch.setattr(module.subprocess, "run", convert)
+    monkeypatch.setattr(module.subprocess, "Popen", launch)
+    status, result = post(app, "/api/files/" + file_id + "/open", {"request_id": "literal-file"})
+    assert status == 200 and result["opened"]
+    assert calls[0][0] == ["wslpath", "-w", str(document)]
+    assert calls[1][0] == ["explorer.exe", "C:\\Docs\\report; $(touch marker).md"]
+    assert all(not kwargs.get("shell") for _, kwargs in calls)
+    assert not (tmp_path / "marker").exists()
+
+
+def test_duplicate_host_header_is_rejected_before_file_or_run_access(http_panel):
+    app, server = http_panel
+    conn = http.client.HTTPConnection(*server.server_address, timeout=5)
+    try:
+        conn.putrequest("GET", "/api/session", skip_host=True)
+        conn.putheader("Host", "127.0.0.1:" + str(app.port))
+        conn.putheader("Host", "attacker.example")
+        conn.putheader("Cookie", "crow_session=" + app.session)
+        conn.endheaders()
+        response = conn.getresponse()
+        assert response.status == 403
+        assert json.loads(response.read())["error"]["details"]["reason"] == "host"
+    finally:
+        conn.close()
