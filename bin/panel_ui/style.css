@@ -395,6 +395,7 @@ body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
 .dashboard { padding: 32px 40px 64px; display: flex; flex-direction: column; gap: 24px; max-width: 1400px; }
 .dash-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
 .dash-date { font-size: 24px; letter-spacing: -0.01em; margin-bottom: 4px; }
+.dash-sub { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
 .alerts { display: flex; flex-direction: column; gap: 6px; }
 .alert {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; border: 1px solid var(--line);

@@ -269,7 +269,7 @@ class Readers:
         afk = self.afk()
         counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items) + sum(dt.date.today().isoformat() <= i["date"] < limit for i in calendar), "decisions": len(decisions),
                   "inbox": len(self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None, "inbox_unread": sum(i["unread"] for i in self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None,
-                  "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": len(draft_rows), "drafts_unverified": sum(i["state"] == "missing" for i in synced_drafts),
+                  "triage_proposals": sum((i["proposal"] or {}).get("action") in ("move", "archive", "trash") for i in self.app.mail.raw()["items"]), "drafts": len(draft_rows), "drafts_unverified": sum(i["state"] == "missing" for i in synced_drafts),
                   "runs_active": active, "runs_queued": queued, "afk_decisions": sum(not d["answered"] for d in afk["decisions"])}
         alerts = [{"level": "error", "text": "Relance dépassée : " + i["title"], "ref": {"kind": "pending", "id": i["id"]}} for i in overdue]
         if self.cfg.dry:

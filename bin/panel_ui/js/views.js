@@ -253,9 +253,14 @@ export function makeViews(ctx) {
       const mailInfo = st && st.mail;
       wrap.append(h('header', { class: 'dash-head' },
         h('div', null, h('h2', { class: 'dash-date', text: dateStr.charAt(0).toUpperCase() + dateStr.slice(1) }),
-          mailInfo ? h('p', { class: ['muted', mailInfo.stale && 'warn-text'], text: `Boîte synchronisée ${ago(mailInfo.synced_at)} · couverture ${mailInfo.coverage === 'complete' ? 'complète' : mailInfo.coverage === 'partial' ? 'partielle' : 'aucune'}${mailInfo.stale ? ' · instantané ancien' : ''}` }) : null)));
+          mailInfo ? h('p', { class: ['muted', 'dash-sub', mailInfo.stale && 'warn-text'] },
+            h('span', { text: mailInfo.synced_at ? `Boîte synchronisée ${ago(mailInfo.synced_at)} · couverture ${mailInfo.coverage === 'complete' ? 'complète' : mailInfo.coverage === 'partial' ? 'partielle' : 'aucune'}${mailInfo.stale ? ' · à actualiser' : ''}` : 'Boîte jamais synchronisée' }),
+            mailInfo.stale ? h('button', { type: 'button', class: 'link-btn', text: 'Synchroniser', onclick: syncMail }) : null) : null)));
 
-      const alerts = (st && st.alerts) || [];
+      // Overdue rows have their own card, the trial badge sits in the header and mail freshness in the line above.
+      const covered = (a) => (a.ref && a.ref.kind === 'pending' && (findPending(a.ref.id)?.overdue_workdays > 0))
+        || (a.ref && a.ref.kind === 'view' && (a.ref.id === 'settings' || a.ref.id === 'mail'));
+      const alerts = ((st && st.alerts) || []).filter((a) => !covered(a));
       if (alerts.length) {
         wrap.append(h('ul', { class: 'alerts' }, alerts.map((a) => h('li', null, h('button', {
           type: 'button', class: ['alert', 'alert-' + a.level], onclick: () => openRef(a.ref),
@@ -269,7 +274,7 @@ export function makeViews(ctx) {
         kpi('En retard', c.overdue, 'pending', { alert: true }),
         kpi('Échéances 7 j', c.due_week, 'pending', { onclick: () => { store.pendingTab = 'dues'; ctx.go('pending'); } }),
         kpi('Brouillons à envoyer', c.drafts, 'drafts'),
-        kpi('Propositions de tri', c.triage_proposals, 'mail', { onclick: () => { store.mailMode = 'triage'; ctx.go('mail'); } }),
+        kpi('Mails à ranger', c.triage_proposals, 'mail', { onclick: () => { store.mailMode = 'triage'; ctx.go('mail'); } }),
         kpi('Mails', c.inbox, 'mail', { sub: c.inbox_unread ? `${c.inbox_unread} non lus` : null, onclick: () => { store.mailMode = 'inbox'; ctx.go('mail'); } }),
         kpi('Runs actifs', c.runs_active, 'jobs', { sub: c.runs_queued ? `${c.runs_queued} en file` : null }),
         kpi('Décisions', (c.decisions || 0) + (c.afk_decisions || 0), 'decisions', { sub: c.afk_decisions ? `dont ${c.afk_decisions} AFK` : null })));
@@ -313,10 +318,10 @@ export function makeViews(ctx) {
       // Propositions de tri
       const mail = cached('mail');
       const props = ((mail && mail.items) || []).filter((m) => m.proposal && ['move', 'archive', 'trash'].includes(m.proposal.action));
-      grid.append(card('Propositions de tri', linkBtn('Trier', () => { store.mailMode = 'triage'; ctx.go('mail'); }),
+      grid.append(card('Mails à ranger', linkBtn('Trier', () => { store.mailMode = 'triage'; ctx.go('mail'); }),
         cardList(props.slice(0, 5).map((m) => cardRow(() => { store.mailMode = 'triage'; ctx.go('mail', m.id); },
           h('span', { class: 'grow' }, h('span', { class: 'strong', text: m.from.name }), h('span', { class: 'muted', text: ' · ' + m.subject })),
-          proposalChip(m.proposal))), 'Aucune proposition.')));
+          proposalChip(m.proposal))), 'Rien à ranger.')));
 
       // Runs
       const runs = cached('runs');
@@ -882,7 +887,7 @@ export function makeViews(ctx) {
     status: () => status(['mail']),
     listHead() {
       const list = cached('mail');
-      const props = mailItems().filter((m) => m.proposal).length;
+      const props = mailItems().filter((m) => m.proposal && actionable(m.proposal)).length;
       store.mailMode = store.mailMode === 'triage' ? 'triage' : 'inbox';
       return h('div', { class: 'list-head' },
         segmented([{ label: 'Boîte', value: 'inbox', count: list ? mailItems().length : null }, { label: 'Propositions', value: 'triage', count: list ? props : null }],
