@@ -520,3 +520,50 @@ def test_public_chat_models_match_account_policy(panel):
             selected = app.launcher.select(topic, {"account": account["name"], "model": model})
             assert selected[:2] == (account["name"], model)
     assert "pending_md" not in config and "real_home" not in config
+
+
+@pytest.mark.parametrize('violation', ['extra_id', 'wrong_folder', 'categories', 'conversation', 'unknown_tool', 'missing_hook'])
+def test_triage_transcript_violation_is_partial_and_alerted(panel, tmp_path, violation):
+    from crow_panel.security import write_policy
+    app, fake = panel
+    op = app.store.operation('mail.triage.execute', {'request_id': violation}, 'Confirmed batch')
+    item = {'message_id': 'one', 'folder_id': 'target', 'source_folder_id': 'inbox', 'action': 'move'}
+    job = app.mail.triage_job(op, {'items': [item]})
+    op.update(status='succeeded', steps=[{'name': 'execute'}])
+    write_policy(app.cfg, op['operation_id'], 'triage', Path(job['output']), job['manifest'])
+    name, arguments = 'mcp__M365__outlook_modify_labels', {'messageId': 'one', 'moveToFolderId': 'target'}
+    if violation == 'extra_id':
+        arguments['messageId'] = 'outside'
+    elif violation == 'wrong_folder':
+        arguments['moveToFolderId'] = 'other'
+    elif violation == 'categories':
+        arguments['categories'] = ['unconfirmed']
+    elif violation == 'conversation':
+        name = 'mcp__M365__outlook_modify_thread_labels'
+    elif violation == 'unknown_tool':
+        name = 'mcp__M365__unexpected_writer'
+    else:
+        (app.cfg.state / 'ops' / op['operation_id'] / 'policy.json').unlink()
+    transcript = tmp_path / 'triage-transcript.jsonl'
+    transcript.write_text(json.dumps({'message': {'content': [{'type': 'tool_use', 'name': name, 'input': arguments}]}}) + '\n')
+    Path(job['output']).write_text(json.dumps({'items': [{'message_id': 'one', 'status': 'succeeded', 'folder_id': 'target'}], 'evidence': ['claimed result']}))
+    app.mail.complete(op, job, {'stdout_path': str(transcript)}, '')
+    assert op['status'] == 'partial'
+    assert op['error']['code'] == 'manifest_violation'
+    assert not op['undo']['available']
+    assert not any(c[1] == 'run' for c in fake.calls)
+
+
+def test_lost_triage_result_stays_unknown_without_retry(panel):
+    app, fake = panel
+    op = app.store.operation('mail.triage.execute', {'request_id': 'lost-triage'}, 'Confirmed batch')
+    item = {'message_id': 'one', 'folder_id': 'target', 'source_folder_id': 'inbox', 'action': 'move'}
+    job = app.mail.triage_job(op, {'items': [item]})
+    op.update(status='succeeded', steps=[{'name': 'execute'}])
+    app.mail.complete(op, job, {}, '')
+    app.store.save_op(op)
+    app.launcher.tick()
+    assert app.operation(op['operation_id'])['status'] == 'unknown'
+    assert op['error']['code'] == 'result_missing'
+    assert not op['undo']['available']
+    assert not any(c[1] == 'run' for c in fake.calls)
