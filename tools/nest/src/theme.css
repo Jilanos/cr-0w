@@ -446,11 +446,12 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .home { grid-template-areas: 'a' 'b' 'c'; }
 @media (max-width: 599.98px) {
   .only-inner { display: none !important; }
-  /* Header A on cover: logo, scope chip, two status chips, clock and theme fit 360px. */
+  /* Header A on cover with the butler badge (item_176): badge, logo, scope chip and the two
+     status chips. The clock and the theme button stay on Fold and laptop (owner, 2026-11-18). */
   .top { gap: 6px; padding: 0 8px 0 12px; }
   .top .logo { margin-right: 2px; }
   .top .chip { padding: 2px 7px; }
-  .top .icon-btn { min-width: 34px; }
+  .top > .clock, .top > .icon-btn { display: none; }
 }
 
 @media (min-width: 600px) {
@@ -1168,6 +1169,9 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
     background: var(--hdr); border-left: 1px solid var(--line);
   }
   .b-rail.folded { width: 56px; }
+}
+/* Rail parts, shared with the phone and Fold chat sheet. */
+@media all {
   .rl-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; position: relative; z-index: 1; }
   .rl-mood { display: inline-flex; align-items: center; gap: 8px; font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; }
   .rl-mood.m-fail { color: var(--c-f); }
@@ -1229,6 +1233,42 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   [data-theme='cyber'] .rl-line b { color: var(--c-w); }
   [data-theme='cyber'] .rl-who .dot { border-radius: 0; }
 }
+
+/* Phone and Fold butler (item_176, boards phone-badge-sheet and its cyber twin): header badge
+   before the wordmark, chat sheet. The head shows the face cropped in a frame tinted by mood. */
+.b-badge { position: relative; flex: none; width: 34px; height: 34px; padding: 0; margin-right: 2px; background: none; border: 0; cursor: pointer; }
+.bb-frame, .bs-head {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  border: 1.5px solid var(--mood, var(--line)); border-radius: 7px; background: var(--well);
+}
+.bb-frame { width: 100%; height: 100%; }
+.m-fail { --mood: var(--c-f); } .m-ask { --mood: var(--c-n); } .m-run { --mood: var(--c-w); } .m-idle { --mood: var(--sub); }
+.bb-frame .dia, .bs-head .dia, .b-sheet .rl-mood .dia { width: 9px; height: 9px; border-radius: 50%; background: var(--mood); flex: none; }
+.bb-frame:has(.rail-head.on) .dia, .bs-head:has(.rail-head.on) .dia { display: none; }
+.bb-frame .rail-head, .bs-head .rail-head { position: absolute; left: 50%; margin: 0; border: 0; transform: translateX(-50%); }
+.bb-frame .rail-head { width: 64px; top: -9px; }
+.bs-head .rail-head { width: 116px; top: -16px; }
+.bb-dot { position: absolute; top: -4px; right: -4px; width: 11px; height: 11px; border-radius: 50%; background: var(--mood); box-shadow: 0 0 0 2px var(--panel-solid); }
+.b-sheet { height: 70dvh; max-height: 70dvh; padding: 8px 0 0; gap: 0; overflow: hidden; }
+.b-sheet:focus { outline: none; }
+.bs-top { display: flex; gap: 12px; align-items: center; padding: 6px 14px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.bs-head { width: 66px; height: 58px; flex: none; }
+.bs-say { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.b-sheet .rl-line { padding: 0; font-size: 13px; }
+.b-sheet .rl-log { padding: 6px 14px 12px; gap: 8px; }
+.b-sheet .rl-msg { max-width: 88%; }
+.b-sheet .rl-msg p { font-size: 13px; }
+.b-sheet .rl-foot { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); }
+.b-sheet .rl-in textarea { font-size: 14px; }
+.rl-close { width: 28px; height: 22px; padding: 0; background: none; border: 0; cursor: pointer; display: grid; place-items: center; }
+.rl-close i { width: 16px; height: 2px; background: var(--sub); }
+@media (min-width: 600px) {
+  .b-sheet { height: auto; max-height: none; padding-top: 14px; }
+}
+[data-theme='cyber'] .bb-frame, [data-theme='cyber'] .bs-head { border-radius: 0; box-shadow: 0 0 10px -3px var(--mood); }
+[data-theme='cyber'] .bb-dot { border-radius: 50%; }
+[data-theme='cyber'] .b-sheet { border-radius: 0; border-top-color: var(--c-w); }
+[data-theme='cyber'] .b-sheet .rl-mood .dia, [data-theme='cyber'] .bb-frame .dia, [data-theme='cyber'] .bs-head .dia { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
 
 /* Home with the butler rail (item_176): one column and the hero; the rail is the right column. */
 .home-lp { grid-template-columns: 320px 1fr; }

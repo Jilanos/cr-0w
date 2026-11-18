@@ -145,6 +145,9 @@ try {
         const file = `${out}/${name}-${size}-${theme}.png`
         await page.screenshot({ path: file })
         console.log(file)
+        // No sideways scroll: the header and the screen fit the board width.
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+        if (over > 0) { console.log(`FAIL ${name}-${size}-${theme} ${over}px wider than the screen`); failed.push(`${name}-${size}-${theme} width`) }
         // Butler chat log opens on its last message (rail on laptop, sheet on phone).
         const gap = await page.evaluate(() => {
           const el = [...document.querySelectorAll('.rl-log')].find((e) => e.clientHeight > 0)
@@ -154,6 +157,24 @@ try {
           const pass = gap <= 2
           console.log(`${pass ? 'PASS' : 'FAIL'} ${name}-${size}-${theme} chat log at the bottom (gap ${Math.round(gap)}px)`)
           if (!pass) failed.push(`${name}-${size}-${theme} chat log`)
+        }
+        // Phone and Fold: the header badge opens the chat sheet (item_176). Shot, checks, Escape.
+        if (name === 'home' && size !== 'laptop' && (await page.locator('.b-badge').count())) {
+          const tag = `chat-${size}-${theme}`
+          const check = (n, pass) => { console.log(`${pass ? 'PASS' : 'FAIL'} ${tag} ${n}`); if (!pass) failed.push(`${tag} ${n}`) }
+          await page.locator('.b-badge').click()
+          await page.waitForTimeout(fixtures ? 600 : 100)
+          check('sheet opens', (await page.locator('.b-sheet').count()) === 1)
+          const g = await page.evaluate(() => { const el = document.querySelector('.b-sheet .rl-log'); return el ? el.scrollHeight - el.clientHeight - el.scrollTop : 0 })
+          check(`log at the bottom (gap ${Math.round(g)}px)`, g <= 2)
+          for (const [s, ratio] of await contrast(page, ['.b-sheet .rl-mood', '.b-sheet .rl-line', '.b-sheet .rl-msg.cr p', '.b-sheet .rl-msg.you p', '.b-sheet .rl-who', '.b-sheet .rl-chip'])) {
+            check(`contrast ${s} ${ratio.toFixed(1)}:1`, ratio >= 4.5)
+          }
+          const file = `${out}/${tag}.png`
+          await page.screenshot({ path: file })
+          console.log(file)
+          await page.keyboard.press('Escape')
+          check('Escape closes', (await page.locator('.b-sheet').count()) === 0)
         }
       }
       await ctx.close()

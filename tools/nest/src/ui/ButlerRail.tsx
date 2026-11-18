@@ -95,7 +95,7 @@ export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapsh
 }
 
 // The conversation and its input (the rail body).
-export function ButlerChat({ snap, fold }: { snap: Snapshot; fold?: () => void }) {
+export function ButlerChat({ snap, fold, close }: { snap: Snapshot; fold?: () => void; close?: () => void }) {
   const b = useButler()
   const [text, setText] = useState('')
   const [acct, setAcct] = useState<string | null>(null)
@@ -143,6 +143,7 @@ export function ButlerChat({ snap, fold }: { snap: Snapshot; fold?: () => void }
             </select>
           </label>
           {fold && <button type="button" className="bare sm" onClick={fold}>Ctrl B fold</button>}
+          {close && <button type="button" className="rl-close" onClick={close} aria-label="Close the chat" title="Close"><i aria-hidden="true" /></button>}
         </div>
         <div className="rl-in">
           <textarea value={text} rows={rowsOf(text, 4)} placeholder="Talk to CR-0W, or /dispatch…" aria-label="Message CR-0W"
