@@ -50,8 +50,9 @@ export function RailHead({ mood, working, asks }: { mood: Mood; working: boolean
       lay = k
       const L = gl.layout({ cw, ch: (cw * 7) / 4, font: cw * FONT_PER_CW, dpr })
       c.style.width = `${L.w}px`; c.style.height = `${L.h}px`
-      c.style.left = `${-L.ox}px`; c.style.top = `${-L.oy}px`
-      el.style.height = `${L.h - 2 * L.oy}px`
+      // Full height with the bake margins: the fin and the waving hands reach into them.
+      c.style.left = `${-L.ox}px`; c.style.top = '0px'
+      el.style.height = `${L.h}px`
     }
     const frame = (t: number) => {
       if (!gl || gl.lost()) return false

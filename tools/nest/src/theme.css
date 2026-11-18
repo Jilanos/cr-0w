@@ -1180,7 +1180,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   .b-rail .dia.m-run { color: var(--c-w); }
   .b-rail .dia.m-idle { color: var(--sub); }
   .rl-kbd { font: 600 10px var(--font-body); color: var(--sub); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; cursor: pointer; }
-  .rail-head { position: relative; flex: none; margin-top: -24px; border-bottom: 1px solid var(--line); }
+  .rail-head { position: relative; flex: none; margin-top: 4px; border-bottom: 1px solid var(--line); }
   .rail-head:not(.on) { display: none; }
   .rail-head canvas { position: absolute; pointer-events: none; }
   .rl-line { margin: 0; padding: 12px 14px 8px; font: 13px / 1.5 var(--font-body); color: var(--fg); }
