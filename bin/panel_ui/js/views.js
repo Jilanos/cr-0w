@@ -9,6 +9,7 @@ import {
 
 const PRIO = { red: 'Urgent', yellow: 'Normal', green: 'Bas', blue: 'Info' };
 const ACTION_LABEL = { reply: 'Répondre', keep: 'Garder', move: 'Ranger', archive: 'Archiver', trash: 'Corbeille' };
+const KIND_LABEL = { chat: 'chat', mail_read: 'lecture mail', mail_skeleton: 'squelette de brouillon', mail_triage: 'tri mail', mail_style: 'mise en forme', files: 'fichiers' };
 const RUN_STATE = { running: 'en cours', succeeded: 'terminé', failed: 'échec', queued: 'en file', partial: 'partiel',
   unknown: 'inconnu', cancelled: 'retiré', cancel_requested: 'retrait demandé' };
 const CAP_STATE = { available: 'disponible', limited: 'limité', unavailable: 'indisponible' };
@@ -1279,8 +1280,8 @@ export function makeViews(ctx) {
         gauge('Semaine', a.remaining_week_pct, a.floor_week_pct, a.reset_week_at ? `reset ${fmtDay(a.reset_week_at)} · plancher ${a.floor_week_pct} %` : 'reset inconnu')),
       h('dl', { class: 'fields' },
         h('dt', { text: 'Crédits de reset' }), h('dd', { text: a.reset_credits == null ? 'inconnu' : String(a.reset_credits) }),
-        h('dt', { text: 'Usages' }), h('dd', null, (a.kinds || []).map((k) => chip(k, 'quiet'))),
-        h('dt', { text: 'Quota' }), h('dd', { text: a.quota_status === 'known' ? 'connu' : 'inconnu' })),
+        h('dt', { text: 'Usages' }), h('dd', null, (a.kinds || []).map((k) => chip(KIND_LABEL[k] || k, 'quiet'))),
+        a.quota_status === 'known' ? null : [h('dt', { text: 'Quota' }), h('dd', { text: 'illisible pour le moment' })]),
       h('p', { class: 'muted small', text: 'Aucun crédit de reset n\'est consommé par le panneau.' }));
   }
 
