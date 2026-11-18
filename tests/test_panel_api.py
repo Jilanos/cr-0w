@@ -766,3 +766,16 @@ def test_pending_undo_cannot_follow_a_changed_target(panel, tmp_path):
         assert other.read_bytes() == data
     finally:
         restarted.store.db.close()
+
+
+def test_unavailable_maj_status_blocks_pending_writes(panel):
+    app, fake = panel
+    item = pending_item(app)
+    fake.unavailable = True
+    app.launcher.cache.clear()
+    before = app.pending.read_bytes()
+    with pytest.raises(Problem) as err:
+        post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "unknown-maj", "item_rev": item["item_rev"]})
+    assert err.value.status == 423
+    assert not app.pending.view()["writable"]
+    assert app.pending.read_bytes() == before

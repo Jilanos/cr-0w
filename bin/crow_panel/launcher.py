@@ -73,7 +73,10 @@ class Launcher:
         if own:
             return {"holder": "maj", "since": own["created_at"], "run_id": next((s["run_id"] for s in own["steps"] if s["run_id"]), None)}
         try:
-            for row in self.running():
+            rows = self.running()
+            if self.cache.get("running_error"):
+                return {"holder": "upstream_unavailable", "since": None, "run_id": None}
+            for row in rows:
                 prompt = row.get("prompt", "")
                 prompt_file = row.get("prompt_file") or (row.get("launch") or {}).get("prompt_file")
                 if not prompt and prompt_file:
@@ -85,7 +88,7 @@ class Launcher:
                 if prompt.startswith("/maj") or row.get("label") == "panel:routine.maj":
                     return {"holder": "maj", "since": row.get("started_at"), "run_id": row["run_id"]}
         except Problem:
-            pass
+            return {"holder": "upstream_unavailable", "since": None, "run_id": None}
         return None
 
     def maintenance(self):
