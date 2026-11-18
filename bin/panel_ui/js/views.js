@@ -129,6 +129,8 @@ export function makeViews(ctx) {
     if (it.kind === 'table_row') {
       for (const col of it.columns || Object.keys(it.cells)) {
         if (col === 'Prio') continue;
+        // The title column repeats the heading; keep it only when it carries more (a link, extra text).
+        if (segText(it.cells[col]).trim() === it.title.trim() && !(it.cells[col] || []).some((x) => x && x.t === 'link')) continue;
         fields.append(h('dt', { text: col }), h('dd', null, segments(it.cells[col])));
       }
     } else fields.append(h('dt', { text: 'Texte' }), h('dd', null, segments(it.cells.text)));
