@@ -52,7 +52,9 @@ class App:
         return {"generated_at": now(), "mode": self.cfg["mode"], "chat": {
             "default_model": self.cfg["chat"].get("default_model", "sonnet"), "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]),
             "default_account": self.cfg["chat"].get("default_account", "claude"), "accounts": [
-                {"name": name, "provider": c.get("provider", "claude" if name == "claude" else "codex"), "kinds": c.get("kinds", [])} for name, c in self.cfg["accounts"].items()]},
+                {"name": name, "provider": c.get("provider", "claude" if name == "claude" else "codex"), "kinds": c.get("kinds", []),
+                 "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]) if c.get("provider", "claude" if name == "claude" else "codex") == "claude"
+                 else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
             "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Mise à jour"}, {"name": "daily_update", "label": "Mise à jour machine"}],
             "views": ["today", "mail", "pending", "decisions", "drafts", "dossiers", "jobs", "accounts"],
             "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter", "x": "toggle_select", "?": "help", "Escape": "close"}}

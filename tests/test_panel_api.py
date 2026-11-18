@@ -509,3 +509,14 @@ def test_repeated_pending_reads_do_not_rewrite_durable_state(panel):
     topic["default_model"] = "haiku"
     app.store.put("topics", topic["topic_id"], topic)
     assert app.topic(topic["topic_id"])["default_model"] == "haiku"
+
+
+def test_public_chat_models_match_account_policy(panel):
+    app, _ = panel
+    config = app.public_config()
+    topic = app.topic(app.launcher.topic("project", "models-contract", "Model selection"))
+    for account in config["chat"]["accounts"]:
+        for model in account["models"]:
+            selected = app.launcher.select(topic, {"account": account["name"], "model": model})
+            assert selected[:2] == (account["name"], model)
+    assert "pending_md" not in config and "real_home" not in config
