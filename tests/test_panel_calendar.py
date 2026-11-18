@@ -161,11 +161,14 @@ def test_mail_sync_also_collects_and_publishes_the_calendar(panel, tmp_path):
     assert len(ops) == 1 and ops[0]["request_id"] == "sync-both:calendar"
     _, again = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-again"})
     assert again["operation_id"] == ops[0]["operation_id"]
-    op = finish_calendar_run(app, fake, ops[0], [("mcp__M365__outlook_calendar_search", {"query": "*"})], snapshot())
+    value = snapshot()
+    value["synced_at"] = "2020-01-01T08:00:00+01:00"
+    op = finish_calendar_run(app, fake, ops[0], [("mcp__M365__outlook_calendar_search", {"query": "*"})], value)
     assert op["status"] == "succeeded" and op["result"]["published"] and op["result"]["events"] == 1
     assert json.loads(path.read_text())["events"][0]["subject"] == "Project review"
     dues = app.readers.dues(14)
     assert any(d["kind"] == "calendar" for d in dues["items"])
+    assert json.loads(path.read_text())["synced_at"].startswith(op["created_at"][:16]) and not dues["calendar"]["stale"]
 
 
 def test_calendar_sync_rejects_mail_tools_and_writes(panel, tmp_path):

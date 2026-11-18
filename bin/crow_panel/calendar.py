@@ -157,6 +157,9 @@ class CalendarSync:
         if not self.app.mail.transcript_ok(op, job, row, require_remote=True):
             op.update(status="failed", error={"code": "unproven", "message": "Lecture de l'agenda non prouvée par le transcript.", "retryable": True, "details": {}})
             return
+        if isinstance(output, dict):
+            # The model's clock is unreliable. The read started after the operation was accepted.
+            output["synced_at"] = op["created_at"]
         try:
             result = publish(Calendar(self.cfg).path, output)
         except (ValueError, KeyError, TypeError, AttributeError, ZoneInfoNotFoundError) as exc:
