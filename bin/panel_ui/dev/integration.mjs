@@ -217,6 +217,25 @@ try {
     await page.click('#drawer-close');
     await sleep(1500);
   });
+  await check('timeline-real',async()=>{
+    await go('Relances & échéances');
+    await page.click('.segmented button','Chronologie');
+    await poll(`!!document.querySelector('.tl-svg')`);
+    const lanes=await page.eval(`[...document.querySelectorAll('.tl-svg .tl-lane')].map(e=>e.textContent)`);
+    const items=await page.eval(`document.querySelectorAll('.tl-item').length`);
+    const note=await page.eval(`document.querySelector('.tl-cal')?.textContent||''`);
+    await page.shot('real-timeline');
+    await page.click('.segmented button','Liste'); await sleep(300);
+    return {lanes,items,note};
+  });
+  await check('dossiers-real',async()=>{
+    await go('Dossiers');
+    const groups=await page.eval(`[...document.querySelectorAll('.list-group')].map(e=>e.textContent)`);
+    const rows=await page.eval(`[...document.querySelectorAll('#pane-list .row .row-title')].map(e=>e.textContent)`);
+    await page.shot('real-dossiers');
+    if(await page.eval(`!!document.querySelector('#pane-list .row')`)){await page.click('#pane-list .row');await sleep(1200);await page.shot('real-dossier-first');}
+    return {groups,rows:rows.slice(0,12)};
+  });
   await check('themes-responsive-persistence',async()=>{
     await go('Relances & échéances'); await selectFirst();
     const sel=await page.eval(`document.querySelector('.row.selected').dataset.key`);
