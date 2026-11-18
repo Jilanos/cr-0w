@@ -49,7 +49,7 @@ function serve() {
 
 // ---------------------------------------------------------------- chromium + CDP
 
-async function findChrome() {
+export async function findChrome() {
   if (opt('--chrome')) return opt('--chrome');
   if (process.env.CHROME) return process.env.CHROME;
   const base = path.join(process.env.HOME || '', '.cache', 'ms-playwright');
@@ -62,7 +62,7 @@ async function findChrome() {
   throw new Error('Chromium introuvable : passer --chrome ou CHROME=');
 }
 
-async function launch(bin) {
+export async function launch(bin) {
   const profile = await mkdtemp(path.join(tmpdir(), 'panel-shots-'));
   const proc = spawn(bin, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run',
     '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars', '--force-color-profile=srgb', '--lang=fr-FR', 'about:blank'],
@@ -80,7 +80,7 @@ async function launch(bin) {
   return { proc, ws, profile };
 }
 
-class CDP {
+export class CDP {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.handlers = new Map();
     this.sock = new WebSocket(url);
@@ -111,7 +111,7 @@ class CDP {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function newPage(cdp, { width, height, dark, mobile }) {
+export async function newPage(cdp, { width, height, dark, mobile }) {
   const { browserContextId } = await cdp.send('Target.createBrowserContext', { disposeOnDetach: true });
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
@@ -126,7 +126,7 @@ async function newPage(cdp, { width, height, dark, mobile }) {
   await s('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: !!mobile });
   await s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: dark ? 'dark' : 'light' }, { name: 'prefers-reduced-motion', value: 'no-preference' }] });
   const page = {
-    errors,
+    errors, sessionId,
     async goto(url, wait = 900) {
       const p = new Promise((r) => { loaded = r; });
       await s('Page.navigate', { url });
@@ -402,6 +402,26 @@ for (const dark of [false, true]) {
   });
 }
 
+add('flow-chat-account-model', DESK, async (page, base) => {
+  await open(page, base, { view: 'dossiers' });
+  await page.click('#pane-list .row');
+  await sleep(500);
+  const models = await page.eval(`(() => {
+    const s = document.querySelector('.chat-foot select[aria-label=Compte]');
+    s.value = 'workb'; s.dispatchEvent(new Event('change'));
+    return [...document.querySelector('.chat-foot select[aria-label=Modèle]').options].map(o => o.value);
+  })()`);
+  if (models.length !== 1 || models[0] !== 'gpt-5') throw new Error('incompatible provider models: ' + models);
+  await page.click('.chat-foot .link-btn', 'Par défaut ici');
+  await expect(page, '.toast', 'gpt-5');
+  const selected = await page.eval(`(() => {
+    const s = document.querySelector('.chat-foot select[aria-label=Compte]');
+    s.value = 'claude'; s.dispatchEvent(new Event('change'));
+    return document.querySelector('.chat-foot select[aria-label=Modèle]').value;
+  })()`);
+  if (selected !== 'sonnet') throw new Error('default model not restored');
+});
+
 // Every fixture scenario from index.json.
 const SCEN = {
   empty: async (page, base) => {
@@ -536,4 +556,6 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((e) => { console.error(e); process.exit(2); });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((e) => { console.error(e); process.exit(2); });
+}
