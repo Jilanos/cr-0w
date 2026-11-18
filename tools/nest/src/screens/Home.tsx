@@ -4,6 +4,7 @@ import type { Snapshot } from '../data/useData'
 import { time } from '../format'
 import { Hero } from '../hero/Hero'
 import { Link } from '../router'
+import { AskBar } from '../ui/AskBar'
 import { Glyph } from '../ui/Glyph'
 import { HomeLaptop } from './HomeLaptop'
 import { LAPTOP, useMedia } from '../ui/useMedia'
@@ -127,6 +128,7 @@ function HomeCompact({ snap }: { snap: Snapshot }) {
     <div className="screen home-ph col">
       <HudRow m={m} />
       {holo}
+      <AskBar />
       <Needs m={m} />
       <Running m={m} />
       <Agenda m={m} />

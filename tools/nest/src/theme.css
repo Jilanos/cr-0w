@@ -1265,6 +1265,17 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 @media (min-width: 600px) {
   .b-sheet { height: auto; max-height: none; padding-top: 14px; }
 }
+/* Home Ask bar (item_176, boards home-F-cover and home-G-inner): the Desk Ask box look. */
+.home-ask {
+  display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 3px 3px 3px 14px;
+  border: 1.5px solid var(--accent); border-radius: 14px; background: rgba(24, 25, 38, 0.7);
+}
+.home-ask input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--fg); font: inherit; font-size: 14px; }
+.home-ask input::placeholder { color: var(--sub); }
+.home-ask .mic { all: unset; display: inline-grid; place-items: center; color: var(--dim); padding: 0 6px; opacity: 0.55; }
+.home-ask .btn { align-self: stretch; padding: 0 16px; border-radius: 11px; font-size: 15px; }
+[data-theme='cyber'] .home-ask { border-radius: 0; background: var(--well); }
+[data-theme='cyber'] .home-ask .btn { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
 [data-theme='cyber'] .bb-frame, [data-theme='cyber'] .bs-head { border-radius: 0; box-shadow: 0 0 10px -3px var(--mood); }
 [data-theme='cyber'] .bb-dot { border-radius: 50%; }
 [data-theme='cyber'] .b-sheet { border-radius: 0; border-top-color: var(--c-w); }
