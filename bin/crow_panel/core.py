@@ -239,8 +239,8 @@ class Store:
 
     def event(self, stream, event, data):
         # SQLite is authoritative. JSONL is a replayable on-disk mirror.
-        from .security import redact
-        data = json.loads(redact(canonical(data)))
+        from .security import redact_data
+        data = redact_data(data)
         with self.mutex, self.db:
             seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events WHERE stream=?", (stream,)).fetchone()[0]
             self.db.execute("INSERT INTO events VALUES(?,?,?,?)", (stream, seq, event, canonical(data)))

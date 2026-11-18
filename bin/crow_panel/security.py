@@ -12,13 +12,24 @@ from urllib.parse import urlsplit
 from .core import Problem, atomic, canonical
 
 CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+SECRET_KEYS = {"csrf_token", "access_token", "refresh_token", "api_key", "authorization", "proxy-authorization", "x-crow-token", "cookie", "set-cookie"}
 
 
 def redact(text):
     text = re.sub(r'(?i)(bearer\s+)[a-z0-9._~+/=-]+', r'\1[masqué]', text)
+    text = re.sub(r'(?i)((?:authorization|proxy-authorization)\s*[:=]\s*basic\s+)[^\s"<>]+', r'\1[masqué]', text)
+    text = re.sub(r'(?im)((?:x-crow-token|cookie|set-cookie)\s*:\s*)[^\r\n]+', r'\1[masqué]', text)
     text = re.sub(r'(?i)([?&](?:sig|token|access_token|key|code|x-amz-signature)=)[^\s&"<>]+', r'\1[masqué]', text)
     text = re.sub(r'(?i)("(?:csrf_token|access_token|refresh_token|api_key|authorization)"\s*:\s*")[^"]*', r'\1[masqué]', text)
     return text
+
+
+def redact_data(value):
+    if isinstance(value, dict):
+        return {k: "[masqué]" if k.lower() in SECRET_KEYS else redact_data(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_data(v) for v in value]
+    return redact(value) if isinstance(value, str) else value
 
 
 class TextHTML(HTMLParser):

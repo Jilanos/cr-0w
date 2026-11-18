@@ -779,3 +779,21 @@ def test_unavailable_maj_status_blocks_pending_writes(panel):
     assert err.value.status == 423
     assert not app.pending.view()["writable"]
     assert app.pending.read_bytes() == before
+
+
+def test_nested_log_secrets_are_redacted_before_persistence(panel):
+    app, _ = panel
+    payload = {"text": 'Tool response: {"refresh_token":"refresh-secret","api_key":"key-secret"}',
+               "nested": {"authorization": "Basic basic-secret", "text": "X-Crow-Token: csrf-secret"}}
+    app.store.event("safe-stream", "text", payload)
+    persisted = canonical(app.store.events("safe-stream")) + (app.cfg.state / "events/safe-stream.jsonl").read_text()
+    assert all(secret not in persisted for secret in ("refresh-secret", "key-secret", "basic-secret", "csrf-secret"))
+
+
+def test_run_reports_do_not_expose_credentials(panel, tmp_path):
+    app, _ = panel
+    report = tmp_path / "report.md"
+    report.write_text('# Result\nAuthorization: Basic credential-secret\nX-Crow-Token: cookie-secret\n')
+    app.store.put("runs", "report-run", {"run_id": "report-run", "task_report": str(report)})
+    rendered = canonical(app.readers.run("report-run"))
+    assert "credential-secret" not in rendered and "cookie-secret" not in rendered

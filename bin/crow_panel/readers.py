@@ -6,6 +6,7 @@ import re
 
 from .core import ACTIVE, Problem, now, read_json
 from .calendar import Calendar
+from .security import redact
 
 
 class Readers:
@@ -108,6 +109,7 @@ class Readers:
                 text = rep.get("final_message") or rep.get("final_text") or ""
             except Problem:
                 pass
+        text = redact(text)
         sections = []
         for block in re.split(r'(?m)^#{1,3} ', text):
             if not block.strip():
