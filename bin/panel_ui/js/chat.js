@@ -89,7 +89,7 @@ function renderMessages(doc, log, topic, ctx) {
     }
     const el = h('div', { class: ['msg', 'msg-crow', live && 'live'] }, h('div', { class: 'msg-who', text: 'crow' }), body, meta);
     log.append(el);
-    if (live && m.status === 'running' && m.operation_id) attachStream(m, body, topic, ctx);
+    if (live && m.operation_id) attachStream(m, body, topic, ctx);
   }
   log.scrollTop = log.scrollHeight;
 }
@@ -101,18 +101,24 @@ function attachStream(m, body, topic, ctx) {
     streams.set(m.operation_id, s);
     s.stop = ctx.api.stream(`/api/operations/${encodeURIComponent(m.operation_id)}/events`, {
       event(type, data) {
+        if (type === 'status' && data.status === 'running' && m.status === 'queued') {
+          m.status = 'running';
+          reload(topic, ctx);
+        }
         if (type === 'text') s.text.push(data.text || '');
         if (type === 'tool') s.text.push(`· ${data.name}${data.summary ? ' : ' + data.summary : ''}`);
         s.listeners.forEach((fn) => fn());
       },
-      end() { streams.delete(m.operation_id); if (current && current.topic.topic_id === topic.topic_id) reload(topic, ctx); },
+      end() { streams.delete(m.operation_id); if (current && current.topic && current.topic.topic_id === topic.topic_id) reload(topic, ctx); },
     });
   }
   const paint = () => {
     if (!body.isConnected) { s.listeners.delete(paint); return; }
     clear(body);
     if (s.text.length) body.append(h('div', { class: 'live-text' }, s.text.map((t) => h('p', { class: t.startsWith('·') ? 'muted small' : null, text: t }))));
-    body.append(h('span', { class: 'typing', 'aria-label': 'crow écrit' }, h('i'), h('i'), h('i')));
+    body.append(m.status === 'queued'
+      ? h('span', { class: 'muted', text: 'En file, en attente d\'un créneau.' })
+      : h('span', { class: 'typing', 'aria-label': 'crow écrit' }, h('i'), h('i'), h('i')));
     const log = body.closest('.chat-log');
     if (log) log.scrollTop = log.scrollHeight;
   };
