@@ -10,6 +10,18 @@ from .launcher import step
 from .security import clean_text, hook_input, https, tool_allowed
 
 
+def tool_result_failed(value):
+    if isinstance(value, str):
+        try:
+            return tool_result_failed(json.loads(value))
+        except ValueError:
+            return value.lstrip().lower().startswith(("error:", "error "))
+    if isinstance(value, dict):
+        return (value.get("isError") is True or value.get("is_error") is True or bool(value.get("error"))
+                or value.get("success") is False or any(tool_result_failed(v) for v in value.values()))
+    return any(tool_result_failed(v) for v in value) if isinstance(value, list) else False
+
+
 class Mail:
     def __init__(self, cfg, store, launcher):
         self.cfg, self.store, self.launcher = cfg, store, launcher
@@ -391,6 +403,44 @@ class Mail:
             return False
         return bool(remote) if require_remote else True
 
+    def completed_moves(self, op, row):
+        """Pair guarded mutation calls with successful tool results, per message."""
+        path = self.transcript_source(row)
+        policy = read_json(self.cfg.state / "ops" / op["operation_id"] / "policy.json", {})
+        pending, completed = {}, set()
+        if not path or not policy:
+            return completed
+        try:
+            with Path(path).open() as source:
+                for line in source:
+                    try:
+                        value = json.loads(line)
+                    except ValueError:
+                        continue
+                    message = value.get("message")
+                    blocks = message.get("content", []) if isinstance(message, dict) else []
+                    for block in blocks if isinstance(blocks, list) else []:
+                        if not isinstance(block, dict):
+                            continue
+                        if block.get("type") == "tool_use":
+                            name, args = block.get("name", ""), block.get("input", {})
+                            short = name.rsplit("__", 1)[-1]
+                            if (block.get("id") and short in ("outlook_modify_labels", "outlook_batch_modify_labels")
+                                    and hook_input(policy, {"tool_name": name, "tool_input": args})):
+                                pending[block["id"]] = args.get("modifications", args.get("messages")) if short == "outlook_batch_modify_labels" else [args]
+                        elif block.get("type") == "tool_result":
+                            calls = pending.pop(block.get("tool_use_id"), [])
+                            content = block.get("content")
+                            if not content or block.get("is_error"):
+                                continue
+                            # MCP errors can be wrapped in a successful transport result.
+                            if tool_result_failed(content):
+                                continue
+                            completed.update((i["messageId"], i["moveToFolderId"]) for i in calls)
+        except (OSError, ValueError, TypeError, KeyError):
+            return set()
+        return completed
+
     def probe_evidence(self, op, job, row, output):
         probe = output.get("probe", {})
         tools = probe.get("tools", [])
@@ -565,12 +615,14 @@ class Mail:
                 results = {i["message_id"]: i for i in output["items"]}
                 expected = {i["message_id"] for i in manifest["items"]}
                 violation = bool(set(results) - expected) or not self.transcript_ok(op, job, row)
+                completed = self.completed_moves(op, row)
                 for item in manifest["items"]:
                     result = results.get(item["message_id"], {})
                     status = result.get("status", "unknown")
                     if status not in ("succeeded", "failed", "unknown"):
                         status = "unknown"
-                    if status == "succeeded" and (result.get("folder_id") != item["folder_id"] or not output.get("evidence")):
+                    if status == "succeeded" and (result.get("folder_id") != item["folder_id"] or not output.get("evidence")
+                                                   or (item["message_id"], item["folder_id"]) not in completed):
                         status = "unknown"
                     op["items"].append({"ref": {"kind": "mail", "id": item["message_id"]}, "status": status, "action": item["action"],
                                         "source_folder_id": item["source_folder_id"], "folder_id": item["folder_id"], "folder_path": item.get("folder_path"),

@@ -809,3 +809,32 @@ def test_worker_failure_closes_the_operation_event_stream(panel):
     assert app.operation(op["operation_id"])["status"] == "unknown"
     events = app.store.events(op["operation_id"])
     assert events[-1]["event"] == "done" and events[-1]["data"]["status"] == "unknown"
+
+
+@pytest.mark.parametrize("evidence", ["none", "error", "wrapped_error", "success"])
+def test_triage_success_requires_a_completed_tool_call(panel, tmp_path, evidence):
+    from crow_panel.security import write_policy
+    app, _ = panel
+    op = app.store.operation("mail.triage.execute", {"request_id": "triage-proof"}, "Confirmed batch")
+    item = {"message_id": "one", "folder_id": "target", "source_folder_id": "inbox", "action": "move"}
+    job = app.mail.triage_job(op, {"items": [item]})
+    write_policy(app.cfg, op["operation_id"], "triage", Path(job["output"]), job["manifest"])
+    op.update(status="succeeded", steps=[{"name": "execute"}])
+    entries = []
+    if evidence != "none":
+        entries = [
+            {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tool-one", "name": "mcp__M365__outlook_modify_labels",
+                                                             "input": {"messageId": "one", "moveToFolderId": "target"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tool-one", "is_error": evidence == "error",
+                                                        "content": '{"isError":true,"error":"access denied"}' if evidence == "wrapped_error" else "access denied" if evidence == "error" else '{"success":true}'}]}},
+        ]
+    transcript = tmp_path / "proof.jsonl"
+    transcript.write_text("".join(json.dumps(e) + "\n" for e in entries))
+    Path(job["output"]).write_text(json.dumps({"items": [{"message_id": "one", "status": "succeeded", "folder_id": "target", "new_message_id": "new-one"}],
+                                               "evidence": ["claimed by final output"]}))
+    app.mail.complete(op, job, {"stdout_path": str(transcript)}, "")
+    if evidence == "success":
+        assert op["status"] == "succeeded" and op["items"][0]["status"] == "succeeded"
+    else:
+        assert op["status"] == "unknown" and op["items"][0]["status"] == "unknown"
+        assert not op["undo"]["available"]
