@@ -843,3 +843,17 @@ def test_triage_success_requires_a_completed_tool_call(panel, tmp_path, evidence
     else:
         assert op["status"] == "unknown" and op["items"][0]["status"] == "unknown"
         assert not op["undo"]["available"]
+
+
+@pytest.mark.parametrize("state", ["queued", "unknown"])
+def test_reply_pipeline_cannot_be_repeated_while_a_draft_is_uncertain(panel, state):
+    app, _ = panel
+    app.mail.publish(snapshot())
+    key = app.mail.raw()["items"][0]["id"]
+    _, op = post(app, "/api/mail/" + key + "/reply-all", {"request_id": "first-reply", "instructions": "Reply"})
+    if state == "unknown":
+        op["status"] = "unknown"
+        app.store.save_op(op)
+    with pytest.raises(Problem) as err:
+        post(app, "/api/mail/" + key + "/reply-all", {"request_id": "second-reply", "instructions": "Another reply"})
+    assert err.value.body["error"]["code"] == "already_running"

@@ -304,6 +304,11 @@ class Mail:
 
     def reply(self, key, body, route):
         row = self.find(key)
+        existing = next((o for o in self.store.all("operations") if o["kind"] == "mail.reply_all"
+                         and o["topic_id"] == row["topic_id"] and o["status"] in ("queued", "running", "cancel_requested", "unknown")), None)
+        if existing:
+            raise Problem(409, "already_running", "Une réponse est en cours ou attend une vérification dans Brouillons et Envoyés.",
+                          {"operation_id": existing["operation_id"]})
         if not isinstance(body.get("instructions"), str) or not body["instructions"].strip():
             raise Problem(400, "bad_request", "Consigne de réponse obligatoire.")
         model = body.get("model", "sonnet")
