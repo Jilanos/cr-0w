@@ -113,16 +113,17 @@ describe('api adapter', () => {
 describe('feed', () => {
   function rig() {
     let up = true
+    const broken = new Set<string>()
     let t = new Date('2026-11-10T10:00:00Z').getTime()
     const { get } = core({
       '/api/state/missions': () => (up ? json(body('state-missions.json')) : json('{"error":"down"}', 502)),
       '/api/state/inbox?all=1': () => (up ? json(body('state-inbox-all.json')) : json('{"error":"down"}', 502)),
-      ...Object.fromEntries(SCRIPT_SECTIONS.map((n) => [`/api/state/${n}`, () => (up ? json(body(`state-${n}.json`)) : json('{"error":"down"}', 502))])),
+      ...Object.fromEntries(SCRIPT_SECTIONS.map((n) => [`/api/state/${n}`, () => (!up ? json('{"error":"down"}', 502) : broken.has(n) ? json('{"error":"not found"}', 404) : json(body(`state-${n}.json`)))])),
     })
     const src = { ...apiSource('/api', get), now: () => new Date(t) }
     const out: Snapshot[] = []
     const refresh = feed(src, (s) => out.push(s))
-    return { refresh, out, down: (v: boolean) => { up = !v }, tick: (ms: number) => { t += ms } }
+    return { refresh, out, broken, down: (v: boolean) => { up = !v }, tick: (ms: number) => { t += ms } }
   }
 
   it('emits only when something changed', async () => {
@@ -154,6 +155,21 @@ describe('feed', () => {
     r.tick(5000)
     await r.refresh()
     expect(r.out.at(-1)!.down).toBe(false)
+  })
+
+  it('shows one missing section empty and keeps the rest up', async () => {
+    const r = rig()
+    r.broken.add('ready')
+    await r.refresh()
+    const s = r.out[0]
+    expect(s.down).toBe(false)
+    expect(s.missions.length).toBeGreaterThan(0)
+    expect(s.sections.ready).toMatchObject({ data: null, stale: true })
+    expect(s.sections.ready.error).toBeTruthy()
+    expect(s.sections.today.data).toEqual(JSON.parse(body('state-today.json')).data)
+    r.tick(5000)
+    await r.refresh()
+    expect(r.out.length).toBe(1)
   })
 
   it('shows an empty state, never fixtures, when the first load fails', async () => {
