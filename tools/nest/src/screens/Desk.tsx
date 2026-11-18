@@ -3,7 +3,7 @@ import { ApiError } from '../data/api'
 import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
 import { useConversation } from '../data/useConversation'
 import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
-import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type ReadyItem, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
@@ -16,7 +16,8 @@ import { enterSubmits, rowsOf } from '../ui/keys'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 import { deskWork, workCounts, workOf, type WorkItem } from '../data/work'
-import { WorkList } from '../ui/WorkList'
+import { doneToday, inFilter, okRate, readyOf, readyRows, shortRef, type ReadyRow, type WorkFilter } from '../data/ready'
+import { WorkList, type RowAct } from '../ui/WorkList'
 import { AccountField } from '../ui/AccountField'
 import { isCommand } from '../data/butler'
 import { useButler } from '../data/useButler'
@@ -83,7 +84,7 @@ type Form = 'run' | 'session' | null
 function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const src = useSource()
   const act = src.actions
-  const { slots, agents } = dispatchOf(snap.sections.dispatch)
+  const { slots, agents, finished = [] } = dispatchOf(snap.sections.dispatch)
   const runs = agents.filter((a) => a.kind === 'run')
   const sessions = agents.filter((a) => a.kind === 'session')
   const resumable = resumableOf(snap.sections.sessions)
@@ -279,6 +280,68 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       .finally(() => setAsking(false))
   }
 
+  // ---- laptop Desk, layout B (item_246) ----
+  const ready = readyRows(readyOf(snap.sections.ready), resumable, agents, snap.now)
+  const [filter, setFilter] = useState<WorkFilter | null>(null)
+  const needN = (work ?? []).filter((w) => inFilter(w, 'needs')).length
+  const shownFilter: WorkFilter = filter ?? (needN ? 'needs' : 'all')
+  const filtered = deskWork((work ?? []).filter((w) => inFilter(w, shownFilter)))
+  const filterCounts: Record<WorkFilter, number> = {
+    needs: needN,
+    running: (work ?? []).filter((w) => inFilter(w, 'running')).length,
+    ready: ready.length,
+    all: shown + ready.length,
+  }
+  const kpi = { done: doneToday(finished, snap.now), ok: okRate(snap.missions, snap.now) }
+  const retry = (w: WorkItem) => {
+    const f = finished.find((x) => x.run_id === w.source.ref)
+    setSheet({
+      title: 'Retry run', lead: `Start ${w.title} of ${w.project} again on the same prompt.`,
+      target: [['run', w.source.ref], ['project', w.project], ['account', f?.account || 'same'], ['slots', `${slots.busy} of ${slots.max} busy`]],
+      note: 'A new run with its own worktree. Nothing is pushed.', ok: 'Retry',
+      run: wrap(`Retry ${w.title}`, () => act.retryRun(w.source.ref)),
+    })
+  }
+  const allow = (a: Agent) => {
+    const p = a.prompt!
+    setSheet({
+      title: 'Allow once', lead: `${nameOf(a)} asks to run ${p.tool}${p.description ? `: ${p.description}` : ''}.`, quote: p.detail,
+      target: [['session', nameOf(a)], ['project', a.project], ['account', a.account]],
+      note: 'Same as Allow once in its window.', ok: 'Allow once',
+      run: wrap(`Allow once ${nameOf(a)}: ${p.tool} ${p.detail}`, () => act.answer(a.pid, p.id, 'allow')),
+    })
+  }
+  // The main action of a work row: Retry a failed run, open an MR, allow or answer a session.
+  const rowAct = (w: WorkItem): RowAct | undefined => {
+    if (w.kind === 'run' && w.state === 'failed' && finished.some((x) => x.run_id === w.source.ref)) return { label: 'Retry', run: () => retry(w) }
+    if (w.kind === 'mr') return { label: 'Open MR', run: () => window.open(w.source.ref, '_blank', 'noopener') }
+    if (w.kind === 'session' && w.state === 'needs') {
+      const a = agents.find((x) => String(x.pid) === w.source.ref)
+      if (!a) return undefined
+      if (a.prompt && promptView(a.prompt) === 'options' && a.prompt.options.some((o) => o.key === 'allow')) return { label: 'Allow', run: () => allow(a) }
+      return { label: 'Answer', run: () => pick(a, !a.prompt) }
+    }
+    if (w.kind === 'mission' && w.state === 'needs') return { label: 'Answer', run: () => navigate(`/missions/${encodeURIComponent(w.source.ref)}`) }
+    return undefined
+  }
+  const promptOf = (i: ReadyItem) => `Implement ${shortRef(i.ref)} end to end. Read ${i.path} first.`
+  const runReady = (i: ReadyItem) => setSheet({
+    title: 'Start a run', lead: `Builds ${i.title} in the background.`, quote: promptOf(i),
+    target: [['project', i.project], ['label', shortRef(i.ref)], ['account', 'auto'], ['slots', `${slots.busy} of ${slots.max} busy`]],
+    note: 'Opens a new run on a free allowed account. Nothing is pushed.', ok: 'Start run',
+    run: wrap(`/dispatch ${i.project} ${shortRef(i.ref)}`, () => act.dispatch({ project: i.project, label: shortRef(i.ref), prompt: promptOf(i) })),
+  })
+  const sessionReady = (i: ReadyItem) => setSheet({
+    title: 'New session', lead: `Starts a claude session on ${i.project} for ${i.title}, with no window. Its chat opens once it shows up.`, quote: promptOf(i),
+    target: [['project', i.project], ['item', shortRef(i.ref)], ['account', 'auto']],
+    note: 'Fails when that account is busy; nothing else is started.', ok: 'Start session',
+    run: wrap(`/session ${i.project}`, async () => {
+      const r = await act.start({ project: i.project, prompt: promptOf(i) })
+      if (r.tmux) setOpening(r.tmux)
+      return r
+    }),
+  })
+
   // /dispatch and /session open their form, prefilled with the project and prompt typed after.
   const command = (t: string) => {
     const [cmd, ...rest] = t.trim().split(/\s+/)
@@ -316,6 +379,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     form, setForm, run, setRun, start, setStart,
     send, settle, retell, pause, stop, dispatch, open, resume, answer, answerAsk, asking, queue, cancel,
     work, groups, shown, counts, openWork,
+    ready, filter: shownFilter, setFilter, filtered, filterCounts, kpi, rowAct, runReady, sessionReady,
   }
 }
 type D = ReturnType<typeof useDesk>
@@ -571,14 +635,21 @@ function DeskLaptop({ d }: { d: D }) {
       <div className="kps">
         <h1 className="dt">Desk</h1>
         <span className="kp c-w"><span className="kn">{d.counts ? d.counts.working : working.length}</span><span className="sm">working{accts && ` · ${accts}`}</span></span>
-        <span className="kp n"><span className="kn c-n">{needs}</span><span className="sm">need you{oldest && ` · oldest ${ago(oldest, d.snap.now)}`}</span></span>
-        {d.counts && d.counts.failed > 0 && <span className="kp f"><span className="kn c-f">{d.counts.failed}</span><span className="sm">failed</span></span>}
-        <span className="kp c-sub"><span className="kn">{d.slots.busy}/{d.slots.max}</span><span className="sm">slots · {Math.max(0, d.slots.max - d.slots.busy)} free</span></span>
-        <span className="kp c-b"><span className="kn">{d.resumable.length}</span><span className="sm">resumable</span></span>
+        <span className={`kp n${needs ? ' hot' : ''}`}><span className="kn c-n">{needs}</span><span className="sm">need you{oldest && ` · oldest ${ago(oldest, d.snap.now)}`}</span></span>
+        <span className="kp f"><span className="kn c-f">{d.counts ? d.counts.failed : 0}</span><span className="sm">failed</span></span>
+        <span className="kp c-d"><span className="kn">{d.kpi.done}</span><span className="sm">done today</span></span>
+        <span className="kp c-sub"><span className="kn">{d.kpi.ok == null ? '—' : `${d.kpi.ok}%`}</span><span className="sm">ok rate 7d</span></span>
       </div>
       <div className="dg">
         <div className="col">
-          {d.work ? <Work d={d} id="dw" /> : (
+          <Sessions d={d} />
+          {(d.form || d.log.length > 0) && (
+            <section className="pn none launch-pn" aria-labelledby="dk">
+              <Ph id="dk" sm="asks before it acts">Launch</Ph>
+              <Chat d={d} />
+            </section>
+          )}
+          {d.work ? <WorkB d={d} /> : (
             <>
               <section className="pn none" aria-labelledby="dn"><Ph id="dn" className="c-n" sm={<span className="c-n">{needs || ''}</span>}>Needs you</Ph><Needs d={d} /></section>
               <section className="pn grow" aria-labelledby="dr"><Ph id="dr" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
@@ -590,29 +661,88 @@ function DeskLaptop({ d }: { d: D }) {
         ) : (
           <section className="pn" aria-labelledby="dl"><Ph id="dl">Live</Ph><div className="sm">Nothing open. Pick a session, or type /dispatch to CR-0W.</div></section>
         )}
-        <div className="col">
-          <section className="pn none" aria-labelledby="ds"><Ph id="ds" sm="click a slot to open it">Slots and queue</Ph><Slots d={d} /></section>
-          {(d.form || d.log.length > 0) && (
-            <section className="pn none launch-pn" aria-labelledby="dk">
-              <Ph id="dk" sm="asks before it acts">Launch</Ph>
-              <Chat d={d} />
-            </section>
-          )}
-          <section className="pn none" aria-labelledby="dv">
-            <Ph id="dv" sm={d.sessions.length}>Live sessions</Ph>
-            <div className="list">
-              {d.sessions.length === 0 && <div className="sm">No live session.</div>}
-              {d.sessions.map((s) => (
-                <div key={s.pid} className={`row${s === a ? ' on' : ''}`}>
-                  {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
-                  <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {said(s)}</span>
-                  <button type="button" className={`btn${waits(s) ? ' p' : ''}`} onClick={() => d.pick(s, waits(s) && !s.prompt)}>Open</button>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
       </div>
+    </div>
+  )
+}
+
+// Layout B (item_246): runs in their slots, then the live sessions, then the queue on one line.
+function Sessions({ d }: { d: D }) {
+  return (
+    <section className="pn none sess-pn" aria-labelledby="dss">
+      <Ph id="dss" sm={`slots ${d.slots.busy}/${d.slots.max}${d.queue.length ? ` · ${d.queue.length} queued` : ''}`}>Sessions</Ph>
+      <div className="list">
+        {d.runs.length + d.sessions.length === 0 && <div className="sm">Nothing runs.</div>}
+        {d.runs.map((a) => (
+          <button type="button" key={a.pid} className={`row edge-w${a === d.picked ? ' on' : ''}`} aria-pressed={a === d.picked} onClick={() => d.pick(a)}>
+            <Ring /><span className="sm c-w">{d.slotOf(a)}</span>
+            <span className="f1">{nameOf(a)}</span><span className="sm">{a.account}</span><span className="c-w num">{d.since(a)}</span>
+          </button>
+        ))}
+        {d.sessions.map((s) => (
+          <div key={s.pid} className={`row${s === d.picked ? ' on' : ''}`}>
+            {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
+            <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {said(s)}</span>
+            <button type="button" className={`btn${waits(s) ? ' p' : ''}`} onClick={() => d.pick(s, waits(s) && !s.prompt)}>Open</button>
+          </div>
+        ))}
+        {d.queue.length > 0 && (
+          <div className="row q qline">
+            <Ring dashed c="c-q" />
+            <span className="f1 sm">{d.queue.map((m, i) => `Q${i + 1} ${title(m)}`).join(' · ')}</span>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+const FILTERS: [WorkFilter, string][] = [['needs', 'Needs'], ['running', 'Running'], ['ready', 'Ready'], ['all', 'All']]
+
+function WorkB({ d }: { d: D }) {
+  const showReady = d.filter !== 'running'
+  const empty = d.filter === 'needs' ? 'Nothing waits on you, Sir.' : d.filter === 'running' ? 'Nothing runs.' : 'Nothing on the desk, Sir.'
+  return (
+    <section className="pn grow work-pn" aria-labelledby="dw">
+      <Ph id="dw" sm={<span className="num">{d.shown}</span>}>Work</Ph>
+      <div className="wchips" role="group" aria-label="Filter work">
+        {FILTERS.map(([f, label]) => (
+          <button type="button" key={f} className={`wchip${d.filter === f ? ' on' : ''}${f === 'needs' && d.filterCounts.needs ? ' n' : ''}`}
+            aria-pressed={d.filter === f} onClick={() => d.setFilter(f)}>
+            {label}{f !== 'all' && <span className="num">{d.filterCounts[f]}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="wscroll">
+        {d.filter !== 'ready' && <WorkList groups={d.filtered} now={d.snap.now} open={d.openWork} act={d.rowAct} compact empty={empty} />}
+        {showReady && (
+          <div className="rdy" role="group" aria-labelledby="drr">
+            <div className="grp c-m" id="drr">Ready to run <span className="sm">{d.ready.length}</span></div>
+            {d.ready.length === 0 && <div className="sm">No Ready item in Logics.</div>}
+            {d.ready.map((r) => <ReadyLine key={r.key} d={d} r={r} />)}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ReadyLine({ d, r }: { d: D; r: ReadyRow }) {
+  if (r.kind === 'parked') {
+    const s = r.session
+    return (
+      <div className="row rrow">
+        <Play /><span className="f1"><b>{s.last_prompt || s.project}</b><span className="sm">{s.project} · parked {s.last_event ? ago(s.last_event, d.snap.now) : ''}</span></span>
+        <button type="button" className="ib p" title="Resume" aria-label={`Resume ${s.project}`} onClick={() => d.resume(s)}>▶</button>
+      </div>
+    )
+  }
+  const i = r.item
+  return (
+    <div className="row rrow">
+      <Play /><span className="f1"><b>{i.title}</b><span className="sm">{i.project} · {shortRef(i.ref)}</span></span>
+      <button type="button" className="ib p" title="Run in the background" aria-label={`Run ${i.title}`} onClick={() => d.runReady(i)}>▶</button>
+      <button type="button" className="ib" title="New session" aria-label={`New session for ${i.title}`} onClick={() => d.sessionReady(i)}>+</button>
     </div>
   )
 }

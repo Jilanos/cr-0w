@@ -33,15 +33,36 @@ export function KindTag({ kind }: { kind: TagKind }) {
   return <span className="ktag"><KindIcon kind={kind} />{TAG_LABEL[kind]}</span>
 }
 
-function Row({ w, now, open }: { w: WorkItem; now: Date; open: (w: WorkItem) => void }) {
+// The main action of a row (item_246): Retry, Open MR, Allow, Answer.
+export interface RowAct { label: string; run: () => void }
+type ActOf = (w: WorkItem) => RowAct | undefined
+
+function Row({ w, now, open, act, compact }: { w: WorkItem; now: Date; open: (w: WorkItem) => void; act?: ActOf; compact?: boolean }) {
   const when = workWhen(w, now)
+  const label = `${KIND_LABEL[w.kind]} ${w.title}, ${w.project}, ${LABEL[w.state]}${when ? `, ${when}` : ''}`
+  const why = w.why && <span className={w.state === 'failed' ? 'c-f' : undefined}>{w.why}</span>
+  // Compact rows (laptop Desk) fold state and time into the sub line; the action sits on the right.
+  if (compact) {
+    const a = act?.(w)
+    return (
+      <div className={`wrow wc s-${w.state}`}>
+        <button type="button" className="wmain" onClick={() => open(w)} aria-label={label}>
+          <span className="wg"><Glyph state={w.state} size={18} /></span>
+          <span className="t">
+            <b>{w.title}</b>
+            <span>{w.project}{why ? <> · {why}</> : <> · {LABEL[w.state]}</>}{when && <> · {when}</>}</span>
+          </span>
+        </button>
+        {a && <button type="button" className="btn p wact" onClick={a.run} aria-label={`${a.label} ${w.title}`}>{a.label}</button>}
+      </div>
+    )
+  }
   return (
-    <button type="button" className={`wrow s-${w.state}`} onClick={() => open(w)}
-      aria-label={`${KIND_LABEL[w.kind]} ${w.title}, ${w.project}, ${LABEL[w.state]}${when ? `, ${when}` : ''}`}>
+    <button type="button" className={`wrow s-${w.state}`} onClick={() => open(w)} aria-label={label}>
       <span className="wg"><Glyph state={w.state} size={18} /></span>
       <span className="t">
         <b>{w.title}</b>
-        <span>{w.project}{w.why && <> · <span className={w.state === 'failed' ? 'c-f' : undefined}>{w.why}</span></>}</span>
+        <span>{w.project}{why && <> · {why}</>}</span>
       </span>
       <KindTag kind={w.kind} />
       <span className="ws">
@@ -54,16 +75,17 @@ function Row({ w, now, open }: { w: WorkItem; now: Date; open: (w: WorkItem) => 
 
 // The Desk work list (item_204 option A): one row per item, a mission's items on a
 // rail under its goal. `open` acts on a row (pick the agent, resume, open the mission).
-export function WorkList({ groups, now, open }: { groups: WorkGroup[]; now: Date; open: (w: WorkItem) => void }) {
-  if (!groups.length) return <div className="sm">Nothing on the desk, Sir.</div>
+export function WorkList({ groups, now, open, act, compact, empty = 'Nothing on the desk, Sir.' }:
+  { groups: WorkGroup[]; now: Date; open: (w: WorkItem) => void; act?: ActOf; compact?: boolean; empty?: string }) {
+  if (!groups.length) return <div className="sm">{empty}</div>
   return (
     <div className="wlist">
       {groups.map((g) => (
         <div key={g.item.id} className="wgrp">
-          <Row w={g.item} now={now} open={open} />
+          <Row w={g.item} now={now} open={open} act={act} compact={compact} />
           {g.children.length > 0 && (
             <div className="wrail" role="group" aria-label={`Items of ${g.item.title}`}>
-              {g.children.map((c) => <Row key={c.id} w={c} now={now} open={open} />)}
+              {g.children.map((c) => <Row key={c.id} w={c} now={now} open={open} act={act} compact={compact} />)}
             </div>
           )}
         </div>

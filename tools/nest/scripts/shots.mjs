@@ -22,7 +22,7 @@ if (!out || out.startsWith('-') || !['', 'all', 'work', 'perso'].includes(scope)
 }
 mkdirSync(out, { recursive: true })
 
-const PORT = 4317
+const PORT = Number(process.env.SHOTS_PORT) || 4317 // another worktree may be shooting on 4317
 const SIZES = tabs ? { cover: [368, 812], inner: [707, 691] } : { cover: [368, 812], inner: [707, 691], laptop: [1440, 900] }
 const SCREENS = {
   home: '/',
@@ -38,6 +38,11 @@ if (unknown.length || (only && !only.length)) {
 }
 const shoot = Object.entries(SCREENS).filter(([n]) => !only || only.includes(n))
 
+// A server already on the port would be shot instead of this checkout (another worktree's run).
+if (await fetch(`http://localhost:${PORT}`).then(() => true, () => false)) {
+  console.error(`port ${PORT} is busy (another shots run?). Set SHOTS_PORT to a free port.`)
+  process.exit(2)
+}
 const cmd = fixtures ? ['vite', '--port', String(PORT), '--strictPort'] : ['vite', 'preview', '--port', String(PORT), '--strictPort']
 // Own process group, so the kill below also stops vite under npx.
 const server = spawn('npx', cmd, { stdio: 'ignore', cwd: new URL('..', import.meta.url).pathname, detached: true })

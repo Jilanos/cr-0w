@@ -87,6 +87,8 @@ export interface Resumable {
   limit?: string | null
   resets_at?: string | null
   last_prompt?: string | null
+  // Last transcript event, RFC 3339.
+  last_event?: string | null
 }
 
 // scope is set on a scoped snapshot (item_206): the mailbox the row came from.
@@ -173,7 +175,7 @@ const list = <T>(v: unknown) => (Array.isArray(v) ? (v as T[]) : [])
 export function dispatchOf(b: SectionBody | undefined): Dispatch {
   const d = obj(b)
   const slots = (d.slots as Dispatch['slots'] | undefined) ?? { busy: 0, max: 0 }
-  return { slots, agents: list<Agent>(d.agents) }
+  return { slots, agents: list<Agent>(d.agents), finished: list<FinishedRun>(d.finished) }
 }
 
 export const resumableOf = (b: SectionBody | undefined) => list<Resumable>(obj(b).sessions)

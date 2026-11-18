@@ -89,3 +89,31 @@ describe('Terminal tab and setup sessions (item_240)', () => {
     expect(r.action).toBe('resume')
   })
 })
+
+describe('laptop Desk layout B (item_246)', () => {
+  const html = async () => {
+    const src = fixtureSource()
+    const s = await snapshot(src)
+    at(1300)
+    return renderToStaticMarkup(<DataContext.Provider value={src}><Desk snap={s} refresh={refresh} /></DataContext.Provider>)
+  }
+
+  it('shows the five KPIs and the sessions block', async () => {
+    const h = await html()
+    for (const k of ['working', 'need you', 'failed', 'done today', 'ok rate 7d']) expect(h).toContain(k)
+    expect(h).not.toContain('resumable</span>')
+    expect(h).toContain('>Sessions<')
+    expect(h).toMatch(/slots \d+\/\d+/)
+  })
+
+  it('opens on the Needs filter with one action per row and Ready to run below', async () => {
+    const h = await html()
+    expect(h).toMatch(/aria-pressed="true"[^>]*>Needs/)
+    expect(h).toContain('>Retry</button>')
+    expect(h).toContain('>Open MR</button>')
+    expect(h).toContain('>Allow</button>')
+    expect(h).toContain('>Answer</button>')
+    expect(h).toContain('Ready to run')
+    expect(h).toContain('aria-label="Run ')
+  })
+})
