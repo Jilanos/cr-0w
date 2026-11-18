@@ -329,7 +329,8 @@ func (s *Server) resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ev := LiveAction{Action: "resume", Target: id, Account: acct, Project: str(row, "project")}
-	s.runAction(w, ev, nil, "crow-focus", "--pid", "0", "--account", acct, "--cwd", str(row, "cwd"), "--session", id)
+	// Headless like a new session (item_240): no desktop window, the reply names the tmux session.
+	s.runAction(w, ev, []string{"CROW_TERMINAL=headless"}, "crow-focus", "--pid", "0", "--account", acct, "--cwd", str(row, "cwd"), "--session", id)
 	s.Refresh("dispatch")
 	s.Refresh("sessions")
 }

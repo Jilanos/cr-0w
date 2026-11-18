@@ -97,9 +97,21 @@ export interface LiveReply {
   code: number
   message: string
   run_id?: string
-  // start: the detached tmux session the new session runs in (item_188).
+  // start and resume: the detached tmux session the session runs in (item_188, item_240).
   tmux?: string
 }
+
+// The Terminal tab (item_240): the tmux screen of a session from `crow-screen show`. Lines
+// keep their ANSI SGR codes; the cursor is 0-based within cols x rows.
+export interface Screen {
+  lines: string[]
+  cols: number
+  rows: number
+  cursor: { x: number; y: number; shown: boolean }
+}
+
+// One key for the session's pane: a tmux key name (Enter, C-c, Up...) or literal text.
+export type TermKey = { key: string } | { text: string }
 
 export interface NewSession { project: string; account?: string; prompt?: string }
 export interface NewRun { project: string; label: string; prompt: string; model?: string; account?: string }
@@ -113,6 +125,10 @@ export interface Actions {
   stop(pid: number): Promise<LiveReply>
   // Opens a terminal window on the desktop attached to the session's tmux session (item_188).
   attach(pid: number): Promise<LiveReply>
+  // Terminal tab (item_240, core terminal.go): read the pane, type into it, size it.
+  screen(pid: number): Promise<Screen>
+  keys(pid: number, keys: TermKey[]): Promise<unknown>
+  resize(pid: number, cols: number, rows: number): Promise<unknown>
   resume(id: string, account?: string): Promise<LiveReply>
   start(s: NewSession): Promise<LiveReply>
   dispatch(r: NewRun): Promise<LiveReply>

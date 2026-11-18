@@ -1134,6 +1134,21 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .chat-cv.chat-in .in { min-height: 44px; border-radius: 10px; }
 .chat-cv.chat-in .in .btn { padding: 10px 14px; min-height: 0; }
 .chat-cv.chat-in .term { flex: 1; overflow-y: auto; }
+/* Terminal tab (item_240): the session's tmux screen. Catppuccin Macchiato ANSI palette. */
+.tty {
+  --tty-bg: #1e2030; --tty-fg: #cad3f5; --tty-pad: 10px;
+  --ansi-0: #494d64; --ansi-1: #ed8796; --ansi-2: #a6da95; --ansi-3: #eed49f; --ansi-4: #8aadf4; --ansi-5: #f5bde6; --ansi-6: #8bd5ca; --ansi-7: #b8c0e0;
+  --ansi-8: #5b6078; --ansi-9: #ed8796; --ansi-10: #a6da95; --ansi-11: #eed49f; --ansi-12: #8aadf4; --ansi-13: #f5bde6; --ansi-14: #8bd5ca; --ansi-15: #a5adcb;
+  position: relative; flex: 1; min-height: 240px; overflow: hidden; padding: var(--tty-pad); box-sizing: border-box;
+  background: var(--tty-bg); color: var(--tty-fg); border: 1px solid var(--line); border-radius: 10px;
+  font: 13px/1.25 'Fira Code', ui-monospace, monospace; font-variant-ligatures: none; white-space: pre; cursor: text; outline: none;
+}
+.tty.on { border-color: var(--accent); }
+.tty .ln { height: 1.25em; overflow: hidden; }
+.tty .probe { position: absolute; visibility: hidden; white-space: pre; line-height: 1.25; }
+.tty .cur { position: absolute; background: var(--tty-fg); opacity: 0.55; pointer-events: none; }
+.tty .hint { position: absolute; right: 10px; bottom: 8px; font-size: 11px; color: var(--sub); background: var(--tty-bg); padding: 2px 6px; border-radius: 6px; }
+.tty .msg { white-space: normal; }
 .desk-in:has(.chat-in) { height: 100%; min-height: 0; box-sizing: border-box; }
 .desk-in:has(.chat-in) > .col:first-child { overflow-y: auto; }
 /* Laptop: the picked session's chat is the centre column (item_187 board desk-chat-a). */

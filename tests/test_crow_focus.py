@@ -39,13 +39,13 @@ def test_ancestors_stop_at_init(tmp_path):
 
 def test_dry_run_needs_account_and_cwd(hub):
     ok = run(hub, "crow-focus", "--pid", "5", "--account", "main", "--cwd", "/tmp", "--dry-run")
-    assert ok.returncode == 0 and "cdx main --dir /tmp --resume" in ok.stdout
+    assert ok.returncode == 0 and "cdx resume main --project /tmp" in ok.stdout
     assert run(hub, "crow-focus", "--pid", "5", "--dry-run").returncode != 0
 
 
 def test_dry_run_resumes_one_session_id(hub):
     ok = run(hub, "crow-focus", "--pid", "0", "--account", "main", "--cwd", "/tmp", "--session", "abc-1", "--dry-run")
-    assert ok.returncode == 0 and "cdx main --dir /tmp --resume abc-1" in ok.stdout
+    assert ok.returncode == 0 and "cdx resume main --project /tmp --conversation abc-1" in ok.stdout
 
 
 def test_send_dry_run_and_command(hub):
@@ -161,7 +161,7 @@ def test_focus_without_kitty_prints_the_resume_command(hub, tmp_path):
     env = {"CROW_TERMINAL": "print"}
     r = run(hub, "crow-focus", "--pid", "5", "--account", "main", "--cwd", str(tmp_path), env=env)
     assert r.returncode == 0, r.stderr
-    assert f"cdx main --dir {tmp_path} --resume" in r.stdout and "new terminal" in r.stdout
+    assert f"cdx resume main --project {tmp_path}" in r.stdout and "new terminal" in r.stdout
     s = run(hub, "crow-focus", "--pid", "5", "--send", "yes", env=env)
     assert s.returncode == 1 and "cannot type into a window" in s.stderr
 
@@ -257,3 +257,57 @@ def test_attach_opens_kitty_on_the_tmux_session(monkeypatch):
 def test_attach_dry_run(hub):
     ok = run(hub, "crow-focus", "--pid", "5", "--attach", "--dry-run", "--json")
     assert ok.returncode == 0 and '"action": "attach"' in ok.stdout.replace('":"', '": "')
+
+
+# item_240: Nest Terminal tab helpers.
+def test_screen_of_reads_lines_and_cursor():
+    class R:
+        def __init__(self, out, rc=0):
+            self.stdout, self.returncode = out, rc
+    calls = []
+    def run(cmd, **kw):
+        calls.append(cmd)
+        return R("\x1b[1m❯\x1b[0m hi\nnext\n") if "capture-pane" in cmd else R("3 1 80 24 1\n")
+    scr = ct.screen_of("%4", run=run)
+    assert scr == {"lines": ["\x1b[1m❯\x1b[0m hi", "next"], "cols": 80, "rows": 24, "cursor": {"x": 3, "y": 1, "shown": True}}
+    assert calls[0][:4] == ["tmux", "capture-pane", "-p", "-e"] and calls[0][-2:] == ["-t", "%4"]
+    assert ct.screen_of("%4", run=lambda cmd, **kw: R("", 1)) is None
+
+
+def test_keys_args_take_named_keys_and_literal_text_only():
+    assert ct.keys_args("%4", [{"text": "yes"}, {"key": "Enter"}, {"key": "C-c"}]) == [
+        ["tmux", "send-keys", "-t", "%4", "-l", "yes"], ["tmux", "send-keys", "-t", "%4", "Enter"],
+        ["tmux", "send-keys", "-t", "%4", "C-c"]]
+    for bad in ([], [{"key": "run-shell"}], [{"text": ""}], [{"key": "Enter", "text": "x"}], ["Enter"], {"key": "Enter"}):
+        with pytest.raises(ValueError):
+            ct.keys_args("%4", bad)
+
+
+def test_resize_args_bound_the_size():
+    assert ct.resize_args("%4", 100, 30) == ["tmux", "resize-window", "-t", "%4", "-x", "100", "-y", "30"]
+    for c, r in ((10, 30), (100, 2), (900, 30)):
+        with pytest.raises(ValueError):
+            ct.resize_args("%4", c, r)
+
+
+def test_crow_screen_refuses_a_pid_without_tmux(tmp_path):
+    import json, subprocess
+    r = subprocess.run([sys.executable, str(BIN / "crow-screen"), "show", "--pid", "1"], capture_output=True, text=True,
+                       env={**os.environ, "TMUX_TMPDIR": str(tmp_path)})
+    assert r.returncode == 1 and json.loads(r.stdout)["ok"] is False
+
+
+def test_resume_headless_prints_json_with_the_tmux_session(tmp_path):
+    """item_240: core resumes with CROW_TERMINAL=headless; no window, one JSON line."""
+    import json, subprocess
+    fakebin, calls = tmp_path / "bin", tmp_path / "tmux.log"
+    fakebin.mkdir()
+    (fakebin / "tmux").write_text(f"#!/bin/sh\necho \"$@\" >> {calls}\n")
+    (fakebin / "tmux").chmod(0o755)
+    env = {**os.environ, "PATH": f"{fakebin}:{os.environ['PATH']}", "CROW_TERMINAL": "headless", "INVOCATION_ID": ""}
+    r = subprocess.run([sys.executable, str(BIN / "crow-focus"), "--pid", "0", "--account", "main", "--cwd", str(tmp_path),
+                        "--session", "abc"], capture_output=True, text=True, env=env)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout.strip().splitlines()[-1])
+    assert out["ok"] and out["account"] == "main" and out["tmux"].startswith("crow-") and "no window" in out["message"]
+    assert calls.read_text().startswith(f"new-session -d -s {out['tmux']} ") and "--conversation abc" in calls.read_text()

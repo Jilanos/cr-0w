@@ -1,5 +1,5 @@
 import { conversationPath, pageQuery, type ConversationPage } from './conversation'
-import type { Actions, LiveReply } from './live'
+import type { Actions, LiveReply, Screen } from './live'
 import type { DataSource } from './source'
 import type { AgendaEvent, InboxItem, Mission, SectionBody, SectionName, TodayEvent } from './types'
 
@@ -91,6 +91,13 @@ export function apiActions(base = '/api', get: Fetch = (i, init) => fetch(i, ini
     ask: (pid, prompt, answers) => post(`/sessions/${pid}/answer`, { prompt, answers }),
     stop: (pid) => post(`/sessions/${pid}/stop`),
     attach: (pid) => post(`/sessions/${pid}/attach`),
+    screen: async (pid) => {
+      const res = await get(`${base}/sessions/${pid}/screen`, { cache: 'no-store' })
+      if (!res.ok) throw await failure(res)
+      return (await res.json()) as Screen
+    },
+    keys: (pid, keys) => post<unknown>(`/sessions/${pid}/keys`, { keys }),
+    resize: (pid, cols, rows) => post<unknown>(`/sessions/${pid}/resize`, { cols, rows }),
     resume: (conv, account) => post(`/sessions/${id(conv)}/resume`, account ? { account } : undefined),
     start: (s) => post('/sessions', s),
     dispatch: (r) => post('/dispatch', r),

@@ -82,6 +82,21 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       if (!a) throw new ApiError(404, `no agent with pid ${pid}`)
       return reply('attach', String(pid), { account: a.account, project: a.project, message: a.tmux ? `opened a terminal on tmux session ${a.tmux}` : 'focused its window' })
     },
+    // A fixed claude screen with colors; keys and resize only check the target.
+    async screen(pid) {
+      const a = agent(pid)
+      if (!a.tmux) throw new ApiError(409, `session ${pid} runs in no tmux session`)
+      const lines = ['\x1b[38;5;174m╭───────────────────────────────╮\x1b[39m', `\x1b[38;5;174m│\x1b[39m \x1b[1m${a.project}\x1b[22m on ${a.account}`, '\x1b[38;5;174m╰───────────────────────────────╯\x1b[39m', '', '\x1b[2m> \x1b[22m']
+      return { lines, cols: 80, rows: 24, cursor: { x: 2, y: 4, shown: true } }
+    },
+    async keys(pid) {
+      if (!agent(pid).tmux) throw new ApiError(409, `session ${pid} runs in no tmux session`)
+      return { ok: true }
+    },
+    async resize(pid) {
+      if (!agent(pid).tmux) throw new ApiError(409, `session ${pid} runs in no tmux session`)
+      return { ok: true }
+    },
     async stopRun(run) {
       const a = dispatch().agents.find((x) => x.run_id === run)
       if (!a) throw new ApiError(404, `no running dispatch run ${run}`)

@@ -306,8 +306,52 @@ def attach(pid):
         return None, f"no tmux session holds pid {pid}"
     if not shutil.which("kitty"):
         return None, "kitty is not on PATH"
+    # Nest's Terminal tab may have fixed the size; let the attached window size it again.
+    subprocess.run(["tmux", "set-option", "-w", "-t", name, "window-size", "latest"], check=False, capture_output=True, timeout=5)
     detach(own_scope(kitty_open_args(["tmux", "attach-session", "-t", name], f"crow · {name}")), clean_env())
     return "attached", name
+
+
+# Nest Terminal tab (item_240): the screen of the tmux pane holding a session, keys typed into
+# it, and its size. Keys are named tmux keys from KEYS or literal text, nothing else.
+KEYS = {"Enter", "Escape", "BSpace", "Tab", "BTab", "Up", "Down", "Left", "Right", "Home", "End",
+        "PPage", "NPage", "DC", "IC", "Space", *(f"C-{c}" for c in "abcdefghijklmnopqrstuvwxyz")}
+SCREEN_FMT = "#{cursor_x} #{cursor_y} #{pane_width} #{pane_height} #{cursor_flag}"
+
+
+def screen_of(pane, run=subprocess.run):
+    """{lines (ANSI), cols, rows, cursor: {x, y, shown}} of a tmux pane, else None."""
+    cap = run(["tmux", "capture-pane", "-p", "-e", "-N", "-t", pane], capture_output=True, text=True, timeout=5)
+    meta = run(["tmux", "display-message", "-p", "-t", pane, SCREEN_FMT], capture_output=True, text=True, timeout=5)
+    if cap.returncode or meta.returncode:
+        return None
+    x, y, cols, rows, shown = (int(v) for v in meta.stdout.split())
+    lines = cap.stdout.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return {"lines": lines, "cols": cols, "rows": rows, "cursor": {"x": x, "y": y, "shown": bool(shown)}}
+
+
+def keys_args(pane, keys):
+    """tmux commands for keys: a list of {"key": name} (from KEYS) or {"text": str}. ValueError on others."""
+    if not isinstance(keys, list) or not keys or len(keys) > 200:
+        raise ValueError("keys: a list of 1 to 200 items")
+    out = []
+    for k in keys:
+        if isinstance(k, dict) and set(k) == {"key"} and k["key"] in KEYS:
+            out.append(["tmux", "send-keys", "-t", pane, k["key"]])
+        elif isinstance(k, dict) and set(k) == {"text"} and isinstance(k["text"], str) and 0 < len(k["text"]) <= 4000:
+            out.append(["tmux", "send-keys", "-t", pane, "-l", k["text"]])
+        else:
+            raise ValueError(f"keys: bad item {k!r}")
+    return out
+
+
+def resize_args(pane, cols, rows):
+    """tmux command sizing the window of pane to cols x rows (Nest's Terminal tab)."""
+    if not (20 <= cols <= 400 and 5 <= rows <= 200):
+        raise ValueError("size: cols 20 to 400, rows 5 to 200")
+    return ["tmux", "resize-window", "-t", pane, "-x", str(cols), "-y", str(rows)]
 
 
 def focus(pid, backend=None):

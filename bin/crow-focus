@@ -12,8 +12,8 @@
 Goes through the terminal backend (crow_term: CROW_TERMINAL=kitty|tmux|print).
 Focus: finds the window (kitty) or pane (tmux) running PID, matching its own process or any
 ancestor of PID (the shell the session was started from). Resume: when no window holds it (the
-process is gone or runs elsewhere), opens a new window in DIR running `cdx ACCOUNT --dir DIR --resume`;
-the print backend prints that command instead. --session resumes that session id (`--resume ID`);
+process is gone or runs elsewhere), opens a new window in DIR running `cdx resume ACCOUNT --project DIR [--conversation ID]`;
+the print backend prints that command instead. --session resumes that session id (`--conversation ID`);
 with --pid 0 it never looks for a window (a History row).
 --send types TEXT and Enter into the window holding PID (the deck's answer to an agent question) and
 never resumes: it exits 1 when no window holds the session (always, on the print backend) or when the
@@ -26,6 +26,7 @@ closing the window leaves the session running. A PID already in a kitty window i
 --json (send, interrupt, stop, attach): exit 0 done, 1 refused (no window, not a claude pid), 2 error (bad
 arguments, the signal failed). Schema: logics/specs/script_contract/schemas/action.schema.json.
 """
+import json
 import os, signal, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -127,7 +128,7 @@ def main(argv):
     account, cwd = opts.get("account"), opts.get("cwd")
     if not account or not cwd:
         sys.exit(__doc__)
-    resume = ["cdx", account, "--dir", cwd, "--resume"] + ([opts["session"]] if opts.get("session") else [])
+    resume = ["cdx", "resume", account, "--project", cwd] + (["--conversation", opts["session"]] if opts.get("session") else [])
     if dry:
         print(f"focus the {backend} window holding pid {pid}, else: {crow_term.print_line(resume, cwd)}")
         return 0
@@ -140,6 +141,11 @@ def main(argv):
         out = crow_term.open_window(resume, f"crow · {os.path.basename(cwd)}", cwd, crow_term.clean_env(), backend=backend)
     except (OSError, subprocess.CalledProcessError) as e:
         sys.exit(f"crow-focus: could not open a {backend} window ({e})")
+    if out.startswith("tmux "):
+        # Headless backend (core, Nest; item_240): one JSON line naming the detached tmux session.
+        print(json.dumps({"ok": True, "message": f"resumed {os.path.basename(cwd)} on {account}, no window",
+                          "account": account, "tmux": out[5:]}))
+        return 0
     print(f"resuming in a new {backend} window" if out == "opened" else f"run this in a new terminal to resume: {out}")
     return 0
 

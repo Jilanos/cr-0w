@@ -13,11 +13,13 @@ import { AskDock } from '../ui/AskDock'
 import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
 import { enterSubmits, rowsOf } from '../ui/keys'
 import { Sheet, type Confirm } from '../ui/Sheet'
+import { Terminal } from '../ui/Terminal'
 
 // Phone chat of one session, run or mission (item_177, boards chat-cover and
 // chat-cover-ask): every word of the conversation, tool calls folded to one line,
 // what waits on the owner docked above the reply box. With `log`, the same chat is the
-// right pane of Desk inner (board chat-inner): header, Chat|Log toggle, Pause and Stop.
+// right pane of Desk inner (board chat-inner): header, Chat|Terminal toggle, Pause and Stop.
+// Terminal is the session's tmux screen (item_240); agents outside tmux (runs) keep Log.
 
 const Mic = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -91,7 +93,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
   const [note, setNote] = useState('')
   const [menu, setMenu] = useState(false)
   const [sheet, setSheet] = useState<Confirm | null>(null)
-  const [tab, setTab] = useState<'chat' | 'log'>('chat')
+  const [tab, setTab] = useState<'chat' | 'side'>('chat')
   const inner = log !== undefined
 
   const name = agent ? (agent.kind === 'run' ? agent.label || agent.run_id || String(agent.pid) : agent.title || agent.project) : mission ? title(mission) : 'Conversation'
@@ -119,6 +121,9 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
     if (el && pinned.current) el.scrollTop = el.scrollHeight
   }, [blocks.length, waits, tab, sent.length])
   useEffect(() => { pinned.current = true }, [target])
+  // A session stuck on a first-run dialog (setup) is answered in its terminal.
+  const setup = agent?.state === 'setup' && !!agent.tmux
+  useEffect(() => { if (setup) setTab('side') }, [setup, tkey])
 
   // The box answers a mission ask with its free-text verb, else types into the session.
   const textVerb: InboxVerb | undefined = answer.item?.verbs.find((v) => v === 'answer' || v === 'msg')
@@ -205,12 +210,6 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
       })
     }
   }
-  // A headless session (item_188): open a terminal window on the desktop attached to it.
-  const attach = () => {
-    if (!agent) return
-    setNote('')
-    act.attach(agent.pid).then((r) => setNote(r.message), (e: unknown) => setNote(e instanceof Error ? e.message : String(e)))
-  }
   const pause = () => {
     setMenu(false)
     if (!agent) return
@@ -230,10 +229,9 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
           <div className="ctl">
             <span className="seg2" role="group" aria-label="View">
               <button type="button" className={`seg${tab === 'chat' ? ' on' : ''}`} aria-pressed={tab === 'chat'} onClick={() => setTab('chat')}>Chat</button>
-              <button type="button" className={`seg${tab === 'log' ? ' on' : ''}`} aria-pressed={tab === 'log'} onClick={() => setTab('log')}>Log</button>
+              <button type="button" className={`seg${tab === 'side' ? ' on' : ''}`} aria-pressed={tab === 'side'} onClick={() => setTab('side')}>{agent?.tmux ? 'Terminal' : 'Log'}</button>
             </span>
             <span className="f1" />
-            {agent?.tmux && <button type="button" className="btn" title={`Attach a terminal to tmux session ${agent.tmux}`} onClick={attach}>Terminal</button>}
             {agent?.kind === 'session' && <button type="button" className="btn" onClick={pause}>Pause</button>}
             {stoppable && <button type="button" className="btn x" onClick={stop}>Stop</button>}
           </div>
@@ -256,7 +254,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
           )}
         </>
       )}
-      {inner && tab === 'log' ? log : (<>
+      {inner && tab === 'side' ? (agent?.tmux ? <Terminal key={agent.pid} pid={agent.pid} /> : log) : (<>
       <div className="chat" ref={box} onScroll={(e) => {
         const el = e.currentTarget
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40

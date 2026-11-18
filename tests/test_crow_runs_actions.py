@@ -202,3 +202,17 @@ def test_codex_report_skips_a_one_line_postscript(cr, monkeypatch, tmp_path, tex
     monkeypatch.setattr(cr, "sh", lambda *a, **k: json.dumps({"report": {"final_message": texts[-1]}}))
     monkeypatch.setattr(cr, "mark_seen", lambda *a: None)
     assert cr.report("abc") == want
+
+
+def test_headless_session_without_id_is_listed_as_setup(cr, monkeypatch, tmp_path):
+    """item_240: a Nest session stuck on a first-run dialog has no session id yet; a plain helper is dropped."""
+    proc = {"provider": "claude", "argv": ["claude"], "cwd": str(tmp_path), "home": str(tmp_path / "home"),
+            "account": "rk1", "started": 0}
+    procs = [{**proc, "pid": 11}, {**proc, "pid": 12}, {**proc, "pid": 13}]
+    monkeypatch.setattr(cr, "agent_procs", lambda proc="/proc": procs)
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr, "finished_rows", lambda since, ttl=8: {})
+    monkeypatch.setattr(cr.crow_term, "tmux_sessions_by_pid", lambda: {11: "crow-lazytf-101010", 12: "work"})
+    monkeypatch.setattr(cr.crow_term, "tmux_session_for", lambda pid, panes: panes.get(pid))
+    agents = cr.collect("today")["agents"]
+    assert [(a["pid"], a["state"], a["tmux"]) for a in agents] == [(11, "setup", "crow-lazytf-101010")]

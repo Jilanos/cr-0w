@@ -784,16 +784,22 @@ def collect(since="today", include_unledgered=False):
         except (OSError, ValueError):
             pass
         sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
-        if not sid and p["provider"] == "claude":
-            continue  # short-lived helper process, not an agent
         kind = "run" if is_headless(p["argv"]) else "session"
+        tmux = crow_term.tmux_session_for(p["pid"], panes) if kind == "session" else None
+        # No session id yet: a short-lived helper, or a headless Nest session stuck on a
+        # first-run dialog (item_240), listed as "setup" so Nest can answer it in its terminal.
+        setup = not sid and p["provider"] == "claude"
+        if setup and not (tmux or "").startswith(crow_term.HEADLESS_PREFIX):
+            continue
         account = p["account"] or (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
         tpath = transcript_path(p["home"], p["cwd"], sid) if sid and p["provider"] == "claude" else None
         mtime = tpath.stat().st_mtime if tpath and tpath.exists() else p["started"]
         t = read_transcript(tpath) if tpath else {}
         idle = now - mtime
         prompt = crow_lib.pending_prompt(p["pid"], meta)
-        if prompt or meta.get("status") == "waiting":
+        if setup:
+            state = "setup"
+        elif prompt or meta.get("status") == "waiting":
             state = "waiting"
         elif meta.get("status") == "busy" or idle < WORKING_S:
             state = "working"
@@ -810,7 +816,7 @@ def collect(since="today", include_unledgered=False):
             "prompt": {k: prompt.get(k) for k in crow_lib.PROMPT_FIELDS} if prompt else None,
             "mission": transcript_mission(tpath) if tpath and kind == "session" else None,
             "branch": t.get("branch") if kind == "session" else None,
-            "tmux": crow_term.tmux_session_for(p["pid"], panes) if kind == "session" else None,
+            "tmux": tmux,
         }
         if kind == "run":
             for rec in reversed(recs):

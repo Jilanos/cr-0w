@@ -15,7 +15,7 @@ import (
 // liveData are the section bodies the live actions check their targets against.
 var liveData = map[string]string{
 	"dispatch": `{"slots":{"busy":1,"max":2},"agents":[
-		{"kind":"session","pid":4242,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-1","run_id":null,
+		{"kind":"session","pid":4242,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-1","run_id":null,"tmux":"crow-demo-101010",
 		 "prompt":{"id":"p1","tool":"Bash","detail":"date +%s > stamp.txt","work_approval":null}},
 		{"kind":"session","pid":6161,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-3","run_id":null,
 		 "prompt":{"id":"p2","tool":"Bash","detail":"git push origin feat","work_approval":"demo"}},
@@ -148,7 +148,7 @@ func TestLiveActionsRunTheirScript(t *testing.T) {
 		{"/api/today/mail-1/done", "", "crow-today", []string{"done", "mail-1", "--json"}, nil},
 		{"/api/today/mail-2/snooze", "", "crow-today", []string{"snooze", "mail-2", "--json"}, nil},
 		{"/api/sessions/c0ffee00-0000-4000-8000-000000000001/resume", "", "crow-focus",
-			[]string{"--pid", "0", "--account", "main", "--cwd", "/src/demo", "--session", "c0ffee00-0000-4000-8000-000000000001"}, nil},
+			[]string{"--pid", "0", "--account", "main", "--cwd", "/src/demo", "--session", "c0ffee00-0000-4000-8000-000000000001"}, []string{"CROW_TERMINAL=headless"}},
 		{"/api/sessions", `{"project":"demo","account":"spare","prompt":"look at the build"}`, "crow",
 			[]string{"term", "--on-busy", "fail", "demo", "look at the build"}, []string{"CROW_TERMINAL=headless", "CROW_ACCOUNT=spare"}},
 		{"/api/sessions", `{"project":"demo"}`, "crow", []string{"term", "--on-busy", "fail", "demo"}, []string{"CROW_TERMINAL=headless"}},

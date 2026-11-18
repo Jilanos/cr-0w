@@ -114,6 +114,7 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	s.routeActions(mux)
 	s.routeLive(mux)
 	s.routeConversation(mux)
+	s.routeTerminal(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "no route")
 	})

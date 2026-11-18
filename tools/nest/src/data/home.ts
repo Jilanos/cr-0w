@@ -114,8 +114,9 @@ export function homeModel(snap: Snapshot): HomeModel {
     ...checksOf(sections.checks).map((c): NeedRow => ({
       key: `c:${c.id}`, kind: 'alert', title: c.what, sub: [c.why, c.due].filter(Boolean).join(' · '), action: cap(c.action), href: '/desk',
     })),
-    ...agents.filter((a) => a.kind === 'session' && a.state === 'waiting').map((a): NeedRow => ({
-      key: `s:${a.pid}`, kind: 'session', title: `${a.project} · ${bare(a)}`, sub: `session waits · ${mins(a.started_at, now)} · ${a.account}`, action: 'Answer', href: deskOf(a),
+    // setup (item_240): a headless session stuck on a first-run dialog, answered in its Terminal tab.
+    ...agents.filter((a) => a.kind === 'session' && (a.state === 'waiting' || a.state === 'setup')).map((a): NeedRow => ({
+      key: `s:${a.pid}`, kind: 'session', title: `${a.project} · ${bare(a)}`, sub: `${a.state === 'setup' ? 'session waits on setup' : 'session waits'} · ${mins(a.started_at, now)} · ${a.account}`, action: 'Answer', href: deskOf(a),
     })),
     ...asks.map((r): NeedRow => {
       const m = missions.find((x) => x.id === r.mission)
@@ -136,7 +137,7 @@ export function homeModel(snap: Snapshot): HomeModel {
     }),
     ...agents.map((a): RunRow => ({
       key: `a:${a.pid}`, kind: a.kind, title: `${a.project} · ${bare(a)}`, state: a.state ?? 'working', age: mins(a.started_at, now),
-      account: a.account, waiting: a.state === 'waiting', href: deskOf(a, a.kind === 'session'),
+      account: a.account, waiting: a.state === 'waiting' || a.state === 'setup', href: deskOf(a, a.kind === 'session'),
     })),
   ]
 

@@ -24,7 +24,9 @@ const MODELS = ['default', 'sonnet', 'opus', 'haiku']
 const INNER = '(min-width: 600px)'
 const LATER = 'Arrives with the live API'
 const nameOf = (a: Agent) => (a.kind === 'run' ? a.label || a.run_id || String(a.pid) : a.title || a.project)
-const waits = (a: Agent) => a.state === 'waiting'
+// setup (item_240): a headless session stuck on a first-run dialog; its Terminal tab answers it.
+const waits = (a: Agent) => a.state === 'waiting' || a.state === 'setup'
+const said = (a: Agent) => (a.state === 'setup' ? 'waits on setup' : waits(a) ? 'waits' : a.state)
 
 // ---- icons (board paths) ----
 const Ring = ({ dashed, c = 'c-w' }: { dashed?: boolean; c?: string }) => (
@@ -191,7 +193,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const open = () => setSheet({
     title: 'New session', lead: `Starts a claude session on ${start.project} here, with no window. Its chat opens once it shows up.`, quote: start.prompt || undefined,
     target: [['project', start.project], ['account', start.account || 'auto']],
-    note: 'Fails when that account is busy; nothing else is started. Terminal attaches a window to it later.', ok: 'Start session',
+    note: 'Fails when that account is busy; nothing else is started. Its Terminal tab shows the session screen.', ok: 'Start session',
     run: wrap(`/session ${start.project}`, async () => {
       const r = await act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined })
       if (r.tmux) setOpening(r.tmux)
@@ -199,9 +201,13 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     }, () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
   })
   const resume = (r: Resumable) => setSheet({
-    title: 'Resume session', lead: `Reopens the conversation of ${r.project} in a new window.`,
+    title: 'Resume session', lead: `Reopens the conversation of ${r.project} here, with no window. Its chat opens once it shows up.`,
     target: [['project', r.project], ['account', r.account], ['id', r.conversation_id.slice(0, 8)]],
-    note: 'Same conversation, same account.', ok: 'Resume', run: wrap(`Resume ${r.project}`, () => act.resume(r.conversation_id, r.account)),
+    note: 'Same conversation, same account.', ok: 'Resume', run: wrap(`Resume ${r.project}`, async () => {
+      const res = await act.resume(r.conversation_id, r.account)
+      if (res.tmux) setOpening(res.tmux)
+      return res
+    }),
   })
   // Queued missions sit under the slots; the row's ⋯ cancels one (crow mission cancel).
   const queue = snap.missions.filter((m) => m.state === 'queued' || m.state === 'preflight')
@@ -599,7 +605,7 @@ function DeskLaptop({ d }: { d: D }) {
               {d.sessions.map((s) => (
                 <div key={s.pid} className={`row${s === a ? ' on' : ''}`}>
                   {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
-                  <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {waits(s) ? 'waits' : s.state}</span>
+                  <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {said(s)}</span>
                   <button type="button" className={`btn${waits(s) ? ' p' : ''}`} onClick={() => d.pick(s, waits(s) && !s.prompt)}>Open</button>
                 </div>
               ))}
@@ -655,7 +661,7 @@ function DeskCover({ d }: { d: D }) {
   const queued = d.resumable.slice(0, 2 - rest.length)
   const hero = a ? (
         <section className={`gcard dhero${waits(a) ? ' n' : ''}`} aria-labelledby="ch">
-          <div className="gt"><span className={waits(a) ? 'c-n' : 'c-w'}>● {d.slotOf(a) || 'Session'} · {waits(a) ? 'waits' : a.state}</span><span>{a.account} · {a.project}</span></div>
+          <div className="gt"><span className={waits(a) ? 'c-n' : 'c-w'}>● {d.slotOf(a) || 'Session'} · {said(a)}</span><span>{a.account} · {a.project}</span></div>
           <div className="hr">
             <div className="ring">
               <svg width="122" height="122" aria-hidden="true">
@@ -701,7 +707,7 @@ function DeskCover({ d }: { d: D }) {
         {rest.map((x) => (
           <button type="button" key={x.pid} className="row r2" onClick={() => navigate(`/desk/${x.pid}`)}>
             <span className={`ic${waits(x) ? ' n' : ''}`}>{waits(x) ? <Diamond s={14} /> : <Spin />}</span>
-            <span className="t"><b>{d.slotOf(x) ? `${d.slotOf(x)} · ` : ''}{nameOf(x)}</b><span>{x.account} · {waits(x) ? 'waits' : x.state}</span></span>
+            <span className="t"><b>{d.slotOf(x) ? `${d.slotOf(x)} · ` : ''}{nameOf(x)}</b><span>{x.account} · {said(x)}</span></span>
             <span className="sm num">{d.since(x)}</span><span className="chev">›</span>
           </button>
         ))}
