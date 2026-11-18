@@ -213,7 +213,7 @@ try {
     await page.shot('real-file-open-dry');
   });
   // Routines execute for real unless simulate_in_trial is set: clicking them is opt-in.
-  for(const label of ['Mise à jour','Mise à jour machine']) await check('routine-'+label.replaceAll(' ','-'),async()=>{
+  for(const label of ['Maj','Mise à jour machine']) await check('routine-'+label.replaceAll(' ','-'),async()=>{
     if(!args.includes('--routines'))return {limited:true,reason:'Routines execute for real. Pass --routines with simulate_in_trial: true.'};
     await page.click('#topbar-actions .btn',label);
     await poll(`document.querySelector('.drawer')?.textContent.includes('Mode essai') || document.querySelector('#drawer')?.textContent.includes('Mode essai')`);

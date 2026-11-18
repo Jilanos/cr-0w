@@ -177,3 +177,108 @@ $result
     path = subprocess.run(['wslpath', '-w', str(script)], capture_output=True, text=True, check=True).stdout.strip()
     result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path], capture_output=True, timeout=20)
     assert result.returncode == 0, result.stderr.decode(errors='replace')
+
+
+def test_panel_connection_label_and_native_sync_are_distinct_from_routines(panel):
+    app, _ = panel
+    assert app.mail.connection()['label'] == 'Outlook classique : non ouvert (repli connecteur)'
+    class Backend:
+        def probe(self):
+            return {'connected': True, 'folders_resolvable': True}
+    app.mail.com = Backend()
+    assert app.readers.state()['mail']['connection']['label'] == 'Outlook classique : connecté'
+    _, op = app.mutate('POST', '/api/mail/sync', {'request_id': 'outlook-only'})
+    assert app.store.get('jobs', op['operation_id'])['kind'] == 'outlook_com'
+    assert not any(o['kind'].startswith('routine.') for o in app.store.all('operations'))
+    assert any(o['kind'] == 'calendar.sync' for o in app.store.all('operations'))
+
+
+def test_shared_mailbox_tree_does_not_change_message_source_or_archive(panel):
+    from test_panel_api import snapshot
+    app, _ = panel
+    value = snapshot()
+    source = next(f for f in value['folders'] if f['well_known'] == 'inbox')
+    archive = next(f for f in value['folders'] if f['well_known'] == 'archive')
+    for folder in value['folders']:
+        folder['store_id'] = 'primary'
+    for row in value['items']:
+        row.update(folder_id=source['id'], store_id='primary')
+    value['folders'][:0] = [{'id': 'shared-inbox', 'path': 'Shared/Inbox', 'well_known': 'inbox', 'store_id': 'shared'},
+                            {'id': 'shared-archive', 'path': 'Shared/Archive', 'well_known': 'archive', 'store_id': 'shared'}]
+    app.mail.publish(value)
+    plan = app.mail.plan({'snapshot_rev': app.mail.raw()['snapshot_rev'], 'items': [{'message_id': value['items'][0]['id'], 'action': 'archive'}]})
+    assert plan['items'][0]['source_folder_id'] == source['id']
+    assert plan['items'][0]['folder_id'] == archive['id']
+
+
+def test_powershell_inline_repair_preserves_bytes_and_remaps_cid(tmp_path):
+    import shutil
+    if not shutil.which('powershell.exe') or not shutil.which('wslpath'):
+        pytest.skip('Windows PowerShell bridge unavailable')
+    source = (Path(__file__).resolve().parents[1] / 'bin/crow_panel/outlook_com.ps1').read_text(encoding='utf-8-sig')
+    functions = source[source.index('function Attachments('):source.index('\nfunction Summary(')] + source[source.index('function InlineCids('):source.index('\nfunction Tree')]
+    script = tmp_path / 'inline.ps1'
+    script.write_text('''
+$ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;using System.IO;using System.Collections;using System.Collections.Generic;
+public class Accessor { public string Cid=""; public object GetProperty(string key){return Cid;} public void SetProperty(string key,object value){if(key.Contains("3712"))Cid=(string)value;} }
+public class Attached { public string FileName; public long Size; public int Type=1; public byte[] Bytes; public Accessor PropertyAccessor=new Accessor(); public Collection Owner; public void SaveAsFile(string dest){File.WriteAllBytes(dest,Bytes);} public void Delete(){Owner.Values.Remove(this);} }
+public class Collection:IEnumerable { public List<Attached> Values=new List<Attached>(); public int Count {get{return Values.Count;}} public Attached Item(int i){return Values[i-1];} public Attached Add(string path,int type){var bytes=File.ReadAllBytes(path);var a=new Attached{FileName=Path.GetFileName(path),Size=bytes.Length,Bytes=bytes,Owner=this};Values.Add(a);return a;} public IEnumerator GetEnumerator(){return Values.GetEnumerator();} }
+public class Draft { public string HTMLBody; public Collection Attachments=new Collection(); }
+'@
+''' + functions + '''
+$path=Join-Path $PSScriptRoot 'image.png'
+[IO.File]::WriteAllBytes($path,[byte[]]@(1,2,3,4,5))
+$source=New-Object Draft; $source.HTMLBody='<img src="cid:source">'
+$a=$source.Attachments.Add($path,1);$a.PropertyAccessor.Cid='source'
+$draft=New-Object Draft
+PreserveInline $source $draft '<img src="cid:quoted">'
+if($draft.Attachments.Count -ne 1 -or $draft.Attachments.Item(1).PropertyAccessor.Cid -ne 'quoted' -or $draft.Attachments.Item(1).Size -ne 5 -or $draft.Attachments.Item(1).Bytes[4] -ne 5){exit 1}
+''', encoding='utf-8-sig')
+    path = subprocess.run(['wslpath', '-w', str(script)], capture_output=True, text=True, check=True).stdout.strip()
+    result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path], capture_output=True, timeout=20)
+    assert result.returncode == 0, result.stderr.decode(errors='replace')
+
+
+def test_deleted_descendants_are_visible_but_not_filing_destinations(panel):
+    from test_panel_api import snapshot
+    app, _ = panel
+    value = snapshot()
+    value['folders'] += [{'id': 'deleted', 'path': 'Deleted', 'well_known': 'deleteditems'},
+                         {'id': 'deleted-child', 'path': 'Deleted/Old', 'parent_id': 'deleted'},
+                         {'id': 'inbox-child', 'path': 'Inbox/Project', 'parent_id': next(f['id'] for f in value['folders'] if f['well_known'] == 'inbox')}]
+    app.mail.publish(value)
+    folders = {f['id']: f for f in app.mail.folders()['folders']}
+    assert not folders['deleted-child']['allowed_target'] and folders['inbox-child']['allowed_target']
+
+
+def test_fast_native_sync_publishes_without_starting_a_model(panel):
+    from test_panel_api import snapshot
+    app, fake = panel
+    value = snapshot()
+    for row in value['items']:
+        row['proposal'] = None
+    class Backend:
+        options = {}
+        def probe(self):
+            return {'connected': True, 'folders_resolvable': True}
+        def call(self, action, **args):
+            if action == 'folders':
+                return {'folders': value['folders'], 'folders_complete': True}
+            if action == 'inbox':
+                return {k: value[k] for k in ('items', 'coverage', 'exhausted')}
+            if action == 'drafts':
+                return {'items': []}
+            raise AssertionError(action)
+        def scan_history(self, folders):
+            return {'folders': []}
+        def conversation(self, *args):
+            return {'items': [], 'complete': True}
+    app.mail.com = Backend()
+    op = app.mail.collect('mail.sync', {'request_id': 'fast', 'fast': True}, '/sync')
+    before = len(fake.calls)
+    app.launcher.tick(); op = app.operation(op['operation_id'])
+    assert op['status'] == 'succeeded' and op['result']['published']
+    assert len(fake.calls) == before and len(op['steps']) == 1
+    assert all(row['proposal'] is None for row in app.mail.raw()['items'])

@@ -165,6 +165,7 @@ function renderHeader() {
   if (mode === 'dry_run') status.append(h('span', { class: 'badge-mode', title: 'Aucune action mail réelle. Les routines s\'exécutent pour de vrai.', text: 'Mode essai' }));
   if (api.fixtures) status.append(h('span', { class: 'badge-fixtures', title: 'Données de fixtures, aucun serveur', text: api.scenario ? `fixtures · ${api.scenario}` : 'fixtures' }));
   if (st) {
+    if (st.mail?.connection) status.append(h('span', { class: 'outlook-status muted small', title: st.mail.connection.label, text: st.mail.connection.label }));
     const adm = st.admissions || {};
     const max = (cfg && cfg.max_parallel) || 2;
     const c = st.counts || {};
@@ -178,18 +179,37 @@ function renderHeader() {
   const routines = (cached('routines') || {}).routines || [];
   const defs = (cfg && cfg.routines) || [{ name: 'maj', label: 'Mise à jour' }, { name: 'daily_update', label: 'Mise à jour machine' }];
   const majLock = st && st.locks && (st.locks.maj || st.locks.pending);
+  actions.append(btn('Synchro Outlook', { icon: 'refresh', small: true, title: 'Actualiser les mails et l’agenda', onclick: syncOutlook }));
   for (const d of defs) {
+    const label = d.name === 'maj' ? 'Maj' : d.label;
     const r = routines.find((x) => x.name === d.name) || {};
     let reason = null;
     if (r.running) reason = `${d.label} déjà en cours`;
     else if (majLock) reason = `Mise à jour en cours depuis ${fmtDate(majLock.since)}`;
     else if (d.name === 'daily_update' && st && st.locks && st.locks.maintenance) reason = 'Maintenance en cours';
-    const b = btn(d.label, { icon: d.name === 'maj' ? 'refresh' : 'bolt', small: true, primary: d.name === 'maj',
+    const b = btn(label, { icon: d.name === 'maj' ? 'moon' : 'bolt', small: true, primary: d.name === 'maj',
       title: r.description || d.label, onclick: () => runRoutine(d.name, d.label, r.blocked_reason) });
     if (reason) disable(b, reason);
     else if (r.blocked_reason) { b.classList.add('has-warning'); b.title = r.blocked_reason; }
     actions.append(b);
   }
+}
+
+async function syncOutlook() {
+  try {
+    const op = await api.post('/api/mail/sync', { fast: true });
+    toast('Synchro Outlook lancée', { kind: 'info' });
+    if (op.calendar_operation_id) {
+      const calendar = await api.get(`/api/operations/${encodeURIComponent(op.calendar_operation_id)}`);
+      trackOp(calendar, async () => { await refresh(['dues', 'state']); render(); });
+    }
+    trackOp(op, async (final) => {
+      await refresh(['mail', 'folders', 'drafts', 'dues', 'caps', 'state']);
+      store.triage.checked.clear(); store.triage.choices?.clear();
+      render();
+      toast(final?.status === 'succeeded' ? 'Outlook synchronisé' : 'Synchronisation à vérifier', { kind: final?.status === 'succeeded' ? 'ok' : 'warn' });
+    }, { log: 'Synchro Outlook' });
+  } catch (err) { toastError(err, 'Synchro Outlook'); }
 }
 
 function renderBanners() {

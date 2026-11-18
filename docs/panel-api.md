@@ -358,3 +358,22 @@ attachments, size, quoted text and continued presence in Drafts.
 
 Links can be HTTPS or `outlook:` followed solely by a hexadecimal EntryID. Only
 mail-specific links accept that native protocol. No sending action is exposed.
+
+## Separate header actions and calendar cache
+
+The header has three actions: **Synchro Outlook** posts `/api/mail/sync` with
+`fast: true` and refreshes only mail/calendar snapshots, **Maj** runs the configured
+night routine, and **Mise à jour machine** runs only its configured update script.
+Fast sync publishes deterministic proposals without waiting for a proposal model.
+The mail view's normal sync retains the proposal-model phase for unresolved mail.
+`state.mail.connection` reports the current backend and its French display label.
+
+A valid complete calendar snapshot younger than 30 minutes that covers the requested
+window is reused. The calendar operation succeeds with `result.skipped: true` and
+launches no backend call. Partial, expired or short-window snapshots are reread.
+Folder discovery exclusions are private `dossiers_discover.exclude` globs relative
+to each discovery root; exclude both a directory and its descendants as needed.
+
+With several mailbox stores, each triage item freezes its actual source folder.
+Archive resolution uses that message's store. An unrelated shared Inbox or Archive
+cannot silently become the source or automatic archive destination.

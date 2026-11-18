@@ -247,3 +247,16 @@ Outlook's supported methods are documented in
 [Move](https://learn.microsoft.com/en-us/office/vba/api/outlook.mailitem.move),
 [conversation tables](https://learn.microsoft.com/en-us/office/vba/api/outlook.conversation.gettable)
 and [recurring instances](https://learn.microsoft.com/en-us/office/vba/api/outlook.items.includerecurrences).
+
+The header separates **Synchro Outlook** (mail/calendar reads), **Maj** (the night
+routine), and **Mise à jour machine** (the configured machine-update script).
+Calendar reads reuse complete snapshots for 30 minutes. Native sync has a fast
+mode without the proposal-model phase; use the mail view's normal sync to request
+proposals for the remaining messages.
+
+Native reply creation removes Outlook's automatic reply signature before inserting
+the configured closing. It preserves the original-message header and quoted HTML.
+If Word leaves empty inline placeholders, the bridge copies the corresponding
+original attachment bytes and keeps the quoted CID. Ambiguous image correspondence
+stops creation. Read-back evidence remains in `mail/draft-proofs` under private
+state. Inspect it before retrying an uncertain operation.

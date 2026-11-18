@@ -460,7 +460,7 @@ add('flow-classer', DESK, async (page, base) => {
 
 add('flow-routine-log', DESK, async (page, base) => {
   await open(page, base, { view: 'jobs', sel: { jobs: 'routine:maj' } });
-  await page.click('.topbar-actions .btn', 'Mise à jour');
+  await page.click('.topbar-actions .btn', 'Maj');
   await sleep(1500);
   await expect(page, '.drawer.open .log-lines li', null, 'journal en direct');
   await page.shot('flow-routine-log');
@@ -597,8 +597,8 @@ const SCEN = {
     await expect(page, '.banner-lock', 'Mise à jour en cours');
     const dis = await page.eval(`[...document.querySelectorAll('.detail .btn')].find((b) => b.textContent.includes('Réglé')).disabled`);
     if (dis) throw new Error('Réglé doit pouvoir rejoindre la file pendant une maj');
-    const maj = await page.eval(`[...document.querySelectorAll('.topbar-actions .btn')].find((b) => b.textContent.includes('Mise à jour')).disabled`);
-    if (!maj) throw new Error('bouton Mise à jour actif pendant une maj');
+    const maj = await page.eval(`[...document.querySelectorAll('.topbar-actions .btn')].find((b) => b.textContent.trim() === 'Maj').disabled`);
+    if (!maj) throw new Error('bouton Maj actif pendant une maj');
     await page.click('.detail .btn', 'Réglé');
     await expect(page, '.toast', 'Clic en file');
     await expect(page, '#pane-list .row[data-key="p_k3m9x2qa"]', null, 'ligne conservée pendant la file');

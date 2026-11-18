@@ -199,3 +199,25 @@ def test_calendar_profile_policy():
     for name in ("mcp__M365__outlook_email_search", "mcp__M365__outlook_update_event", "mcp__M365__outlook_delete_event", "Bash"):
         assert not tool_allowed("calendar", name, {})
     assert not tool_allowed("read", "mcp__M365__outlook_calendar_search", {})
+
+
+def test_calendar_younger_than_thirty_minutes_skips_all_backends(panel, tmp_path):
+    app, fake = panel
+    path = target(app, tmp_path)
+    data = snapshot(); publish(path, data)
+    calls = len(fake.calls)
+    op = app.calendar.sync({'request_id': 'fresh-calendar'}, '/calendar')
+    assert op['status'] == 'succeeded' and op['result']['skipped']
+    assert len(fake.calls) == calls and not app.store.get('jobs', op['operation_id'])
+    data['synced_at'] = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=31)).isoformat()
+    path.write_text(json.dumps(data))
+    op = app.calendar.sync({'request_id': 'stale-calendar'}, '/calendar')
+    assert op['status'] == 'queued'
+
+
+def test_fresh_incomplete_calendar_is_collected_again(panel, tmp_path):
+    app, _ = panel
+    path = target(app, tmp_path)
+    data = snapshot(); data['coverage']['status'] = 'partial'; publish(path, data)
+    op = app.calendar.sync({'request_id': 'partial-calendar'}, '/calendar')
+    assert op['status'] == 'queued'

@@ -78,7 +78,7 @@ class App:
                 {"name": name, "provider": c.get("provider", "claude" if name == "claude" else "codex"), "kinds": c.get("kinds", []),
                  "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]) if c.get("provider", "claude" if name == "claude" else "codex") == "claude"
                  else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
-            "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Mise à jour"}, {"name": "daily_update", "label": "Mise à jour machine"}],
+            "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Maj"}, {"name": "daily_update", "label": "Mise à jour machine"}],
             "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts"],
             "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
 
@@ -201,7 +201,10 @@ class App:
         if path == "/api/mail/sync":
             op = self.mail.collect("mail.sync", body, route, probe=body.get("probe") is True)
             if body.get("probe") is not True:
-                self.sync_calendar_with_mail(body, route)
+                calendar = self.sync_calendar_with_mail(body, route)
+                if calendar:
+                    op["calendar_operation_id"] = calendar["operation_id"]
+                    self.store.save_op(op)
             return 202, op
         if path == "/api/dossiers/create":
             return 200, self.dossiers.create(body)

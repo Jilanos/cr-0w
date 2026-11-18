@@ -128,7 +128,7 @@ class Readers:
     def routines(self):
         result = []
         waits = self.cfg["routines"].get("daily_update", {}).get("wait_runs", True)
-        for name, label, description in (("maj", "Mise à jour", "Mails, brouillons, relances, fichier en attente"),
+        for name, label, description in (("maj", "Maj", "Mails, brouillons, relances, fichier en attente"),
                                          ("daily_update", "Mise à jour machine", "Outils et dépôts." + (" Attend la fin des runs." if waits else ""))):
             ops = [o for o in self.store.all("operations") if o["kind"] == "routine." + name]
             active = next((o for o in reversed(ops) if o["status"] in ACTIVE), None)
@@ -322,4 +322,5 @@ class Readers:
         return {"generated_at": now(), "mode": self.cfg["mode"], "counts": counts, "alerts": alerts,
                 "locks": {"pending": pending["lock"], "maj": self.launcher.maj(), "maintenance": {"holder": "daily_update", "since": None, "run_id": None} if self.launcher.maintenance() else None},
                 "admissions": {"open": bool(admission), "reason": None if admission else "Maintenance ou état cdx indisponible."},
-                "mail": {"synced_at": mail["synced_at"], "stale": mail["stale"], "coverage": mail["coverage"]["status"]}, "since_last_visit": self.app.visits.changes()}
+                "mail": {"synced_at": mail["synced_at"], "stale": mail["stale"], "coverage": mail["coverage"]["status"],
+                         "connection": self.app.mail.connection()}, "since_last_visit": self.app.visits.changes()}

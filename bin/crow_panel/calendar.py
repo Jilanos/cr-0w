@@ -130,16 +130,28 @@ class CalendarSync:
         running = self.active()
         if running:
             return running
+        start, end, zone = self.window(days)
+        try:
+            cached = normalize(read_json(Calendar(self.cfg).path))
+            age = (dt.datetime.now(dt.timezone.utc) - timestamp(cached["synced_at"])).total_seconds()
+            if (0 <= age < 1800 and cached["coverage"]["status"] == "complete"
+                    and timestamp(cached["coverage"]["window_start"]) <= start
+                    and timestamp(cached["coverage"]["window_end"]) >= end):
+                op = self.store.operation(self.KIND, body, "Agenda déjà à jour")
+                op.update(status="succeeded", result={"skipped": True, "reason": "Instantané de moins de 30 minutes.",
+                                                     "synced_at": cached["synced_at"], "events": len(cached["events"])})
+                self.store.save_op(op)
+                return op
+        except (ValueError, KeyError, TypeError, AttributeError, ZoneInfoNotFoundError):
+            pass
         if self.app.mail.com_ready():
             op = self.store.operation(self.KIND, body, "Lecture de l'agenda Outlook classique")
-            start, end, zone = self.window(days)
             self.launcher.enqueue(op, {"kind": "outlook_com", "window_start": start.isoformat(), "window_end": end.isoformat(), "time_zone": str(zone)}, route, body, "collect")
             return op
         self.launcher.running(fresh=True)  # Fail before accepting when admission cannot be measured.
         op = self.store.operation(self.KIND, body, "Lecture de l'agenda")
         output = self.cfg.state / "calendar/incoming" / (op["operation_id"] + ".json")
         output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        start, end, zone = self.window(days)
         from .core import ENGINE
         prompt = (ENGINE / "bin/panel_prompts/calendar-sync.md").read_text() + "\nConfiguration: " + canonical({
             "output": str(output), "time_zone": str(zone), "window_start": start.isoformat(), "window_end": end.isoformat(),

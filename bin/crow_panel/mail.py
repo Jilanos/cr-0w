@@ -35,10 +35,15 @@ class Mail:
     def com_ready(self):
         return bool(self.com and self.com.probe().get("connected"))
 
+    def connection(self):
+        connected = self.com_ready()
+        return {"backend": "outlook_com" if connected else "connector", "connected": connected,
+                "label": "Outlook classique : " + ("connecté" if connected else "non ouvert (repli connecteur)")}
+
     def com_snapshot(self):
         native = self.raw().get("backend") == "outlook_com"
         if native != self.com_ready():
-            raise Problem(422, "backend_changed", "Le backend Outlook a changé. Synchronise la boîte avant cette action.")
+            raise Problem(422, "backend_changed", "Le mode de connexion à Outlook a changé. Synchronise la boîte avant cette action.")
         return native
 
     def history(self):
@@ -201,7 +206,9 @@ class Mail:
             return None
         target = value.get("folder_id")
         if value["action"] == "archive":
-            target = next((f["id"] for f in folders.values() if f.get("well_known") == "archive"), None)
+            store_id = folders.get(current, {}).get("store_id")
+            target = next((f["id"] for f in folders.values() if f.get("well_known") == "archive"
+                           and (not store_id or f.get("store_id") == store_id)), None)
         if value["action"] in ("move", "archive") and (not target or target not in folders or not folders[target].get("allowed_target") or target == current):
             return None
         if target and target not in folders:
@@ -221,9 +228,19 @@ class Mail:
         rows = cached.get("folders", snapshot.get("folders", []))
         allowed = self.cfg["mail"].get("allowed_folders", [])
         by_path = {r["path"]: r["id"] for r in rows}
+        by_id = {r["id"]: r for r in rows}
+        def system_branch(row):
+            seen = set()
+            while row:
+                if row["id"] in seen or row.get("well_known") in ("drafts", "sentitems", "deleteditems", "outbox", "junkemail"):
+                    return True
+                seen.add(row["id"])
+                parent = row.get("parent_id") or (by_path.get(row["path"].rsplit("/", 1)[0]) if "/" in row["path"] else None)
+                row = by_id.get(parent)
+            return False
         folders = []
         for row in rows:
-            permitted = row.get("mail_folder", True) and row.get("well_known") not in ("inbox", "drafts", "sentitems", "deleteditems", "outbox", "junkemail") and (not allowed or row["id"] in allowed)
+            permitted = row.get("mail_folder", True) and row.get("well_known") != "inbox" and not system_branch(row) and (not allowed or row["id"] in allowed)
             parent = row.get("parent_id") or by_path.get(row["path"].rsplit("/", 1)[0])
             folders.append({"id": row["id"], "path": row["path"], "well_known": row.get("well_known"), "allowed_target": permitted,
                             **({"store_id": row["store_id"]} if row.get("store_id") else {}),
@@ -301,6 +318,10 @@ class Mail:
         coverage = value["coverage"]
         if coverage.get("status") not in ("complete", "partial", "none"):
             raise ValueError("invalid coverage")
+        if (self.raw().get("backend", "connector") != value.get("backend", "connector")
+                and self.raw()["snapshot_rev"] and value.get("folders_complete") is not True):
+            return {"published": False, "coverage": {**coverage, "status": "partial",
+                    "errors": ["Connexion Outlook modifiée : liste complète des dossiers requise. Relance la synchronisation."]}, "invalid_proposals": 0}
         for field in ("started_at", "ended_at"):
             if coverage.get(field):
                 stamp = dt.datetime.fromisoformat(coverage[field])
@@ -463,7 +484,7 @@ class Mail:
             self.find(key)
         if self.com_ready() and (not key or self.com_snapshot()):
             op = self.store.operation(kind, body, "Synchronisation Outlook classique" if not key else "Lecture Outlook classique")
-            self.launcher.enqueue(op, {"kind": "outlook_com", "message_id": key, "probe": probe}, route, body, "collect" if not key else "fetch")
+            self.launcher.enqueue(op, {"kind": "outlook_com", "message_id": key, "probe": probe, "fast": body.get("fast") is True}, route, body, "collect" if not key else "fetch")
             return op
         if key:
             self.com_snapshot()
@@ -483,10 +504,10 @@ class Mail:
         if probe:
             prompt += ("\nAlso run a read-only capability probe. Enumerate the exact M365 tool names and parameter schemas you can discover. "
                        "Attempt the read tool " + denied + " once; it is intentionally denied before reaching the connector. "
-                       "Record its actual denial without retry. Include probe:{tools:[names],denied_tool:{name,blocked},notes:[]} in the output. "
+                       "Record its actual denial without retry. Include probe:{tools:[names],schemas:{tool_name:actual JSON schema},denied_tool:{name,blocked},notes:[]} in the output. "
                        "Never exercise any write tool. If a tool is absent, report it absent.")
         self.launcher.enqueue(op, {"account": "claude", "model": "sonnet", "provider": "claude", "cwd": str(self.cfg.home), "profile": "read",
-                                  "prompt": prompt, "output": str(output), "message_id": key, "probe": probe}, route, body, "collect" if not key else "fetch")
+                                  "prompt": prompt, "output": str(output), "message_id": key, "probe": probe, "fast": body.get("fast") is True}, route, body, "collect" if not key else "fetch")
         if probe:
             job = self.store.get("jobs", op["operation_id"])
             job["deny_tools"] = [denied]
@@ -553,9 +574,11 @@ class Mail:
                 raise Problem(400, "bad_request", "Un message apparaît deux fois dans le lot.")
             seen.add(key)
             row = self.find(key)
+            source = row.get("folder_id") or source
             target = selected.get("folder_id")
             if action == "archive":
-                target = next((f["id"] for f in folders.values() if f["well_known"] == "archive"), None)
+                target = next((f["id"] for f in folders.values() if f["well_known"] == "archive"
+                               and (not row.get("store_id") or f.get("store_id") == row["store_id"])), None)
             if action not in ("move", "archive") or not source or target not in folders or not folders[target]["allowed_target"]:
                 rejected.append({"message_id": key, "action": action, "code": "capability_unavailable", "message": "Corbeille indisponible : outil absent." if action == "trash" else "Action ou dossier non autorisé."})
                 continue
@@ -896,7 +919,7 @@ class Mail:
                     op["status"] = "partial"
                 if job.get("probe"):
                     self.probe_evidence(op, job, row, output)
-                if op["result"]["published"] and op["result"]["coverage"]["status"] == "complete" and not job.get("probe") and "history" in output:
+                if op["result"]["published"] and op["result"]["coverage"]["status"] == "complete" and not job.get("probe") and not job.get("fast") and "history" in output:
                     op["result"]["proposals"] = self.proposal_counts()
                     self.queue_proposals(op)
             elif op["kind"] == "mail.fetch":
