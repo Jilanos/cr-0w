@@ -62,3 +62,4 @@ Put a temporary `globalThis.__ring`-style switch in the scene, shoot each varian
 - `reducedMotion: 'reduce'` hides the GL head: screenshot `.hero-box` without it.
 - Live core data for a check: `curl --unix-socket local/state/core.sock http://x/api/state/<section>`.
 - After a Nest change, run `npm run build`: core serves `tools/nest/dist`, so the phone keeps the old app until then (no restart needed).
+- After a core (Go) change, rebuild the binary before restarting: `cd tools/crow-core && go build -o crow-core . && systemctl --user restart crow-core`. A restart alone reruns the old binary. A section Nest reads but the old core lacks returns 404, and Nest shows every screen empty with "core down".
