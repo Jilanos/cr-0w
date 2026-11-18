@@ -1,10 +1,10 @@
 ## item_246_desk_rework_for_day_to_day_use_with_the_butler_rail - Desk rework for day to day use with the butler rail
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 80%
-> Progress: 0%
+> Progress: 90%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -63,6 +63,9 @@
 - Owner 2026-11-18: page has a lot to take in; rework for day to day use. Keep the rail pushing. Open session 2/3, not 50/50.
 - Owner 2026-11-18: picked B (sessions on top of the left column) "this way when a work task is launched it goes up into sessions (animation later)".
 - Design: vault `Research/nest-design/item_246/desk-B.png` is the approved layout (annotated sketch, not a pixel board); `sketch.html?v=B` is its source. Decisions in `design-notes.md` there.
+
+- Build 2026-11-18 (a1e0a77, core retry route c8541ae): layout B on laptop. Sessions block (runs, sessions with Open, queue line), filter chips Needs/Running/Ready/All (Needs by default), one action per row (Retry, Open MR, Allow, Answer), Ready to run = Logics Ready + at most 3 sessions parked in the last 24h (owner 18/11), KPIs working/need you·oldest/failed/done today/ok rate 7d. Shots in vault `Research/nest-design/item_246/build/`.
+- Left: owner check vs desk-B.png. A running item still shows under the Running chip (it is not removed from Work, only from the default Needs view). Ready ▶ dispatches with account auto.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
