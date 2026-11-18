@@ -45,7 +45,7 @@ export function makeViews(ctx) {
   }
 
   function dueChip(it) {
-    if (it.overdue_workdays > 0) return chip(`${fmtDate(it.due, false)} · ${it.overdue_workdays} j ouvrés de retard`, 'late');
+    if (it.overdue_workdays > 0) { const c = chip(`+${it.overdue_workdays} j ouvrés`, 'late'); c.title = `Échéance ${fmtDate(it.due, false)} dépassée`; return c; }
     if (!it.due) return null;
     const d = daysFromNow(it.due);
     if (d === 0) return chip("aujourd'hui", 'soon');
@@ -73,7 +73,7 @@ export function makeViews(ctx) {
     return {
       key: it.id, pending: (it.actions || []).includes('done') ? it : null,
       text: `${it.title} ${segText(it.cells.Attendu || it.cells.text)} ${it.due_raw || ''}`,
-      dim: it.section === 'done', topic: pendingTopic(it),
+      dim: it.section === 'done', cls: (it.actions || []).includes('done') ? 'has-quick' : null, topic: pendingTopic(it),
       row: () => pendingRow(it, opts), detail: () => pendingDetail(it),
     };
   }
@@ -269,7 +269,7 @@ export function makeViews(ctx) {
       const runRows = [];
       if (runs && runs.runs) {
         for (const r of runs.runs) runRows.push(cardRow(() => ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
-          h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account} · ${r.status === 'running' ? ago(r.started_at) : RUN_STATE[r.status] || r.status}` })));
+          h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account} · ${RUN_STATE[r.status] || r.status}` })));
         for (const q of runs.queue || []) runRows.push(cardRow(() => ctx.go('jobs', 'queue:' + q.operation_id), runDot('queued'),
           h('span', { class: 'grow', text: q.label }), h('span', { class: 'muted small', text: `en file · position ${q.position}` })));
       }
@@ -459,8 +459,8 @@ export function makeViews(ctx) {
     const syncBtn = btn('Synchroniser', { icon: 'refresh', small: true, ghost: true, onclick: syncMail });
     const line = h('div', { class: ['fresh', list.stale && 'fresh-stale', cov.status === 'partial' && 'fresh-partial'] },
       h('span', { class: 'fresh-dot' }),
-      h('span', { text: list.synced_at ? `Synchro ${ago(list.synced_at)}` : 'Jamais synchronisée' }),
-      h('span', { class: 'muted', text: `· couverture ${covLabel}${cov.collected != null ? ` · ${cov.collected} mails` : ''}${cov.total_known != null ? ` sur ${cov.total_known}` : ''}` }),
+      h('span', { class: 'fresh-text' }, h('span', { text: list.synced_at ? `Synchro ${ago(list.synced_at)}` : 'Jamais synchronisée' }),
+        h('span', { class: 'muted', text: ` · couverture ${covLabel}${cov.collected != null ? ` · ${cov.collected} mails` : ''}${cov.total_known != null ? ` sur ${cov.total_known}` : ''}` })),
       syncBtn);
     const box = h('div', { class: 'fresh-box' }, line);
     if (list.stale && list.synced_at) box.append(h('p', { class: 'small warn-text', text: `Instantané plus vieux que ${list.stale_after_minutes} min.` }));

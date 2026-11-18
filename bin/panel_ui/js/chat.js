@@ -11,15 +11,17 @@ export function setChatDraft(topicId, text, intent) {
   drafts.set(topicId, Object.assign(d, { text, intent }));
 }
 
+let wantFocus = false;
+
+// Focuses the composer now, or as soon as the thread has loaded.
 export function focusComposer() {
-  setTimeout(() => {
-    const ta = document.getElementById('chat-input');
-    if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
-  }, 0);
+  const ta = document.getElementById('chat-input');
+  if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); wantFocus = false; } else wantFocus = true;
 }
 
 export function renderChat(pane, topic, ctx) {
   current = { pane, topic, ctx };
+  if (!topic || !topic.topic_id) wantFocus = false;
   const closeBtn = h('button', { type: 'button', class: 'icon-btn chat-close', 'aria-label': 'Fermer le chat', onclick: () => document.body.classList.remove('chat-open') }, icon('close'));
   if (!topic) {
     pane.append(h('div', { class: 'chat-head' }, h('div', { class: 'chat-title', text: 'Chat' }), closeBtn),
@@ -200,4 +202,5 @@ function renderComposer(doc, foot, topic, ctx, log) {
   foot.append(intentChip, h('div', { class: 'composer' }, ta, send),
     h('div', { class: 'composer-opts' }, h('label', { class: 'inline-label' }, h('span', { class: 'muted small', text: 'Modèle' }), modelSel),
       h('label', { class: 'inline-label' }, h('span', { class: 'muted small', text: 'Compte' }), accSel), defBtn));
+  if (wantFocus) focusComposer();
 }

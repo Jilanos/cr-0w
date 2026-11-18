@@ -266,9 +266,6 @@ function renderDetail() {
       h('p', { class: 'muted', text: 'j / k pour naviguer, Entrée pour ouvrir.' })));
     return;
   }
-  const back = h('button', { type: 'button', class: 'btn btn-ghost btn-small only-narrow detail-back', onclick: () => { store.showDetail = false; layoutNarrow(); } },
-    icon('back'), h('span', { text: 'Retour' }));
-  pane.append(back);
   try {
     pane.append(e.detail());
   } catch (err) {
