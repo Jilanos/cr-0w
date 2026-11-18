@@ -126,6 +126,8 @@ try {
     await page.key('Escape');
     await page.click('.segmented button','Propositions');
     await page.eval(`(()=>{const s=document.querySelector('#pane-list select[aria-label=Action]');s.value='move';s.dispatchEvent(new Event('change'));})()`);
+    await page.click('.triage-controls .folder-change');
+    await page.click('.folder-option:not(:disabled)');
     await page.click('#pane-list input[type=checkbox]:not(:disabled)');
     await page.click('.list-foot .btn','Valider');
     await poll(`document.querySelector('.detail')?.textContent.includes('Exécuter')`);
@@ -175,6 +177,8 @@ try {
   await check('classer-dry',async()=>{
     await go('Mails'); await selectFirst();
     await page.click('.detail .btn','Classer');
+    await page.eval(`(()=>{const s=document.querySelector('.menu select[aria-label=Action]');s.value='move';s.dispatchEvent(new Event('change'));})()`);
+    await page.click('.folder-option:not(:disabled)');
     await page.click('.menu .btn','Préparer le lot');
     await poll(`document.querySelector('.detail')?.textContent.includes('Lot de rangement figé')`);
     await page.shot('real-classer-plan');

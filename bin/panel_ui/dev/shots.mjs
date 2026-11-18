@@ -367,9 +367,9 @@ add('flow-reply-all', DESK, async (page, base) => {
 add('flow-triage', DESK, async (page, base) => {
   await open(page, base, { view: 'mail', mailMode: 'triage' });
   await expect(page, '.triage-row', null, 'propositions');
-  await page.click('.list-foot .link-btn', 'propositions sûres');
+  await expect(page, '#pane-list', 'Confiance haute');
   await page.shot('flow-triage-checked');
-  await page.click('.list-foot .btn-primary', 'Valider');
+  await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
   await sleep(300);
   await expect(page, '.detail h2', 'action', 'récapitulatif du lot');
   await page.shot('flow-triage-plan');
@@ -564,16 +564,14 @@ const SCEN = {
   },
   consumed: async (page, base) => {
     await open(page, base, { view: 'mail', scenario: 'consumed', mailMode: 'triage' });
-    await page.click('.list-foot .link-btn', 'propositions sûres');
-    await page.click('.list-foot .btn-primary', 'Valider');
+    await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
     await page.click('.detail .btn-primary', 'Exécuter');
     await sleep(400);
     await expect(page, '.toast', 'déjà été exécuté');
   },
   expired: async (page, base) => {
     await open(page, base, { view: 'mail', scenario: 'expired', mailMode: 'triage' });
-    await page.click('.list-foot .link-btn', 'propositions sûres');
-    await page.click('.list-foot .btn-primary', 'Valider');
+    await page.click('.list-foot .link-btn', 'Tout valider (haute confiance)');
     await page.click('.detail .btn-primary', 'Exécuter');
     await sleep(400);
     await expect(page, '.toast', 'expiré');

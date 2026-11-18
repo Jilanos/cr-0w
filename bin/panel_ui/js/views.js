@@ -581,7 +581,9 @@ export function makeViews(ctx) {
       const op = await ctx.api.post('/api/mail/sync', {});
       toast('Synchronisation lancée', { kind: 'info', detail: 'lecture seule' });
       ctx.trackOp(op, async (final) => {
-        await ctx.refresh(['mail', 'state']);
+        await ctx.refresh(['mail', 'folders', 'state']);
+        await completeMailPages();
+        triage.checked.clear(); triage.choices.clear();
         ctx.render();
         toast(final && final.status === 'succeeded' ? 'Boîte synchronisée' : `Synchronisation : ${final ? RUN_STATE[final.status] || final.status : 'inconnue'}`,
           { kind: final && final.status === 'succeeded' ? 'ok' : 'warn' });
@@ -594,6 +596,27 @@ export function makeViews(ctx) {
 
   const mailItems = () => ((cached('mail') || {}).items || []);
   const triage = store.triage;
+  let mailPages = null;
+  async function completeMailPages() {
+    if (mailPages) return mailPages;
+    mailPages = (async () => {
+      const list = await load('mail');
+      const cursors = new Set();
+      try {
+        while (list?.next_cursor && cached('mail') === list) {
+          const cursor = list.next_cursor;
+          if (cursors.has(cursor)) throw new Error('La pagination ne progresse plus.');
+          cursors.add(cursor);
+          const more = await ctx.api.get(`/api/mail?cursor=${encodeURIComponent(cursor)}&limit=200`);
+          if (more.snapshot_rev !== list.snapshot_rev) throw new Error('La boîte a changé. Recharge la liste.');
+          const known = new Set(list.items.map((m) => m.id));
+          list.items.push(...more.items.filter((m) => !known.has(m.id)));
+          list.next_cursor = more.next_cursor;
+        }
+      } catch (err) { toastError(err, 'Chargement des mails'); }
+    })();
+    try { await mailPages; } finally { mailPages = null; }
+  }
 
   function defaultChoice(m) {
     const p = m.proposal || {};
@@ -608,7 +631,7 @@ export function makeViews(ctx) {
       return (m.proposal && m.proposal.action === 'trash' && m.proposal.disabled_reason) || (cap && cap.reason) || 'Corbeille désactivée en v1';
     }
     if (c.action === 'archive' && !((cached('folders') || {}).folders || []).some(f => f.well_known === 'archive' && f.allowed_target)) return 'Dossier d’archive absent de l’instantané';
-    if (c.action === 'move' && !c.folder_id) return 'Choisis un dossier';
+    if (c.action === 'move' && !((cached('folders') || {}).folders || []).some((f) => f.id === c.folder_id && f.allowed_target)) return 'Choisis un dossier autorisé';
     if (!actionable(c)) return c.action === 'reply' ? 'Rien à ranger : réponse attendue' : 'Rien à ranger : garder dans la boîte';
     return null;
   }
@@ -632,8 +655,7 @@ export function makeViews(ctx) {
     const cb = h('input', { type: 'checkbox', class: 'check', 'aria-label': `Cocher ${m.subject}`, onchange: () => toggleCheck(m, cb.checked) });
     cb.checked = checked && !reason;
     if (reason) { disable(cb, reason); }
-    const folders = ((cached('folders') || {}).folders || []).filter((f) => f.allowed_target && f.well_known !== 'archive');
-    const actSel = h('select', { class: 'select select-small', 'aria-label': 'Action', onchange: () => setChoice(m, { action: actSel.value, folder_id: actSel.value === 'move' ? (c.folder_id || (folders[0] && folders[0].id) || null) : null }) },
+    const actSel = h('select', { class: 'select select-small', 'aria-label': 'Action', onchange: () => setChoice(m, { action: actSel.value, folder_id: actSel.value === 'move' ? c.folder_id : null }) },
       ['move', 'archive', 'keep', 'reply', 'trash'].map((a) => {
         const o = h('option', { value: a, text: ACTION_LABEL[a] });
         if (a === 'trash') { const cap = capability('mail_trash'); if (!cap || !cap.allowed) { o.disabled = true; o.textContent = 'Corbeille (indisponible)'; } }
@@ -689,7 +711,8 @@ export function makeViews(ctx) {
       triage.checked.clear();
       ctx.trackOp(op, async (final) => {
         triage.op = final;
-        await ctx.refresh(['mail', 'state']);
+        await ctx.refresh(['mail', 'folders', 'state']);
+        await completeMailPages();
         ctx.render();
         toast(final.summary || 'Lot exécuté', { kind: final.status === 'succeeded' ? 'ok' : 'warn', detail: final.dry_run ? 'mode essai : simulé' : null });
       });
@@ -829,8 +852,12 @@ export function makeViews(ctx) {
       if (a === (actionable(p) ? p.action : 'move')) o.selected = true;
       return o;
     }));
-    const fold = folderPicker(cached('folders'), p.folder_id);
-    const sync = () => { fold.setDisabled(act.value !== 'move'); };
+    const prepare = h('button', { type: 'submit', class: 'btn btn-primary btn-small', text: 'Préparer le lot' });
+    const fold = folderPicker(cached('folders'), p.folder_id, () => sync());
+    const sync = () => {
+      fold.setDisabled(act.value !== 'move');
+      prepare.disabled = act.value === 'move' && !folders.some((f) => f.id === fold.value);
+    };
     act.addEventListener('change', sync); sync();
     const form = h('form', { class: 'menu-form menu-form-col', onsubmit: (e) => {
       e.preventDefault(); closeMenus();
@@ -838,7 +865,7 @@ export function makeViews(ctx) {
       makePlan([{ message_id: d.id, action: act.value, folder_id: act.value === 'move' ? fold.value : undefined }]);
     } },
     h('div', { class: 'menu-label', text: p.action && actionable(p) ? `Proposition de crow : ${p.reason}` : 'Classer ce mail' }),
-    act, fold.element, h('button', { type: 'submit', class: 'btn btn-primary btn-small', text: 'Préparer le lot' }),
+    act, fold.element, prepare,
     h('p', { class: 'muted small', text: 'Le lot s\'affiche avant toute exécution.' }));
     popMenu(anchor, form);
   }
@@ -906,8 +933,8 @@ export function makeViews(ctx) {
   const mail = {
     title: 'Mails', icon: 'mail',
     count: (c) => ({ n: c.inbox ?? null }),
-    load: () => Promise.all([load('mail'), load('folders', null, { quiet: true }), load('caps', null, { quiet: true }), load('pending', null, { quiet: true })]),
-    reload: () => ctx.refresh(['mail', 'folders']).then(ctx.render),
+    load: () => Promise.all([completeMailPages(), load('folders', null, { quiet: true }), load('caps', null, { quiet: true }), load('pending', null, { quiet: true })]),
+    reload: () => ctx.refresh(['mail', 'folders']).then(completeMailPages).then(ctx.render),
     status: () => status(['mail']),
     listHead() {
       const list = cached('mail');
@@ -928,18 +955,22 @@ export function makeViews(ctx) {
       const out = [];
       const entry = (m) => ({ key: m.id, text: `${m.from.name} ${m.subject}`, topic: { topic_id: m.topic_id, title: m.subject, kind: 'mail', mailOnly: true },
         row: () => triageRow(m), detail: () => mailDetail(m) });
-      if (toFile.length) { out.push(groupHeader('À ranger', toFile.length)); toFile.forEach((m) => out.push(entry(m))); }
+      for (const confidence of ['high', 'medium', 'low']) {
+        const group = toFile.filter((m) => (m.proposal.confidence || 'low') === confidence);
+        if (group.length) { out.push(groupHeader(`Confiance ${conf(confidence)}`, group.length)); group.forEach((m) => out.push(entry(m))); }
+      }
       if (others.length) { out.push(groupHeader('Garder ou répondre', others.length)); others.forEach((m) => out.push(entry(m))); }
       return out;
     },
     listFoot() {
       if (store.mailMode === 'triage') {
         const n = triage.checked.size;
-        const safe = mailItems().filter((m) => m.proposal && m.proposal.allowed !== false && ['move', 'archive'].includes(m.proposal.action) && m.proposal.confidence === 'high');
+        const safe = mailItems().filter((m) => m.proposal && m.proposal.allowed !== false && ['move', 'archive'].includes(m.proposal.action) && m.proposal.confidence === 'high'
+          && choiceOf(m).action === m.proposal.action && (m.proposal.action !== 'move' || choiceOf(m).folder_id === m.proposal.folder_id) && !blockedReason(m, choiceOf(m)));
         return h('div', { class: 'list-foot sticky' },
-          h('button', { type: 'button', class: 'link-btn small', text: `Cocher les propositions sûres (${safe.length})`, onclick: () => {
-            safe.forEach((m) => { const c = choiceOf(m); if (!blockedReason(m, c)) triage.checked.set(m.id, c); }); ctx.renderList();
-          } }),
+          h('button', { type: 'button', class: 'link-btn small', text: `Tout valider (haute confiance) · ${safe.length}`, disabled: !safe.length || triage.busy,
+            onclick: () => makePlan(safe.slice(0, 500).map((m) => ({ message_id: m.id, ...defaultChoice(m) }))) }),
+          safe.length > 500 ? h('p', { class: 'small muted', text: 'Lots de 500 mails au maximum.' }) : null,
           triage.checked.size ? h('button', { type: 'button', class: 'link-btn small', text: 'Tout décocher', onclick: () => { triage.checked.clear(); ctx.renderList(); } }) : null,
           btn(`Valider ${n} action${n > 1 ? 's' : ''}`, { primary: true, icon: 'check', disabled: !n ? 'Coche au moins un mail' : triage.busy ? 'Préparation…' : null,
             onclick: () => makePlan([...triage.checked].map(([id, c]) => ({ message_id: id, action: c.action, folder_id: c.action === 'move' ? c.folder_id : undefined }))) }));

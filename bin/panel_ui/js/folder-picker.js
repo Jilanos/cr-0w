@@ -2,11 +2,12 @@ import { h, clear } from './ui.js';
 
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
 
+if (!document.getElementById('mail-picker-css')) document.head.append(h('link', {
+  id: 'mail-picker-css', rel: 'stylesheet', href: new URL('../mail.css', import.meta.url).href,
+}));
+
 // Shared by Classer and each proposal. Server values enter text nodes only.
 export function folderPicker(data = {}, selected, onChange = () => {}) {
-  if (!document.getElementById('mail-picker-css')) document.head.append(h('link', {
-    id: 'mail-picker-css', rel: 'stylesheet', href: new URL('../mail.css', import.meta.url).href,
-  }));
   const folders = [...(data.folders || [])].sort((a, b) => a.path.localeCompare(b.path));
   let value = selected || null;
   const list = h('div', { class: 'folder-options', role: 'listbox', 'aria-label': 'Dossiers Outlook' });
@@ -34,6 +35,8 @@ export function folderPicker(data = {}, selected, onChange = () => {}) {
     chosen.textContent = target ? `Choisi : ${target.path}` : 'Choisis une destination.';
   }
   const element = h('div', { class: 'folder-picker', onkeydown: (e) => {
+    if (e.key !== 'Escape') e.stopPropagation();
+    if (e.key === 'Enter' && e.target.matches('.folder-option:not(:disabled)')) { e.preventDefault(); e.target.click(); return; }
     if (e.key === 'Enter' && e.target === search) { e.preventDefault(); list.querySelector('button:not(:disabled)')?.focus(); }
     if (!['ArrowDown', 'ArrowUp'].includes(e.key)) return;
     e.preventDefault();
