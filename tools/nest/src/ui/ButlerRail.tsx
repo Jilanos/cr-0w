@@ -8,6 +8,7 @@ import { heroLiveOf, heroModel, type HeroModel } from '../hero/model'
 import { RailHead } from '../hero/RailHead'
 import { Link, navigate } from '../router'
 import { enterSubmits, rowsOf } from './keys'
+import { stickBottom } from './stickBottom'
 
 const FOLD_KEY = 'nest.rail'
 
@@ -100,12 +101,17 @@ export function ButlerChat({ snap, fold }: { snap: Snapshot; fold?: () => void }
   const [acct, setAcct] = useState<string | null>(null)
   const log = useRef<HTMLOListElement>(null)
   const accounts = useMemo(() => accountsOf(snap.sections.accounts), [snap.sections.accounts])
+  const stick = useRef<ReturnType<typeof stickBottom> | null>(null)
   const n = b?.messages.length ?? 0
+  const has = !!b
 
   useEffect(() => {
     const el = log.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [n, b?.partial])
+    if (!el) return
+    stick.current = stickBottom(el)
+    return () => { stick.current?.stop(); stick.current = null }
+  }, [has])
+  useEffect(() => { stick.current?.follow() }, [n, b?.partial, b?.busy])
 
   if (!b) return null
   const send = () => {
