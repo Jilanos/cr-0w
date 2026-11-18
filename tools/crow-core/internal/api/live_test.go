@@ -150,7 +150,9 @@ func TestLiveActionsRunTheirScript(t *testing.T) {
 		{"/api/sessions/c0ffee00-0000-4000-8000-000000000001/resume", "", "crow-focus",
 			[]string{"--pid", "0", "--account", "main", "--cwd", "/src/demo", "--session", "c0ffee00-0000-4000-8000-000000000001"}, nil},
 		{"/api/sessions", `{"project":"demo","account":"spare","prompt":"look at the build"}`, "crow",
-			[]string{"term", "--on-busy", "fail", "demo", "look at the build"}, []string{"CROW_ACCOUNT=spare"}},
+			[]string{"term", "--on-busy", "fail", "demo", "look at the build"}, []string{"CROW_TERMINAL=headless", "CROW_ACCOUNT=spare"}},
+		{"/api/sessions", `{"project":"demo"}`, "crow", []string{"term", "--on-busy", "fail", "demo"}, []string{"CROW_TERMINAL=headless"}},
+		{"/api/sessions/4242/attach", "", "crow-focus", []string{"--pid", "4242", "--attach", "--json"}, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
@@ -171,6 +173,20 @@ func TestLiveActionsRunTheirScript(t *testing.T) {
 				t.Errorf("log = %+v", evs)
 			}
 		})
+	}
+}
+
+// item_188: a headless start replies with the tmux session it runs in.
+func TestStartRepliesTmux(t *testing.T) {
+	s, _, log := liveServer(t, func(c scriptCall) ([]byte, error) {
+		return []byte("crow: started\n" + `{"ok":true,"message":"started demo on main, no window","account":"main","tmux":"crow-demo-101500"}`), nil
+	})
+	w := do(t, s, post("/api/sessions", `{"project":"demo"}`))
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"tmux":"crow-demo-101500"`) {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	if evs := logLines(t, log); len(evs) != 1 || evs[0].Tmux != "crow-demo-101500" || evs[0].Account != "main" {
+		t.Errorf("log = %+v", evs)
 	}
 }
 

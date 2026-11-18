@@ -30,6 +30,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import crow_lib  # noqa: E402
+import crow_term  # noqa: E402
 
 HOME = Path(crow_lib.data_home())
 ACCOUNT = os.environ.get("CROW_ACCOUNT") or os.environ.get("CROW_SESSION_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
@@ -773,6 +774,7 @@ def collect(since="today", include_unledgered=False):
     cutoff = datetime.now().astimezone().date() if since == "today" else None
     agents, claimed = [], set()
     titles = session_titles()
+    panes = crow_term.tmux_sessions_by_pid()
 
     for p in agent_procs():
         # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
@@ -808,6 +810,7 @@ def collect(since="today", include_unledgered=False):
             "prompt": {k: prompt.get(k) for k in crow_lib.PROMPT_FIELDS} if prompt else None,
             "mission": transcript_mission(tpath) if tpath and kind == "session" else None,
             "branch": t.get("branch") if kind == "session" else None,
+            "tmux": crow_term.tmux_session_for(p["pid"], panes) if kind == "session" else None,
         }
         if kind == "run":
             for rec in reversed(recs):

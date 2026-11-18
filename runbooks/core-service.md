@@ -31,14 +31,14 @@
 - Probe: `curl -s --unix-socket local/state/core.sock -H 'X-Crow: 1' -X POST http://x/api/missions/<id>/stop`.
 
 ## Live actions (sessions, runs, mail)
-- `POST /api/sessions` (body `{project, account?, prompt?}`): `crow term --on-busy fail`, account forced through `CROW_ACCOUNT`.
+- `POST /api/sessions` (body `{project, account?, prompt?}`): `crow term --on-busy fail` with `CROW_TERMINAL=headless`, account forced through `CROW_ACCOUNT`. The session runs in a detached tmux session (own systemd scope, survives a core restart); the reply and the agent row carry `tmux`. A first start in a project can stop on Claude's "external CLAUDE.md imports" dialog: the row only shows once it is answered (attach, or `tmux attach -t <name>`).
 - `POST /api/sessions/<id>/resume` (body `{account?}`): resumes a row of the `sessions` section in its own cwd.
-- `POST /api/sessions/<pid>/send` (body `{text}`), `/interrupt`, `/stop`: `crow-focus --pid`. The pid must be an agent of the `dispatch` section.
+- `POST /api/sessions/<pid>/send` (body `{text}`), `/interrupt`, `/stop`, `/attach`: `crow-focus --pid`. Attach focuses the kitty window holding the pid, else opens kitty on `tmux attach`; closing it leaves the session running. The pid must be an agent of the `dispatch` section.
 - `POST /api/sessions/<pid>/answer` (body `{prompt, option}`, option `allow` or `deny`): `crow-prompt answer`. 409 when the agent no longer waits on that prompt id, or on allow for a work push/MR (approvals only). The prompt comes from the `crow-prompt hook` PermissionRequest hook.
 - `POST /api/dispatch` (body `{project, label, prompt, model?, account?}`): `crow-runs dispatch` with a temp prompt file, `--account` when one is named (never-accounts are 400). Full slots are 409 before anything runs.
 - `POST /api/dispatch/<run>/stop`, `POST /api/today/<id>/done`, `/snooze` (Outlook flag only).
 - Each route refreshes the section it checks first. A failed refresh is a stale view: 409, nothing runs. Accounts with policy `never` are 400.
-- Replies: 200 done, 409 refused (script code 1), 502 failed (code 2), 503 no script runner. Every run appends one line to `local/state/actions.jsonl` with `actor: owner`, `surface: nest`.
+- Replies: 200 done, 409 refused (script code 1), 502 failed (code 2), 503 no script runner. Every POST needs the `X-Crow: 1` header (curl tests too). Every run appends one line to `local/state/actions.jsonl` with `actor: owner`, `surface: nest`.
 
 ## Sections
 - Store sections: `inbox`, `missions`, `runs`.

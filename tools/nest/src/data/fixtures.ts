@@ -77,6 +77,11 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       const a = drop(pid)
       return reply('stop', String(pid), { account: a.account, project: a.project })
     },
+    async attach(pid) {
+      const a = dispatch().agents.find((x) => x.pid === pid)
+      if (!a) throw new ApiError(404, `no agent with pid ${pid}`)
+      return reply('attach', String(pid), { account: a.account, project: a.project, message: a.tmux ? `opened a terminal on tmux session ${a.tmux}` : 'focused its window' })
+    },
     async stopRun(run) {
       const a = dispatch().agents.find((x) => x.run_id === run)
       if (!a) throw new ApiError(404, `no running dispatch run ${run}`)
@@ -89,8 +94,16 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       if (!r) throw new ApiError(404, `no session "${id}"`)
       return reply('resume', id, { account: account ?? r.account, project: r.project, message: `resumed ${r.project}` })
     },
+    // A headless start (item_188): the session shows up at once with its tmux session.
     async start(s) {
-      return reply('start', s.project, { text: s.prompt, account: s.account ?? 'main', project: s.project, message: `opened a window on ${s.project}` })
+      const d = dispatch()
+      const account = s.account ?? 'main'
+      const tmux = `crow-${s.project}-${String(d.agents.length).padStart(6, '0')}`
+      set('dispatch', {
+        ...d,
+        agents: [...d.agents, { kind: 'session', pid: 8000 + d.agents.length, account, project: s.project, cwd: `/src/${s.project}`, state: 'working', started_at: now.toISOString(), last_prompt: s.prompt ?? null, tmux }],
+      })
+      return reply('start', s.project, { text: s.prompt, account, project: s.project, message: `started ${s.project} on ${account}, no window`, tmux })
     },
     async dispatch(r) {
       const d = dispatch()

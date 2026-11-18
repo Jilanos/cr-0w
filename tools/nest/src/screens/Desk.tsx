@@ -95,6 +95,8 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const [form, setForm] = useState<Form>(null)
   const [run, setRun] = useState({ project: '', label: '', model: 'default', account: '', prompt: '' })
   const [start, setStart] = useState({ project: '', account: '', prompt: '' })
+  // tmux session of a session just started here: its chat opens once a poll shows it (item_188).
+  const [opening, setOpening] = useState<string | null>(null)
 
   const picked = agents.find((a) => a.pid === sel) ?? runs[0] ?? sessions.find((a) => a.state === 'working') ?? agents[0]
   const slotOf = (a: Agent) => (a.kind === 'run' ? `S${runs.indexOf(a) + 1}` : '')
@@ -187,11 +189,14 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       () => { setRun({ project: '', label: '', model: 'default', account: '', prompt: '' }); setForm(null) }),
   })
   const open = () => setSheet({
-    title: 'New session', lead: `Opens a claude session on ${start.project} in a new window.`, quote: start.prompt || undefined,
+    title: 'New session', lead: `Starts a claude session on ${start.project} here, with no window. Its chat opens once it shows up.`, quote: start.prompt || undefined,
     target: [['project', start.project], ['account', start.account || 'auto']],
-    note: 'Fails when that account is busy; nothing else is started.', ok: 'Open session',
-    run: wrap(`/session ${start.project}`, () => act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined }),
-      () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
+    note: 'Fails when that account is busy; nothing else is started. Terminal attaches a window to it later.', ok: 'Start session',
+    run: wrap(`/session ${start.project}`, async () => {
+      const r = await act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined })
+      if (r.tmux) setOpening(r.tmux)
+      return r
+    }, () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
   })
   const resume = (r: Resumable) => setSheet({
     title: 'Resume session', lead: `Reopens the conversation of ${r.project} in a new window.`,
@@ -216,6 +221,13 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     },
   })
   const pick = (a: Agent, talk = false) => { setSel(a.pid); setTell(talk) }
+  const fresh = opening ? agents.find((a) => a.tmux === opening) : undefined
+  useEffect(() => {
+    if (!fresh) return
+    setOpening(null)
+    if (matchMedia(INNER).matches) pick(fresh)
+    else navigate(`/desk/${fresh.pid}`)
+  }, [fresh?.pid])
   // The work feed (item_204) drives the list; null on a core without it (old sections stay).
   const work = workOf(snap.sections.work)
   const groups = deskWork(work ?? [])

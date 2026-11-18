@@ -211,3 +211,49 @@ def test_locate_falls_back_to_tmux_from_kitty(monkeypatch):
     assert ct.locate(42, "print") is None
     monkeypatch.setattr(ct, "kitty_locate", lambda pid: ("unix:/s", 7))
     assert ct.locate(42, "kitty") == ("kitty", ("unix:/s", 7))
+
+
+def test_headless_is_never_auto_picked_and_names_its_session(monkeypatch):
+    monkeypatch.setattr(ct.shutil, "which", lambda name, **_: f"/bin/{name}")
+    assert ct.choose({}) == "kitty" and ct.choose({"CROW_TERMINAL": "headless"}) == "headless"
+    assert ct.headless_name("crow · cr-0w (hub)", now=0).startswith("crow-cr-0w-hub-")
+    assert ct.headless_name("crow", now=0).startswith("crow-session-")
+
+
+def test_headless_open_is_detached_and_scoped_under_a_service(monkeypatch):
+    monkeypatch.setattr(ct.shutil, "which", lambda name, **_: f"/bin/{name}")
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
+    cmd = ct.headless_open_args(["claude"], "crow-demo-1", cwd="/src/demo", env=dict(os.environ))
+    assert cmd[:5] == ["tmux", "new-session", "-d", "-s", "crow-demo-1"] and "/src/demo" in cmd and cmd[-1] == "claude"
+    monkeypatch.setenv("INVOCATION_ID", "abc")
+    scoped = ct.headless_open_args(["claude"], "crow-demo-1", env=dict(os.environ))
+    assert scoped[:5] == ["systemd-run", "--user", "--scope", "--quiet", "--collect"] and scoped[5] == "tmux"
+
+
+def test_tmux_session_for_walks_ancestors(tmp_path):
+    for pid, ppid in ((30, 20), (20, 10), (10, 1)):
+        d = tmp_path / str(pid)
+        d.mkdir()
+        (d / "stat").write_text(f"{pid} (a) S {ppid} 0")
+    assert ct.tmux_session_for(30, {20: "crow-demo-1"}, proc=str(tmp_path)) == "crow-demo-1"
+    assert ct.tmux_session_for(30, {99: "other"}, proc=str(tmp_path)) is None
+    assert ct.tmux_session_for(30, {}, proc=str(tmp_path)) is None
+
+
+def test_attach_opens_kitty_on_the_tmux_session(monkeypatch):
+    opened = []
+    monkeypatch.setattr(ct, "kitty_locate", lambda pid: None)
+    monkeypatch.setattr(ct, "tmux_locate", lambda pid: "%3" if pid == 42 else None)
+    monkeypatch.setattr(ct, "tmux_session_of", lambda pane: "crow-demo-1")
+    monkeypatch.setattr(ct, "detach", lambda argv, env, cwd=None: opened.append(argv))
+    monkeypatch.setattr(ct.shutil, "which", lambda name, **_: f"/bin/{name}")
+    monkeypatch.delenv("INVOCATION_ID", raising=False)
+    assert ct.attach(42) == ("attached", "crow-demo-1")
+    assert opened[0][0] == "kitty" and opened[0][-4:] == ["tmux", "attach-session", "-t", "crow-demo-1"]
+    how, why = ct.attach(7)
+    assert how is None and "no tmux session" in why
+
+
+def test_attach_dry_run(hub):
+    ok = run(hub, "crow-focus", "--pid", "5", "--attach", "--dry-run", "--json")
+    assert ok.returncode == 0 and '"action": "attach"' in ok.stdout.replace('":"', '": "')

@@ -205,6 +205,12 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
       })
     }
   }
+  // A headless session (item_188): open a terminal window on the desktop attached to it.
+  const attach = () => {
+    if (!agent) return
+    setNote('')
+    act.attach(agent.pid).then((r) => setNote(r.message), (e: unknown) => setNote(e instanceof Error ? e.message : String(e)))
+  }
   const pause = () => {
     setMenu(false)
     if (!agent) return
@@ -227,6 +233,7 @@ export function Chat({ snap, refresh, target, log }: { snap: Snapshot; refresh: 
               <button type="button" className={`seg${tab === 'log' ? ' on' : ''}`} aria-pressed={tab === 'log'} onClick={() => setTab('log')}>Log</button>
             </span>
             <span className="f1" />
+            {agent?.tmux && <button type="button" className="btn" title={`Attach a terminal to tmux session ${agent.tmux}`} onClick={attach}>Terminal</button>}
             {agent?.kind === 'session' && <button type="button" className="btn" onClick={pause}>Pause</button>}
             {stoppable && <button type="button" className="btn x" onClick={stop}>Stop</button>}
           </div>

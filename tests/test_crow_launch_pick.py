@@ -233,6 +233,21 @@ def test_term_without_kitty_prints_the_command_and_launches_nothing(hub, fake):
     assert launches() == []
 
 
+def test_term_headless_starts_a_detached_tmux_session_and_prints_json(hub, fake, tmp_path):
+    env, set_state, launches = fake
+    set_state([row("main"), row("spare")])
+    tmux, calls = tmp_path / "fakebin/tmux", tmp_path / "tmux.log"
+    tmux.write_text(f"#!/bin/sh\necho \"$@\" >> {calls}\n")
+    tmux.chmod(0o755)
+    r = run(hub, "crow", "term", "demo", "hello", env={**env, "CROW_TERMINAL": "headless", "INVOCATION_ID": ""})
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout.strip().splitlines()[-1])
+    assert out["ok"] and out["account"] == "main" and out["tmux"].startswith("crow-demo-") and "no window" in out["message"]
+    call = calls.read_text()
+    assert call.startswith(f"new-session -d -s {out['tmux']} ") and "open --on-busy ask demo hello" in call
+    assert launches() == []
+
+
 def test_term_refuses_an_unknown_backend(hub, fake):
     env, set_state, launches = fake
     set_state([row("main")])

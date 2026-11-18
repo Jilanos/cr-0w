@@ -95,6 +95,13 @@
       ],
       "description": "Branch a dispatched run started on, or the git branch a live session's transcript records."
      },
+     "tmux": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "tmux session holding the agent (item_188): set for a headless Nest session; attach opens a terminal on it."
+     },
      "projects": {
       "type": [
        "array",

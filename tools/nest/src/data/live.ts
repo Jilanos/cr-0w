@@ -23,6 +23,8 @@ export interface Agent {
   projects?: Array<{ name: string; share_pct?: number }> | null
   recent?: Array<{ action: string; ts: string }> | null
   prompt?: Prompt | null
+  // tmux session holding a headless Nest session (item_188); attach opens a terminal on it.
+  tmux?: string | null
 }
 
 // The permission prompt a waiting session shows (item_174, crow-prompt). work_approval
@@ -95,6 +97,8 @@ export interface LiveReply {
   code: number
   message: string
   run_id?: string
+  // start: the detached tmux session the new session runs in (item_188).
+  tmux?: string
 }
 
 export interface NewSession { project: string; account?: string; prompt?: string }
@@ -107,6 +111,8 @@ export interface Actions {
   answer(pid: number, prompt: string, option: 'allow' | 'deny'): Promise<LiveReply>
   ask(pid: number, prompt: string, answers: AskAnswer[]): Promise<LiveReply>
   stop(pid: number): Promise<LiveReply>
+  // Opens a terminal window on the desktop attached to the session's tmux session (item_188).
+  attach(pid: number): Promise<LiveReply>
   resume(id: string, account?: string): Promise<LiveReply>
   start(s: NewSession): Promise<LiveReply>
   dispatch(r: NewRun): Promise<LiveReply>
