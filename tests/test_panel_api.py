@@ -217,7 +217,7 @@ def test_dossier_recent_files_sorted_bounded_and_rooted(panel, tmp_path):
     assert result[-1]["modified_after_crow"] is False
     assert all(app.files.resolve(f["file_id"]).is_relative_to(root) for f in result)
     unknown, note = app.readers.recent_files(app.files.register(root), {})
-    assert all(f["modified_after_crow"] is None for f in unknown) and "inconnue" in note
+    assert all(f["modified_after_crow"] is None for f in unknown) and note is None
     assert app.readers.recent_files(None, {})[0] is None
 
 
@@ -235,7 +235,7 @@ def test_dossier_detail_uses_private_folder_and_version_reference(panel, tmp_pat
     assert str(root) not in canonical(result)
     version.unlink()
     result = app.readers.dossier("example-project")
-    assert result["recent_files"] == [] and "inconnue" in result["recent_files_note"]
+    assert result["recent_files"] == [] and "inconnu" in result["recent_files_note"]
 
 
 def test_chat_queue_cancel_admission_and_continuation(panel):

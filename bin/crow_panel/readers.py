@@ -213,14 +213,17 @@ class Readers:
                 files.append({"file_id": key, "name": str(path.relative_to(root)),
                               "modified": dt.datetime.fromtimestamp(modified, dt.timezone.utc).isoformat(), "size": size,
                               "modified_after_crow": modified > reference if reference is not None else None})
-        notes = ["10 fichiers au maximum, deux niveaux de sous-dossiers."]
-        if reference is None:
-            notes.append("Date de la dernière version crow inconnue.")
-        else:
-            notes.append("Dernière version crow : " + dt.datetime.fromtimestamp(reference, dt.timezone.utc).isoformat())
+        # Only say what helps reading the list: the reference date of "modifié depuis", or a partial read.
+        notes = []
+        if reference is not None:
+            notes.append("Modifié depuis : après la version crow du " + dt.datetime.fromtimestamp(reference).strftime("%d/%m à %H:%M") + ".")
+        elif config.get("last_crow_at") or config.get("crow_version_file"):
+            notes.append("Repère de version crow inconnu.")
         if partial:
             notes.append("Lecture partielle : limite de parcours ou accès indisponible.")
-        return files, " ".join(notes)
+        if not files:
+            notes.append("Aucun fichier récent.")
+        return files, " ".join(notes) or None
 
     def afk(self):
         root = Path(self.cfg.get("afk_dir", self.cfg.home / "local/state/afk"))
