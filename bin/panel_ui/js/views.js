@@ -500,6 +500,7 @@ export function makeViews(ctx) {
       const cap = capability('mail_trash');
       return (m.proposal && m.proposal.action === 'trash' && m.proposal.disabled_reason) || (cap && cap.reason) || 'Corbeille désactivée en v1';
     }
+    if (c.action === 'archive' && !((cached('folders') || {}).folders || []).some(f => f.well_known === 'archive' && f.allowed_target)) return 'Dossier d’archive absent de l’instantané';
     if (c.action === 'move' && !c.folder_id) return 'Choisis un dossier';
     if (!actionable(c)) return c.action === 'reply' ? 'Rien à ranger : réponse attendue' : 'Rien à ranger : garder dans la boîte';
     return null;
@@ -529,6 +530,7 @@ export function makeViews(ctx) {
       ['move', 'archive', 'keep', 'reply', 'trash'].map((a) => {
         const o = h('option', { value: a, text: ACTION_LABEL[a] });
         if (a === 'trash') { const cap = capability('mail_trash'); if (!cap || !cap.allowed) { o.disabled = true; o.textContent = 'Corbeille (indisponible)'; } }
+        if (a === 'archive' && blockedReason(m, { action: 'archive' })) { o.disabled = true; o.textContent = 'Archiver (dossier indisponible)'; }
         if (a === c.action) o.selected = true;
         return o;
       }));
@@ -706,6 +708,7 @@ export function makeViews(ctx) {
       const o = h('option', { value: a, text: ACTION_LABEL[a] });
       const cap = capability('mail_trash');
       if (a === 'trash' && (!cap || !cap.allowed)) { o.disabled = true; o.textContent = 'Corbeille (indisponible)'; }
+      if (a === 'archive' && !folders.some(f => f.well_known === 'archive')) { o.disabled = true; o.textContent = 'Archiver (dossier indisponible)'; }
       if (a === (actionable(p) ? p.action : 'move')) o.selected = true;
       return o;
     }));
