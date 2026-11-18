@@ -55,3 +55,4 @@ want to trigger it by name.
 - [nest-screenshots](nest-screenshots.md): headless screenshots of the Nest PWA at the board sizes, both themes; hero layout, idle and perf scripts
 - [nest-phone-install](nest-phone-install.md): serve Nest on the tailnet and install it as an app on Android (Play parks it while the VPN is up)
 - [vault-sync-new-device](vault-sync-new-device.md): add a machine to the vault Syncthing mesh (direct pairing, ignore patterns, conflict cleanup)
+- [remote-computer-use-windows](remote-computer-use-windows.md): give a Windows Claude Code session desktop control from the phone (RC + Windows-MCP, no admin)
