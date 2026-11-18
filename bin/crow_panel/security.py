@@ -142,11 +142,15 @@ def tool_allowed(profile, name, args, manifest=None):
         if short not in ("outlook_modify_labels", "outlook_batch_modify_labels") or not manifest:
             return False
         allowed = {i["message_id"]: i["folder_id"] for i in manifest["items"]}
+        if short == "outlook_batch_modify_labels" and set(args) not in ({"modifications"}, {"messages"}):
+            return False
         entries = args.get("modifications", args.get("messages")) if short == "outlook_batch_modify_labels" else [args]
         if not isinstance(entries, list) or not 1 <= len(entries) <= 5:
             return False
         return all(isinstance(i, dict) and set(i) == {"messageId", "moveToFolderId"}
-                   and allowed.get(i["messageId"]) == i["moveToFolderId"] for i in entries)
+                   and isinstance(i["messageId"], str) and i["messageId"] in allowed
+                   and isinstance(i["moveToFolderId"], str) and bool(i["moveToFolderId"])
+                   and allowed[i["messageId"]] == i["moveToFolderId"] for i in entries)
     if short == "read_resource":
         uri = args.get("uri", "")
         return isinstance(uri, str) and (uri == "mail:///folders" or uri.startswith(("mail:///folders/", "mail:///messages/")))

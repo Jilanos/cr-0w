@@ -40,3 +40,12 @@ def test_m365_resource_reads_are_bounded_to_mail():
     assert tool_allowed("read", "mcp__M365__read_resource", {"uri": "mail:///folders/inbox"})
     assert not tool_allowed("read", "mcp__M365__read_resource", {"uri": "file:///etc/passwd"})
     assert not tool_allowed("triage", "mcp__M365__read_resource", {"uri": "mail:///folders/inbox"}, {"items": []})
+
+
+def test_triage_guard_rejects_null_targets_and_unchecked_batch_arguments():
+    manifest = {"items": [{"message_id": "one", "folder_id": "folder"}]}
+    allowed = {"messageId": "one", "moveToFolderId": "folder"}
+    assert not tool_allowed("triage", "outlook_modify_labels", {"messageId": "outside", "moveToFolderId": None}, manifest)
+    assert not tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed], "categories": ["unconfirmed"]}, manifest)
+    assert not tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed], "messages": [allowed]}, manifest)
+    assert tool_allowed("triage", "outlook_batch_modify_labels", {"modifications": [allowed]}, manifest)
