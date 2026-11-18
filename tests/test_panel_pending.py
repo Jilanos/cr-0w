@@ -164,3 +164,17 @@ def test_undo_preserves_the_other_duplicate_row_identity(tmp_path):
     assert [i["id"] for i in items(writer)[:2]] == [first["id"], second["id"]]
     writer.mutate(second["id"], "done", {"request_id": "second", "item_rev": second["item_rev"]}, "/done")
     assert items(writer)[0]["id"] == first["id"]
+
+
+def test_rows_written_above_the_separator_keep_the_first_header(tmp_path):
+    writer, store, cfg = setup(tmp_path)
+    writer.path.write_text("# Pending\n\n## 🎯 Décisions\n\n| Sujet | Attendu | Depuis |\n| First | One | 17/11 |\n| Second | Two | 16/11 |\n"
+                           "|---|---|---|\n| Third | Three | 15/11 |\n\n## ✅ Réglé récemment\n- 10/11 Previous\n")
+    rows = items(writer)
+    assert [r["title"] for r in rows] == ["First", "Second", "Third"]
+    assert all(r["columns"] == ["Sujet", "Attendu", "Depuis"] for r in rows)
+    op = writer.mutate(rows[0]["id"], "done", {"request_id": "above", "item_rev": rows[0]["item_rev"]}, "/done")
+    result = writer.path.read_text()
+    assert "| First |" not in result and "| Second | Two | 16/11 |\n|---|---|---|\n| Third |" in result
+    writer.undo(op, {"request_id": "undo-above"}, "/undo")
+    assert "| Sujet | Attendu | Depuis |\n| First | One | 17/11 |\n| Second |" in writer.path.read_text()

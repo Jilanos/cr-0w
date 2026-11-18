@@ -9,6 +9,9 @@ import unicodedata
 from .core import Problem, atomic, canonical, digest, lock, locked, now
 
 
+SEPARATOR = re.compile(r'^\s*\|?[\s:|-]+\|\s*$')
+
+
 def split_row(line):
     return [v.strip() for v in re.split(r'(?<!\\)\|', line.strip().strip("|"))]
 
@@ -91,11 +94,26 @@ class Pending:
                 columns = None
                 i += 1
                 continue
-            if line.startswith("|") and i + 1 < len(lines) and re.match(r'^\s*\|?[\s:|-]+\|\s*$', lines[i + 1]):
+            in_table = columns is not None and i > 0 and lines[i - 1].startswith("|")
+            if line.startswith("|") and not in_table and i + 1 < len(lines) and SEPARATOR.match(lines[i + 1]):
                 columns = split_row(line)
                 if current is not None:
                     current["columns"] = columns
                 i += 2
+                continue
+            if line.startswith("|") and columns is None:
+                # Rows written between the header and its separator: the first line stays the header.
+                j = i + 1
+                while j < len(lines) and lines[j].startswith("|") and not SEPARATOR.match(lines[j]):
+                    j += 1
+                if j > i + 1 and j < len(lines) and SEPARATOR.match(lines[j]):
+                    columns = split_row(line)
+                    if current is not None:
+                        current["columns"] = columns
+                    i += 1
+                    continue
+            if in_table and SEPARATOR.match(line):
+                i += 1
                 continue
             is_table = line.startswith("|") and columns is not None
             is_list = line.startswith("- ")
