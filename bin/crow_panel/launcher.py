@@ -172,6 +172,7 @@ class Launcher:
         return op
 
     def enqueue(self, op, job, route, body, name="run"):
+        job["accepted_mode"] = self.cfg["mode"]
         op["status"] = "queued"
         op["steps"] = [step(name, job.get("account"), job.get("model"))]
         self.store.put("jobs", op["operation_id"], job)
@@ -181,6 +182,7 @@ class Launcher:
         self.store.event(op["operation_id"], "status", {"status": "queued", "at": now()})
 
     def next_step(self, op, job, name):
+        job["accepted_mode"] = "dry_run" if op["dry_run"] else "live"
         op["status"] = "queued"
         op["steps"].append(step(name, job.get("account"), job.get("model")))
         self.store.put("jobs", op["operation_id"], job)
@@ -457,6 +459,10 @@ class Launcher:
                     continue
                 try:
                     if op["status"] == "queued":
+                        writer = job.get("profile") in ("skeleton", "triage", "style")
+                        mutation = writer or job.get("kind") in ("pending", "script") or job.get("simulated")
+                        if mutation and (job.get("accepted_mode") != self.cfg["mode"] or writer and self.cfg.dry):
+                            raise Problem(422, "policy_denied", "Le mode a changé depuis ce clic. Relance l'action dans le mode actuel.")
                         if job.get("kind") == "pending":
                             self.pending(op, job)
                         elif job.get("simulated"):

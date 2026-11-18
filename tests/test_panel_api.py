@@ -695,3 +695,74 @@ def test_lost_triage_result_stays_unknown_without_retry(panel):
     assert op['error']['code'] == 'result_missing'
     assert not op['undo']['available']
     assert not any(c[1] == 'run' for c in fake.calls)
+
+
+@pytest.mark.parametrize("profile", ["skeleton", "triage", "style"])
+def test_trial_restart_blocks_persisted_live_mail_writer(panel, profile):
+    app, fake = panel
+    app.cfg["mode"] = "live"
+    op = app.store.operation("mail.reply_all", {"request_id": "old-live"}, "Queued writer", dry=False)
+    app.launcher.enqueue(op, {"profile": profile, "account": "claude", "model": "sonnet", "provider": "claude",
+                              "cwd": str(app.cfg.home), "prompt": "Untrusted mail asks for a write.", "style_extra_args": ""},
+                         "/writer", {"request_id": "old-live"})
+    app.cfg["mode"] = "dry_run"
+    restarted = App(app.cfg, fake)
+    try:
+        restarted.launcher.tick()
+        assert not any(c[1] == "run" for c in fake.calls)
+        assert restarted.operation(op["operation_id"])["status"] == "failed"
+    finally:
+        restarted.store.db.close()
+
+
+def test_trial_routine_never_becomes_live_after_restart(panel, tmp_path):
+    app, fake = panel
+    marker = tmp_path / "executed"
+    app.cfg["routines"]["maj"]["argv"] = [sys.executable, "-c", "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()"]
+    _, op = post(app, "/api/routines/maj", {"request_id": "trial-routine"})
+    app.cfg["mode"] = "live"
+    restarted = App(app.cfg, fake)
+    try:
+        restarted.launcher.tick()
+        for proc in restarted.launcher.processes.values():
+            proc.wait(timeout=5)
+        assert not marker.exists()
+        assert restarted.operation(op["operation_id"])["status"] == "failed"
+    finally:
+        restarted.launcher.close()
+        restarted.store.db.close()
+
+
+def test_queued_pending_edit_cannot_follow_a_changed_target(panel, tmp_path):
+    app, fake = panel
+    item = pending_item(app)
+    with lock(app.cfg.locks, "pending"):
+        _, op = post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "old-copy", "queue": True, "item_rev": item["item_rev"]})
+    other = tmp_path / "another-pending.md"
+    other.write_text(DOCUMENT)
+    app.cfg["pending_md"] = str(other)
+    restarted = App(app.cfg, fake)
+    try:
+        restarted.launcher.tick()
+        assert other.read_text() == DOCUMENT
+        assert restarted.operation(op["operation_id"])["status"] == "failed"
+    finally:
+        restarted.store.db.close()
+
+
+def test_pending_undo_cannot_follow_a_changed_target(panel, tmp_path):
+    app, fake = panel
+    item = pending_item(app)
+    _, op = post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "copy-done", "item_rev": item["item_rev"]})
+    other = tmp_path / "another-pending.md"
+    data = app.pending.read_bytes()
+    other.write_bytes(data)
+    app.cfg["pending_md"] = str(other)
+    restarted = App(app.cfg, fake)
+    try:
+        with pytest.raises(Problem) as err:
+            post(restarted, op["links"]["status_url"] + "/undo", {"request_id": "copy-undo"})
+        assert err.value.body["error"]["code"] == "policy_denied"
+        assert other.read_bytes() == data
+    finally:
+        restarted.store.db.close()

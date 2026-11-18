@@ -216,7 +216,8 @@ class Pending:
         op = self.store.operation("pending." + action, body, "En file : " + item["title"], item["topic_id"], self.cfg.dry)
         op["status"] = "queued"
         op["steps"] = [{"name": "wait_pending", "status": "queued", "run_id": None, "account": None, "model": None}]
-        self.store.put("jobs", op["operation_id"], {"kind": "pending", "key": key, "action": action, "body": frozen, "route": route})
+        self.store.put("jobs", op["operation_id"], {"kind": "pending", "key": key, "action": action, "body": frozen, "route": route,
+                       "accepted_mode": self.cfg["mode"], "pending_path": str(self.path.resolve())})
         self.store.put("intents", op["operation_id"], {"request_hash": digest(canonical([route, body]))})
         self.store.save_op(op)
         self.store.audit(op)
@@ -225,6 +226,8 @@ class Pending:
 
     def resume(self, op, job):
         try:
+            if not self.path or job.get("pending_path") != str(self.path.resolve()):
+                raise Problem(422, "policy_denied", "Le fichier cible a changé depuis ce clic. Relance l'action sur le fichier actuel.")
             self.mutate(job["key"], job["action"], job["body"], job["route"], op)
         except Problem as exc:
             if exc.status == 423:
@@ -338,7 +341,8 @@ class Pending:
         result = {"doc_rev_before": digest(before, "d_"), "doc_rev_after": digest(after, "d_"), "backup": backup}
         op["result"] = result
         request_hash = self.store.get("intents", op["operation_id"], {}).get("request_hash", digest(canonical([route, body])))
-        intent = {"request_hash": request_hash, "before": digest(before), "after": digest(after), "inverse": inverse}
+        intent = {"request_hash": request_hash, "before": digest(before), "after": digest(after), "inverse": inverse,
+                  "pending_path": str(self.path.resolve()), "accepted_mode": self.cfg["mode"]}
         self.store.put("intents", op["operation_id"], intent)
         self.store.save_op(op)
         atomic(self.cfg.state / "backups" / backup, before)
@@ -356,6 +360,10 @@ class Pending:
         self.store.event(op["operation_id"], "done", {"status": "succeeded", "exit_code": 0, "final_segments": []})
 
     def undo(self, original, body, route):
+        intent = self.store.get("intents", original["operation_id"], {})
+        if (not self.path or intent.get("pending_path") != str(self.path.resolve())
+                or intent.get("accepted_mode") != self.cfg["mode"]):
+            raise Problem(422, "policy_denied", "Le mode ou le fichier cible a changé depuis cette action. Sauvegarde disponible.")
         if original["undone_by"]:
             raise Problem(409, "conflict", "Cette action est déjà annulée.")
         until = original["undo"].get("until")
