@@ -12,14 +12,21 @@ import { stickBottom } from './stickBottom'
 
 const FOLD_KEY = 'nest.rail'
 
-function useFold(): [boolean, () => void] {
-  const [folded, setFolded] = useState(() => {
-    try { return localStorage.getItem(FOLD_KEY) === 'folded' } catch { return false }
+type Fold = 'folded' | 'open' | null
+
+// The owner's fold choice, remembered; null until they pick one.
+function useFold(auto: boolean): [boolean, () => void] {
+  const [pick, setPick] = useState<Fold>(() => {
+    try { const v = localStorage.getItem(FOLD_KEY); return v === 'folded' || v === 'open' ? v : null } catch { return null }
   })
-  const toggle = () => setFolded((f) => {
-    try { localStorage.setItem(FOLD_KEY, f ? 'open' : 'folded') } catch { /* storage off: fold lasts the visit */ }
-    return !f
-  })
+  const folded = pick ? pick === 'folded' : auto
+  const now = useRef(folded)
+  now.current = folded
+  const toggle = () => {
+    const next: Fold = now.current ? 'open' : 'folded'
+    try { localStorage.setItem(FOLD_KEY, next) } catch { /* storage off: fold lasts the visit */ }
+    setPick(next)
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'KeyB') { e.preventDefault(); toggle() }
@@ -57,18 +64,19 @@ function Msg({ m }: { m: ButlerMsg }) {
 
 // Butler rail (item_176, board desk-rail-a): CR-0W on the right of every laptop screen.
 // Hero on top (none on Home, which has its own), the hero line, the conversation, then the
-// account and the input. Ctrl+B folds it to a strip. Pinned (Home, where the rail is the right
-// column): always open, no fold key, and no hero line (the hero says it already).
+// account and the input. Ctrl+B folds it to a strip, remembered. Pinned (Home, where the rail
+// is the right column): no hero line (the hero says it already), and folded while the chat is
+// empty until the owner picks open or folded (owner 2026-11-18).
 export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapshot; head?: boolean; pinned?: boolean }) {
   const b = useButler()
-  const [folded, fold] = useFold()
+  const [folded, fold] = useFold(pinned && !!b && b.messages.length === 0 && !b.busy)
   const m = useMemo(() => heroModel(snap.missions, snap.inbox, heroLiveOf(snap.sections), snap.now), [snap])
   const working = m.projects.some((p) => p.state === 'working')
 
   if (!b) return null
   const label = railLabel(m)
 
-  if (folded && !pinned) {
+  if (folded) {
     return (
       <aside className="b-rail folded" aria-label="CR-0W">
         <button type="button" className="rl-strip" onClick={fold} title="Open CR-0W (Ctrl+B)" aria-expanded="false">
@@ -85,11 +93,11 @@ export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapsh
     <aside className="b-rail" aria-label="CR-0W">
       <div className="rl-top">
         <span className={`rl-mood m-${m.mood}`}><i className="dia" aria-hidden="true" />{label}</span>
-        {!pinned && <button type="button" className="rl-kbd" onClick={fold} title="Fold (Ctrl+B)" aria-expanded="true">Ctrl B</button>}
+        <button type="button" className="rl-kbd" onClick={fold} title="Fold (Ctrl+B)" aria-expanded="true">Ctrl B</button>
       </div>
       {head && <RailHead mood={m.mood} working={working} asks={m.asks} />}
       {!pinned && <p className="rl-line"><b>cr-0w</b> › {lower(m.line)}<span className="cur" aria-hidden="true">▌</span></p>}
-      <ButlerChat snap={snap} fold={pinned ? undefined : fold} />
+      <ButlerChat snap={snap} fold={fold} />
     </aside>
   )
 }
