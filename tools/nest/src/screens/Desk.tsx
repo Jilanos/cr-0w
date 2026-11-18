@@ -680,11 +680,10 @@ function Sessions({ d }: { d: D }) {
           </button>
         ))}
         {d.sessions.map((s) => (
-          <div key={s.pid} className={`row${s === d.picked ? ' on' : ''}`}>
+          <button type="button" key={s.pid} className={`row${s === d.picked ? ' on' : ''}`} aria-pressed={s === d.picked} onClick={() => d.pick(s, waits(s) && !s.prompt)}>
             {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
             <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {said(s)}</span>
-            <button type="button" className={`btn${waits(s) ? ' p' : ''}`} onClick={() => d.pick(s, waits(s) && !s.prompt)}>Open</button>
-          </div>
+          </button>
         ))}
         {d.queue.length > 0 && (
           <div className="row q qline">

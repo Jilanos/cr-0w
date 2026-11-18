@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """crow-ready: Logics backlog items with status Ready, across the active registered projects.
 
-  crow-ready json [--limit N]   {"schema", "total", "items": [{project, ref, title, path, progress, modified}]}
+  crow-ready json [--limit N] [--per-project N]
+      {"schema", "total", "items": [{project, ref, title, path, progress, modified}]}
 
-Newest first (file mtime), at most --limit items (default 8); `total` counts them all.
+Newest first (file mtime), at most --per-project items of one project (default 2) and
+--limit items in all (default 30); `total` counts them all. Nest trims the list further per scope.
 Reads each repo through `logics-manager flow list --kind backlog --format json`.
 A repo without logics/backlog, or whose listing fails, is skipped and named in "skipped".
 """
@@ -59,14 +61,26 @@ def ready(projects, lister=listing):
     return items, skipped
 
 
+def capped(items, per_project):
+    """Keeps the first per_project items of each project, in order."""
+    seen = {}
+    out = []
+    for i in items:
+        seen[i["project"]] = seen.get(i["project"], 0) + 1
+        if seen[i["project"]] <= per_project:
+            out.append(i)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(prog="crow-ready")
     sub = ap.add_subparsers(dest="cmd", required=True)
     j = sub.add_parser("json")
-    j.add_argument("--limit", type=int, default=8)
+    j.add_argument("--limit", type=int, default=30)
+    j.add_argument("--per-project", type=int, default=2)
     a = ap.parse_args()
     items, skipped = ready(crow_lib.registry().get("projects") or [])
-    out = {"schema": 1, "total": len(items), "items": items[:max(a.limit, 0)]}
+    out = {"schema": 1, "total": len(items), "items": capped(items, a.per_project)[:max(a.limit, 0)]}
     if skipped:
         out["skipped"] = skipped
     print(json.dumps(out))

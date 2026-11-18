@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Agent, FinishedRun, ReadyItem, Resumable } from './live'
-import { doneToday, inFilter, okRate, PARKED_MAX, readyRows, shortRef } from './ready'
+import { doneToday, inFilter, okRate, PARKED_MAX, READY_MAX, readyRows, shortRef } from './ready'
 import type { Mission } from './types'
 import type { WorkItem } from './work'
 
 const now = new Date('2026-11-18T16:00:00+01:00')
-const item = (ref: string): ReadyItem => ({ project: 'demo', ref, title: ref, path: `/x/${ref}.md`, progress: '', modified: '' })
-const parked = (id: string, hoursAgo: number | null): Resumable =>
-  ({ conversation_id: id, project: 'demo', account: 'main', last_event: hoursAgo == null ? null : new Date(now.getTime() - hoursAgo * 3600e3).toISOString() }) as Resumable
+const item = (ref: string, project = 'demo'): ReadyItem => ({ project, ref, title: ref, path: `/x/${ref}.md`, progress: '', modified: '' })
+const parked = (id: string, hoursAgo: number | null, project = id): Resumable =>
+  ({ conversation_id: id, project, account: 'main', last_event: hoursAgo == null ? null : new Date(now.getTime() - hoursAgo * 3600e3).toISOString() }) as Resumable
 
 describe('ready rows', () => {
   it('shortens Logics refs', () => {
@@ -25,6 +25,13 @@ describe('ready rows', () => {
     const rows = readyRows([], [parked('a', 30), parked('b', 2), parked('c', 1), parked('d', 5), parked('e', 3), parked('f', null)], [], now)
     expect(rows.map((r) => r.key)).toEqual(['c', 'b', 'e'])
     expect(rows.length).toBe(PARKED_MAX)
+  })
+
+  it('shows five rows at most, two per project, parked sessions counted', () => {
+    const items = ['a1', 'a2', 'a3', 'b1', 'c1', 'd1', 'e1'].map((r) => item(r, r[0]))
+    const rows = readyRows(items, [parked('p', 1, 'a')], [], now)
+    expect(rows.map((r) => r.key)).toEqual(['a:a1', 'b:b1', 'c:c1', 'd:d1', 'p'])
+    expect(rows.length).toBe(READY_MAX)
   })
 })
 

@@ -46,3 +46,8 @@ def test_ready_items_newest_first_and_skips(tmp_path):
     assert [i["ref"] for i in items] == ["item_2", "item_9", "item_1"]
     assert items[0]["project"] == "a" and items[0]["title"] == "Two"
     assert skipped == {"c": "boom"}
+
+
+def test_capped_keeps_two_per_project_in_order():
+    items = [{"project": p, "ref": r} for p, r in [("a", "1"), ("a", "2"), ("b", "3"), ("a", "4"), ("b", "5"), ("b", "6")]]
+    assert [i["ref"] for i in _mod().capped(items, 2)] == ["1", "2", "3", "5"]
