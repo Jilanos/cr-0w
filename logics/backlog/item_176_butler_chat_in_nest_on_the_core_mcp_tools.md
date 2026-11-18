@@ -8,7 +8,7 @@
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-16 18:29:42
+> Indicators reviewed: 2026-11-18 13:47:43
 
 # AI Context
 - Summary: a chat in Nest with the butler (CR-0W persona), run by the req_032 engine: one long-lived `claude -p` stream-json process per conversation, core MCP tools only, a core bridge that streams replies to Nest. The butler starts missions first, and sessions or dispatch only when asked.
@@ -65,6 +65,11 @@
 - Rationale: the main surface the owner asked for.
 
 # Notes
+- 2026-11-18 boards approved (vault `Research/nest-design/item_176/design-notes.md`, pages `options/round2.html`, `options/round3.html`):
+  - Laptop: rail A, hero on top (320px rail, 240px hero block) showing the whole droid with no background box. The Desk "Ask CR-0W" panel goes; Live sessions takes its space. Alt+B folds to a 56px strip. Home rail has no hero.
+  - Phone: badge top left before the wordmark. Typing in the bottom Ask box opens the chat sheet; on other tabs the badge opens it.
+  - Phone Home: cover is D plus the Desk Ask bar under the holotable. Fold inner is G: HUD row, big centred holotable, Ask bar, then Needs you and Running in two columns. Source `home-phone/mockup.html?v=G`.
+  - Still to render before the build: cyber versions of these boards.
 - Owner 2026-11-16 (header gauges hand-off): free chat needs an account choice like /dispatch and /session.
 - Owner 2026-11-10: "when i talk to the butler i want the hero to respond". Placement on Home under the holotable, transcript on Desk. Layout base: item_171 approved design D.
 
