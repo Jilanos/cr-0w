@@ -363,8 +363,9 @@ function openChat(opts = {}) {
 async function openFile(fileId, label) {
   try {
     const res = await api.post(`/api/files/${encodeURIComponent(fileId)}/open`, {});
-    if (res && res.opened === false) toast(`Ouverture refusée : ${label}`, { kind: 'error' });
-    else toast(res && res.dry_run ? `Mode essai : ${label} non ouvert` : `Ouvert dans Windows : ${label}`, { kind: 'ok' });
+    if (res && res.dry_run) toast(`Mode essai : ${label} non ouvert`, { kind: 'info' });
+    else if (res && res.opened === false) toast(`Ouverture refusée : ${label}`, { kind: 'error' });
+    else toast(`Ouvert dans Windows : ${label}`, { kind: 'ok' });
   } catch (err) { toastError(err, `Ouverture de ${label}`); }
 }
 
