@@ -79,6 +79,8 @@
 - Owner 2026-11-10: "when i talk to the butler i want the hero to respond". Placement on Home under the holotable, transcript on Desk. Layout base: item_171 approved design D.
 
 - Owner 2026-11-12: on the laptop Home is rarely open, so the hero must be visible while working → butler rail on every laptop screen, badge on phone.
+- Progress 2026-11-18: slice 2 built 2c7b7a1 (laptop rail, Home pinned rail), head clip fix 9a86b3d. Open: slice 3 (phone badge + sheet, cover D + Ask bar, Fold inner G); the rail chat opens without scrolling to the bottom (scroll likely runs before the head lays out).
+
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
