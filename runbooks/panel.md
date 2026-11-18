@@ -127,3 +127,12 @@ Review results JSON and captures. Keep the real pending document's checksum and
 compare the copy before and after testing. Run the affected Python tests with
 pytest and PyYAML available. The API and security details are in
 [panel-api.md](../docs/panel-api.md).
+
+For a security review, exercise mode changes with persisted jobs and undo records,
+duplicate rows with independent clicks, unavailable update status, malformed batch
+arguments, missing tool results and repeated draft attempts. Use fake commands and
+disposable files. Reproduce each finding before changing its guard. Verify that
+worker failures emit a terminal event and that the browser leaves its waiting state.
+Read tools resolve paths against the configured data home, file roots and projects.
+Test symlink escapes and out-of-root credential reads. Native resumed chat disables
+local read tools as well as MCP because continuation settings cannot carry hooks.

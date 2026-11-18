@@ -75,6 +75,9 @@ SSE events persist sequence numbers in SQLite and a JSONL mirror. Reconnect with
 once. Provider transcripts supply live events when cdx stdout is buffered. User
 prompts and tool result bodies are excluded. Signed URL parameters and bearer
 tokens are masked before event persistence.
+Nested JSON values and displayed run reports are also redacted. Raw subprocess
+logs remain private source artifacts and can retain credentials. Do not include
+their directory in file roots until a redacting script runner is available.
 
 ## Actions and evidence
 
@@ -84,6 +87,9 @@ write journals its intention and saves a backup before atomic replacement.
 Undo applies an inverse edit for ten seconds, with two seconds of network
 tolerance. It preserves independent intervening changes. Keep other writers on
 the shared lock: external editors can race with the final atomic replacement.
+An unavailable update status blocks edits. Queued edits and pending inverses stay
+bound to their accepted mode and resolved target file. A changed mode or target
+requires a fresh click. Legacy queued mutations without that binding are refused.
 
 Mail is read by recorded headless runs through the connector. The HTTP server
 never accesses the mailbox directly. Inbox coverage is a scan across a time
@@ -103,6 +109,12 @@ stages, and verifies the result. The drafting account uses high effort and a
 restricted draft-only app. Configure `mail.draft_app_id`, `mail.style_rules` and
 `work_handoff_dir` privately. Shell tools and other apps are disabled in that
 profile. Its capability and permissions must be proven before activation.
+The skeleton hook permits one blank reply-all creation attempt on the clicked
+message. A newer message requires refreshing the mailbox. Additional recipients,
+other message ids and draft updates are refused at this stage. Concurrent replies
+and replies with an unknown outcome block another pipeline for the same topic.
+The styling profile still lacks a server-enforced draft-id argument guard. Keep
+live drafting disabled until that guard and its connector proof are available.
 
 Live triage requires connector schema, headless and permission evidence. Its hook
 allows only confirmed message ids and destinations, at most five messages per
@@ -110,6 +122,9 @@ call, without categories or conversation mutations. Lost results become unknown
 and are never retried automatically. Undo first verifies current locations and
 leaves independently reclassified messages alone. Trash and run stopping remain
 disabled. A real move and its return still require the owner's trial.
+Each claimed successful move must match a guarded tool call and its completed
+non-error result. A missing call, lost result or wrapped connector error stays
+unknown. The final run text alone cannot prove a move.
 
 Sonnet is the default chat model. Per-message, topic, kind and project settings
 follow the configured cascade. Invalid account/model pairs are rejected. Mail
