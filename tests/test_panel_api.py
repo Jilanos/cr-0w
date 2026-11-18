@@ -496,3 +496,16 @@ def test_restart_marks_unfinished_acceptance_unknown(panel):
     assert restarted.operation(op["operation_id"])["status"] == "unknown"
     assert not any(c[1] == "run" for c in fake.calls)
     restarted.store.db.close()
+
+
+def test_repeated_pending_reads_do_not_rewrite_durable_state(panel):
+    app, _ = panel
+    before = app.pending.view()
+    changes = app.store.db.total_changes
+    after = app.pending.view()
+    assert after["sections"] == before["sections"]
+    assert app.store.db.total_changes == changes
+    topic = app.topic(before["sections"][0]["items"][0]["topic_id"])
+    topic["default_model"] = "haiku"
+    app.store.put("topics", topic["topic_id"], topic)
+    assert app.topic(topic["topic_id"])["default_model"] == "haiku"

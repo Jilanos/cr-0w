@@ -187,8 +187,13 @@ class Store:
             return json.loads(row[0]) if row else default
 
     def put(self, bucket, key, data):
-        with self.mutex, self.db:
-            self.db.execute("INSERT OR REPLACE INTO objects VALUES(?,?,?)", (bucket, key, canonical(data)))
+        encoded = canonical(data)
+        with self.mutex:
+            previous = self.db.execute("SELECT data FROM objects WHERE bucket=? AND id=?", (bucket, key)).fetchone()
+            if previous and previous[0] == encoded:
+                return data
+            with self.db:
+                self.db.execute("INSERT OR REPLACE INTO objects VALUES(?,?,?)", (bucket, key, encoded))
         return data
 
     def all(self, bucket):
