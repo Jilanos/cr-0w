@@ -10,6 +10,9 @@ import { Desk } from './screens/Desk'
 import { Missions } from './screens/Missions'
 import { Placeholder } from './screens/Placeholder'
 import { Shell } from './ui/Shell'
+import { ButlerRail } from './ui/ButlerRail'
+import { ButlerProvider } from './data/useButler'
+import { LAPTOP, useMedia } from './ui/useMedia'
 import { screenTab } from './ui/tabs'
 
 const LATER: Record<string, [string, string]> = {
@@ -26,6 +29,7 @@ export function App() {
   // Every screen reads the scoped snapshot; Chat reads the whole one so a link to any session opens.
   const snap = useMemo(() => raw && scopeSnapshot(raw, scope), [raw, scope])
   const active = screenTab(route)
+  const laptop = useMedia(LAPTOP)
   let body = null
   if (snap && raw) {
     if (route.tab === 'home') body = <Home snap={snap} />
@@ -35,5 +39,12 @@ export function App() {
     else if (route.tab === 'chat') body = <Chat snap={raw} refresh={refresh} target={route.target} />
     else body = <Placeholder name={LATER[route.tab][0]} note={LATER[route.tab][1]} />
   }
-  return <Shell active={active} snap={snap} scope={scope} setScope={setScope}>{body}</Shell>
+  // Butler rail on every laptop screen (item_176); Home keeps its own hero, so no head there.
+  const home = route.tab === 'home'
+  const rail = laptop && snap ? <ButlerRail snap={snap} head={!home} pinned={home} /> : null
+  return (
+    <ButlerProvider>
+      <Shell active={active} snap={snap} scope={scope} setScope={setScope} rail={rail}>{body}</Shell>
+    </ButlerProvider>
+  )
 }

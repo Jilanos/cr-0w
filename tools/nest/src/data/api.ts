@@ -1,3 +1,4 @@
+import { apiButler } from './butler'
 import { conversationPath, pageQuery, type ConversationPage } from './conversation'
 import type { Actions, LiveReply, Screen } from './live'
 import type { DataSource } from './source'
@@ -147,6 +148,7 @@ export function apiSource(base = '/api', get: Fetch = (i, init) => fetch(i, init
     },
     actions: apiActions(base, get),
     now: () => new Date(),
+    butler: apiButler(base, get),
     poll: 5000,
   }
 }

@@ -5,6 +5,7 @@ import stateAgenda from '../../fixtures/states/agenda.json'
 import stateLive from '../../fixtures/states/live.json'
 import stateWork from '../../fixtures/states/work.json'
 import { ApiError } from './api'
+import { fixtureButler, type ButlerMsg } from './butler'
 import type { ChatTarget, ConversationPage, Entry, PageAsk } from './conversation'
 import type { Actions, Dispatch, LiveReply } from './live'
 import type { DataSource } from './source'
@@ -181,6 +182,26 @@ function fixtureChats(known: (t: ChatTarget) => void) {
   return { page, said }
 }
 
+// The exchange the desk-rail-a board draws (item_176).
+const BUTLER_SEED: ButlerMsg[] = [
+  { seq: 1, ts: '2026-11-09T14:20:00Z', role: 'you', text: 'Start a review of !224 lambda', surface: 'nest' },
+  { seq: 2, ts: '2026-11-09T14:20:00Z', role: 'crow', text: 'Review mission started for !224, Sir. It runs on main.', account: 'main',
+    chips: [{ label: 'Open mission', href: '/missions/20261109-build-mr-pipeline-badge' }] },
+  { seq: 3, ts: '2026-11-09T14:31:00Z', role: 'you', text: "What's running?", surface: 'nest' },
+  { seq: 4, ts: '2026-11-09T14:31:00Z', role: 'crow', text: 'Two sessions and one run, Sir. S1 Nest waits on you for a Bash approval. The infra push run failed: token rotation.', account: 'main',
+    chips: [{ label: 'Open S1', href: '/desk' }, { label: 'Allow in Inbox', href: '/inbox' }, { label: 'Show failure', href: '/missions/20261109-fix-push-token-refresh' }] },
+  { seq: 5, ts: '2026-11-09T14:33:00Z', role: 'you', text: 'Why did the token rotation fail?', surface: 'nest' },
+  { seq: 6, ts: '2026-11-09T14:33:00Z', role: 'tool', text: 'read run log · infra push · 2 files' },
+  { seq: 7, ts: '2026-11-09T14:34:00Z', role: 'crow', text: 'The refresh call got a 401, Sir. The deploy key expired yesterday at 18:00. A new key in the vault fixes it; the run can retry after that.', account: 'main',
+    chips: [{ label: 'Show failure', href: '/missions/20261109-fix-push-token-refresh' }] },
+  { seq: 8, ts: '2026-11-09T14:36:00Z', role: 'you', text: 'ok rotate it and retry', surface: 'nest' },
+  { seq: 9, ts: '2026-11-09T14:36:00Z', role: 'crow', text: 'That needs your OK on infra, Sir. I put the request in your Inbox.', account: 'main',
+    chips: [{ label: 'Allow in Inbox', href: '/inbox' }] },
+  { seq: 10, ts: '2026-11-09T14:40:00Z', role: 'you', text: 'what is left for today?', surface: 'nest' },
+  { seq: 11, ts: '2026-11-09T14:40:00Z', role: 'crow', text: 'Three things, Sir. The management weekly at 15:00, its prep is ready. Two reviews wait on you: !226 and !231. Sprint planning prep is due at 17:30.', account: 'main',
+    chips: [{ label: 'Open prep', href: '/agenda' }, { label: 'Open reviews', href: '/mrs' }] },
+]
+
 export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[] = INBOX, now: Date = NOW, agenda: AgendaEvent[] = AGENDA, live: LiveData = LIVE): DataSource {
   const data: LiveData = structuredClone(live)
   // One body object per section version, so unchanged sections keep their reference.
@@ -212,6 +233,7 @@ export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[]
     conversation: chats.page,
     actions,
     now: () => now,
+    butler: fixtureButler(now, BUTLER_SEED),
   }
 }
 

@@ -522,7 +522,6 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 }
 
 .lp { height: 100%; display: grid; gap: 14px; padding: 12px 20px 16px; font-size: 13px; line-height: 1.4; min-height: 0; }
-.home-lp { grid-template-columns: 360px 1fr 360px; }
 .lp .rail { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .lp .pn { padding: 10px 12px; gap: 6px; min-height: 0; overflow: hidden; }
 .lp .pn.grow { flex: 1; }
@@ -1158,3 +1157,82 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   .desk-lp .chat-cv.chat-in .msg { font-size: 13.5px; line-height: 1.55; }
   .desk-lp .col .ask-pn { flex: 1; }
 }
+
+/* Butler rail (item_176, boards desk-rail-a and desk-rail-a-cyber). Laptop only. */
+.b-rail { display: none; }
+@media (min-width: 1200px) {
+  .app.has-rail { grid-template-columns: minmax(0, 1fr) auto; }
+  .app.has-rail > .top { grid-column: 1 / -1; }
+  .b-rail {
+    display: flex; flex-direction: column; width: 320px; min-height: 0; overflow: hidden;
+    background: var(--hdr); border-left: 1px solid var(--line);
+  }
+  .b-rail.folded { width: 56px; }
+  .rl-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; position: relative; z-index: 1; }
+  .rl-mood { display: inline-flex; align-items: center; gap: 8px; font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; }
+  .rl-mood.m-fail { color: var(--c-f); }
+  .rl-mood.m-ask { color: var(--c-n); }
+  .rl-mood.m-run { color: var(--c-w); }
+  .rl-mood.m-idle { color: var(--sub); }
+  .b-rail .dia { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+  .b-rail .dia.m-fail { color: var(--c-f); }
+  .b-rail .dia.m-ask { color: var(--c-n); }
+  .b-rail .dia.m-run { color: var(--c-w); }
+  .b-rail .dia.m-idle { color: var(--sub); }
+  .rl-kbd { font: 600 10px var(--font-body); color: var(--sub); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; cursor: pointer; }
+  .rail-head { position: relative; flex: none; margin-top: -24px; border-bottom: 1px solid var(--line); }
+  .rail-head:not(.on) { display: none; }
+  .rail-head canvas { position: absolute; pointer-events: none; }
+  .rl-line { margin: 0; padding: 12px 14px 8px; font: 13px / 1.5 var(--font-body); color: var(--fg); }
+  .rl-line b { color: var(--c-b); }
+  .rl-line .cur { color: var(--c-w); animation: rl-blink 1s steps(1) infinite; }
+  @keyframes rl-blink { 50% { opacity: 0; } }
+  .rl-log { list-style: none; margin: 0; padding: 4px 14px 12px; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .rl-msg { display: flex; flex-direction: column; gap: 6px; max-width: 92%; }
+  .rl-msg p { margin: 0; padding: 9px 12px; font-size: 12px; line-height: 1.5; border: 1px solid var(--line); border-radius: var(--r-row); }
+  .rl-msg.you { align-self: flex-end; align-items: flex-end; }
+  .rl-msg.you p { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .rl-msg.cr { align-self: flex-start; }
+  .rl-msg.cr p { background: var(--panel); }
+  .rl-msg.typing p { color: var(--sub); }
+  .rl-msg.tool, .rl-msg.note { align-self: center; font-size: 11px; color: var(--sub); }
+  .rl-who { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font: 600 10.5px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sub); }
+  .rl-who .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-d); }
+  .rl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rl-chip {
+    font: 700 10.5px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 5px; padding: 3px 8px;
+  }
+  .rl-chip:hover { background: var(--accent-soft); }
+  .rl-err { margin: 0; padding: 4px 14px; font-size: 11px; }
+  .rl-foot { border-top: 1px solid var(--line); padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .rl-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--sub); }
+  .rl-meta label { display: inline-flex; align-items: center; gap: 8px; }
+  .rl-meta select { font: 11px var(--font-body); color: var(--fg); background: var(--btn); border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; }
+  .rl-meta .bare { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--sub); }
+  .rl-in { display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--well); padding: 6px 6px 6px 12px; }
+  .rl-in textarea { flex: 1; resize: none; background: none; border: 0; outline: 0; color: var(--fg); font: 12px / 1.5 var(--font-body); padding: 6px 0; }
+  .rl-in button { font: 700 12px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--r-btn); padding: 8px 14px; cursor: pointer; }
+  .rl-in button:disabled { opacity: 0.55; cursor: default; }
+  .rl-strip { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 14px 0; background: none; border: 0; color: var(--sub); cursor: pointer; }
+  .rl-vert { writing-mode: vertical-rl; font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; }
+  .rl-busy { width: 6px; height: 6px; border-radius: 50%; background: var(--c-w); animation: rl-blink 1s steps(1) infinite; }
+
+  /* Cyber: cyan edge with glow, square mood diamond, chamfered input, Orbitron labels, no radius. */
+  [data-theme='cyber'] .b-rail { border-left-color: var(--c-w); box-shadow: -6px 0 18px -10px var(--c-w); }
+  [data-theme='cyber'] .b-rail .dia { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
+  [data-theme='cyber'] .rl-mood, [data-theme='cyber'] .rl-who, [data-theme='cyber'] .rl-vert { font-family: var(--font-display); font-size: 10px; }
+  [data-theme='cyber'] .rl-msg p, [data-theme='cyber'] .rl-chip, [data-theme='cyber'] .rl-kbd,
+  [data-theme='cyber'] .rl-meta select, [data-theme='cyber'] .rl-meta .bare { border-radius: 0; }
+  [data-theme='cyber'] .rl-in { border-radius: 0; clip-path: var(--clip-btn); border-color: color-mix(in srgb, var(--c-w) 45%, transparent); }
+  [data-theme='cyber'] .rl-in button { border-radius: 0; clip-path: var(--clip-btn); }
+  [data-theme='cyber'] .rl-line b { color: var(--c-w); }
+  [data-theme='cyber'] .rl-who .dot { border-radius: 0; }
+}
+
+/* Home with the butler rail (item_176): one column and the hero; the rail is the right column. */
+.home-lp { grid-template-columns: 320px 1fr; }
+.home-lp .rail .more { align-self: flex-end; font-size: 0.9em; }
+.lp .next-ev { display: flex; align-items: baseline; gap: 10px; }
+.lp .next-ev .tm { font-size: 1.4em; }
+.lp .next-ev .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

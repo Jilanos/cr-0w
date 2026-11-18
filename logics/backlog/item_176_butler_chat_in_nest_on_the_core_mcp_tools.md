@@ -69,7 +69,12 @@
   - Laptop: rail A, hero on top (320px rail, 240px hero block) showing the whole droid with no background box. The Desk "Ask CR-0W" panel goes; Live sessions takes its space. Alt+B folds to a 56px strip. Home rail has no hero.
   - Phone: badge top left before the wordmark. Typing in the bottom Ask box opens the chat sheet; on other tabs the badge opens it.
   - Phone Home: cover is D plus the Desk Ask bar under the holotable. Fold inner is G: HUD row, big centred holotable, Ask bar, then Needs you and Running in two columns. Source `home-phone/mockup.html?v=G`.
-  - Still to render before the build: cyber versions of these boards.
+  - Cyber versions approved 18/11 (round 4, `options/round4.html`). Ready to build.
+- Owner 2026-11-18 (slice 2 build):
+  - Fold key is Ctrl+B (Alt+B clashed).
+  - Home: the rail is pinned as the right column. Always open, no fold key, no hero line (the hero says it already). The mood label stays.
+  - Home left column: Needs you (top 3, then "N more in Inbox"), Next event, Running. MRs and reports join as one-line counts once their live data exists. No placeholders, no duplicated info.
+  - The hero stays the main thing on Home; the rest is toned down. Panel boxes and frames stay.
 - Owner 2026-11-16 (header gauges hand-off): free chat needs an account choice like /dispatch and /session.
 - Owner 2026-11-10: "when i talk to the butler i want the hero to respond". Placement on Home under the holotable, transcript on Desk. Layout base: item_171 approved design D.
 

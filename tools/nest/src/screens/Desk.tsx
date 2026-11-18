@@ -3,12 +3,12 @@ import { ApiError } from '../data/api'
 import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
 import { useConversation } from '../data/useConversation'
 import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
-import { accountsOf, dispatchOf, projectsOf, resumableOf, type Account, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
 import { missionOfRun } from '../data/state'
-import { Link, navigate } from '../router'
+import { Link, navigate, useQuery } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
 import { AskDock } from '../ui/AskDock'
 import { promptView } from '../ui/prompt'
@@ -17,6 +17,9 @@ import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 import { deskWork, workCounts, workOf, type WorkItem } from '../data/work'
 import { WorkList } from '../ui/WorkList'
+import { AccountField } from '../ui/AccountField'
+import { isCommand } from '../data/butler'
+import { useButler } from '../data/useButler'
 
 // Desk (item_138 boards desk, fold-desk-inner, fold-desk-cover) on the live actions of
 // item_170. Every action goes through the confirm sheet, then the feed refetches.
@@ -94,6 +97,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const [tell, setTell] = useState(() => new URLSearchParams(location.search).get('tell') === '1')
   const [text, setText] = useState('')
   const [ask, setAsk] = useState('')
+  const butler = useButler()
   const [form, setForm] = useState<Form>(null)
   const [run, setRun] = useState({ project: '', label: '', model: 'default', account: '', prompt: '' })
   const [start, setStart] = useState({ project: '', account: '', prompt: '' })
@@ -275,22 +279,36 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       .finally(() => setAsking(false))
   }
 
-  // The ask box: /dispatch and /session open their form; free chat waits for the hub API.
+  // /dispatch and /session open their form, prefilled with the project and prompt typed after.
+  const command = (t: string) => {
+    const [cmd, ...rest] = t.trim().split(/\s+/)
+    const words = rest.join(' ')
+    const p = projects.find((x) => x === rest[0])
+    if (cmd === '/dispatch') setRun((r) => ({ ...r, project: p ?? r.project, prompt: (p ? rest.slice(1).join(' ') : words) || r.prompt }))
+    else setStart((s) => ({ ...s, project: p ?? s.project, prompt: (p ? rest.slice(1).join(' ') : words) || s.prompt }))
+    setForm(cmd === '/dispatch' ? 'run' : 'session')
+  }
+
+  // The ask box: commands open their form; anything else goes to the butler (item_176).
   const submitAsk = () => {
     const t = ask.trim()
     if (!t) return
-    const [cmd, ...rest] = t.split(/\s+/)
-    if (cmd === '/dispatch' || cmd === '/session') {
-      const words = rest.join(' ')
-      const p = projects.find((x) => x === rest[0])
-      if (cmd === '/dispatch') setRun((r) => ({ ...r, project: p ?? r.project, prompt: (p ? rest.slice(1).join(' ') : words) || r.prompt }))
-      else setStart((s) => ({ ...s, project: p ?? s.project, prompt: (p ? rest.slice(1).join(' ') : words) || s.prompt }))
-      setForm(cmd === '/dispatch' ? 'run' : 'session')
-    } else {
-      setLog((l) => [...l, { me: true, text: t }, { text: `Free chat with CR-0W: ${LATER.toLowerCase()}. Use /dispatch or /session.` }])
-    }
+    if (isCommand(t)) command(t)
+    else void butler?.say(t, matchMedia(LAPTOP).matches ? 'nest' : 'phone')
     setAsk('')
   }
+
+  // The butler rail sends commands here as /desk?cmd=...: open the form, then drop the param.
+  const cmd = useQuery().get('cmd')
+  useEffect(() => {
+    if (!cmd || !isCommand(cmd)) return
+    command(cmd)
+    const q = new URLSearchParams(location.search)
+    q.delete('cmd')
+    history.replaceState(null, '', location.pathname + (q.size ? `?${q}` : ''))
+    dispatchEvent(new PopStateEvent('popstate'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cmd])
 
   return {
     snap, refresh, slots, agents, runs, sessions, resumable, projects, accounts,
@@ -441,15 +459,6 @@ function Timeline({ d, a, term }: { d: D; a: Agent; term?: boolean }) {
   )
 }
 
-// Allowed accounts only (accountsOf drops never); auto lets crow pick a free one.
-function AccountField({ value, accounts, set }: { value: string; accounts: Account[]; set: (a: string) => void }) {
-  return (
-    <label>Account<select className="field" value={value} onChange={(e) => set(e.target.value)}>
-      <option value="">auto</option>{accounts.map((a) => <option key={a.name} value={a.name}>{a.name} · {a.policy}</option>)}
-    </select></label>
-  )
-}
-
 function Forms({ d }: { d: D }) {
   if (d.form === 'run') {
     const r = d.run
@@ -579,24 +588,15 @@ function DeskLaptop({ d }: { d: D }) {
         {a ? (
           <AgentChat key={a.pid} snap={d.snap} refresh={d.refresh} target={{ pid: a.pid }} log={<Timeline d={d} a={a} term />} />
         ) : (
-          <section className="pn ask-pn" aria-labelledby="da">
-            <Ph id="da" sm="butler · sees missions, queue, inbox, sessions">Ask CR-0W</Ph>
-            <Chat d={d} />
-            <Chips d={d} />
-            <AskBox d={d} ph="Tell CR-0W what to run, ask about a mission…" />
-          </section>
+          <section className="pn" aria-labelledby="dl"><Ph id="dl">Live</Ph><div className="sm">Nothing open. Pick a session, or type /dispatch to CR-0W.</div></section>
         )}
         <div className="col">
           <section className="pn none" aria-labelledby="ds"><Ph id="ds" sm="click a slot to open it">Slots and queue</Ph><Slots d={d} /></section>
-          {a ? (
-            <section className="pn grow ask-pn" aria-labelledby="da">
-              <Ph id="da" sm="butler">Ask CR-0W</Ph>
+          {(d.form || d.log.length > 0) && (
+            <section className="pn none launch-pn" aria-labelledby="dk">
+              <Ph id="dk" sm="asks before it acts">Launch</Ph>
               <Chat d={d} />
-              <Chips d={d} />
-              <AskBox d={d} ph="Tell CR-0W what to run…" />
             </section>
-          ) : (
-            <section className="pn grow" aria-labelledby="dl"><Ph id="dl">Live</Ph><div className="sm">Nothing runs. Start one with /dispatch.</div></section>
           )}
           <section className="pn none" aria-labelledby="dv">
             <Ph id="dv" sm={d.sessions.length}>Live sessions</Ph>
