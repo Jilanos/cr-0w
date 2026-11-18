@@ -17,6 +17,7 @@
     "GET /api/mail/{id}": "mail-detail.json",
     "POST /api/mail/{id}/fetch": "operation-sync.json",
     "POST /api/mail/sync": "operation-sync.json",
+    "POST /api/calendar/sync": "operation-sync.json",
     "POST /api/mail/triage/plan": "triage-plan.json",
     "POST /api/mail/triage/execute": "operation-triage-partial.json",
     "POST /api/mail/{id}/reply-all": "operation-reply-all.json",

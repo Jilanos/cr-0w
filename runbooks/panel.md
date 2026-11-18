@@ -70,8 +70,22 @@ values stay unknown. No reset credit is consumed automatically.
 
 **Brouillons** lists the rows of the pending drafts section; its count matches
 them. Messages the sync cannot find in Drafts or Sent appear apart, under
-**À vérifier dans Outlook**, and are never marked done. Deadlines hide account
-quota resets by default; **Comptes** shows them and a toggle brings them back.
+**À vérifier dans Outlook**, and are never marked done.
+
+**Relances & échéances** has three tabs: **Liste**, **Échéances** and
+**Chronologie**. Chronologie is a 15-day lane timeline (Relances, Échéances,
+Réunions, Brouillons, Décisions) with an overdue column, an undated column, day
+cards and the selected item's detail. Quick filter chips are shared by Échéances
+and Chronologie: categories combine with OR, then **En retard**, person and
+priority narrow the result. Filters and the tab are remembered in the browser.
+Account quota resets stay hidden unless **Resets comptes** is on; **Comptes**
+always shows them.
+
+**Synchroniser** also starts a read-only calendar run for the next 14 days.
+**Synchroniser l'agenda** in Chronologie starts it alone. The run uses the
+`calendar` action profile: calendar search only, no mail tool, no event write.
+A validated complete read replaces the calendar snapshot; a partial read keeps
+the previous one.
 **Mails à ranger** counts move, archive and trash proposals only.
 
 The search button or Ctrl+K opens global search. `/` opens it when the list has

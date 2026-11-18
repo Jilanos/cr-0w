@@ -224,7 +224,7 @@ add('search-filter-empty-stale', DESK, async (page, base) => {
   await page.key('j'); await page.key('/');
   if (await page.eval('document.activeElement.id') !== 'filter') throw new Error('Filtre de liste perdu');
   await page.key('Escape');
-  await page.click('.segmented button', 'Échéances 14 j');
+  await page.click('.segmented button', 'Échéances');
   await page.click('#search-open'); await page.type('Alpha'); await sleep(600);
   await page.click('.search-result', 'Fournisseur Alpha (J. Martin)'); await sleep(600);
   await expect(page, '.detail h2', 'Fournisseur Alpha (J. Martin)');
@@ -268,7 +268,7 @@ add('flow-calendar', DESK, async (page, base) => {
   await open(page, base, { scenario: 'calendar' });
   await expect(page, '.card', 'Calendrier : à jour');
   await page.click('.card-row', 'Revue du projet exemple');
-  await expect(page, '.detail', 'Calendrier Outlook');
+  await expect(page, '.detail', 'Réunion Outlook');
   await expect(page, '.detail', 'Salle projet');
   await page.shot('calendar-detail');
   const link = await page.eval(`document.querySelector('.detail a').href`);
@@ -276,6 +276,38 @@ add('flow-calendar', DESK, async (page, base) => {
   const done = await page.eval(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.includes('Réglé'))`);
   if (done) throw new Error('Un rendez-vous ne doit pas proposer Réglé');
 });
+
+for (const [name, vp] of [['timeline', DESK], ['timeline-dark', { ...DESK, dark: true }], ['timeline-mobile', MOBILE]]) {
+  add(`flow-${name}`, vp, async (page, base) => {
+    await open(page, base, { view: 'pending', scenario: 'calendar' });
+    await page.click('.seg', 'Chronologie'); await sleep(400);
+    await expect(page, '.tl-svg', null, 'frise');
+    for (const lane of ['Relances', 'Échéances', 'Réunions', 'Brouillons', 'Décisions']) await expect(page, '.tl-svg .tl-lane', lane);
+    if (await has(page, '.tl-item', 'worka')) throw new Error('reset de compte visible par défaut');
+    await expect(page, '.tl-item', 'Point fournisseur Beta');
+    await page.shot(`${name}`);
+    await page.click('.tl-item', 'Point fournisseur Beta'); await sleep(300);
+    await expect(page, '.tl-side', 'Réunion Outlook');
+    await page.click('.fchip', 'Réunions'); await sleep(300);
+    if (await has(page, '.tl-item', 'Câbles Beta')) throw new Error('filtre Réunions sans effet');
+    await page.click('.fchip', 'Relances'); await sleep(300);
+    await expect(page, '.tl-item', 'Câbles Beta', 'filtres combinables');
+    await page.click('.fchip', 'En retard'); await sleep(300);
+    if (await has(page, '.tl-item', 'Câbles Beta')) throw new Error('filtre En retard sans effet');
+    await expect(page, '.tl-item', 'Fournisseur Alpha');
+    await page.shot(`${name}-filtered`);
+    await page.goto(url(base, { scenario: 'calendar' }), 1100);
+    await expect(page, '.fchip.on', 'En retard', 'filtres mémorisés');
+    await expect(page, '.tl-svg', null, 'onglet mémorisé');
+    await page.click('.fchip', 'Resets comptes'); await sleep(300);
+    await page.click('.fchip', 'En retard'); await sleep(300);
+    await page.click('.link-btn', 'Effacer'); await sleep(300);
+    await expect(page, '.tl-item', 'worka', 'resets sur demande');
+    await page.click('.seg', 'Échéances'); await sleep(300);
+    await expect(page, '.list-group', 'Sans date');
+    await page.shot(`${name}-list`);
+  });
+}
 
 // Every view, light and dark, desktop.
 for (const dark of [false, true]) {

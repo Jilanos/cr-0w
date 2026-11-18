@@ -6,6 +6,7 @@ import {
   fmtDate, fmtDay, ago, until, duration, money, bytes, plural, daysFromNow, isoDay, gauge, popMenu, closeMenus,
   followLog, safeHref, parseDate,
 } from './ui.js';
+import { loadFilters, filterDues, filterBar, timeline, legend, dayCards, calendarLine, activeCount } from './timeline.js';
 
 const PRIO = { red: 'Urgent', yellow: 'Normal', green: 'Bas', blue: 'Info' };
 const ACTION_LABEL = { reply: 'Répondre', keep: 'Garder', move: 'Ranger', archive: 'Archiver', trash: 'Corbeille' };
@@ -40,6 +41,11 @@ export function makeViews(ctx) {
   // Account quota resets are shown in Comptes; Échéances lists them only on request.
   const showResets = () => localStorage.getItem('crow.showResets') === 'true';
   const visibleDues = () => ((cached('dues') || {}).items || []).filter((d) => d.kind !== 'reset' || showResets());
+  // Échéances list and Chronologie share the quick filters (combinable, remembered).
+  const dueFilters = loadFilters();
+  const allDues = () => { const d = cached('dues') || {}; return [...(d.items || []), ...(d.undated || [])]; };
+  const filteredDues = () => filterDues(allDues(), dueFilters);
+  const dueKey = (d) => (d.kind === 'calendar' ? 'calendar:' + d.ref.id : `due:${d.date || 'none'}:${d.ref ? d.ref.id : d.text}`);
 
   const mailPolicyKinds = new Set(['drafts', 'followups']);
   const pendingTopic = (it) => it.topic_id ? { topic_id: it.topic_id, title: it.title, kind: 'pending',
@@ -396,11 +402,21 @@ export function makeViews(ctx) {
 
   // ------------------------------------------------------------ Relances & échéances
 
-  store.pendingTab = store.pendingTab || 'list';
+  store.pendingTab = store.pendingTab || localStorage.getItem('crow.pendingTab') || 'list';
+  const setPendingTab = (v) => { store.pendingTab = v; try { localStorage.setItem('crow.pendingTab', v); } catch { /* storage off */ } ctx.render(); };
+  function pendingTabs() {
+    const doc = cached('pending');
+    const dues = cached('dues');
+    return segmented([{ label: 'Liste', value: 'list', count: doc ? allPending().filter((x) => x.section !== 'done').length : null },
+      { label: 'Échéances', value: 'dues', count: dues ? filteredDues().length : null },
+      { label: 'Chronologie', value: 'timeline' }], store.pendingTab, setPendingTab);
+  }
   const ORDERED = ['followups', 'drafts', 'decisions', 'dossiers', 'filing', 'inbox_note', 'other'];
 
   const pending = {
     title: 'Relances & échéances', icon: 'pending', allowDoneKey: true,
+    get wide() { return store.pendingTab === 'timeline'; },
+    dashboard: () => timelineDashboard(),
     count: (c) => (c.overdue ? { alert: c.overdue, alertTitle: `${c.overdue} en retard sur ${c.pending ?? '?'} lignes` } : { n: c.pending ?? null }),
     load: () => Promise.all([load('pending'), load('dues', null, { quiet: true }), load('operations', null, { quiet: true })]),
     reload: () => ctx.refresh(['pending', 'dues']).then(ctx.render),
@@ -409,12 +425,9 @@ export function makeViews(ctx) {
       const doc = cached('pending');
       const dues = cached('dues');
       return h('div', { class: 'list-head' },
-        segmented([{ label: 'Liste', value: 'list', count: doc ? allPending().filter((x) => x.section !== 'done').length : null },
-          { label: 'Échéances 14 j', value: 'dues', count: dues ? visibleDues().length : null }], store.pendingTab, (v) => { store.pendingTab = v; ctx.render(); }),
+        pendingTabs(),
         store.pendingTab === 'dues' && dues?.calendar ? h('p', { class: 'muted small list-note', text: dues.calendar.note }) : null,
-        store.pendingTab === 'dues' && dues ? h('label', { class: 'toggle small list-note' },
-          h('input', { type: 'checkbox', checked: showResets(), onchange: (e) => { localStorage.setItem('crow.showResets', String(e.target.checked)); ctx.render(); } }),
-          h('span', { text: 'Afficher les resets de comptes' })) : null,
+        store.pendingTab === 'dues' && dues ? filterBar(dueFilters, allDues(), ctx.render) : null,
         doc && doc.updated_note ? h('p', { class: 'muted small list-note', text: `${doc.file_label || 'En attente'} · mis à jour ${doc.updated_note}` }) : null);
     },
     items() {
@@ -457,36 +470,77 @@ export function makeViews(ctx) {
   };
   function rank(kind) { const i = ORDERED.indexOf(kind); return i < 0 ? ORDERED.length : i; }
 
-  function dueEntries() {
-    const dues = cached('dues');
-    if (!dues) return [];
-    const out = [];
-    const groups = [['En retard', (d) => d.overdue], ['Cette semaine', (d) => !d.overdue && daysFromNow(d.date) <= 7], ['Plus tard', (d) => !d.overdue && daysFromNow(d.date) > 7]];
-    for (const [title, test] of groups) {
-      const items = visibleDues().filter(test);
-      if (!items.length) continue;
-      out.push(groupHeader(title, items.length));
-      items.forEach((d, i) => {
-        const it = d.ref && d.ref.kind === 'pending' ? findPending(d.ref.id) : null;
-        out.push({
-          key: d.kind === 'calendar' ? 'calendar:' + d.ref.id : `due:${d.date}:${d.ref ? d.ref.id : i}`, text: `${d.text} ${d.date}`, pending: it && (it.actions || []).includes('done') ? it : null,
-          topic: it ? pendingTopic(it) : { topic_id: null, title: d.text },
-          row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' },
-            h('span', { class: ['date-col', d.overdue && 'late'], text: fmtDay(d.date) }), h('span', { class: 'row-title', text: d.text }),
-            chip(d.kind === 'reset' ? 'reset compte' : d.kind === 'calendar' ? 'calendrier' : 'relance', 'quiet'))),
-          detail: () => it ? pendingDetail(it) : h('article', { class: 'detail' }, h('header', { class: 'detail-head' },
-            h('div', { class: 'eyebrow', text: d.kind === 'reset' ? 'Reset de quota' : d.kind === 'calendar' ? 'Calendrier Outlook' : 'Échéance' }), h('h2', { text: d.text }),
-            h('p', { class: 'due-line' }, icon('clock'), h('span', { text: fmtDay(d.date) }))),
+  const CAT_CHIP = { followup: 'relance', deadline: 'échéance', meeting: 'réunion', draft: 'brouillon', decision: 'décision', reset: 'reset compte' };
+
+  function dueEntry(d) {
+    const it = d.ref && d.ref.kind === 'pending' ? findPending(d.ref.id) : null;
+    const cat = d.category || (d.kind === 'reset' ? 'reset' : d.kind === 'calendar' ? 'meeting' : 'followup');
+    return {
+      key: dueKey(d), text: `${d.text} ${d.date || ''} ${d.who || ''}`, pending: it && (it.actions || []).includes('done') ? it : null,
+      topic: it ? pendingTopic(it) : { topic_id: null, title: d.text },
+      row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' },
+        h('span', { class: ['date-col', d.overdue && 'late'], text: d.date ? fmtDay(d.date) : 'sans date' }), h('span', { class: 'row-title', text: d.text }),
+        chip(CAT_CHIP[cat] || 'échéance', 'quiet'))),
+      detail: () => it ? pendingDetail(it) : h('article', { class: 'detail' }, h('header', { class: 'detail-head' },
+        h('div', { class: 'eyebrow', text: d.kind === 'reset' ? 'Reset de quota' : d.kind === 'calendar' ? 'Réunion Outlook' : 'Échéance' }), h('h2', { text: d.text }),
+        h('p', { class: 'due-line' }, icon('clock'), h('span', { text: d.date ? fmtDay(d.date) : 'sans date' }))),
           d.kind === 'calendar' ? h('div', null,
             h('p', { text: d.all_day ? 'Toute la journée' : `${fmtDate(d.start)} → ${fmtDate(d.end)}` }),
             d.location ? h('p', { text: d.location }) : null,
             d.stale ? h('p', { class: 'muted', text: 'Instantané ancien. Vérifie Outlook.' }) : null,
             safeHref(d.url) ? h('a', { class: 'btn', href: safeHref(d.url), target: '_blank', rel: 'noopener noreferrer', text: 'Ouvrir dans Outlook' }) : null)
             : h('div', { class: 'actions' }, d.ref ? btn('Ouvrir', { icon: 'external', onclick: () => openRef(d.ref) }) : null)),
-        });
-      });
+    };
+  }
+
+  function dueEntries() {
+    const dues = cached('dues');
+    if (!dues) return [];
+    const out = [];
+    const groups = [['En retard', (d) => d.overdue], ['Cette semaine', (d) => !d.overdue && d.date && daysFromNow(d.date) <= 7],
+      ['Plus tard', (d) => !d.overdue && d.date && daysFromNow(d.date) > 7], ['Sans date', (d) => !d.date]];
+    for (const [title, test] of groups) {
+      const items = filteredDues().filter(test);
+      if (!items.length) continue;
+      out.push(groupHeader(title, items.length));
+      items.forEach((d) => out.push(dueEntry(d)));
     }
     return out;
+  }
+
+  function syncCalendar() {
+    ctx.api.post('/api/calendar/sync', {}).then((op) => {
+      toast("Lecture de l'agenda lancée", { kind: 'info', detail: 'lecture seule, 14 jours' });
+      ctx.refresh(['dues']).then(ctx.render);
+      ctx.trackOp(op, async (final) => {
+        await ctx.refresh(['dues', 'state']);
+        ctx.render();
+        if (final) toast(final.status === 'succeeded' ? 'Agenda à jour' : "Lecture de l'agenda : " + (RUN_STATE[final.status] || final.status),
+          { kind: final.status === 'succeeded' ? 'ok' : 'warn', detail: final.error ? final.error.message : null });
+      });
+    }, (err) => toastError(err, "Lecture de l'agenda"));
+  }
+
+  function timelineDashboard() {
+    const dues = cached('dues');
+    if (!dues && !cacheErr('dues')) return loadingState();
+    if (!dues) return errorState(cacheErr('dues'), () => ctx.refresh(['dues']).then(ctx.render));
+    const all = allDues();
+    const items = filterDues(all, dueFilters);
+    const selected = store.timelineSel;
+    const opts = { selected, keyOf: dueKey, kinds: dueFilters.kinds, onSelect: (k) => { store.timelineSel = k; ctx.renderDetail(); } };
+    const current = items.find((d) => dueKey(d) === selected);
+    const side = current ? dueEntry(current) : null;
+    return h('div', { class: 'dashboard tl-dash' },
+      h('div', { class: 'tl-top' }, pendingTabs(), calendarLine(dues, syncCalendar)),
+      filterBar(dueFilters, all, ctx.render),
+      h('div', { class: 'tl-frame' }, timeline(items, opts), legend()),
+      items.length ? null : emptyState('Rien à afficher', activeCount(dueFilters) ? 'Aucun élément pour ces filtres.' : 'Aucune échéance sur 15 jours.'),
+      h('div', { class: 'tl-body' }, dayCards(items, opts),
+        h('aside', { class: 'tl-side', 'aria-label': 'Élément choisi' }, side
+          ? [side.detail(), h('div', { class: 'actions' }, btn('Ouvrir avec le chat', { icon: 'chat',
+            onclick: () => { store.pendingTab = 'dues'; ctx.go('pending', side.key); } }))]
+          : h('p', { class: 'muted', text: 'Choisis un élément dans la frise ou les jours.' }))));
   }
 
   // ------------------------------------------------------------ Décisions

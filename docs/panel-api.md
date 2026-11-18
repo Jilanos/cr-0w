@@ -269,7 +269,13 @@ opens this dedicated form; Chat remains separately available.
 
 ## Calendar deadlines
 
-`/api/dues` adds `calendar: {synced_at, stale, coverage, time_zone, note}`. Calendar
+`/api/dues` adds `calendar: {synced_at, stale, coverage, time_zone, note, sync}`.
+`sync` reports the last calendar run (`running`, `status`, `at`, `error`). Each row
+has `category` (`followup`, `deadline`, `meeting`, `draft`, `decision`, `reset`);
+pending rows add `section`, `prio` and `who` (the person column). `undated` lists
+draft and decision rows without a date. `POST /api/calendar/sync` starts a
+read-only calendar run; `POST /api/mail/sync` starts one too, with request id
+`<request_id>:calendar`. An active calendar run is returned instead of a new one. Calendar
 rows have `kind: calendar`, an opaque occurrence reference, local `date`, `start`,
 `end`, `all_day`, `location`, `url` and `stale`. Finished and cancelled events are
 excluded. Ongoing events appear on today. Recurring instances remain distinct.
@@ -277,7 +283,8 @@ Only HTTPS links are exposed. Calendar rows have no pending-file actions.
 
 The default source is `CROW_HOME/local/state/maj/calendar.json`. Override it with
 `calendar.snapshot`, the display zone with `calendar.time_zone` (IANA), and age
-with `calendar.stale_after_minutes`. No server request calls Outlook. The night
+with `calendar.stale_after_minutes`. The server never calls Outlook itself; the
+panel calendar run publishes through the same validation. The night
 `/maj` prompt collects 16 days of occurrences using read tools and writes an
 incoming JSON file. The launcher validates and atomically publishes it after a
 successful run. `crow-maj calendar schema` prints the format; `calendar import
