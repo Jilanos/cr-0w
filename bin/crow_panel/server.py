@@ -25,6 +25,7 @@ from .afk import Decisions
 from .followups import Followups
 from .search import Search
 from .notifications import Notifications
+from .calendar import CalendarSync
 
 
 class App:
@@ -39,7 +40,8 @@ class App:
         self.mail = Mail(cfg, self.store, self.launcher)
         self.followups = Followups(self)
         self.mail.followups = self.followups
-        self.launcher.complete = self.mail.complete
+        self.calendar = CalendarSync(self)
+        self.launcher.complete = self.complete
         self.readers = Readers(self)
         self.visits = Visits(self)
         self.decisions = Decisions(self)
@@ -72,6 +74,18 @@ class App:
             "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Mise à jour"}, {"name": "daily_update", "label": "Mise à jour machine"}],
             "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts"],
             "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
+
+    def complete(self, op, job, row, text):
+        if op["kind"] == CalendarSync.KIND:
+            return self.calendar.complete(op, job, row, text)
+        return self.mail.complete(op, job, row, text)
+
+    def sync_calendar_with_mail(self, body, route):
+        # Synchroniser also refreshes the calendar. Its failure never blocks the mail sync.
+        try:
+            return self.calendar.sync({**body, "request_id": str(body.get("request_id")) + ":calendar"}, route + " calendar")
+        except Problem:
+            return None
 
     def topic(self, key):
         topic = self.store.get("topics", key)
@@ -168,7 +182,12 @@ class App:
                 return 200, self.pending.undo(op, body, route)
             return 202, self.mail.undo(op, body, route)
         if path == "/api/mail/sync":
-            return 202, self.mail.collect("mail.sync", body, route, probe=body.get("probe") is True)
+            op = self.mail.collect("mail.sync", body, route, probe=body.get("probe") is True)
+            if body.get("probe") is not True:
+                self.sync_calendar_with_mail(body, route)
+            return 202, op
+        if path == "/api/calendar/sync":
+            return 202, self.calendar.sync(body, route)
         if path == "/api/mail/triage/plan":
             return 200, self.mail.plan(body)
         if path == "/api/mail/triage/execute":

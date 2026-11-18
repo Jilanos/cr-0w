@@ -10,7 +10,11 @@
       "ref": {
         "kind": "pending",
         "id": "p_k3m9x2qa"
-      }
+      },
+      "category": "followup",
+      "section": "followups",
+      "prio": "red",
+      "who": "Fournisseur Alpha (J. Martin)"
     },
     {
       "date": "2026-11-18",
@@ -20,7 +24,8 @@
       "ref": {
         "kind": "account",
         "id": "worka"
-      }
+      },
+      "category": "reset"
     },
     {
       "date": "2026-11-18",
@@ -36,6 +41,24 @@
       "all_day": false,
       "location": "Salle projet",
       "url": "https://outlook.office365.com/calendar/item/example",
+      "stale": false,
+      "category": "meeting"
+    },
+    {
+      "date": "2026-11-19",
+      "kind": "calendar",
+      "category": "meeting",
+      "text": "Point fournisseur Beta",
+      "overdue": false,
+      "ref": {
+        "kind": "calendar",
+        "id": "cal_example2"
+      },
+      "start": "2026-11-19T14:00:00+01:00",
+      "end": "2026-11-19T15:00:00+01:00",
+      "all_day": false,
+      "location": "Teams",
+      "url": "https://outlook.office365.com/calendar/item/example2",
       "stale": false
     },
     {
@@ -46,7 +69,11 @@
       "ref": {
         "kind": "pending",
         "id": "p_7hd2lw0e"
-      }
+      },
+      "category": "followup",
+      "section": "followups",
+      "prio": "yellow",
+      "who": "Câbles Beta : plans révision C"
     },
     {
       "date": "2026-11-20",
@@ -56,7 +83,11 @@
       "ref": {
         "kind": "pending",
         "id": "p_m2n4b6v8"
-      }
+      },
+      "category": "followup",
+      "section": "followups",
+      "prio": "yellow",
+      "who": "Câbles Beta : plans révision C"
     },
     {
       "date": "2026-11-21",
@@ -66,6 +97,38 @@
       "ref": {
         "kind": "account",
         "id": "claude"
+      },
+      "category": "reset"
+    },
+    {
+      "date": "2026-11-24",
+      "kind": "calendar",
+      "category": "meeting",
+      "text": "Revue faisceau série",
+      "overdue": false,
+      "ref": {
+        "kind": "calendar",
+        "id": "cal_example3"
+      },
+      "start": "2026-11-24T09:30:00+01:00",
+      "end": "2026-11-24T11:00:00+01:00",
+      "all_day": false,
+      "location": "Atelier",
+      "url": null,
+      "stale": false
+    },
+    {
+      "date": "2026-11-26",
+      "kind": "pending",
+      "category": "deadline",
+      "section": "dossiers",
+      "text": "Rendu du dossier exemple",
+      "overdue": false,
+      "prio": "yellow",
+      "who": null,
+      "ref": {
+        "kind": "pending",
+        "id": "p_b2c4e6g8"
       }
     }
   ],
@@ -74,6 +137,56 @@
     "stale": false,
     "coverage": "complete",
     "time_zone": "UTC",
-    "note": "Calendrier : à jour, couverture complète."
-  }
+    "note": "Calendrier : à jour, couverture complète.",
+    "sync": {
+      "running": false,
+      "status": "succeeded",
+      "at": "2026-11-18T08:20:00+01:00",
+      "error": null
+    }
+  },
+  "undated": [
+    {
+      "date": null,
+      "kind": "pending",
+      "category": "draft",
+      "section": "drafts",
+      "text": "Fournisseur Alpha : offre 26-XYZ lot 2",
+      "overdue": false,
+      "prio": null,
+      "who": null,
+      "ref": {
+        "kind": "pending",
+        "id": "p_d0r4ft6b"
+      }
+    },
+    {
+      "date": null,
+      "kind": "pending",
+      "category": "decision",
+      "section": "decisions",
+      "text": "Outillage : intégrer la rédaction du fournisseur",
+      "overdue": false,
+      "prio": "yellow",
+      "who": null,
+      "ref": {
+        "kind": "pending",
+        "id": "p_q81zc5vn"
+      }
+    },
+    {
+      "date": null,
+      "kind": "pending",
+      "category": "decision",
+      "section": "decisions",
+      "text": "Batteries : envoyer la trace CAN seule",
+      "overdue": false,
+      "prio": null,
+      "who": null,
+      "ref": {
+        "kind": "pending",
+        "id": "p_l5s8ne1u"
+      }
+    }
+  ]
 }

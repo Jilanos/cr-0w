@@ -136,3 +136,63 @@ def test_maj_calendar_import_uses_data_home_and_preserves_good_snapshot(tmp_path
     assert module["main"](["calendar", "import", str(source)]) == 2
     assert path.read_bytes() == before
     assert json.loads(path.with_suffix(".attempt.json").read_text())["status"] == "failed"
+
+
+def finish_calendar_run(app, fake, op, tools, value):
+    app.launcher.tick()
+    live = app.operation(op["operation_id"])
+    job = app.store.get("jobs", op["operation_id"])
+    assert job["profile"] == "calendar"
+    rid = live["steps"][-1]["run_id"]
+    log = Path(fake.rows[rid]["artifacts"]["stdout_path"])
+    log.write_text("".join(json.dumps({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": name, "input": args}]}}) + "\n" for name, args in tools))
+    if value is not None:
+        Path(job["output"]).write_text(json.dumps(value))
+    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
+    app.launcher.tick()
+    return app.operation(op["operation_id"])
+
+
+def test_mail_sync_also_collects_and_publishes_the_calendar(panel, tmp_path):
+    app, fake = panel
+    path = target(app, tmp_path)
+    _, mail_op = app.mutate("POST", "/api/mail/sync", {"request_id": "sync-both"})
+    ops = [o for o in app.store.all("operations") if o["kind"] == "calendar.sync"]
+    assert len(ops) == 1 and ops[0]["request_id"] == "sync-both:calendar"
+    _, again = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-again"})
+    assert again["operation_id"] == ops[0]["operation_id"]
+    op = finish_calendar_run(app, fake, ops[0], [("mcp__M365__outlook_calendar_search", {"query": "*"})], snapshot())
+    assert op["status"] == "succeeded" and op["result"]["published"] and op["result"]["events"] == 1
+    assert json.loads(path.read_text())["events"][0]["subject"] == "Project review"
+    dues = app.readers.dues(14)
+    assert any(d["kind"] == "calendar" for d in dues["items"])
+
+
+def test_calendar_sync_rejects_mail_tools_and_writes(panel, tmp_path):
+    app, fake = panel
+    path = target(app, tmp_path)
+    _, op = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-guard"})
+    op = finish_calendar_run(app, fake, op, [("mcp__M365__outlook_calendar_search", {}), ("mcp__M365__outlook_email_search", {})], snapshot())
+    assert op["status"] == "failed" and not path.exists()
+    _, op = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-write"})
+    op = finish_calendar_run(app, fake, op, [("mcp__M365__outlook_calendar_search", {}), ("mcp__M365__outlook_update_event", {})], snapshot())
+    assert op["status"] == "failed" and not path.exists()
+
+
+def test_calendar_sync_invalid_or_missing_output(panel, tmp_path):
+    app, fake = panel
+    path = target(app, tmp_path)
+    _, op = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-missing"})
+    op = finish_calendar_run(app, fake, op, [("mcp__M365__outlook_calendar_search", {})], None)
+    assert op["status"] == "unknown"
+    _, op = app.mutate("POST", "/api/calendar/sync", {"request_id": "cal-invalid"})
+    op = finish_calendar_run(app, fake, op, [("mcp__M365__outlook_calendar_search", {})], {"events": "nope"})
+    assert op["status"] == "failed" and op["error"]["code"] == "invalid_snapshot" and not path.exists()
+
+
+def test_calendar_profile_policy():
+    from crow_panel.security import tool_allowed
+    assert tool_allowed("calendar", "mcp__M365__outlook_calendar_search", {})
+    for name in ("mcp__M365__outlook_email_search", "mcp__M365__outlook_update_event", "mcp__M365__outlook_delete_event", "Bash"):
+        assert not tool_allowed("calendar", name, {})
+    assert not tool_allowed("read", "mcp__M365__outlook_calendar_search", {})

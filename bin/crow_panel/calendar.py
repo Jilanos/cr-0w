@@ -106,3 +106,62 @@ class Calendar:
             if self.path.exists():
                 meta["note"] = "Instantané calendrier invalide ou indisponible. Lance une mise à jour."
             return [], meta
+
+
+class CalendarSync:
+    """Read-only Outlook calendar collection through a guarded headless run."""
+
+    KIND = "calendar.sync"
+
+    def __init__(self, app):
+        self.app = app
+        self.cfg, self.store, self.launcher = app.cfg, app.store, app.launcher
+
+    def window(self, days=14):
+        zone = ZoneInfo(self.cfg.get("calendar", {}).get("time_zone") or "UTC")
+        start = dt.datetime.combine(dt.datetime.now(zone).date(), dt.time(), zone)
+        # The view needs coverage through the end of the last requested day.
+        return start, start + dt.timedelta(days=days + 1), zone
+
+    def active(self):
+        return next((o for o in self.store.all("operations") if o["kind"] == self.KIND and o["status"] in ("queued", "running")), None)
+
+    def sync(self, body, route, days=14):
+        running = self.active()
+        if running:
+            return running
+        self.launcher.running(fresh=True)  # Fail before accepting when admission cannot be measured.
+        op = self.store.operation(self.KIND, body, "Lecture de l'agenda")
+        output = self.cfg.state / "calendar/incoming" / (op["operation_id"] + ".json")
+        output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        start, end, zone = self.window(days)
+        from .core import ENGINE
+        prompt = (ENGINE / "bin/panel_prompts/calendar-sync.md").read_text() + "\nConfiguration: " + canonical({
+            "output": str(output), "time_zone": str(zone), "window_start": start.isoformat(), "window_end": end.isoformat(),
+            "contract": {"synced_at": "ISO timestamp with offset", "time_zone": str(zone),
+                         "coverage": {"status": "complete|partial", "window_start": start.isoformat(), "window_end": end.isoformat()},
+                         "events": [{"id": "stable Outlook event id", "subject": "text", "start": "ISO with offset, or YYYY-MM-DD when all_day",
+                                     "end": "ISO with offset, or YYYY-MM-DD when all_day", "all_day": False, "cancelled": False,
+                                     "location": "text or null", "web_link": "https link or null"}]}})
+        self.launcher.enqueue(op, {"account": "claude", "model": "sonnet", "provider": "claude", "cwd": str(self.cfg.home), "profile": "calendar",
+                                   "prompt": prompt, "output": str(output)}, route, body, "collect")
+        return op
+
+    def complete(self, op, job, row, text):
+        if op["kind"] != self.KIND or op["status"] != "succeeded":
+            return
+        output = read_json(job.get("output", ""))
+        if output is None:
+            op.update(status="unknown", error={"code": "result_missing", "message": "Le run est terminé sans agenda validable.", "retryable": False, "details": {}})
+            return
+        if not self.app.mail.transcript_ok(op, job, row, require_remote=True):
+            op.update(status="failed", error={"code": "unproven", "message": "Lecture de l'agenda non prouvée par le transcript.", "retryable": True, "details": {}})
+            return
+        try:
+            result = publish(Calendar(self.cfg).path, output)
+        except (ValueError, KeyError, TypeError, AttributeError, ZoneInfoNotFoundError) as exc:
+            op.update(status="failed", error={"code": "invalid_snapshot", "message": "Agenda reçu invalide : " + str(exc)[:200], "retryable": True, "details": {}})
+            return
+        op["result"] = {**result, "events": len(output.get("events", []))}
+        if not result["published"] or result["status"] != "complete":
+            op["status"] = "partial"

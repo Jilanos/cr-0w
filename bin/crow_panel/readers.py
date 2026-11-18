@@ -244,16 +244,38 @@ class Readers:
             raise Problem(400, "bad_request", "Période invalide.")
         today = dt.date.today()
         end = (today + dt.timedelta(days=days)).isoformat()
-        rows = [{"date": i["due"], "kind": "pending", "text": i["title"], "overdue": i["due"] < today.isoformat(), "ref": {"kind": "pending", "id": i["id"]}}
-                for s in self.app.pending.view()["sections"] if s["kind"] != "done" for i in s["items"] if i["due"] and i["due"] <= end]
+        def who(item):
+            cells = item.get("cells") or {}
+            value = next((cells[k] for k in cells if k.lower() in ("qui", "who", "personne", "contact")), None)
+            return "".join(seg.get("v", "") for seg in value or []).strip() or None
+
+        category = {"followups": "followup", "drafts": "draft", "decisions": "decision"}
+        sections = [s for s in self.app.pending.view()["sections"] if s["kind"] != "done"]
+        rows, undated = [], []
+        for s in sections:
+            for i in s["items"]:
+                row = {"date": i["due"], "kind": "pending", "category": category.get(s["kind"], "deadline"), "section": s["kind"], "text": i["title"],
+                       "overdue": bool(i["due"] and i["due"] < today.isoformat()), "prio": i.get("prio"), "who": who(i), "ref": {"kind": "pending", "id": i["id"]}}
+                if i["due"] and i["due"] <= end:
+                    rows.append(row)
+                elif not i["due"] and s["kind"] in ("drafts", "decisions"):
+                    undated.append(row)
         for account in self.accounts()["accounts"]:
             for field, label in (("reset_5h_at", "fenêtre 5 h"), ("reset_week_at", "semaine")):
                 date = account[field]
                 if date and today.isoformat() <= date[:10] <= end:
-                    rows.append({"date": date[:10], "kind": "reset", "text": account["name"] + " : " + label, "overdue": False, "ref": {"kind": "account", "id": account["name"]}})
+                    rows.append({"date": date[:10], "kind": "reset", "category": "reset", "text": account["name"] + " : " + label, "overdue": False, "ref": {"kind": "account", "id": account["name"]}})
         calendar, metadata = Calendar(self.cfg).view(days)
+        for event in calendar:
+            event["category"] = "meeting"
         rows.extend(calendar)
-        return {"generated_at": now(), "days": days, "items": sorted(rows, key=lambda r: (r["date"], r.get("start", ""))), "calendar": metadata}
+        syncs = [o for o in self.store.all("operations") if o["kind"] == "calendar.sync"]
+        last = max(syncs, key=lambda o: o["created_at"]) if syncs else None
+        metadata["sync"] = {"running": bool(last and last["status"] in ACTIVE), "status": last["status"] if last else None,
+                            "at": last["updated_at"] if last else None, "error": (last.get("error") or {}).get("message") if last else None}
+        if metadata["coverage"] == "none":
+            metadata["note"] = "Agenda absent. Synchroniser pour le lire."
+        return {"generated_at": now(), "days": days, "items": sorted(rows, key=lambda r: (r["date"], r.get("start", ""))), "undated": undated, "calendar": metadata}
 
     def state(self):
         pending = self.app.pending.view()
