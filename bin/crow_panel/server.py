@@ -137,7 +137,7 @@ class App:
                 return 200, self.pending.undo(op, body, route)
             return 202, self.mail.undo(op, body, route)
         if path == "/api/mail/sync":
-            return 202, self.mail.collect("mail.sync", body, route)
+            return 202, self.mail.collect("mail.sync", body, route, probe=body.get("probe") is True)
         if path == "/api/mail/triage/plan":
             return 200, self.mail.plan(body)
         if path == "/api/mail/triage/execute":
@@ -346,7 +346,7 @@ class Handler(BaseHTTPRequestHandler):
                     row = self.app.store.get("runs", key, {})
                     if not row.get("operation_id"):
                         try:
-                            row = self.app.launcher.command(["cdx", "run-status", key, "--json"]).get("run", {})
+                            row = self.app.launcher.cached("sse:" + key, ["cdx", "run-status", key, "--json"], ttl=2).get("run", {})
                             dummy = {"operation_id": key}
                             self.app.launcher.tail(dummy, row)
                             if row.get("ended_at"):

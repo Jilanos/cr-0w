@@ -115,7 +115,8 @@ class Files:
 # Unknown tools fail closed in the hook. This also covers dynamically named MCP servers.
 READ_SUFFIXES = ("outlook_email_search", "outlook_email_get", "outlook_get_email", "outlook_get_message",
                  "outlook_get_thread", "outlook_list_folders", "outlook_get_folders", "outlook_search_emails",
-                 "outlook_get_draft", "search", "fetch", "get_email", "list_mail_folders")
+                 "outlook_get_draft", "outlook_search", "outlook_get_email_content", "outlook_get_mail_folders",
+                 "search", "fetch", "get_email", "list_mail_folders")
 
 
 def tool_allowed(profile, name, args, manifest=None):
@@ -135,6 +136,9 @@ def tool_allowed(profile, name, args, manifest=None):
             return False
         return all(isinstance(i, dict) and set(i) == {"messageId", "moveToFolderId"}
                    and allowed.get(i["messageId"]) == i["moveToFolderId"] for i in entries)
+    if short == "read_resource":
+        uri = args.get("uri", "")
+        return isinstance(uri, str) and (uri == "mail:///folders" or uri.startswith(("mail:///folders/", "mail:///messages/")))
     if short in READ_SUFFIXES or any(short.startswith(prefix) for prefix in ("outlook_email_search_", "outlook_email_get_")):
         return True
     if profile == "skeleton" and short in ("outlook_create_reply_all_draft", "outlook_update_draft"):
@@ -144,16 +148,18 @@ def tool_allowed(profile, name, args, manifest=None):
 
 def hook_input(policy, payload):
     name, args = payload.get("tool_name", ""), payload.get("tool_input", {})
+    if name in policy.get("deny_tools", []) or name.rsplit("__", 1)[-1] in policy.get("deny_tools", []):
+        return False
     if name in ("Write", "Edit"):
         path = Path(args.get("file_path", "")).resolve()
         return str(path) in policy.get("write_paths", [])
     return tool_allowed(policy["profile"], name, args, policy.get("manifest"))
 
 
-def write_policy(cfg, op_id, profile="read", output=None, manifest=None):
+def write_policy(cfg, op_id, profile="read", output=None, manifest=None, deny_tools=None):
     directory = cfg.state / "ops" / op_id
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    policy = {"profile": profile, "manifest": manifest, "write_paths": [str(output.resolve())] if output else []}
+    policy = {"profile": profile, "manifest": manifest, "deny_tools": deny_tools or [], "write_paths": [str(output.resolve())] if output else []}
     atomic(directory / "policy.json", canonical(policy))
     import shlex
     command = shlex.join([str(Path(__file__).resolve().parents[1] / "crow-panel"), "tool-guard", str(directory / "policy.json")])

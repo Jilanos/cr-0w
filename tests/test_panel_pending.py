@@ -111,3 +111,26 @@ def test_bullet_and_expiry_and_recovery(tmp_path):
     recovered = store.get("operations", op["operation_id"])
     assert recovered["status"] == "succeeded" and recovered["result"]["recovered"]
     assert writer.read_bytes() == before
+
+
+def test_exact_duplicates_keep_ids_and_independent_undo(tmp_path):
+    writer, _, _ = setup(tmp_path)
+    document = DOCUMENT.replace("| Second |", "| Keep [link](https://example.org/) and escaped \\| pipe |")
+    writer.path.write_text(document)
+    first, second, _ = items(writer)
+    a = writer.mutate(first["id"], "done", {"request_id": "a", "item_rev": first["item_rev"]}, "/a")
+    assert items(writer)[0]["id"] == second["id"]
+    b = writer.mutate(second["id"], "done", {"request_id": "b", "item_rev": second["item_rev"]}, "/b")
+    writer.undo(a, {"request_id": "ua"}, "/ua")
+    writer.undo(b, {"request_id": "ub"}, "/ub")
+    assert writer.path.read_text() == document
+
+
+def test_crlf_and_dossier_restore_stay_in_original_block(tmp_path):
+    writer, _, _ = setup(tmp_path)
+    data = '# Pending\n\n## Dossiers\n### First\n- One\n\n### Second\n- Two\n\n## ✅ Réglé récemment\n'.replace('\n', '\r\n').encode()
+    writer.path.write_bytes(data)
+    first = items(writer)[0]
+    op = writer.mutate(first["id"], "done", {"request_id": "a", "item_rev": first["item_rev"]}, "/a")
+    writer.undo(op, {"request_id": "ua"}, "/ua")
+    assert writer.path.read_bytes() == data

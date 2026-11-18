@@ -84,8 +84,11 @@ def shared_locks(home):
 class Config(dict):
     def __init__(self, path=None, overrides=None):
         home = Path(crow_lib.data_home()).resolve()
+        explicit = path or os.environ.get("CROW_PANEL_CONFIG")
         path = Path(path or os.environ.get("CROW_PANEL_CONFIG") or home / "local/panel.yaml")
         if not path.exists():
+            if explicit:
+                raise ValueError("configuration file not found")
             path = ENGINE / "docs/panel.example.yaml"
         with path.open() as f:
             data = yaml.safe_load(f) or {}

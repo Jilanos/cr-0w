@@ -317,3 +317,103 @@ def test_sse_persistent_replay_without_duplicates(http_panel):
     assert status == 200 and b"event: done" in raw
     status, _, raw = request(server, "GET", op["links"]["events_url"], headers={**auth(app), "Last-Event-ID": str(events[-1]["id"])})
     assert status == 200 and raw == b""
+
+
+def test_missing_result_unknown_never_relaunches(panel):
+    app, fake = panel
+    _, op = post(app, "/api/mail/sync", {"request_id": "sync"})
+    app.launcher.tick()
+    op = app.operation(op["operation_id"])
+    rid = op["steps"][0]["run_id"]
+    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
+    app.launcher.tick()
+    assert app.operation(op["operation_id"])["status"] == "unknown"
+    count = len([c for c in fake.calls if c[1] == "run"])
+    app.launcher.tick()
+    assert len([c for c in fake.calls if c[1] == "run"]) == count
+
+
+def test_journal_recovers_lost_http_response_without_rewrite(panel):
+    app, _ = panel
+    item = pending_item(app)
+    path = "/api/pending/" + item["id"] + "/done"
+    body = {"request_id": "lost", "item_rev": item["item_rev"]}
+    op = app.pending.mutate(item["id"], "done", body, "POST " + path)
+    op["status"] = "running"
+    app.store.save_op(op)
+    before = Path(app.cfg["pending_md"]).read_bytes()
+    app.pending.recover()
+    _, same = post(app, path, body)
+    assert same["operation_id"] == op["operation_id"]
+    assert Path(app.cfg["pending_md"]).read_bytes() == before
+    assert len(list((app.cfg.state / "backups").glob("*"))) == 1
+
+
+def test_live_mail_is_blocked_without_proof(panel):
+    app, fake = panel
+    app.mail.publish(snapshot())
+    app.cfg["mode"] = "live"
+    key = app.mail.raw()["items"][0]["id"]
+    with pytest.raises(Problem) as err:
+        post(app, "/api/mail/" + key + "/reply-all", {"request_id": "live", "instructions": "reply"})
+    assert err.value.body["error"]["code"] == "capability_unavailable"
+    assert not any(c[1] == "run" for c in fake.calls)
+
+
+def test_live_reply_pipeline_persists_draft_before_styling_and_restart(panel, tmp_path):
+    app, fake = panel
+    app.mail.publish(snapshot())
+    app.cfg["mode"] = "live"
+    app.cfg["mail"]["draft_app_id"] = "draft_only_example"
+    app.cfg["mail"]["style_rules"] = str(tmp_path / "style.md")
+    app.cfg["work_handoff_dir"] = str(tmp_path / "handoff")
+    Path(app.cfg["mail"]["style_rules"]).write_text("Concise, no send.")
+    (tmp_path / "local").mkdir(exist_ok=True)
+    (tmp_path / "local/owner-prefs.md").write_text("Drafts only.")
+    proof = {name: {k: {"ok": True, "at": "2026-11-18T00:00:00+00:00", "detail": "fixture proof"} for k in ("schema", "headless_probe", "permissions", "live_trial")} for name in ("draft_skeleton", "draft_style")}
+    (app.cfg.state / "capabilities.json").write_text(json.dumps(proof))
+    key = app.mail.raw()["items"][0]["id"]
+    _, op = post(app, "/api/mail/" + key + "/reply-all", {"request_id": "live", "instructions": "Reply concisely"})
+    app.launcher.tick()
+    current = app.operation(op["operation_id"])
+    rid = current["steps"][-1]["run_id"]
+    job = app.store.get("jobs", op["operation_id"])
+    Path(job["output"]).write_text(json.dumps({"draft_id": "draft-one", "replied_message_id": key, "to": [], "cc": [], "thread_text": "untrusted", "evidence": ["tool fixture"]}))
+    Path(fake.rows[rid]["artifacts"]["stdout_path"]).write_text(json.dumps({"message": {"content": [{"type": "tool_use", "name": "mcp__M365__outlook_create_reply_all_draft", "input": {"messageId": key}}]}}) + "\n")
+    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
+    app.launcher.tick()
+    saved = app.operation(op["operation_id"])
+    assert saved["result"]["draft_id"] == "draft-one" and saved["steps"][-1]["name"] == "style"
+    restarted = App(app.cfg, fake)
+    restarted.launcher.tick()
+    cmd = next(c for c in reversed(fake.calls) if c[1] == "run")
+    assert cmd[2] == "worka" and "--power" in cmd
+    assert 'apps._default.enabled=false' in cmd[cmd.index("--extra-args") + 1]
+    saved = restarted.operation(op["operation_id"])
+    rid = saved["steps"][-1]["run_id"]
+    output = Path(fake.rows[rid]["artifacts"]["stdout_path"])
+    output.write_text(json.dumps({"type": "result", "result": json.dumps({"draft_id": "draft-one", "updated": True, "evidence": ["fixture"]})}) + "\n")
+    # Codex's final envelope differs from Claude's.
+    output.write_text(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps({"draft_id": "draft-one", "updated": True, "evidence": ["fixture"]})}}) + "\n")
+    fake.rows[rid].update(ended_at="2026-11-18T00:02:00+00:00", exit_code=0, status="succeeded")
+    restarted.launcher.tick()
+    assert restarted.operation(op["operation_id"])["steps"][-1]["name"] == "verify"
+    assert len([c for c in fake.calls if c[1] == "run" and c[2] == "claude"]) == 1
+    restarted.store.db.close()
+
+
+def test_utf8_tail_waits_for_complete_line_and_redacts(panel, tmp_path):
+    app, _ = panel
+    op = app.store.operation("chat.message", {"request_id": "tail"}, "Example")
+    path = tmp_path / "utf8.jsonl"
+    line = json.dumps({"message": {"content": [{"type": "text", "text": "Été https://example.org/?sig=secret"}]}}, ensure_ascii=False).encode() + b"\n"
+    path.write_bytes(line[:line.index("É".encode()) + 1])
+    row = {"run_id": "tail", "stdout_path": str(path)}
+    app.launcher.tail(op, row)
+    assert app.store.events("tail") == []
+    path.write_bytes(line)
+    app.launcher.tail(op, row)
+    events = app.store.events("tail")
+    assert len(events) == 1 and "Été" in events[0]["data"]["text"] and "secret" not in canonical(events)
+    app.launcher.tail(op, row)
+    assert app.store.events("tail") == events

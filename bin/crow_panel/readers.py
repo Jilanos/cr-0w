@@ -23,6 +23,11 @@ class Readers:
             row = next((r for r in rows if r.get("session_name") == name), {})
             floor = self.cfg.get("floors", {}).get(name, {})
             h5, week = row.get("remaining_5h_pct"), row.get("remaining_week_pct")
+            windows = row.get("quota_windows") or {}
+            if windows.get("5h", {}).get("availability") in ("unavailable", "unknown"):
+                h5 = None
+            if windows.get("weekly", {}).get("availability") in ("unavailable", "unknown"):
+                week = None
             known = h5 is not None or week is not None
             low = h5 is not None and h5 < floor.get("h5", 0) or week is not None and week < floor.get("week", 0)
             accounts.append({"name": name, "provider": row.get("provider") or config.get("provider", "claude"), "in_policy": True,
@@ -197,7 +202,7 @@ class Readers:
         queued = sum(o["status"] == "queued" for o in self.store.all("operations"))
         limit = (dt.date.today() + dt.timedelta(days=7 - dt.date.today().weekday())).isoformat()
         afk = self.afk()
-        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and i["due"] <= limit) for i in items), "decisions": len(decisions),
+        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items), "decisions": len(decisions),
                   "inbox": len(self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None, "inbox_unread": sum(i["unread"] for i in self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None,
                   "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": sum(i["state"] == "draft" for i in self.app.mail.drafts()["items"]),
                   "runs_active": active, "runs_queued": queued, "afk_decisions": sum(not d["answered"] for d in afk["decisions"])}

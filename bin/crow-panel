@@ -37,6 +37,28 @@ def main():
     if args.command == "check-config":
         print(canonical({"ok": True, "mode": cfg["mode"], "host": cfg["host"], "port": cfg["port"]}))
         return 0
+    if args.command in ("sync", "probe"):
+        # Reuse the existing server and its durable queue after a night update.
+        import http.client
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", cfg["port"], timeout=10)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            cookie = response.getheader("Set-Cookie", "").split(";", 1)[0]
+            response.read()
+            if cookie.startswith("crow_session="):
+                conn.request("GET", "/api/session", headers={"Cookie": cookie})
+                response = conn.getresponse()
+                session = json.loads(response.read())
+                body = canonical({"request_id": uid("req_"), "probe": args.command == "probe"})
+                conn.request("POST", "/api/mail/sync", body, {"Cookie": cookie, "X-Crow-Token": session["csrf_token"],
+                             "Origin": "http://127.0.0.1:" + str(cfg["port"]), "Content-Type": "application/json"})
+                response = conn.getresponse()
+                print(response.read().decode())
+                return 0 if response.status == 202 else 1
+            conn.close()
+        except (OSError, ValueError, KeyError, http.client.HTTPException):
+            pass
     os.umask(0o077)
     from crow_panel.server import App, Server
     # One server or CLI mutation process per state directory.

@@ -58,6 +58,10 @@ class Pending:
     def read_bytes(self):
         return self.path.read_bytes() if self.path and self.path.is_file() else b""
 
+    def version(self):
+        stat = self.path.stat() if self.path and self.path.is_file() else None
+        return (stat.st_mtime_ns, stat.st_size, stat.st_ino) if stat else None
+
     def parse(self, data=None, hints=None):
         data = self.read_bytes() if data is None else data
         rev = digest(data, "d_")
@@ -157,6 +161,7 @@ class Pending:
             key = (hints or {}).get(record["start"]) or (match["id"] if match and not uncertain else "p_" + base64.b32encode(secrets.token_bytes(5)).decode().lower())
             record.update(id=key, active=True, ambiguous=False)
             former = next((r for r in old if r["id"] == key), {})
+            record["original_group_size"] = former.get("original_group_size", len(group))
             record["anchor_prev"] = former.get("anchor_prev", former.get("prev", record["prev"]))
             record["anchor_next"] = former.get("anchor_next", former.get("next", record["next"]))
             self.store.put("pending_index", key, record)
@@ -194,6 +199,7 @@ class Pending:
     def mutate(self, key, action, body, route):
         self.check_lock()
         with lock(self.cfg.locks, "pending", False):
+            version = self.version()
             before = self.read_bytes()
             previous = self.store.get("pending_index", key)
             document, lines, entries = self.parse(before)
@@ -211,8 +217,9 @@ class Pending:
             inserted = None
             if action == "done":
                 cells = record["raw_cells"]
-                title = cells.get("Qui", cells.get("Sujet", ""))
-                text = title + " : " + cells.get("Attendu", "") if item["kind"] == "table_row" else record["raw"][2:].rstrip()
+                title = cells.get("Qui", cells.get("Sujet", next(iter(cells.values()), "")))
+                expected = cells.get("Attendu", " / ".join(v for v in cells.values() if v != title))
+                text = title + " : " + expected if item["kind"] == "table_row" else record["raw"][2:].rstrip()
                 note = body.get("note")
                 if note is not None and (not isinstance(note, str) or "\n" in note or "\r" in note or len(note) > 2000):
                     raise Problem(400, "bad_request", "Note invalide.")
@@ -246,16 +253,23 @@ class Pending:
                 parts = re.split(r'(?<!\\)\|', record["raw"])
                 offset = 1 + item["columns"].index("Échéance")
                 cell = parts[offset]
-                parts[offset] = re.sub(r'\S.*\S|\S', due.strftime("%d/%m"), cell, count=1)
+                parts[offset] = re.sub(r'\S.*\S|\S', due.strftime("%d/%m"), cell, count=1) if cell.strip() else cell + due.strftime("%d/%m")
                 updated[record["start"]:record["end"]] = ["|".join(parts)]
             after = "".join(updated).encode()
             op = self.store.operation("pending." + action, body, ("Réglé : " if action == "done" else "Reporté : ") + item["title"], item["topic_id"])
             inverse = {"record": record, "inserted": inserted, "replacement": "".join(updated[record["start"]:record["end"]]) if action == "snooze" else None,
-                       "original_count": sum(r["raw"] == record["raw"] and r["section"] == record["section"] and r["block"] == record["block"] for r, _, _ in entries)}
+                       "original_count": record["original_group_size"]}
             op["items"] = [{"ref": {"kind": "pending", "id": key}, "status": "succeeded", "detail": "ligne déplacée dans Réglé récemment" if action == "done" else "échéance reportée"}]
-            self.write(op, before, after, inverse, route, body)
+            self.write(op, before, after, inverse, route, body, version)
+            if action == "done":
+                op["result"]["moved_to"] = {"section": "done", "item_id": key, "line_preview": inserted.rstrip()}
+            else:
+                op["result"]["item_rev_after"] = digest("|".join(parts), "r_")
+            self.store.save_op(op)
             # Preserve the identities of every surviving line by its exact position after the splice.
             hints = {}
+            if action == "done":
+                hints[position] = key
             for old, _, _ in entries:
                 if old["id"] == key:
                     if action == "snooze":
@@ -271,7 +285,7 @@ class Pending:
             self.parse(after, hints)
             return op
 
-    def write(self, op, before, after, inverse, route, body):
+    def write(self, op, before, after, inverse, route, body, version=None):
         backup = "EN_ATTENTE." + dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%f") + ".md"
         result = {"doc_rev_before": digest(before, "d_"), "doc_rev_after": digest(after, "d_"), "backup": backup}
         op["result"] = result
@@ -281,7 +295,7 @@ class Pending:
         atomic(self.cfg.state / "backups" / backup, before)
         for path in sorted((self.cfg.state / "backups").glob("*.md"))[:-200]:
             path.unlink()
-        if self.read_bytes() != before:
+        if self.read_bytes() != before or version is not None and self.version() != version:
             op["status"] = "failed"
             self.store.save_op(op)
             raise Problem(409, "conflict", "Le fichier a changé avant l'écriture. Rien n'a été écrit.")
@@ -300,6 +314,7 @@ class Pending:
             raise Problem(409, "undo_expired", "Fenêtre d'annulation de 10 s dépassée. Sauvegarde disponible.", {"operation_id": original["operation_id"], "backup": (original["result"] or {}).get("backup")})
         self.check_lock()
         with lock(self.cfg.locks, "pending", False):
+            version = self.version()
             before = self.read_bytes()
             document, lines, entries = self.parse(before)
             intent = self.store.get("intents", original["operation_id"])
@@ -315,7 +330,7 @@ class Pending:
                 hint = {current["start"]: record["id"]}
             else:
                 inserted = inverse["inserted"]
-                matches = [r for r, _, s in entries if r["raw"] == inserted and s["kind"] == "done"]
+                matches = [r for r, _, s in entries if r["id"] == record["id"] and r["raw"] == inserted and s["kind"] == "done"]
                 count = sum(r["raw"] == record["raw"] and r["section"] == record["section"] and r["block"] == record["block"] for r, _, _ in entries)
                 if len(matches) != 1 or count >= inverse["original_count"]:
                     raise Problem(409, "conflict", "La ligne réglée a changé ou l'original est déjà présent.")
@@ -329,6 +344,13 @@ class Pending:
                 if removed["start"] < start:
                     start -= removed["end"] - removed["start"]
                     end -= removed["end"] - removed["start"]
+                if record["block"]:
+                    headings = [i for i in range(start, min(end, len(updated))) if updated[i].startswith("### ")]
+                    matches = [i for i in headings if slug(updated[i][4:].strip()) == record["block"]]
+                    if len(matches) != 1:
+                        raise Problem(409, "ambiguous", "Bloc d'origine absent ou ambigu.")
+                    start = matches[0] + 1
+                    end = next((i for i in headings if i > matches[0]), end)
                 prev = [i for i in range(start, min(end, len(updated))) if updated[i] == record.get("anchor_prev", record["prev"])]
                 nex = [i for i in range(start, min(end, len(updated))) if updated[i] == record.get("anchor_next", record["next"])]
                 position = prev[-1] + 1 if len(prev) == 1 else nex[0] if len(nex) == 1 else end
@@ -336,7 +358,7 @@ class Pending:
                 hint = {position: record["id"]}
             op = self.store.operation("pending.undo", body, "Annulé : ligne remise à sa place", original["topic_id"])
             op["items"] = original["items"]
-            self.write(op, before, "".join(updated).encode(), {"undoes": original["operation_id"]}, route, body)
+            self.write(op, before, "".join(updated).encode(), {"undoes": original["operation_id"]}, route, body, version)
             op["result"]["undoes"] = original["operation_id"]
             self.store.save_op(op)
             original["undone_by"] = op["operation_id"]

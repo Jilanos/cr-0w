@@ -31,5 +31,11 @@ Write UTF-8 JSON to the configured output path with this schema:
   "drafts":[]
 }
 Use an actual enumeration value, never a pipe-separated example string.
+Read message bodies with the read_resource tool and the mail:///messages/ URIs
+returned by the search. A missing conversation id is null; never use "unknown" or
+invent one. Try folder resources read-only; if real folder ids remain unavailable,
+leave folders empty and explain that limitation in probe.notes. Coverage.errors
+describes Inbox enumeration failures only. Missing body or folder capabilities go
+in probe.notes. The server records the collection start and end timestamps.
 Write the file with Write. No shell is permitted. If tools are missing, report the
 limitation and partial/none coverage. Never fabricate mailbox data or proof.

@@ -71,7 +71,19 @@ def project_name(cwd):
 def ledger():
     if not LEDGER.exists():
         return []
-    return [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
+    rows = [json.loads(l) for l in LEDGER.read_text().splitlines() if l.strip()]
+    for row in rows:
+        if row.get("source") == "panel" and row.get("kind") == "script" and row.get("panel_state_dir"):
+            import sqlite3
+            try:
+                database = Path(row["panel_state_dir"]) / "panel.db"
+                with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
+                    value = db.execute("SELECT data FROM objects WHERE bucket='runs' AND id=?", (row["run_id"],)).fetchone()
+                if value:
+                    row.update(json.loads(value[0]))
+            except (sqlite3.Error, ValueError, OSError):
+                pass
+    return rows
 
 
 _finished_cache = {}
@@ -84,6 +96,7 @@ def finished_rows(since, ttl=8):
         return hit[1]
     out = sh("cdx", "runs", "--since", since, "--limit", "200", "--json")
     runs = {r["run_id"]: r for r in (json.loads(out).get("runs", []) if out else [])}
+    runs.update({r["run_id"]: r for r in ledger() if r.get("kind") == "script" and r.get("ended_at")})
     _finished_cache[since] = (time.time(), runs)
     return runs
 
@@ -774,7 +787,7 @@ def collect(since="today", include_unledgered=False):
         }
         if kind == "run":
             for rec in reversed(recs):
-                if rec["cwd"] == p["cwd"] and rec["run_id"] not in done and rec["run_id"] not in claimed:
+                if rec.get("kind") != "script" and rec["cwd"] == p["cwd"] and rec["run_id"] not in done and rec["run_id"] not in claimed:
                     claimed.add(rec["run_id"])
                     a.update(run_id=rec["run_id"], label=rec["label"], commits=commits_since(rec["cwd"], rec.get("start_sha")),
                              mission=run_mission(rec), branch=rec.get("branch") or None)

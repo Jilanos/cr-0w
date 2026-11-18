@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import crow_lib
@@ -34,6 +35,7 @@ def now():
 def log(msg):
     with LOG.open("a", encoding="utf-8") as fh:
         fh.write(f"{dt.datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n")
+    print(msg, flush=True)
 
 
 def since():
@@ -72,16 +74,59 @@ def relay_start():
 
 
 def _night():
+    from crow_panel.core import lock, shared_locks
     log("start")
     manifest, relay = relay_start()
     log(f"relay on {manifest}")
     prompt = "/maj mode=nuit"
     cmd = ["cdx", "run", CFG.get("account", "claude"), "--cwd", str(HOME), "--model", CFG.get("model", "sonnet"),
-           "--permission", "full", "--prompt", prompt, "--json"]
-    env = dict(os.environ, CROW_RETRO="1", CROW_MAJ_NIGHT="1")
-    out = subprocess.run(cmd, capture_output=True, text=True, env=env)
+           "--permission", "full", "--prompt", prompt, "--detach", "--max-parallel", os.environ.get("CROW_MAX_RUNS", "2"), "--json"]
+    env = dict(os.environ, HOME=crow_lib.real_home(), CROW_RETRO="1", CROW_MAJ_NIGHT="1")
+    with lock(shared_locks(HOME), "admission"):
+        out = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    exit_code = out.returncode or 1
     try:
         res = json.loads(out.stdout)
+        run_id = res.get("run_id")
+        registry = os.environ.get("CROW_PANEL_RUNS_REGISTRY")
+        if res.get("ok") and run_id and registry:
+            record = {"run_id": run_id, "project": "crow", "label": "panel:routine.maj", "cwd": str(HOME),
+                      "started_at": now().isoformat(), "prompt_file": None, "power": None, "source": "panel",
+                      "operation_id": os.environ.get("CROW_PANEL_OPERATION_ID"), "topic_id": None,
+                      "account": CFG.get("account", "claude"), "model": CFG.get("model", "sonnet"), "kind": "agent",
+                      "parent_script": os.environ.get("CROW_PANEL_PARENT_RUN")}
+            with lock(shared_locks(HOME), "registry"):
+                path = Path(registry)
+                path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                with path.open("a") as stream:
+                    stream.write(json.dumps(record) + "\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                path.chmod(0o600)
+        offset = 0
+        while res.get("ok") and run_id:
+            status = subprocess.run(["cdx", "run-status", run_id, "--json"], capture_output=True, text=True, env=env)
+            try:
+                row = json.loads(status.stdout).get("run") or {}
+            except ValueError:
+                log("run status unavailable; retrying")
+                time.sleep(5)
+                continue
+            artifact = (row.get("artifacts") or row).get("stdout_path")
+            if artifact and Path(artifact).is_file():
+                with Path(artifact).open("rb") as stream:
+                    stream.seek(offset)
+                    chunk = stream.read()
+                end = chunk.rfind(b"\n") + 1
+                if end:
+                    sys.stdout.write(chunk[:end].decode("utf-8", "replace"))
+                    sys.stdout.flush()
+                    offset += end
+            if row.get("ended_at"):
+                res = {**res, **row}
+                exit_code = row.get("exit_code") if row.get("exit_code") is not None else 1
+                break
+            time.sleep(5)
         log(f"run ok={res.get('ok')} exit={res.get('exit_code')} run_id={res.get('run_id')} stdout={res.get('stdout_path')}")
     except json.JSONDecodeError:
         log("run failed: " + (out.stderr or out.stdout)[-400:].replace("\n", " "))
@@ -98,13 +143,14 @@ def _night():
         sync = subprocess.run([str(ENGINE / "bin/crow-panel"), "sync", "--config", str(panel_config)],
                               capture_output=True, text=True, env=env)
         log(f"panel sync queued={sync.returncode == 0}")
+    return exit_code
 
 
 def night():
     from crow_panel.core import lock, shared_locks
     locks = shared_locks(HOME)
     with lock(locks, "maj", False), lock(locks, "pending"):
-        _night()
+        return _night()
 
 
 def main(argv):
@@ -139,7 +185,7 @@ def main(argv):
         d.mkdir(parents=True, exist_ok=True)
         print(d / "manifest.tsv")
     elif cmd == "night":
-        night()
+        return night()
     else:
         print(__doc__)
         return 2
