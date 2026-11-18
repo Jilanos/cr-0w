@@ -47,7 +47,7 @@ def panel(tmp_path):
     pending = tmp_path / "pending.md"
     pending.write_text(DOCUMENT)
     fake = FakeCdx(tmp_path)
-    cfg = Config(overrides={"crow_home": str(tmp_path), "state_dir": str(tmp_path / "state"), "locks_dir": str(tmp_path / "locks"),
+    cfg = Config(path=Path(__file__).resolve().parents[1] / "docs/panel.example.yaml", overrides={"crow_home": str(tmp_path), "state_dir": str(tmp_path / "state"), "locks_dir": str(tmp_path / "locks"),
                             "runs_registry": str(tmp_path / "runs.jsonl"), "pending_md": str(pending), "port": 0,
                             "files": {"roots": [str(tmp_path)]}, "routines": {"maj": {"argv": ["example-maj", "night"]}, "daily_update": {"argv": ["example-update"]}},
                             "notifications": {"enabled": False},

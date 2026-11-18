@@ -225,3 +225,51 @@ def test_unchanged_choice_is_not_a_correction_and_undo_retracts_learning(panel):
     app.launcher.tick()
     assert app.operation(undo['operation_id'])['status'] == 'succeeded'
     assert json.loads(app.mail.feedback_path.read_text()) == {}
+
+
+def test_com_capability_requires_readonly_folder_resolution(panel):
+    app, _ = panel
+    app.cfg['mode'] = 'live'
+    class Backend:
+        def probe(self):
+            return {'connected': True, 'folders_resolvable': self.resolved}
+    app.mail.com = Backend()
+    app.mail.com.resolved = False
+    with pytest.raises(Exception):
+        app.mail.require('mail_move')
+    app.mail.com.resolved = True
+    for name in ('mail_move', 'mail_archive', 'mail_triage_undo'):
+        app.mail.require(name)
+
+
+def test_connector_owner_trial_requires_schema_guard_and_single_message(panel):
+    app, _ = panel
+    app.cfg['mode'] = 'live'
+    proof = {'mail_move': {'schema': {'ok': True}}, 'tool_deny_passthrough':
+             {k: {'ok': True} for k in ('schema', 'headless_probe', 'permissions')}}
+    path = app.cfg.state / 'capabilities.json'
+    path.write_text(json.dumps(proof))
+    assert not app.mail.connector_trial({}, [{}])
+    assert not app.mail.connector_trial({'owner_trial': True}, [{}, {}])
+    assert app.mail.connector_trial({'owner_trial': True}, [{}])
+    proof['tool_deny_passthrough']['permissions']['ok'] = None
+    path.write_text(json.dumps(proof))
+    assert not app.mail.connector_trial({'owner_trial': True}, [{}])
+
+
+def test_connector_proof_only_after_successful_confirmed_roundtrip(panel):
+    app, _ = panel
+    app.cfg['mode'] = 'live'
+    original = app.store.operation('mail.triage.execute', {'request_id': 'trial'}, 'trial')
+    original['status'] = 'succeeded'
+    app.store.save_op(original)
+    undo = app.store.operation('mail.triage.undo', {'request_id': 'undo'}, 'undo')
+    undo.update(status='unknown', items=[{'status': 'succeeded'}])
+    manifest = {'undoes': original['operation_id'], 'owner_trial': True}
+    app.mail.record_connector_trial(undo, manifest)
+    assert not (app.cfg.state / 'capabilities.json').exists()
+    undo['status'] = 'succeeded'
+    app.mail.record_connector_trial(undo, manifest)
+    proof = json.loads((app.cfg.state / 'capabilities.json').read_text())
+    assert all(proof[n]['live_trial']['undo_operation_id'] == undo['operation_id']
+               for n in ('mail_move', 'mail_archive', 'mail_triage_undo'))

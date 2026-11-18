@@ -393,19 +393,48 @@ class Mail:
 
     def capabilities(self):
         proof = read_json(self.cfg.state / "capabilities.json", {})
+        backend = getattr(self, "com", None)
+        com = backend.probe() if backend else {}
         caps = []
         labels = {"mail_read": "Lire la boîte de réception", "mail_move": "Ranger un mail", "mail_archive": "Archiver un mail", "mail_trash": "Corbeille",
                   "mail_triage_undo": "Annuler un rangement", "draft_skeleton": "Créer une réponse à tous", "draft_style": "Mise en forme du brouillon", "run_stop": "Arrêter un run", "tool_deny_passthrough": "Refus d'outils"}
         for name, label in labels.items():
             evidence = proof.get(name, {k: {"ok": None, "at": None, "detail": None} for k in ("schema", "headless_probe", "permissions", "live_trial")})
+            if com.get("connected") and name in ("mail_read", "mail_move", "mail_archive", "mail_triage_undo", "draft_skeleton", "draft_style"):
+                reachable = name not in ("mail_move", "mail_archive", "mail_triage_undo") or com.get("folders_resolvable") is True
+                evidence = {**evidence, **{k: {"ok": reachable, "at": now(), "detail": "Outlook classique et dossiers accessibles en lecture seule."}
+                                           for k in ("schema", "headless_probe", "permissions")}}
             required = all(evidence.get(k, {}).get("ok") is True for k in ("schema", "headless_probe", "permissions"))
             simulated = self.cfg.dry and name in ("mail_move", "mail_archive", "mail_triage_undo", "draft_skeleton", "draft_style")
             forbidden = name in ("mail_trash", "run_stop")
             allowed = not forbidden and (required or simulated)
             caps.append({"name": name, "label": label, "state": "unavailable" if forbidden else "available" if required and evidence.get("live_trial", {}).get("ok") is True else "limited",
                          "allowed": allowed, "mode": self.cfg["mode"], "evidence": evidence,
-                         "reason": "Outil par message non prouvé." if forbidden else "Mode essai : actions simulées." if simulated else None if required else "Sonde et permissions à vérifier."})
+                         "reason": "Outil par message non prouvé." if forbidden else "Mode essai : actions simulées." if simulated else None if required else
+                         "Ouvre Outlook classique et synchronise. Avec le connecteur, lance la sonde puis confirme un premier déplacement avec retour."})
         return {"generated_at": now(), "probed_at": proof.get("probed_at"), "capabilities": caps}
+
+    def connector_trial(self, body, items):
+        """One explicit, guarded owner trial breaks the connector proof deadlock."""
+        if body.get("owner_trial") is not True or len(items) != 1:
+            return False
+        proof = read_json(self.cfg.state / "capabilities.json", {})
+        return (proof.get("mail_move", {}).get("schema", {}).get("ok") is True
+                and all(proof.get("tool_deny_passthrough", {}).get(k, {}).get("ok") is True
+                        for k in ("schema", "headless_probe", "permissions")))
+
+    def record_connector_trial(self, op, manifest):
+        if self.cfg.dry or op["status"] != "succeeded" or not manifest.get("undoes") or not manifest.get("owner_trial"):
+            return
+        original = self.store.get("operations", manifest["undoes"])
+        if not original or original["status"] != "succeeded" or len(op["items"]) != 1:
+            return
+        proof = read_json(self.cfg.state / "capabilities.json", {})
+        evidence = {"ok": True, "at": now(), "detail": "Déplacement confirmé et retour vérifiés dans les résultats des outils.",
+                    "move_operation_id": original["operation_id"], "undo_operation_id": op["operation_id"]}
+        for name in ("mail_move", "mail_archive", "mail_triage_undo"):
+            proof.setdefault(name, {}).update({k: evidence for k in ("headless_probe", "permissions", "live_trial")})
+        atomic(self.cfg.state / "capabilities.json", canonical(proof))
 
     def require(self, name):
         cap = next(c for c in self.capabilities()["capabilities"] if c["name"] == name)
@@ -531,9 +560,13 @@ class Mail:
             raise Problem(409, "plan_expired", "Lot expiré ou boîte resynchronisée depuis. Refaire la sélection.")
         if body.get("confirm") is not True or body.get("plan_hash") != plan["plan_hash"] or not plan["items"]:
             raise Problem(400, "bad_request", "Confirmation du manifeste requise.")
-        self.require("mail_move")
+        trial = not self.cfg.dry and self.connector_trial(body, plan["items"])
+        if not trial:
+            self.require("mail_move")
+        plan["owner_trial"] = trial
         if not self.cfg.dry:
-            self.require("tool_deny_passthrough")
+            if not (getattr(self, "com", None) and self.com.probe().get("connected")):
+                self.require("tool_deny_passthrough")
             self.launcher.running(fresh=True)
         op = self.store.operation("mail.triage.execute", body, "Rangement de " + str(len(plan["items"])) + " mails", dry=self.cfg.dry)
         plan.update(status="consumed", operation_id=op["operation_id"])
@@ -607,14 +640,18 @@ class Mail:
         if not original["dry_run"] and self.cfg.dry:
             raise Problem(422, "capability_unavailable", "Une action réelle exige le mode réel pour son annulation.")
         rows = [i for i in original["items"] if i["status"] == "succeeded" and i.get("new_message_id")]
-        manifest = {"undoes": original["operation_id"], "items": [{"message_id": i["new_message_id"], "original_message_id": i["ref"]["id"],
+        original_job = self.store.get("jobs", original["operation_id"], {})
+        trial = original_job.get("full_manifest", original_job.get("manifest", {})).get("owner_trial", False)
+        manifest = {"undoes": original["operation_id"], "owner_trial": trial, "items": [{"message_id": i["new_message_id"], "original_message_id": i["ref"]["id"],
                     "folder_id": i["source_folder_id"], "source_folder_id": i["folder_id"], "action": "move", "folder_path": None} for i in rows]}
         op = self.store.operation("mail.triage.undo", body, "Annulation du rangement", dry=original["dry_run"])
         if original["dry_run"]:
             job = {"simulated": True, "undoes": original["operation_id"], "manifest": manifest}
         else:
-            self.require("mail_triage_undo")
-            self.require("tool_deny_passthrough")
+            if not trial:
+                self.require("mail_triage_undo")
+            if not (getattr(self, "com", None) and self.com.probe().get("connected")):
+                self.require("tool_deny_passthrough")
             self.launcher.running(fresh=True)
             output = self.cfg.state / "mail/incoming" / (op["operation_id"] + "-verify.json")
             job = {"account": "claude", "model": "sonnet", "provider": "claude", "cwd": str(self.cfg.home), "profile": "read", "manifest": manifest,
@@ -724,10 +761,15 @@ class Mail:
             if name in ("mail_move", "mail_archive", "mail_triage_undo"):
                 schema = schemas.get(tool, {})
                 exists = exists and {"messageId", "moveToFolderId"}.issubset(schema.get("properties", {}))
+            previous = saved.get(name, {})
             saved[name] = {"schema": proof(exists, "Outil et schéma énumérés par le run." if exists else "Schéma non prouvé."),
                            "headless_probe": proof(read_ok if name == "mail_read" else None, "Lecture réelle." if name == "mail_read" else "Écriture non exercée."),
                            "permissions": proof(blocked if name == "mail_read" else None, "Refus de lecture observé dans le transcript." if blocked else "Transmission des refus à vérifier."),
                            "live_trial": proof(read_ok if name == "mail_read" else None, "Lecture réelle." if name == "mail_read" else "Essai du propriétaire requis.")}
+            if exists and name in ("mail_move", "mail_archive", "mail_triage_undo"):
+                for key in ("headless_probe", "permissions", "live_trial"):
+                    if previous.get(key, {}).get("ok") is True:
+                        saved[name][key] = previous[key]
         saved["tool_deny_passthrough"] = {k: proof(blocked, "Refus effectif observé." if blocked else "Refus non prouvé.") for k in ("schema", "headless_probe", "permissions", "live_trial")}
         atomic(self.cfg.state / "capabilities.json", canonical(saved))
 
@@ -876,7 +918,7 @@ class Mail:
                         else:
                             op["items"].append({"ref": {"kind": "mail", "id": item["message_id"]}, "status": "failed", "detail": "Message reclassé depuis : laissé en place."})
                     if eligible:
-                        self.launcher.next_step(op, self.triage_job(op, {"items": eligible}), "execute")
+                        self.launcher.next_step(op, self.triage_job(op, {**job["manifest"], "items": eligible}), "execute")
                     else:
                         op.update(status="partial", result={"succeeded": 0, "failed": len(op["items"]), "unknown": 0})
                     return
@@ -907,6 +949,7 @@ class Mail:
                               "until": None, "reason": "Annuler les messages encore dans le dossier cible."}
                 if not violation:
                     self.forget_undone_choices(manifest, op["items"])
+                    self.record_connector_trial(op, manifest)
         except (ValueError, KeyError, TypeError):
             uncertain = op["kind"] in ("mail.reply_all", "mail.followup", "mail.triage.execute", "mail.triage.undo")
             op.update(status="unknown" if uncertain else "failed", error={"code": "invalid_result", "message": "Résultat invalide. Vérification requise.", "retryable": False, "details": {}})

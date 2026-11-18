@@ -310,3 +310,18 @@ exclusive. Partial or invalid imports preserve a valid previous snapshot and
 record the failed attempt. An older snapshot cannot overwrite a newer one.
 Missing data is shown as unavailable. A short collection window is labelled
 partial even when the source exhausted that shorter window.
+
+## Mail capability activation
+
+Classic Outlook capabilities use a read-only COM probe: the running application
+and its folders must resolve. Every move resolves both frozen folder ids again
+before writing. Closing classic Outlook returns the panel to connector evidence.
+Connector evidence never inherits COM evidence.
+
+For the connector's first live proof, run the read-only probe, select one message,
+and confirm its plan with `owner_trial: true` in the execute body. This exception
+requires the discovered move schema and proven tool denial. Undo uses the same
+frozen manifest and guarded tool profile. Only successful tool results for both
+the move and its undo record `headless_probe`, `permissions` and `live_trial`.
+A missing result remains unknown and cannot unlock the capability. Later
+read-only probes preserve proven trials while the required schema remains present.
