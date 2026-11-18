@@ -77,7 +77,7 @@ const ctx = {
 };
 
 const views = makeViews(ctx);
-const ORDER = ['today', 'mail', 'pending', 'decisions', 'drafts', 'dossiers', 'jobs', 'accounts'];
+const ORDER = ['today', 'mail', 'drafts', 'pending', 'decisions', 'dossiers', 'jobs', 'accounts'];
 
 // ---------------------------------------------------------------- rail
 

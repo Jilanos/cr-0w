@@ -190,7 +190,7 @@ async function expect(page, sel, text, what) {
   if (!(await has(page, sel, text))) throw new Error(`attendu : ${what || sel + (text ? ' « ' + text + ' »' : '')}`);
 }
 
-const VIEWS = ['today', 'mail', 'pending', 'decisions', 'drafts', 'dossiers', 'jobs', 'accounts'];
+const VIEWS = ['today', 'mail', 'drafts', 'pending', 'decisions', 'dossiers', 'jobs', 'accounts'];
 
 const SCENARIOS = [];
 const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });

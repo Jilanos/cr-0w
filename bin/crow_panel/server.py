@@ -70,7 +70,7 @@ class App:
                  "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]) if c.get("provider", "claude" if name == "claude" else "codex") == "claude"
                  else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
             "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Mise à jour"}, {"name": "daily_update", "label": "Mise à jour machine"}],
-            "views": ["today", "mail", "pending", "decisions", "drafts", "dossiers", "jobs", "accounts"],
+            "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts"],
             "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
 
     def topic(self, key):
