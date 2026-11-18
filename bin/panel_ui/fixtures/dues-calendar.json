@@ -23,6 +23,22 @@
       }
     },
     {
+      "date": "2026-11-18",
+      "kind": "calendar",
+      "text": "Revue du projet exemple",
+      "overdue": false,
+      "ref": {
+        "kind": "calendar",
+        "id": "cal_example"
+      },
+      "start": "2026-11-18T10:00:00+01:00",
+      "end": "2026-11-18T10:30:00+01:00",
+      "all_day": false,
+      "location": "Salle projet",
+      "url": "https://outlook.office365.com/calendar/item/example",
+      "stale": false
+    },
+    {
       "date": "2026-11-20",
       "kind": "pending",
       "text": "Câbles Beta : plans révision C",
@@ -51,22 +67,6 @@
         "kind": "account",
         "id": "claude"
       }
-    },
-    {
-      "date": "2026-11-18",
-      "kind": "calendar",
-      "text": "Revue du projet exemple",
-      "overdue": false,
-      "ref": {
-        "kind": "calendar",
-        "id": "cal_example"
-      },
-      "start": "2026-11-18T10:00:00+01:00",
-      "end": "2026-11-18T10:30:00+01:00",
-      "all_day": false,
-      "location": "Salle projet",
-      "url": "https://outlook.office365.com/calendar/item/example",
-      "stale": false
     }
   ],
   "calendar": {

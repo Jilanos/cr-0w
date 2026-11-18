@@ -111,7 +111,9 @@ export function makeViews(ctx) {
     }
     if (acts.includes('followup')) {
       bar.append(btn('Relancer', { icon: 'reply', title: 'Contrôle Brouillons et Envoyés, puis prépare un brouillon',
-        onclick: () => { const state = store.followups[it.id] ||= { log: [] }; state.open = true; ctx.renderDetail(); } }));
+        onclick: () => { const state = store.followups[it.id] ||= { log: [] };
+          if (['succeeded', 'partial', 'failed', 'cancelled'].includes(state.op?.status)) state.op = null;
+          state.open = true; ctx.renderDetail(); } }));
     }
     if (it.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
     if (!w.ok) bar.append(h('span', { class: 'muted small', text: w.reason }));
@@ -141,6 +143,13 @@ export function makeViews(ctx) {
   }
 
   function followupBox(it) {
+    if (!store.followups[it.id]) {
+      const previous = [...(cached('operations')?.operations || [])].reverse().find(o => o.kind === 'mail.followup' && o.topic_id === it.topic_id);
+      if (previous) {
+        const restored = store.followups[it.id] = { open: true, op: previous, log: [] };
+        if (['queued', 'running', 'cancel_requested'].includes(previous.status)) ctx.trackOp(previous, final => { restored.op = final; ctx.renderDetail(); });
+      }
+    }
     const state = store.followups[it.id];
     if (!state?.open) return null;
     if (state.op) return replyOp(it, state);
@@ -361,7 +370,7 @@ export function makeViews(ctx) {
   const pending = {
     title: 'Relances & échéances', icon: 'pending', allowDoneKey: true,
     count: (c) => (c.overdue ? { alert: c.overdue, alertTitle: `${c.overdue} en retard sur ${c.pending ?? '?'} lignes` } : { n: c.pending ?? null }),
-    load: () => Promise.all([load('pending'), load('dues', null, { quiet: true })]),
+    load: () => Promise.all([load('pending'), load('dues', null, { quiet: true }), load('operations', null, { quiet: true })]),
     reload: () => ctx.refresh(['pending', 'dues']).then(ctx.render),
     status: () => status(store.pendingTab === 'dues' ? ['dues'] : ['pending']),
     listHead() {
@@ -1000,7 +1009,10 @@ export function makeViews(ctx) {
     title: 'Dossiers', icon: 'dossiers',
     count: () => { const d = cached('dossiers'); return { n: d ? d.dossiers.length : null }; },
     load: () => Promise.all([load('dossiers'), load('pending', null, { quiet: true })]),
-    reload: () => ctx.refresh(['dossiers']).then(ctx.render),
+    reload: () => {
+      for (const key of store.cache.keys()) if (key.startsWith('dossier:')) store.cache.delete(key);
+      return ctx.refresh(['dossiers']).then(ctx.render);
+    },
     status: () => status(['dossiers']),
     items() {
       return ((cached('dossiers') || {}).dossiers || []).map((d) => ({

@@ -19,6 +19,7 @@ const PATHS = {
   folders: '/api/mail/folders', drafts: '/api/drafts', dues: '/api/dues?days=14', runs: '/api/runs?since_hours=24',
   routines: '/api/routines', accounts: '/api/accounts', dossiers: '/api/dossiers', afk: '/api/afk',
   caps: '/api/capabilities', topics: '/api/topics', session: '/api/session',
+  operations: '/api/operations',
 };
 
 const store = {
@@ -438,8 +439,8 @@ function pendingResult(op) {
 }
 
 function undoToast(op) {
-  const secs = (cached('config') || {}).undo_seconds || 10;
-  const can = op.undo && op.undo.available;
+  const secs = op.undo?.until ? Math.max(0, Math.ceil((Date.parse(op.undo.until) - api.now().getTime()) / 1000)) : 0;
+  const can = op.undo?.available && secs > 0;
   toast(op.summary || 'Fait', {
     kind: 'ok', key: op.operation_id,
     detail: op.dry_run ? 'mode essai' : null,

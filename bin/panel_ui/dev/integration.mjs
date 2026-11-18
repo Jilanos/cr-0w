@@ -82,6 +82,9 @@ try {
     await page.click('.followup-box .btn','Préparer la relance');
     await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
     await page.shot('real-followup');
+    await page.goto(base+'/', 1600);
+    await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
+    await page.shot('real-followup-after-reload');
   });
   await check('reply-all-dry',async()=>{
     await go('Mails'); await selectFirst();

@@ -278,6 +278,8 @@ add('flow-followup', DESK, async (page, base) => {
   if (steps !== 4) throw new Error('Quatre étapes attendues pour la relance : ' + steps);
   await expect(page, '.steps', 'Contrôle Brouillons et Envoyés');
   await page.shot('flow-followup-pipeline');
+  await page.click('.detail .btn', 'Relancer');
+  await expect(page, '.followup-box', 'Préparer la relance');
 });
 
 add('flow-chat-stream', DESK, async (page, base) => {
@@ -485,6 +487,11 @@ const SCEN = {
     await expect(page, '.toast', 'Clic en file');
     await expect(page, '#pane-list .row[data-key="p_k3m9x2qa"]', null, 'ligne conservée pendant la file');
     await page.shot('scenario-locked');
+    await sleep(4000);
+    await expect(page, '.toast', 'Clic en file');
+    await page.click('.toast-action', 'Retirer de la file');
+    await sleep(600);
+    await expect(page, '.toast', 'Clic retiré');
   },
   partial: async (page, base) => {
     await open(page, base, { view: 'mail', scenario: 'partial' });
@@ -588,6 +595,7 @@ async function main() {
     await sleep(100);
     const errs = page.errors.filter((e) => !/favicon/.test(e));
     results.push({ name: sc.name, ok: !err && !errs.length, err, console: errs });
+    await writeFile(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
     console.log(`${!err && !errs.length ? 'ok  ' : 'FAIL'} ${sc.name}${err ? '  · ' + err : ''}${errs.length ? '  · console: ' + errs.join(' | ') : ''}`);
     await page.close();
   }

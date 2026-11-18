@@ -216,7 +216,8 @@ class Store:
                 intent = self.get("intents", op["operation_id"], {})
                 if intent.get("request_hash") != hashed:
                     raise Problem(409, "idempotency_mismatch", "Même request_id avec un contenu différent.")
-                return (200 if op["kind"].startswith("pending.") and op["status"] != "queued" else 202), op
+                synchronous = op["kind"] in ("state.visit", "afk.answer") or op["kind"].startswith("pending.") and op["status"] != "queued"
+                return (200 if synchronous else 202), op
         return None
 
     def remember(self, request_id, route, body, status, response):

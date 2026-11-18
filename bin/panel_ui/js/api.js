@@ -165,6 +165,7 @@ const fake = {
   async request(method, rawPath, body) {
     await new Promise((r) => setTimeout(r, 60));
     const [path, qs] = rawPath.split('?');
+    if (method === 'GET' && path === '/api/operations') return { status: 200, data: { operations: [...this.ops.values()].map(e => clone(e.done ? e.final : e.op)) } };
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
     const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
     const followup = /^\/api\/pending\/([^/]+)\/followup$/.exec(path);
@@ -172,6 +173,8 @@ const fake = {
       const op = this.newOp(this.raw('operation-reply-all-done.json').data, { kind: 'mail.followup', status: 'queued',
         dry_run: true, request_id: body.request_id, summary: 'Relance simulée' });
       op.steps.unshift({ ...clone(op.steps[0]), name: 'check_followup' });
+      for (const step of op.steps) Object.assign(step, { status: 'queued', run_id: 'simulated', output: { simulated: true } });
+      op.result = { simulated: true, draft_link: null, checks: op.result.checks.map(c => ({ name: c.name, ok: null, detail: 'simulation, aucune écriture distante' })) };
       this.track(op); return { status: 202, data: clone(op) };
     }
     if (method === 'POST' && decision) {
@@ -339,9 +342,11 @@ const fake = {
         const runs = this.doc('GET', '/api/runs');
         if (runs && runs.queue) runs.queue = runs.queue.filter((q) => q.operation_id !== p.id);
         this.counts({ runs_queued: -1 });
-        const op = clone(base);
+        const existing = this.ops.get(p.id);
+        const op = clone(existing?.op || base);
         Object.assign(op, { operation_id: p.id, status: 'cancelled', summary: 'Retiré de la file' });
         op.steps.forEach((s) => { s.status = 'cancelled'; });
+        if (existing) Object.assign(existing, { op, final: op, done: true });
         return { status: 200, data: op };
       }
       case '/api/mail/sync': {
@@ -491,6 +496,16 @@ const fake = {
     const doc = this.files.get('run-events.json');
     const events = (doc && doc.events) || [];
     const opId = (/^\/api\/operations\/([^/]+)\/events$/.exec(path) || [])[1];
+    const waiting = this.ops.get(opId);
+    if (waiting?.op.kind?.startsWith('pending.') && waiting.op.status === 'queued') {
+      const timer = setInterval(() => {
+        if (!waiting.done) return;
+        clearInterval(timer);
+        const data = { status: waiting.final.status };
+        handlers.event?.('done', data, 1); handlers.end?.(data);
+      }, 250);
+      return () => clearInterval(timer);
+    }
     let i = 0;
     let stopped = false;
     const tick = () => {

@@ -120,6 +120,21 @@ def test_visit_checkpoint_is_explicit_durable_and_idempotent(panel):
     restarted.store.db.close()
 
 
+def test_visit_recovers_a_lost_http_response_without_moving_checkpoint(panel):
+    app, fake = panel
+    body = {"request_id": "lost-visit"}
+    op = app.visits.visit(body, "POST /api/state/visit")
+    checkpoint = app.store.get("meta", "visit")
+    op["status"] = "running"
+    app.store.save_op(op)
+    restarted = App(app.cfg, fake)
+    status, recovered = post(restarted, "/api/state/visit", body)
+    assert status == 200 and recovered["operation_id"] == op["operation_id"] and recovered["status"] == "succeeded"
+    assert restarted.store.get("meta", "visit") == checkpoint
+    assert len(restarted.store.all("operations")) == 1
+    restarted.store.db.close()
+
+
 def test_lock_blocks_display_and_mutation(panel):
     app, _ = panel
     item = pending_item(app)

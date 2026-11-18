@@ -1,5 +1,5 @@
 """Durable visit checkpoints. Reading state never acknowledges changes."""
-from .core import now
+from .core import canonical, digest, now
 
 
 class Visits:
@@ -33,10 +33,21 @@ class Visits:
                        for key, row in old.items() if key.startswith("pending:") and key not in current)
         return {"visited_at": previous["visited_at"], "total": len(changes), "items": changes[:100], "truncated": len(changes) > 100}
 
-    def visit(self, body):
+    def visit(self, body, route):
         snapshot = self.snapshot()
-        self.store.put("meta", "visit", snapshot)
         op = self.store.operation("state.visit", body, "Visite enregistrée", dry=self.app.cfg.dry)
-        op.update(status="succeeded", result={"visited_at": snapshot["visited_at"]})
+        op["result"] = {"visited_at": snapshot["visited_at"]}
+        self.store.put("intents", op["operation_id"], {"request_hash": digest(canonical([route, body])), "checkpoint": digest(canonical(snapshot))})
+        self.store.save_op(op)
+        self.store.put("meta", "visit", snapshot)
+        op["status"] = "succeeded"
         self.store.save_op(op)
         return op
+
+    def recover(self):
+        checkpoint = digest(canonical(self.store.get("meta", "visit")))
+        for op in self.store.all("operations"):
+            if op["kind"] == "state.visit" and op["status"] == "running":
+                intent = self.store.get("intents", op["operation_id"], {})
+                op["status"] = "succeeded" if checkpoint == intent.get("checkpoint") else "unknown"
+                self.store.save_op(op)

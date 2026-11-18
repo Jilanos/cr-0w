@@ -43,6 +43,7 @@ class App:
         self.decisions = Decisions(self)
         self.pending.recover()
         self.decisions.recover()
+        self.visits.recover()
         for op in self.store.all("operations"):
             if op["status"] in ACTIVE and not op["kind"].startswith("pending.") and not self.store.get("jobs", op["operation_id"]):
                 op.update(status="unknown", error={"code": "interrupted_acceptance", "message": "Opération interrompue avant sa mise en file. Vérification requise.", "retryable": False, "details": {}})
@@ -137,7 +138,7 @@ class App:
         if method != "POST":
             raise Problem(404, "not_found", "Route introuvable.")
         if path == "/api/state/visit":
-            return 200, self.visits.visit(body)
+            return 200, self.visits.visit(body, route)
         match = re.fullmatch(r'/api/afk/decisions/(\d+)/answer', path)
         if match:
             return 200, self.decisions.answer(int(match[1]), body, route)
