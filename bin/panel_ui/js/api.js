@@ -167,6 +167,13 @@ const fake = {
     const [path, qs] = rawPath.split('?');
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
     const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
+    const followup = /^\/api\/pending\/([^/]+)\/followup$/.exec(path);
+    if (method === 'POST' && followup) {
+      const op = this.newOp(this.raw('operation-reply-all-done.json').data, { kind: 'mail.followup', status: 'queued',
+        dry_run: true, request_id: body.request_id, summary: 'Relance simulée' });
+      op.steps.unshift({ ...clone(op.steps[0]), name: 'check_followup' });
+      this.track(op); return { status: 202, data: clone(op) };
+    }
     if (method === 'POST' && decision) {
       const afk = this.doc('GET', '/api/afk');
       const row = afk.decisions.find(d => d.n === Number(decision[1]));

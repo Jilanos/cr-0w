@@ -22,6 +22,7 @@ from .readers import Readers
 from .security import CSP, Files
 from .visits import Visits
 from .afk import Decisions
+from .followups import Followups
 
 
 class App:
@@ -34,6 +35,8 @@ class App:
         self.pending.active_maj = self.launcher.maj
         self.launcher.pending = self.pending.resume
         self.mail = Mail(cfg, self.store, self.launcher)
+        self.followups = Followups(self)
+        self.mail.followups = self.followups
         self.launcher.complete = self.mail.complete
         self.readers = Readers(self)
         self.visits = Visits(self)
@@ -141,6 +144,9 @@ class App:
         match = re.fullmatch(r'/api/pending/([^/]+)/(done|snooze)', path)
         if match:
             return self.pending.submit(match[1], match[2], body, route)
+        match = re.fullmatch(r'/api/pending/([^/]+)/followup', path)
+        if match:
+            return 202, self.followups.submit(match[1], body, route)
         match = re.fullmatch(r'/api/operations/([^/]+)/(undo|cancel|reconcile)', path)
         if match:
             op = self.operation(match[1])

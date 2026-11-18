@@ -255,10 +255,16 @@ add('flow-snooze', DESK, async (page, base) => {
 add('flow-followup', DESK, async (page, base) => {
   await open(page, base, { view: 'pending', sel: { pending: 'p_k3m9x2qa' } });
   await page.click('.detail .btn', 'Relancer');
-  const v = await page.eval(`document.getElementById('chat-input').value`);
+  const v = await page.eval(`document.querySelector('.followup-box textarea').value`);
   if (!v.startsWith('Prépare la relance de')) throw new Error('consigne de relance absente : ' + v);
-  await expect(page, '.intent', 'relance');
-  await page.shot('flow-followup-chat');
+  await expect(page, '.followup-box', 'Contrôle Brouillons et Envoyés');
+  await page.shot('flow-followup-form');
+  await page.click('.followup-box .btn-primary', 'Préparer la relance');
+  await sleep(4000);
+  const steps = await page.eval(`document.querySelectorAll('.steps .step').length`);
+  if (steps !== 4) throw new Error('Quatre étapes attendues pour la relance : ' + steps);
+  await expect(page, '.steps', 'Contrôle Brouillons et Envoyés');
+  await page.shot('flow-followup-pipeline');
 });
 
 add('flow-chat-stream', DESK, async (page, base) => {

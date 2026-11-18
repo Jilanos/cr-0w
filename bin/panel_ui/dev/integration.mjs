@@ -78,7 +78,9 @@ try {
     await poll(`!!document.querySelector('.toast-action')`);
     await page.click('.toast-action'); await poll(`!document.querySelector('.toast-action')`); await sleep(700);
     await page.click('.detail .btn','Relancer');
-    await poll(`document.querySelector('#chat-input')?.value.startsWith('Prépare la relance de')`);
+    await poll(`document.querySelector('.followup-box textarea')?.value.startsWith('Prépare la relance de')`);
+    await page.click('.followup-box .btn','Préparer la relance');
+    await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
     await page.shot('real-followup');
   });
   await check('reply-all-dry',async()=>{

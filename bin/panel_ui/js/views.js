@@ -110,8 +110,8 @@ export function makeViews(ctx) {
       bar.append(b);
     }
     if (acts.includes('followup')) {
-      bar.append(btn('Relancer', { icon: 'reply', title: 'Ouvre le chat avec une consigne de relance modifiable',
-        onclick: () => ctx.openChat({ prefill: followupText(it), intent: 'followup' }) }));
+      bar.append(btn('Relancer', { icon: 'reply', title: 'Contrôle Brouillons et Envoyés, puis prépare un brouillon',
+        onclick: () => { const state = store.followups[it.id] ||= { log: [] }; state.open = true; ctx.renderDetail(); } }));
     }
     if (it.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
     if (!w.ok) bar.append(h('span', { class: 'muted small', text: w.reason }));
@@ -136,8 +136,41 @@ export function makeViews(ctx) {
         h('div', { class: 'eyebrow' }, prioDot(it.prio), h('span', { text: section ? section.title : it.section }),
           it.prio ? h('span', { class: 'muted', text: '· ' + PRIO[it.prio] }) : null),
         h('h2', { text: it.title }), dueLine),
-      bar, fields,
+      bar, acts.includes('followup') ? followupBox(it) : null, fields,
       h('p', { class: 'meta', text: `${(cached('pending') || {}).file_label || 'En attente'} · ligne ${it.source_line ?? '?'}` }));
+  }
+
+  function followupBox(it) {
+    const state = store.followups[it.id];
+    if (!state?.open) return null;
+    if (state.op) return replyOp(it, state);
+    const instructions = h('textarea', { class: 'input', rows: 3, 'aria-label': 'Consigne de relance',
+      oninput: (e) => { state.instructions = e.target.value; } });
+    instructions.value = state.instructions ?? followupText(it);
+    const models = ctx.config?.chat?.models || ['haiku', 'sonnet', 'opus'];
+    const model = h('select', { class: 'select', 'aria-label': 'Modèle de relance', onchange: e => { state.model = e.target.value; } },
+      models.map(m => h('option', { value: m, selected: m === (state.model || 'sonnet'), text: m })));
+    const start = btn('Préparer la relance', { primary: true, onclick: async () => {
+      if (state.busy) return;
+      state.busy = true; start.disabled = true;
+      try {
+        state.op = await ctx.api.post(`/api/pending/${encodeURIComponent(it.id)}/followup`, {
+          item_rev: it.item_rev, instructions: instructions.value, model: model.value,
+        });
+        ctx.renderDetail();
+        ctx.trackOp(state.op, async (final) => { state.op = final; ctx.renderDetail(); await ctx.refresh(['state', 'runs']); },
+          { onEvent: async (type) => {
+            if (type === 'step') {
+              try { state.op = await ctx.api.get(state.op.links.status_url); ctx.renderDetail(); }
+              catch (err) { toastError(err, 'Suivi de la relance'); }
+            }
+          } });
+      } catch (err) { toastError(err, 'Relance'); start.disabled = false; }
+      finally { state.busy = false; }
+    } });
+    return h('section', { class: 'box followup-box' }, h('h3', { class: 'h3', text: 'Préparer une relance' }), instructions,
+      h('div', { class: 'box-foot' }, model, start),
+      h('p', { class: 'muted small', text: 'Contrôle Brouillons et Envoyés → squelette → mise en forme worka → vérification. Aucun envoi.' }));
   }
 
   function freeBlockEntry(b) {
@@ -166,7 +199,7 @@ export function makeViews(ctx) {
   function opSteps(op) {
     const ul = h('ol', { class: 'steps' });
     const names = { skeleton: 'Squelette du brouillon', style: 'Mise en forme', verify: 'Vérification', execute: 'Exécution', collect: 'Collecte',
-      run: 'Run', wait_runs: 'Attente des runs', script: 'Script' };
+      run: 'Run', wait_runs: 'Attente des runs', script: 'Script', check_followup: 'Contrôle Brouillons et Envoyés', wait_pending: 'Attente de la mise à jour' };
     for (const s of op.steps || []) {
       const out = s.output || {};
       const extra = [];
@@ -711,14 +744,21 @@ export function makeViews(ctx) {
         chip(RUN_STATE[op.status] || op.status, op.status === 'succeeded' ? 'ok' : op.status === 'failed' ? 'late' : 'run'),
         op.dry_run ? chip('mode essai', 'warn') : null),
       opSteps(op),
+      r.reason ? h('p', { class: 'callout', text: r.reason }) : null,
+      op.error ? h('p', { class: 'callout', text: op.error.message }) : null,
       rs.log.length && op.status !== 'succeeded' ? h('ol', { class: 'mini-log' }, rs.log.slice(-4).map((t) => h('li', { text: t }))) : null,
       r.checks ? h('ul', { class: 'checks' }, r.checks.map((c) => h('li', { class: c.ok === true ? 'ok' : c.ok === false ? 'ko' : 'muted' },
         h('span', { class: ['status-icon', c.ok === true ? 'st-succeeded' : c.ok === false ? 'st-failed' : 'st-unknown'] }, icon(c.ok === true ? 'check' : c.ok === false ? 'close' : 'help')),
         h('span', { text: { body_present: 'Texte présent', signature: 'Signature', size: 'Taille', attachments: 'Pièces jointes', no_send: 'Aucun envoi' }[c.name] || c.name }),
         c.detail ? h('span', { class: 'muted small', text: ' · ' + c.detail }) : null))) : null,
       h('div', { class: 'actions' },
+        op.kind === 'mail.followup' && op.status === 'unknown' ? btn('Vérifier', { onclick: async () => {
+          try { const check = await ctx.api.post(op.links.status_url + '/reconcile', {});
+            ctx.trackOp(check, async () => { rs.op = await ctx.api.get(op.links.status_url); ctx.renderDetail(); });
+          } catch (err) { toastError(err, 'Vérification de relance'); }
+        } }) : null,
         link ? h('a', { class: 'btn btn-primary', href: link, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Ouvrir le brouillon dans Outlook' })) : null,
-        ['succeeded', 'failed', 'partial', 'unknown'].includes(op.status)
+        ['succeeded', 'failed', 'partial', ...(op.kind === 'mail.followup' ? [] : ['unknown'])].includes(op.status)
           ? btn('Nouvelle consigne', { ghost: true, onclick: () => { rs.op = null; rs.open = true; ctx.renderDetail(); } }) : null));
   }
 

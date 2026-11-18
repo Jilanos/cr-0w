@@ -54,6 +54,7 @@ fixture. Supply one when retrying it.
 | `/api/state/visit` | POST |
 | `/api/pending` | GET |
 | `/api/pending/{id}/done`, `/api/pending/{id}/snooze` | POST |
+| `/api/pending/{id}/followup`, `/api/afk/decisions/{n}/answer` | POST |
 | `/api/operations`, `/api/operations/{id}` | GET |
 | `/api/operations/{id}/undo`, `/cancel`, `/reconcile` | POST |
 | `/api/operations/{id}/events`, `/api/runs/{id}/events` | GET, SSE |
@@ -199,3 +200,25 @@ and saves the previous file under `state_dir/afk/backups/`. In dry-run mode it
 reads the configured source and writes an overlay under `state_dir/afk/`; the
 original decision log stays untouched. Subsequent reads show that overlay.
 Interrupted writes are reconciled by the recorded content hash, without replay.
+
+## Dedicated follow-up pipeline
+
+`POST /api/pending/{id}/followup` accepts `request_id`, `item_rev`, `instructions`
+and `model` (Sonnet by default). Only a current row in a follow-ups section is
+eligible. The returned `mail.followup` operation first runs `check_followup` with
+the read profile on the read account. The result must identify the conversation,
+latest incoming message and exhaustive Drafts/Sent checks, backed by a permitted
+remote-read transcript and evidence. Incomplete access or ambiguous matching stops
+the pipeline. An existing draft returns its link. A proven reply in Sent prevents
+a new follow-up. The pending line is never resolved automatically.
+
+Only a proven ready result on an unchanged pending row enters the existing
+`skeleton`, `style`, `verify` pipeline. Capability proofs still gate creation and
+styling. The draft-only styling account runs at high effort. The skeleton checks
+Drafts/Sent again before creation and adds no unsolicited cc. The entire flow is
+simulated in dry-run mode, including its four visible steps, with no mailbox run.
+
+A second follow-up on an active or uncertain subject returns 409. Unknown results
+are never retried automatically. `/reconcile` runs only the read check. Observing
+no draft does not authorize a retry after a lost write. The UI's Relancer button
+opens this dedicated form; Chat remains separately available.

@@ -30,6 +30,7 @@ const store = {
   mailMode: LS.get('mailMode', 'inbox'),
   triage: { checked: new Map(), plan: null, op: null, busy: false },
   reply: {},              // mail id -> {open, instructions, model, op, log[]}
+  followups: {},
   chatTopic: null,
   sinceVisit: undefined,
   showDetail: false,
