@@ -80,8 +80,12 @@
 
 - Owner 2026-11-12: on the laptop Home is rarely open, so the hero must be visible while working → butler rail on every laptop screen, badge on phone.
 - Progress 2026-11-18: slice 2 built 2c7b7a1 (laptop rail, Home pinned rail), head clip fix 9a86b3d. Open: slice 3 (phone badge + sheet, cover D + Ask bar, Fold inner G); the rail chat opens without scrolling to the bottom (scroll likely runs before the head lays out).
+- Owner 2026-11-18 (slice 3 build): the cover header hides the theme button and the clock at 368px. The Fold inner chat keeps the 380px right side panel. The hub makes the board compares.
+- Progress 2026-11-18: slice 3 built on branch item-176-s3. Rail chat opens at the bottom d0f4ab4 (each message is observed). Phone badge + chat sheet 58190f6. Home cover D + Ask bar 19f54aa. Fold inner G 86c876a. Shots in vault `Research/nest-design/item_176/build-s3/`. Open: the head inside the Desk Ask box waits for the item_246 Desk rewrite.
 
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-18T15:45:56.241856+00:00 | cdx | 1ecba0382a11411cb668ead8ded4746f | item_176-s3b | running |  |  |
+

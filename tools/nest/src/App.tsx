@@ -11,6 +11,7 @@ import { Missions } from './screens/Missions'
 import { Placeholder } from './screens/Placeholder'
 import { Shell } from './ui/Shell'
 import { ButlerRail } from './ui/ButlerRail'
+import { ButlerBadge, ButlerSheet } from './ui/ButlerSheet'
 import { ButlerProvider } from './data/useButler'
 import { LAPTOP, useMedia } from './ui/useMedia'
 import { screenTab } from './ui/tabs'
@@ -42,9 +43,12 @@ export function App() {
   // Butler rail on every laptop screen (item_176); Home keeps its own hero, so no head there.
   const home = route.tab === 'home'
   const rail = laptop && snap ? <ButlerRail snap={snap} head={!home} pinned={home} /> : null
+  // Phone and Fold: a header badge and a chat sheet instead of the rail.
+  const badge = !laptop && snap ? <ButlerBadge snap={snap} /> : null
   return (
     <ButlerProvider>
-      <Shell active={active} snap={snap} scope={scope} setScope={setScope} rail={rail}>{body}</Shell>
+      <Shell active={active} snap={snap} scope={scope} setScope={setScope} rail={rail} badge={badge}>{body}</Shell>
+      {!laptop && snap && <ButlerSheet snap={snap} />}
     </ButlerProvider>
   )
 }

@@ -41,9 +41,9 @@ function ScopeChip({ scope, setScope }: { scope: ScopeMode; setScope: (m: ScopeM
   )
 }
 
-interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; rail?: ReactNode; children: ReactNode }
+interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; rail?: ReactNode; badge?: ReactNode; children: ReactNode }
 
-export function Shell({ active, snap, scope, setScope, rail, children }: ShellProps) {
+export function Shell({ active, snap, scope, setScope, rail, badge, children }: ShellProps) {
   const [theme, toggle] = useTheme()
   const b = badges(snap)
   const c = snap ? homeCounts(snap) : null
@@ -53,6 +53,7 @@ export function Shell({ active, snap, scope, setScope, rail, children }: ShellPr
   return (
     <div className={`app${rail ? ' has-rail' : ''}`}>
       <header className="top">
+        {badge}
         <Link href="/" className="logo" aria-label="CR-0W home">CR-0W</Link>
         <ScopeChip scope={scope} setScope={setScope} />
         <span className="hdr-sep" aria-hidden="true" />

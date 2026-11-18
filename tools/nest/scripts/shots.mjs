@@ -1,7 +1,8 @@
 // Headless screenshots of the Nest screens at the three board sizes, both themes.
-// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]
+// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--gl] [--tabs] [--only=inbox,desk]
 //   scope: sets the saved scope filter (nest.scope) before load.
 //   --fixtures: runs vite dev (fixture data, pinned clock) instead of vite preview of dist/.
+//   --gl: live WebGL heads on software GL (nest.head=gl), as on a real screen.
 //   --tabs: phone sizes only, the More sheet states and checks (see moreSheet below).
 //   --only: comma list of SCREENS keys; default all of them.
 // Without --fixtures, run `npm run build` first.
@@ -10,12 +11,13 @@ import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright-core'
 
-const USAGE = 'usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]'
+const USAGE = 'usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--gl] [--tabs] [--only=inbox,desk]'
 const args = process.argv.slice(2)
 const fixtures = args.includes('--fixtures')
+const gl = args.includes('--gl')
 const tabs = args.includes('--tabs')
 const only = args.find((a) => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean)
-const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs' && !a.startsWith('--only='))
+const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs' && a !== '--gl' && !a.startsWith('--only='))
 if (!out || out.startsWith('-') || !['', 'all', 'work', 'perso'].includes(scope)) {
   console.error(USAGE)
   process.exit(2)
@@ -124,15 +126,16 @@ function contrast(page, selectors) {
   }, selectors)
 }
 
-const browser = await chromium.launch({ headless: true })
+const browser = await chromium.launch({ headless: true, args: gl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [] })
 try {
   for (const theme of ['modern', 'cyber']) {
     for (const [size, [w, h]] of Object.entries(SIZES)) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, timezoneId: 'Europe/Paris' })
-      await ctx.addInitScript(([t, s]) => {
+      await ctx.addInitScript(([t, s, g]) => {
         localStorage.setItem('nest.theme', t)
+        if (g) localStorage.setItem('nest.head', 'gl')
         if (s) localStorage.setItem('nest.scope', s)
-      }, [theme, scope])
+      }, [theme, scope, gl])
       const page = await ctx.newPage()
       if (tabs) {
         await moreSheet(page, `${size}-${theme}`, w)
@@ -147,6 +150,37 @@ try {
         const file = `${out}/${name}-${size}-${theme}.png`
         await page.screenshot({ path: file })
         console.log(file)
+        // No sideways scroll: the header and the screen fit the board width.
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+        if (over > 0) { console.log(`FAIL ${name}-${size}-${theme} ${over}px wider than the screen`); failed.push(`${name}-${size}-${theme} width`) }
+        // Butler chat log opens on its last message (rail on laptop, sheet on phone).
+        const gap = await page.evaluate(() => {
+          const el = [...document.querySelectorAll('.rl-log')].find((e) => e.clientHeight > 0)
+          return el && el.scrollHeight > el.clientHeight ? el.scrollHeight - el.clientHeight - el.scrollTop : null
+        })
+        if (gap !== null) {
+          const pass = gap <= 2
+          console.log(`${pass ? 'PASS' : 'FAIL'} ${name}-${size}-${theme} chat log at the bottom (gap ${Math.round(gap)}px)`)
+          if (!pass) failed.push(`${name}-${size}-${theme} chat log`)
+        }
+        // Phone and Fold: the header badge opens the chat sheet (item_176). Shot, checks, Escape.
+        if (name === 'home' && size !== 'laptop' && (await page.locator('.b-badge').count())) {
+          const tag = `chat-${size}-${theme}`
+          const check = (n, pass) => { console.log(`${pass ? 'PASS' : 'FAIL'} ${tag} ${n}`); if (!pass) failed.push(`${tag} ${n}`) }
+          await page.locator('.b-badge').click()
+          await page.waitForTimeout(fixtures ? 600 : 100)
+          check('sheet opens', (await page.locator('.b-sheet').count()) === 1)
+          const g = await page.evaluate(() => { const el = document.querySelector('.b-sheet .rl-log'); return el ? el.scrollHeight - el.clientHeight - el.scrollTop : 0 })
+          check(`log at the bottom (gap ${Math.round(g)}px)`, g <= 2)
+          for (const [s, ratio] of await contrast(page, ['.b-sheet .rl-mood', '.b-sheet .rl-line', '.b-sheet .rl-msg.cr p', '.b-sheet .rl-msg.you p', '.b-sheet .rl-who', '.b-sheet .rl-chip'])) {
+            check(`contrast ${s} ${ratio.toFixed(1)}:1`, ratio >= 4.5)
+          }
+          const file = `${out}/${tag}.png`
+          await page.screenshot({ path: file })
+          console.log(file)
+          await page.keyboard.press('Escape')
+          check('Escape closes', (await page.locator('.b-sheet').count()) === 0)
+        }
       }
       await ctx.close()
     }

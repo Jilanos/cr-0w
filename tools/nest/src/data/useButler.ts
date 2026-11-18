@@ -10,6 +10,9 @@ export interface Butler {
   error: string
   // account: undefined keeps the current one, '' means auto.
   say(text: string, surface: Surface, account?: string): Promise<void>
+  // Phone and Fold chat sheet: the header badge opens it, a phone message opens it too.
+  sheet: boolean
+  setSheet(open: boolean): void
 }
 
 const BUSY_MS = 1000
@@ -23,6 +26,7 @@ function useButlerState(api: ButlerApi | undefined, conv: string): Butler | null
   const [busy, setBusy] = useState(false)
   const [account, setAccount] = useState('')
   const [error, setError] = useState('')
+  const [sheet, setSheet] = useState(false)
   const last = useRef(0)
   const kick = useRef<() => void>(() => {})
 
@@ -63,6 +67,7 @@ function useButlerState(api: ButlerApi | undefined, conv: string): Butler | null
 
   const say = useCallback(async (text: string, surface: Surface, acct?: string) => {
     if (!api) return
+    if (surface === 'phone') setSheet(true)
     try {
       const m = await api.say(conv, text, surface, acct)
       setMsgs((h) => mergeMsgs(h, [m]))
@@ -75,7 +80,7 @@ function useButlerState(api: ButlerApi | undefined, conv: string): Butler | null
   }, [api, conv])
 
   if (!api) return null
-  return { messages: msgs, partial, busy, account, error, say }
+  return { messages: msgs, partial, busy, account, error, say, sheet, setSheet }
 }
 
 const ButlerContext = createContext<Butler | null>(null)

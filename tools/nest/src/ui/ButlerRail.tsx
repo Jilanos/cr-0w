@@ -8,6 +8,7 @@ import { heroLiveOf, heroModel, type HeroModel } from '../hero/model'
 import { RailHead } from '../hero/RailHead'
 import { Link, navigate } from '../router'
 import { enterSubmits, rowsOf } from './keys'
+import { stickBottom } from './stickBottom'
 
 const FOLD_KEY = 'nest.rail'
 
@@ -94,18 +95,23 @@ export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapsh
 }
 
 // The conversation and its input (the rail body).
-export function ButlerChat({ snap, fold }: { snap: Snapshot; fold?: () => void }) {
+export function ButlerChat({ snap, fold, close }: { snap: Snapshot; fold?: () => void; close?: () => void }) {
   const b = useButler()
   const [text, setText] = useState('')
   const [acct, setAcct] = useState<string | null>(null)
   const log = useRef<HTMLOListElement>(null)
   const accounts = useMemo(() => accountsOf(snap.sections.accounts), [snap.sections.accounts])
+  const stick = useRef<ReturnType<typeof stickBottom> | null>(null)
   const n = b?.messages.length ?? 0
+  const has = !!b
 
   useEffect(() => {
     const el = log.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [n, b?.partial])
+    if (!el) return
+    stick.current = stickBottom(el)
+    return () => { stick.current?.stop(); stick.current = null }
+  }, [has])
+  useEffect(() => { stick.current?.follow() }, [n, b?.partial, b?.busy])
 
   if (!b) return null
   const send = () => {
@@ -137,6 +143,7 @@ export function ButlerChat({ snap, fold }: { snap: Snapshot; fold?: () => void }
             </select>
           </label>
           {fold && <button type="button" className="bare sm" onClick={fold}>Ctrl B fold</button>}
+          {close && <button type="button" className="rl-close" onClick={close} aria-label="Close the chat" title="Close"><i aria-hidden="true" /></button>}
         </div>
         <div className="rl-in">
           <textarea value={text} rows={rowsOf(text, 4)} placeholder="Talk to CR-0W, or /dispatch…" aria-label="Message CR-0W"
