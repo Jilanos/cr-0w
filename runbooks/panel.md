@@ -60,6 +60,12 @@ registry with its operation and subject identifiers. **Jobs** shows the journal
 and report. **Comptes** shows quotas, resets and capability evidence. Unknown
 values stay unknown. No reset credit is consumed automatically.
 
+**Brouillons** lists the rows of the pending drafts section; its count matches
+them. Messages the sync cannot find in Drafts or Sent appear apart, under
+**À vérifier dans Outlook**, and are never marked done. Deadlines hide account
+quota resets by default; **Comptes** shows them and a toggle brings them back.
+**Mails à ranger** counts move, archive and trash proposals only.
+
 The home page retains changes since the previous page visit. Pending clicks made
 during an update join a durable queue. Rows stay visible until applied; remove a
 queued click from its toast or Jobs. Changed rows fail without editing the file.
