@@ -41,6 +41,7 @@
 # Decision framing
 - Product framing: Not needed
 - Architecture framing: Not needed
+- 2026-11-18: Terminal tab scroll (1692d9c): 500 lines of scrollback for plain shells; Claude Code is on the alternate screen, so the wheel sends Page Up/Down. Owner confirmed it works.
 
 # Links
 - Product brief(s): `prod_009_nest_laptop_parity`
