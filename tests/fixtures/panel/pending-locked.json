@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "file_label": "En attente",
+  "doc_rev": "d_4be0c9a1f2",
+  "writable": false,
+  "lock": {
+    "holder": "maj",
+    "since": "2026-11-18T08:15:02+01:00",
+    "run_id": "scr_20261118T081500"
+  },
+  "updated_note": "17/11 nuit (maj de nuit)",
+  "sections": [
+    {
+      "key": "followups",
+      "title": "📌 Relances : retours attendus",
+      "kind": "followups",
+      "columns": [
+        "Échéance",
+        "Prio",
+        "Qui",
+        "Attendu"
+      ],
+      "items": [
+        {
+          "id": "p_k3m9x2qa",
+          "item_rev": "r_0f3a77",
+          "section": "followups",
+          "block": null,
+          "kind": "table_row",
+          "columns": [
+            "Échéance",
+            "Prio",
+            "Qui",
+            "Attendu"
+          ],
+          "cells": {
+            "Échéance": [
+              {
+                "t": "text",
+                "v": "27/10 · dépassée"
+              }
+            ],
+            "Prio": [
+              {
+                "t": "text",
+                "v": "🔴"
+              }
+            ],
+            "Qui": [
+              {
+                "t": "text",
+                "v": "Fournisseur Alpha (J. Martin)"
+              }
+            ],
+            "Attendu": [
+              {
+                "t": "text",
+                "v": "Brochage définitif du connecteur et débit CAN. "
+              },
+              {
+                "t": "link",
+                "v": "mail du 03/11",
+                "href": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKE0001%3D%3D&exvsurl=1&viewmodel=ReadMessageItem"
+              },
+              {
+                "t": "text",
+                "v": ". Si ça bloque, mettre le responsable en copie."
+              }
+            ]
+          },
+          "title": "Fournisseur Alpha (J. Martin)",
+          "due": "2026-10-27",
+          "due_raw": "27/10 · dépassée",
+          "overdue_workdays": 16,
+          "prio": "red",
+          "actions": [
+            "done",
+            "snooze",
+            "followup",
+            "chat"
+          ],
+          "topic_id": "t_1f2e3d4c5b",
+          "source_line": 51
+        }
+      ]
+    }
+  ],
+  "free_blocks": [],
+  "unparsed": []
+}

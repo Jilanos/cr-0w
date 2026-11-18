@@ -1,0 +1,46 @@
+{
+  "http_status": 200,
+  "body": {
+    "operation_id": "op_01HZPD0001",
+    "kind": "pending.done",
+    "status": "succeeded",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Réglé : Fournisseur Alpha (J. Martin)",
+    "topic_id": "t_1f2e3d4c5b",
+    "dry_run": false,
+    "steps": [],
+    "items": [
+      {
+        "ref": {
+          "kind": "pending",
+          "id": "p_k3m9x2qa"
+        },
+        "status": "succeeded",
+        "detail": "ligne déplacée dans Réglé récemment"
+      }
+    ],
+    "result": {
+      "doc_rev_before": "d_4be0c9a1f2",
+      "doc_rev_after": "d_9c2e11ab70",
+      "backup": "EN_ATTENTE.20261118T083102.md",
+      "moved_to": {
+        "section": "done",
+        "item_id": "p_k3m9x2qa",
+        "line_preview": "- 18/11 Fournisseur Alpha (J. Martin) : Brochage définitif du connecteur et débit CAN. [mail du 03/11](…)"
+      }
+    },
+    "undo": {
+      "available": true,
+      "until": "2026-11-18T08:31:12+01:00",
+      "reason": null
+    },
+    "undone_by": null,
+    "error": null,
+    "links": {
+      "status_url": "/api/operations/op_01HZPD0001",
+      "events_url": "/api/operations/op_01HZPD0001/events"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "http_status": 422,
+  "body": {
+    "error": {
+      "code": "policy_denied",
+      "message": "Le compte workb ne traite aucun mail.",
+      "retryable": false,
+      "details": {
+        "account": "workb",
+        "topic_kind": "mail"
+      }
+    }
+  }
+}

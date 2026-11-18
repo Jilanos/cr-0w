@@ -1,0 +1,13 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "idempotency_mismatch",
+      "message": "Même request_id avec un contenu différent.",
+      "retryable": false,
+      "details": {
+        "request_id": "req_FAKE_0001"
+      }
+    }
+  }
+}

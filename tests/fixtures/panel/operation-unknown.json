@@ -1,0 +1,66 @@
+{
+  "http_status": 200,
+  "body": {
+    "operation_id": "op_01HZTR0009",
+    "kind": "mail.triage.execute",
+    "status": "unknown",
+    "request_id": "req_FAKE_0001",
+    "created_at": "2026-11-18T08:31:02+01:00",
+    "updated_at": "2026-11-18T08:31:02+01:00",
+    "summary": "Rangement de 2 mails : résultat inconnu",
+    "topic_id": null,
+    "dry_run": false,
+    "steps": [
+      {
+        "name": "execute",
+        "status": "unknown",
+        "account": "claude",
+        "model": "sonnet",
+        "run_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "started_at": "2026-11-18T08:40:00+01:00",
+        "ended_at": "2026-11-18T08:41:30+01:00",
+        "error": {
+          "code": "result_missing",
+          "message": "Le run s'est terminé sans fichier de résultat."
+        }
+      }
+    ],
+    "items": [
+      {
+        "ref": {
+          "kind": "mail",
+          "id": "AAMkAGFAKE0003=="
+        },
+        "status": "unknown",
+        "detail": "à vérifier avant toute nouvelle tentative"
+      },
+      {
+        "ref": {
+          "kind": "mail",
+          "id": "AAMkAGFAKE0004=="
+        },
+        "status": "unknown",
+        "detail": "à vérifier avant toute nouvelle tentative"
+      }
+    ],
+    "result": null,
+    "undo": {
+      "available": false,
+      "until": null,
+      "reason": null
+    },
+    "undone_by": null,
+    "error": {
+      "code": "remote_effect_unknown",
+      "message": "Effet distant incertain. Lancer une vérification.",
+      "retryable": false,
+      "details": {
+        "reconcile_url": "/api/operations/op_01HZTR0009/reconcile"
+      }
+    },
+    "links": {
+      "status_url": "/api/operations/op_01HZTR0009",
+      "events_url": "/api/operations/op_01HZTR0009/events"
+    }
+  }
+}

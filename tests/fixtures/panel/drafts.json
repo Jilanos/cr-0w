@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "snapshot_rev": "s_20261118T051540",
+  "items": [
+    {
+      "id": "AAMkAGFAKEDRAFT1==",
+      "subject": "RE: Offre 26-XYZ lot 2",
+      "to": [
+        "j.martin@example.com"
+      ],
+      "cc": [
+        "a.durand@example.org"
+      ],
+      "updated": "2026-11-17T21:40:00+01:00",
+      "state": "draft",
+      "signature_ok": true,
+      "attachments_missing": [],
+      "owa_link": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKEDRAFT1%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+      "pending_ref": {
+        "kind": "pending",
+        "id": "p_d0r4ft6b"
+      },
+      "topic_id": "t_9a1b2c3d4e",
+      "evidence": "présent dans Brouillons"
+    },
+    {
+      "id": "AAMkAGFAKEDRAFT2==",
+      "subject": "RE: Plans révision C",
+      "to": [
+        "j.dupont@example.com"
+      ],
+      "cc": [],
+      "updated": "2026-11-17T22:05:00+01:00",
+      "state": "draft",
+      "signature_ok": false,
+      "attachments_missing": [
+        "plans-revC.pdf"
+      ],
+      "owa_link": "https://outlook.office365.com/owa/?ItemID=AAMkAGFAKEDRAFT2%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+      "pending_ref": null,
+      "topic_id": "t_draft00002",
+      "evidence": "présent dans Brouillons"
+    },
+    {
+      "id": "AAMkAGFAKEDRAFT3==",
+      "subject": "Relance brochage connecteur",
+      "to": [
+        "j.martin@example.com"
+      ],
+      "cc": [],
+      "updated": "2026-11-16T20:00:00+01:00",
+      "state": "sent",
+      "signature_ok": true,
+      "attachments_missing": [],
+      "owa_link": null,
+      "pending_ref": {
+        "kind": "pending",
+        "id": "p_k3m9x2qa"
+      },
+      "topic_id": "t_draft00003",
+      "evidence": "trouvé dans Éléments envoyés le 17/11 à 08:02"
+    },
+    {
+      "id": "AAMkAGFAKEDRAFT4==",
+      "subject": "Offre outillage v2",
+      "to": [
+        "l.chen@example.com"
+      ],
+      "cc": [],
+      "updated": "2026-11-15T19:00:00+01:00",
+      "state": "missing",
+      "signature_ok": null,
+      "attachments_missing": [],
+      "owa_link": null,
+      "pending_ref": null,
+      "topic_id": "t_draft00004",
+      "evidence": "absent de Brouillons et d'Éléments envoyés : état incertain"
+    }
+  ]
+}

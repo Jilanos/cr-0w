@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Loopback panel: serve, check-config, read-only probe, optional static digest."""
+import argparse
+import html
+import json
+import os
+from pathlib import Path
+import sys
+import webbrowser
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from crow_panel.core import Config, Problem, atomic, canonical, uid
+
+
+def main():
+    # Guard invocation is deliberately tiny and fails closed before loading any server.
+    if len(sys.argv) > 1 and sys.argv[1] == "tool-guard":
+        from crow_panel.security import hook_input
+        try:
+            policy = json.loads(Path(sys.argv[2]).read_text())
+            allowed = hook_input(policy, json.load(sys.stdin))
+        except Exception:
+            allowed = False
+        if not allowed:
+            print("Panel action policy denied this tool.", file=sys.stderr)
+            return 2
+        return 0
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("serve", "check-config", "probe", "build", "sync"))
+    parser.add_argument("--config")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    cfg = Config(args.config, {"host": args.host, **({"port": args.port} if args.port is not None else {})})
+    if args.command == "check-config":
+        print(canonical({"ok": True, "mode": cfg["mode"], "host": cfg["host"], "port": cfg["port"]}))
+        return 0
+    if args.command in ("sync", "probe"):
+        # Reuse the existing server and its durable queue after a night update.
+        import http.client
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", cfg["port"], timeout=10)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            cookie = response.getheader("Set-Cookie", "").split(";", 1)[0]
+            response.read()
+            if cookie.startswith("crow_session="):
+                conn.request("GET", "/api/session", headers={"Cookie": cookie})
+                response = conn.getresponse()
+                session = json.loads(response.read())
+                body = canonical({"request_id": uid("req_"), "probe": args.command == "probe"})
+                conn.request("POST", "/api/mail/sync", body, {"Cookie": cookie, "X-Crow-Token": session["csrf_token"],
+                             "Origin": "http://127.0.0.1:" + str(cfg["port"]), "Content-Type": "application/json"})
+                response = conn.getresponse()
+                print(response.read().decode())
+                return 0 if response.status == 202 else 1
+            conn.close()
+        except (OSError, ValueError, KeyError, http.client.HTTPException):
+            pass
+    os.umask(0o077)
+    from crow_panel.server import App, Server
+    # One server or CLI mutation process per state directory.
+    from crow_panel.core import lock
+    with lock(cfg.state, "server", False):
+        app = App(cfg)
+        if args.command in ("sync", "probe"):
+            op = app.mail.collect("mail.sync", {"request_id": uid("req_")}, "CLI " + args.command, probe=args.command == "probe")
+            print(canonical(op))
+            # Persisted queued jobs are resumed by serve. Do not bypass global admission.
+            app.launcher.tick()
+            print(canonical(app.operation(op["operation_id"])))
+            return 0
+        if args.command == "build":
+            # Optional local digest. The interactive UI has no build step.
+            state = app.readers.state()
+            data = "<!doctype html><html lang=fr><meta charset=utf-8><title>Crow</title><h1>État local</h1><pre>" + html.escape(json.dumps(state, ensure_ascii=False, indent=2)) + "</pre></html>"
+            output = Path(args.output) if args.output else cfg.state / "digest.html"
+            atomic(output, data)
+            print(output)
+            return 0
+        server = Server(app)
+        app.launcher.start()
+        url = "http://127.0.0.1:" + str(app.port) + "/"
+        print(url, flush=True)
+        if not args.no_browser:
+            webbrowser.open(url)
+        try:
+            server.serve_forever(poll_interval=0.5)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            app.launcher.close()
+            server.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Problem as exc:
+        print(canonical(exc.body), file=sys.stderr)
+        sys.exit(1)
+    except (ValueError, OSError) as exc:
+        print("Panel configuration: " + str(exc), file=sys.stderr)
+        sys.exit(2)

@@ -1,0 +1,159 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "snapshot_rev": "s_20261118T051540",
+  "synced_at": "2026-11-18T05:15:40+01:00",
+  "stale": true,
+  "stale_after_minutes": 120,
+  "sync_operation_id": null,
+  "coverage": {
+    "status": "complete",
+    "collected": 57,
+    "total_known": null,
+    "started_at": "2026-11-18T05:12:01+01:00",
+    "ended_at": "2026-11-18T05:15:40+01:00",
+    "oldest": "2025-09-02T08:00:00+02:00",
+    "errors": []
+  },
+  "folder": "inbox",
+  "items": [
+    {
+      "id": "AAMkAGFAKE0002==",
+      "conversation_id": "AAQkAGFAKECONV0002==",
+      "from": {
+        "name": "Jean Dupont (Câbles Beta)",
+        "address": "j.dupont@example.com"
+      },
+      "to_count": 2,
+      "subject": "RE: Plans révision C",
+      "received": "2026-11-18T07:12:00+01:00",
+      "preview": "Bonjour, ci-joint les plans révisés. Pour les fils 12 et 48, pouvez-vous confirmer la section ?",
+      "preview_truncated": true,
+      "has_attachments": true,
+      "unread": true,
+      "proposal": {
+        "action": "reply",
+        "folder_id": null,
+        "folder_path": null,
+        "reason": "question directe sur la section des fils 12 et 48",
+        "confidence": "high",
+        "allowed": true,
+        "disabled_reason": null
+      },
+      "pending_ref": {
+        "kind": "pending",
+        "id": "p_7hd2lw0e"
+      },
+      "draft_ref": null,
+      "topic_id": "t_mail000002"
+    },
+    {
+      "id": "AAMkAGFAKE0005==",
+      "conversation_id": "AAQkAGFAKECONV0005==",
+      "from": {
+        "name": "Fournisseur Alpha",
+        "address": "compta@example.com"
+      },
+      "to_count": 2,
+      "subject": "Facture 2026-118",
+      "received": "2026-11-17T15:02:00+01:00",
+      "preview": "Veuillez trouver ci-joint la facture 2026-118 relative à la commande…",
+      "preview_truncated": true,
+      "has_attachments": true,
+      "unread": false,
+      "proposal": {
+        "action": "move",
+        "folder_id": "AQMkFAKEF001",
+        "folder_path": "Fournisseurs/Alpha",
+        "reason": "facture fournisseur, déjà transmise à la comptabilité",
+        "confidence": "high",
+        "allowed": true,
+        "disabled_reason": null
+      },
+      "pending_ref": null,
+      "draft_ref": null,
+      "topic_id": "t_mail000005"
+    },
+    {
+      "id": "AAMkAGFAKE0006==",
+      "conversation_id": "AAQkAGFAKECONV0006==",
+      "from": {
+        "name": "Salon Pro",
+        "address": "news@example.org"
+      },
+      "to_count": 2,
+      "subject": "Newsletter salon",
+      "received": "2026-11-16T09:00:00+01:00",
+      "preview": "Les inscriptions pour le salon de printemps sont ouvertes…",
+      "preview_truncated": true,
+      "has_attachments": false,
+      "unread": false,
+      "proposal": {
+        "action": "archive",
+        "folder_id": "AQMkFAKEARCH",
+        "folder_path": "Archive",
+        "reason": "information sans action",
+        "confidence": "medium",
+        "allowed": true,
+        "disabled_reason": null
+      },
+      "pending_ref": null,
+      "draft_ref": null,
+      "topic_id": "t_mail000006"
+    },
+    {
+      "id": "AAMkAGFAKE0008==",
+      "conversation_id": "AAQkAGFAKECONV0008==",
+      "from": {
+        "name": "Notifications outil",
+        "address": "noreply@example.net"
+      },
+      "to_count": 2,
+      "subject": "Votre export est prêt",
+      "received": "2026-11-14T22:00:00+01:00",
+      "preview": "L'export demandé est disponible pendant 7 jours.",
+      "preview_truncated": true,
+      "has_attachments": false,
+      "unread": false,
+      "proposal": {
+        "action": "trash",
+        "folder_id": null,
+        "folder_path": null,
+        "reason": "notification automatique expirée",
+        "confidence": "medium",
+        "allowed": false,
+        "disabled_reason": "Corbeille indisponible : outil absent"
+      },
+      "pending_ref": null,
+      "draft_ref": null,
+      "topic_id": "t_mail000008"
+    },
+    {
+      "id": "AAMkAGFAKE0009==",
+      "conversation_id": "AAQkAGFAKECONV0009==",
+      "from": {
+        "name": "Marie Leroy",
+        "address": "m.leroy@example.com"
+      },
+      "to_count": 2,
+      "subject": "Point série A jeudi",
+      "received": "2026-11-13T10:40:00+01:00",
+      "preview": "Salut, on peut décaler le point de jeudi à 14 h ?",
+      "preview_truncated": true,
+      "has_attachments": false,
+      "unread": false,
+      "proposal": {
+        "action": "keep",
+        "folder_id": null,
+        "folder_path": null,
+        "reason": "demande de planning, réponse attendue de ta part",
+        "confidence": "low",
+        "allowed": true,
+        "disabled_reason": null
+      },
+      "pending_ref": null,
+      "draft_ref": null,
+      "topic_id": "t_mail000009"
+    }
+  ],
+  "next_cursor": "c_s_20261118T051540_5"
+}

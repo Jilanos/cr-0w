@@ -1,0 +1,13 @@
+{
+  "http_status": 409,
+  "body": {
+    "error": {
+      "code": "plan_expired",
+      "message": "Lot expiré ou boîte resynchronisée depuis. Refaire la sélection.",
+      "retryable": false,
+      "details": {
+        "plan_id": "plan_01HZTP0001"
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "cached_at": "2026-11-18T08:28:00+01:00",
+  "source_status": "ok",
+  "accounts": [
+    {
+      "name": "claude",
+      "provider": "claude",
+      "in_policy": true,
+      "kinds": [
+        "chat",
+        "mail_read",
+        "mail_skeleton",
+        "mail_triage"
+      ],
+      "quota_status": "known",
+      "remaining_5h_pct": 62,
+      "remaining_week_pct": 48,
+      "reset_5h_at": "2026-11-18T11:00:00+01:00",
+      "reset_week_at": "2026-11-21T09:00:00+01:00",
+      "reset_credits": 0,
+      "floor_5h_pct": 20,
+      "floor_week_pct": 8,
+      "state": "ok",
+      "error": null
+    },
+    {
+      "name": "worka",
+      "provider": "codex",
+      "in_policy": true,
+      "kinds": [
+        "chat",
+        "mail_style",
+        "files"
+      ],
+      "quota_status": "known",
+      "remaining_5h_pct": 9,
+      "remaining_week_pct": 41,
+      "reset_5h_at": "2026-11-18T09:12:00+01:00",
+      "reset_week_at": "2026-11-20T03:00:00+01:00",
+      "reset_credits": 1,
+      "floor_5h_pct": 8,
+      "floor_week_pct": 15,
+      "state": "near_floor",
+      "error": null
+    },
+    {
+      "name": "workb",
+      "provider": "codex",
+      "in_policy": true,
+      "kinds": [
+        "chat",
+        "files"
+      ],
+      "quota_status": "unknown",
+      "remaining_5h_pct": null,
+      "remaining_week_pct": null,
+      "reset_5h_at": null,
+      "reset_week_at": null,
+      "reset_credits": null,
+      "floor_5h_pct": 8,
+      "floor_week_pct": 15,
+      "state": "unknown",
+      "error": "cdx status : délai dépassé"
+    }
+  ],
+  "out_of_policy": [
+    {
+      "name": "compte-ancien",
+      "error": "401 depuis 82 j"
+    }
+  ]
+}

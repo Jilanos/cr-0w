@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-11-18T08:31:00+01:00",
+  "mode": "live",
+  "counts": {
+    "pending": 14,
+    "overdue": 3,
+    "due_week": 4,
+    "decisions": 3,
+    "inbox": 57,
+    "inbox_unread": 9,
+    "triage_proposals": 21,
+    "drafts": 4,
+    "runs_active": 2,
+    "runs_queued": 1,
+    "afk_decisions": 0
+  },
+  "alerts": [
+    {
+      "level": "info",
+      "text": "Mise à jour en cours depuis 08:15 : les actions sur la liste sont suspendues",
+      "ref": {
+        "kind": "run",
+        "id": "scr_20261118T081500"
+      }
+    }
+  ],
+  "locks": {
+    "pending": {
+      "holder": "maj",
+      "since": "2026-11-18T08:15:02+01:00",
+      "run_id": "scr_20261118T081500"
+    },
+    "maj": {
+      "holder": "maj",
+      "since": "2026-11-18T08:15:02+01:00",
+      "run_id": "scr_20261118T081500"
+    },
+    "maintenance": null
+  },
+  "admissions": {
+    "open": true,
+    "reason": null
+  },
+  "mail": {
+    "synced_at": "2026-11-18T08:16:10+01:00",
+    "stale": false,
+    "coverage": "partial"
+  },
+  "since_last_visit": null
+}
