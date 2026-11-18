@@ -685,3 +685,5 @@ body.drawer-open .toasts { bottom: calc(min(42vh, 380px) + 16px); }
 .dir-item.sel { background: var(--accent-soft); color: var(--accent); }
 .dir-results li:last-child .dir-item { border-bottom: 0; }
 .dir-results > li.muted { padding: 8px 10px; }
+.dossier-linked .card-row > .grow { flex: 1 1 40%; }
+.dossier-linked .card-row > .muted.small { flex: 1 1 60%; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

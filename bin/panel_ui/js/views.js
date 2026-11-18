@@ -1221,7 +1221,7 @@ export function makeViews(ctx) {
         btn(full.pinned ? 'Désépingler' : 'Épingler', { icon: 'pin', ghost: true, onclick: () => dossierPref(d, 'pin', !full.pinned) }),
         btn(full.hidden ? 'Afficher' : 'Masquer', { icon: full.hidden ? 'eye' : 'eye-off', ghost: true, onclick: () => dossierPref(d, 'hide', !full.hidden) })),
       h('h3', { class: 'h3', text: `Lignes liées (${items.length})` }),
-      items.length ? h('ul', { class: 'linked' }, items.map((it) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.go('pending', it.id) },
+      items.length ? h('ul', { class: 'linked dossier-linked' }, items.map((it) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.go('pending', it.id) },
         prioDot(it.prio), h('span', { class: 'grow' }, segments(it.cells.Sujet || it.cells.Qui || it.cells.text)), links[it.id] ? chip(links[it.id], 'quiet') : null,
         h('span', { class: 'muted small', text: segText(it.cells.Attendu) }))))) : h('p', { class: 'muted', text: 'Aucune ligne ouverte.' }),
       full.mails ? h('h3', { class: 'h3', text: `Mails liés (${full.mails.length})` }) : null,
