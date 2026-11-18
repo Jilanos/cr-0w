@@ -181,3 +181,47 @@ def test_sync_stages_fallback_batches_after_history(panel, monkeypatch):
         app.mail.complete(op, job, {}, '')
     assert op['status'] == 'succeeded' and len(seen) == len(value['items'])
     assert op['result']['proposals']['llm'] == len(value['items'])
+
+
+def test_learning_starts_on_confirmation_is_weighted_durable_and_isolated(panel):
+    from crow_panel.mail import Mail
+    app, _ = panel
+    folders = destinations(app)
+    row = app.mail.raw()['items'][0]
+    target = next(f for f in folders if f['id'] != (row.get('proposal') or {}).get('folder_id'))
+    plan = app.mail.plan({'snapshot_rev': app.mail.raw()['snapshot_rev'], 'items': [{'message_id': row['id'], 'action': 'move', 'folder_id': target['id']}]})
+    assert not app.mail.feedback_path.exists()
+    confirmation = {'plan_id': plan['plan_id'], 'plan_hash': plan['plan_hash'], 'confirm': True, 'request_id': 'corrected'}
+    op = app.mail.execute(confirmation, '/execute')
+    saved = json.loads(app.mail.feedback_path.read_text())
+    assert len(saved) == 1 and next(iter(saved.values()))['weight'] == 5
+    app.mail.record_choices(plan, op['operation_id'])
+    assert len(json.loads(app.mail.feedback_path.read_text())) == 1
+    restarted = Mail(app.cfg, app.store, app.launcher)
+    proposal = restarted.deterministic_proposal(message(conversation_id=None, **{'from': row['from']}), folders)
+    assert proposal['source'] == 'sender' and proposal['folder_id'] == target['id']
+    assert app.mail.folders()['recent_targets'][0] == target['id']
+    assert app.mail.feedback_path.stat().st_mode & 0o777 == 0o600
+    app.cfg['mode'] = 'live'
+    assert not app.mail.feedback_path.exists()
+    assert app.mail.deterministic_proposal(message(conversation_id=None, **{'from': row['from']}), folders) is None
+
+
+def test_unchanged_choice_is_not_a_correction_and_undo_retracts_learning(panel):
+    app, _ = panel
+    folders = destinations(app)
+    row = next(r for r in app.mail.raw()['items'] if (r.get('proposal') or {}).get('folder_id'))
+    suggested = row['proposal']['folder_id']
+    same = {'items': [{'message_id': row['id'], 'folder_id': suggested, 'learning': {'sender': row['from']['address'], 'suggested_folder_id': suggested}}]}
+    app.mail.record_choices(same, 'same')
+    assert json.loads(app.mail.feedback_path.read_text()) == {}
+    target = next(f['id'] for f in folders if f['id'] != suggested)
+    plan = app.mail.plan({'snapshot_rev': app.mail.raw()['snapshot_rev'], 'items': [{'message_id': row['id'], 'action': 'move', 'folder_id': target}]})
+    op = app.mail.execute({'request_id': 'correct-and-undo', 'plan_id': plan['plan_id'], 'plan_hash': plan['plan_hash'], 'confirm': True}, '/execute')
+    app.launcher.tick()
+    op = app.operation(op['operation_id'])
+    assert op['status'] == 'succeeded'
+    undo = app.mail.undo(op, {'request_id': 'undo-correction'}, '/undo')
+    app.launcher.tick()
+    assert app.operation(undo['operation_id'])['status'] == 'succeeded'
+    assert json.loads(app.mail.feedback_path.read_text()) == {}

@@ -33,6 +33,35 @@ class Mail:
     def history(self):
         return read_json(self.history_path, {"version": 1, "messages": {}, "folders": {}})
 
+    @property
+    def feedback_path(self):
+        return self.cfg.state / ("mail/filing-feedback.dry-run.json" if self.cfg.dry else "mail/filing-feedback.json")
+
+    def record_choices(self, plan, operation_id):
+        saved = read_json(self.feedback_path, {})
+        recent = self.store.get("meta", "mail_recent_targets", [])
+        for item in plan["items"]:
+            target, learning = item["folder_id"], item.get("learning", {})
+            recent = [target] + [f for f in recent if f != target]
+            sender = learning.get("sender", "").strip().casefold()
+            if sender and learning.get("suggested_folder_id") != target:
+                key = operation_id + ":" + digest(item["message_id"])
+                saved.setdefault(key, {"operation_id": operation_id, "message_id": item["message_id"], "sender": sender,
+                    "folder_id": target, "suggested_folder_id": learning.get("suggested_folder_id"), "at": now(),
+                    "weight": max(1, int(self.cfg["mail"].get("history_feedback_weight", 5)))})
+        atomic(self.feedback_path, canonical(saved))
+        self.store.put("meta", "mail_recent_targets", recent[:10])
+
+    def forget_undone_choices(self, manifest, items):
+        if not manifest.get("undoes"):
+            return
+        successful = {i["ref"]["id"] for i in items if i["status"] == "succeeded"}
+        saved = read_json(self.feedback_path, {})
+        # Undo uses the moved id; retain the original id in the frozen inverse.
+        originals = {i.get("original_message_id", i["message_id"]) for i in manifest["items"] if i["message_id"] in successful}
+        saved = {k: v for k, v in saved.items() if not (v["operation_id"] == manifest["undoes"] and v["message_id"] in originals)}
+        atomic(self.feedback_path, canonical(saved))
+
     def update_history(self, value, folders):
         """Merge proven folder scans. Partial scans never advance a watermark."""
         if not isinstance(value, dict):
@@ -79,10 +108,17 @@ class Mail:
                 senders[sender][folder] += 1
                 if "@" in sender:
                     domains[sender.rsplit("@", 1)[1]][folder] += 1
+        for row in read_json(self.feedback_path, {}).values():
+            sender, folder, weight = row["sender"], row["folder_id"], row["weight"]
+            senders[sender][folder] += weight
+            if "@" in sender:
+                domains[sender.rsplit("@", 1)[1]][folder] += weight
         return conversations, senders, domains
 
     def rule_proposal(self, row, folders):
         """Private predicates reference an actual rule in the owner's Markdown."""
+        if not self.cfg["mail"].get("triage_rules"):
+            return None
         def folded(text):
             return "".join(c for c in unicodedata.normalize("NFD", text.casefold()) if not unicodedata.combining(c))
 
@@ -146,7 +182,7 @@ class Mail:
             if folder == current:
                 return None
             confidence = "high" if kind == "sender" and count >= 5 and ratio >= .9 else "medium"
-            return proposal(folder, f"Historique {identity} : {count} occurrences dans {allowed[folder]['path']} ({ratio:.0%})", confidence, kind)
+            return proposal(folder, f"Historique {identity} : score pondéré {count} dans {allowed[folder]['path']} ({ratio:.0%})", confidence, kind)
         return None
 
     def normalized_proposal(self, value, folders, current=None):
@@ -474,7 +510,8 @@ class Mail:
                 rejected.append({"message_id": key, "action": action, "code": "capability_unavailable", "message": "Corbeille indisponible : outil absent." if action == "trash" else "Action ou dossier non autorisé."})
                 continue
             items.append({"message_id": key, "subject": row["subject"], "from": row["from"]["name"], "received": row["received"], "action": action,
-                          "source_folder_id": source, "folder_id": target, "folder_path": folders[target]["path"]})
+                          "source_folder_id": source, "folder_id": target, "folder_path": folders[target]["path"],
+                          "learning": {"sender": row["from"]["address"], "suggested_folder_id": (row.get("proposal") or {}).get("folder_id")}})
         plan = {"plan_id": uid("plan_"), "plan_hash": None, "snapshot_rev": snapshot["snapshot_rev"], "created_at": now(),
                 "expires_at": (dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=15)).isoformat(), "status": "ready", "dry_run": self.cfg.dry,
                 "summary": {"move": sum(i["action"] == "move" for i in items), "archive": sum(i["action"] == "archive" for i in items), "trash": 0, "rejected": len(rejected)},
@@ -501,6 +538,7 @@ class Mail:
         op = self.store.operation("mail.triage.execute", body, "Rangement de " + str(len(plan["items"])) + " mails", dry=self.cfg.dry)
         plan.update(status="consumed", operation_id=op["operation_id"])
         self.store.put("plans", plan["plan_id"], plan)
+        self.record_choices(plan, op["operation_id"])
         job = {"simulated": True, "manifest": plan} if self.cfg.dry else self.triage_job(op, plan)
         self.launcher.enqueue(op, job, route, body, "execute")
         return op
@@ -569,7 +607,8 @@ class Mail:
         if not original["dry_run"] and self.cfg.dry:
             raise Problem(422, "capability_unavailable", "Une action réelle exige le mode réel pour son annulation.")
         rows = [i for i in original["items"] if i["status"] == "succeeded" and i.get("new_message_id")]
-        manifest = {"items": [{"message_id": i["new_message_id"], "folder_id": i["source_folder_id"], "source_folder_id": i["folder_id"], "action": "move", "folder_path": None} for i in rows]}
+        manifest = {"undoes": original["operation_id"], "items": [{"message_id": i["new_message_id"], "original_message_id": i["ref"]["id"],
+                    "folder_id": i["source_folder_id"], "source_folder_id": i["folder_id"], "action": "move", "folder_path": None} for i in rows]}
         op = self.store.operation("mail.triage.undo", body, "Annulation du rangement", dry=original["dry_run"])
         if original["dry_run"]:
             job = {"simulated": True, "undoes": original["operation_id"], "manifest": manifest}
@@ -731,6 +770,7 @@ class Mail:
                 op["result"] = {"plan_id": manifest.get("plan_id"), "succeeded": len(op["items"]), "failed": 0, "unknown": 0, "simulated": True}
                 if op["kind"] == "mail.triage.execute":
                     op["undo"] = {"available": True, "until": None, "reason": "Annuler le lot simulé."}
+                self.forget_undone_choices(manifest, op["items"])
             return
         if op["status"] != "succeeded":
             return
@@ -865,6 +905,8 @@ class Mail:
                     op["error"] = {"code": "manifest_violation", "message": "Écart entre le transcript et le manifeste. Vérification requise.", "retryable": False, "details": {}}
                 op["undo"] = {"available": not violation and op["status"] != "unknown" and any(i["status"] == "succeeded" and i.get("new_message_id") for i in op["items"]),
                               "until": None, "reason": "Annuler les messages encore dans le dossier cible."}
+                if not violation:
+                    self.forget_undone_choices(manifest, op["items"])
         except (ValueError, KeyError, TypeError):
             uncertain = op["kind"] in ("mail.reply_all", "mail.followup", "mail.triage.execute", "mail.triage.undo")
             op.update(status="unknown" if uncertain else "failed", error={"code": "invalid_result", "message": "Résultat invalide. Vérification requise.", "retryable": False, "details": {}})
