@@ -487,3 +487,12 @@ def test_real_transcript_shapes_and_intentional_probe_denial(panel):
     read = next(c for c in caps["capabilities"] if c["name"] == "mail_read")
     assert read["allowed"] and read["evidence"]["permissions"]["ok"]
     assert all("actual provider stores" not in e["data"].get("text", "") for e in app.store.events(rid))
+
+
+def test_restart_marks_unfinished_acceptance_unknown(panel):
+    app, fake = panel
+    op = app.store.operation("mail.reply_all", {"request_id": "interrupted"}, "Example")
+    restarted = App(app.cfg, fake)
+    assert restarted.operation(op["operation_id"])["status"] == "unknown"
+    assert not any(c[1] == "run" for c in fake.calls)
+    restarted.store.db.close()

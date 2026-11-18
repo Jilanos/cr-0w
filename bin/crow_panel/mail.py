@@ -498,6 +498,7 @@ class Mail:
                         raise ValueError("missing draft id")
                     # Commit the creation proof before admitting a styling run.
                     op["result"] = {"draft_id": output["draft_id"], "replied_message_id": output["replied_message_id"], "draft_link": None, "checks": None}
+                    op["status"] = "running"
                     self.store.save_op(op)
                     handoff = Path(self.cfg["work_handoff_dir"]) / op["operation_id"]
                     handoff.mkdir(mode=0o700, parents=True, exist_ok=True)

@@ -34,6 +34,10 @@ class App:
         self.launcher.complete = self.mail.complete
         self.readers = Readers(self)
         self.pending.recover()
+        for op in self.store.all("operations"):
+            if op["status"] in ACTIVE and not op["kind"].startswith("pending.") and not self.store.get("jobs", op["operation_id"]):
+                op.update(status="unknown", error={"code": "interrupted_acceptance", "message": "Opération interrompue avant sa mise en file. Vérification requise.", "retryable": False, "details": {}})
+                self.store.save_op(op)
         self.session = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.started = now()
