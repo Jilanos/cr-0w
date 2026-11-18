@@ -137,7 +137,7 @@ export function makeViews(ctx) {
           it.prio ? h('span', { class: 'muted', text: '· ' + PRIO[it.prio] }) : null),
         h('h2', { text: it.title }), dueLine),
       bar, fields,
-      h('p', { class: 'meta mono', text: `ligne ${it.source_line ?? '?'} · ${it.id} · ${it.item_rev}` }));
+      h('p', { class: 'meta', text: `${(cached('pending') || {}).file_label || 'En attente'} · ligne ${it.source_line ?? '?'}` }));
   }
 
   function freeBlockEntry(b) {
@@ -605,7 +605,7 @@ export function makeViews(ctx) {
     return h('article', { class: 'detail' },
       h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow' }, h('span', { text: 'Lot de rangement figé' }), plan.dry_run ? chip('mode essai', 'warn') : null),
         h('h2', { text: `${plan.items.length} action${plan.items.length > 1 ? 's' : ''} à exécuter` }),
-        h('p', { class: 'muted', text: `Expire ${exp ? 'dans ' + until(plan.expires_at) : '?'} · instantané ${plan.snapshot_rev}` })),
+        h('p', { class: 'muted', text: `Expire ${exp ? 'dans ' + until(plan.expires_at) : '?'}` })),
       h('div', { class: 'summary-chips' }, s.move ? chip(plural(s.move, 'déplacé', 'déplacés'), 'quiet') : null,
         s.archive ? chip(plural(s.archive, 'archivé', 'archivés'), 'quiet') : null, s.rejected ? chip(plural(s.rejected, 'refusé', 'refusés'), 'warn') : null),
       h('ul', { class: 'plan-list' }, plan.items.map((it) => h('li', null, h('span', { class: 'grow' }, h('strong', { text: it.subject }), h('span', { class: 'muted', text: ` · ${it.from}` })),
