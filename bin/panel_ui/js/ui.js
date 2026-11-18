@@ -135,6 +135,7 @@ export function until(s) {
 
 export function duration(s) {
   if (s == null) return 'inconnu';
+  s = Math.round(s);
   if (s < 60) return `${s} s`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m} min ${pad(s % 60)}`;

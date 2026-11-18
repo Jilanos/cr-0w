@@ -1142,8 +1142,9 @@ export function makeViews(ctx) {
       topic: r.topic_id ? { topic_id: r.topic_id, title: r.label, kind: 'run' } : { topic_id: null, title: r.label },
       row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, runDot(r.status), h('span', { class: 'row-title', text: r.label }),
         r.owned_by_panel ? null : chip('hors panneau', 'quiet'), h('span', { class: 'row-time', text: fmtDate(r.started_at) })),
-      h('div', { class: 'row-sub', text: [r.project, [r.account, r.model].filter(Boolean).join(' · ') || 'script local', r.status === 'running' ? `lancé ${fmtDate(r.started_at)}` : duration(r.duration_s),
-        money(r.cost_usd, r.cost_status)].join(' · ') }),
+      h('div', { class: 'row-sub', text: [r.project && String(r.project).split('/').filter(Boolean).pop(), [r.account, r.model].filter(Boolean).join(' · ') || 'script local',
+        r.status === 'running' ? `lancé ${fmtDate(r.started_at)}` : r.duration_s != null ? duration(r.duration_s) : null,
+        r.cost_usd != null ? money(r.cost_usd) : null].filter(Boolean).join(' · ') }),
       r.error ? h('div', { class: 'row-sub late', text: r.error }) : null),
       detail: () => runDetail(r),
     };
@@ -1210,7 +1211,7 @@ export function makeViews(ctx) {
       r.blocked_reason ? h('p', { class: 'callout callout-warn', text: r.blocked_reason }) : null,
       r.dry_run ? h('p', { class: 'muted small', text: 'Mode essai : le journal affiche la commande exacte, sans l\'exécuter.' }) : null,
       h('dl', { class: 'fields' },
-        h('dt', { text: 'Dernier passage' }), h('dd', { text: r.last ? `${fmtDate(r.last.at)} · ${RUN_STATE[r.last.status] || r.last.status} · code ${r.last.exit_code ?? '?'}` : 'jamais' })),
+        h('dt', { text: 'Dernier passage' }), h('dd', { text: r.last ? [fmtDate(r.last.at), RUN_STATE[r.last.status] || r.last.status, r.last.exit_code != null ? `code ${r.last.exit_code}` : null].filter(Boolean).join(' · ') : 'jamais' })),
       r.last && r.last.run_id ? h('button', { type: 'button', class: 'link-btn', text: 'Voir le dernier run', onclick: () => ctx.go('jobs', 'run:' + r.last.run_id) }) : null);
   }
 
