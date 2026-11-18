@@ -23,6 +23,7 @@ async function go(label) {
   await page.click('.rail-item', label);
   await poll(`document.querySelector('.view-title').textContent.includes(${JSON.stringify(label)}) && !document.querySelector('#pane-detail .state-loading')`);
   await sleep(350);
+  if (label === 'Mails') await page.click('.segmented button', 'Boîte');
 }
 async function selectFirst() {
   if (await page.eval(`!!document.querySelector('#pane-list .row')`)) {
@@ -123,6 +124,33 @@ try {
     await poll(`document.querySelector('.msg-crow:not(.live) .bubble')?.textContent.includes('OK')`,180000);
     await page.shot('real-chat-complete');
     return await api("api.get('/api/operations?active=0').then(d=>d.operations.filter(o=>o.kind==='chat.message').at(-1))");
+  });
+  await check('chat-settings',async()=>{
+    await go('Dossiers'); await selectFirst();
+    await poll(`!!document.querySelector('.chat-foot select[aria-label=Compte]')`);
+    const values=await page.eval(`(()=>{
+      const a=document.querySelector('.chat-foot select[aria-label=Compte]');
+      a.value='workb';a.dispatchEvent(new Event('change'));
+      return [...document.querySelector('.chat-foot select[aria-label=Modèle]').options].map(o=>o.value);
+    })()`);
+    if(!values.length||values.includes('sonnet'))throw new Error('incompatible account models');
+    await page.click('.chat-foot .link-btn','Par défaut ici');
+    await poll(`[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Défaut du sujet')&&t.textContent.includes('workb'))`);
+    await page.eval(`(()=>{
+      const a=document.querySelector('.chat-foot select[aria-label=Compte]');
+      a.value='claude';a.dispatchEvent(new Event('change'));
+    })()`);
+    await page.click('.chat-foot .link-btn','Par défaut ici');
+    await page.shot('real-chat-settings');
+    return {models:values,restored_account:'claude',messages_sent:0};
+  });
+  await check('classer-dry',async()=>{
+    await go('Mails'); await selectFirst();
+    await page.click('.detail .btn','Classer');
+    await page.click('.menu .btn','Préparer le lot');
+    await poll(`document.querySelector('.detail')?.textContent.includes('Lot de rangement figé')`);
+    await page.shot('real-classer-plan');
+    await page.click('.detail .btn','Modifier la sélection');
   });
   await check('sse-reconnect',async()=>{
     const op=await api("api.get('/api/operations?active=0').then(d=>d.operations.filter(o=>o.kind==='chat.message'&&o.status==='succeeded').at(-1))");
