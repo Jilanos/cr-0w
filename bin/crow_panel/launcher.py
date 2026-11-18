@@ -457,7 +457,9 @@ class Launcher:
                     continue
                 try:
                     if op["status"] == "queued":
-                        if job.get("simulated"):
+                        if job.get("kind") == "pending":
+                            self.pending(op, job)
+                        elif job.get("simulated"):
                             self.complete(op, job, {}, "")
                             self.store.save_op(op)
                             self.store.event(op["operation_id"], "done", {"status": op["status"], "exit_code": None, "final_segments": []})

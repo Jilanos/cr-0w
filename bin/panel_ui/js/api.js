@@ -171,6 +171,13 @@ const fake = {
     if (!m) throw new ApiError(404, { error: { code: 'not_found', message: `Route absente des fixtures : ${method} ${path}` } });
     const { route, p } = m;
     const res = this.raw(route.file);
+    if (method === 'POST' && body?.queue && SCENARIO === 'locked' && /^\/api\/pending\/[^/]+\/(done|snooze)$/.test(path)) {
+      const action = path.split('/').at(-1);
+      const op = this.newOp(this.files.get('operation-chat-queued.json'), { request_id: body.request_id,
+        kind: 'pending.' + action, status: 'queued', summary: 'En file pendant la mise à jour', steps: [], undo: { available: false } });
+      this.ops.set(op.operation_id, { op, final: op, done: false });
+      return { status: 202, data: clone(op) };
+    }
     if (res.status >= 400) throw new ApiError(res.status, res.data);
     if (method === 'GET') return this.get(route, p, res, qs);
     return this.mutate(route, p, res, body || {});

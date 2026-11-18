@@ -85,7 +85,7 @@ class Readers:
                            "tokens": (row.get("usage") or {}).get("total_tokens"), "report_file_id": None, "owned_by_panel": row.get("source") == "panel",
                            "exit_code": row.get("exit_code")})
         queue = [{"operation_id": op["operation_id"], "label": op["summary"], "account": op["steps"][0].get("account") if op["steps"] else None,
-                  "waiting_for": "maintenance" if self.launcher.maintenance() else "slot", "position": n + 1,
+                  "waiting_for": "maj" if (self.store.get("jobs", op["operation_id"], {}).get("kind") == "pending") else "maintenance" if self.launcher.maintenance() else "slot", "position": n + 1,
                   "cancel_url": op["links"]["status_url"] + "/cancel"} for n, op in enumerate(o for o in self.store.all("operations") if o["status"] == "queued")]
         return {"generated_at": now(), "source_status": {"cdx_runs": "unavailable" if self.launcher.cache.get("running_error") or self.launcher.cache.get("runs:" + str(hours) + "h_error") else "ok", "registry": "ok"},
                 "runs": sorted(result, key=lambda r: r["started_at"] or "", reverse=True), "queue": queue}

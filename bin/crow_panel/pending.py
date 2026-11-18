@@ -196,7 +196,68 @@ class Pending:
         if info or locked(self.cfg.locks, "maj"):
             raise Problem(423, "locked", "Mise à jour en cours.", info, True)
 
-    def mutate(self, key, action, body, route):
+    def submit(self, key, action, body, route):
+        try:
+            return 200, self.mutate(key, action, body, route)
+        except Problem as exc:
+            if exc.status != 423 or body.get("queue") is not True:
+                raise
+        document = self.view()
+        item = next((i for s in document["sections"] for i in s["items"] if i["id"] == key), None)
+        if not item or item["item_rev"] != body.get("item_rev"):
+            raise Problem(409, "conflict", "La ligne a changé depuis l'affichage.")
+        if action not in item["actions"]:
+            raise Problem(400, "bad_request", "Action indisponible sur cette ligne.")
+        frozen = dict(body)
+        if action == "snooze":
+            frozen.pop("workdays", None)
+            frozen["due"] = self.snooze_due(body).isoformat()
+        self.validate_note(body.get("note"))
+        op = self.store.operation("pending." + action, body, "En file : " + item["title"], item["topic_id"], self.cfg.dry)
+        op["status"] = "queued"
+        op["steps"] = [{"name": "wait_pending", "status": "queued", "run_id": None, "account": None, "model": None}]
+        self.store.put("jobs", op["operation_id"], {"kind": "pending", "key": key, "action": action, "body": frozen, "route": route})
+        self.store.put("intents", op["operation_id"], {"request_hash": digest(canonical([route, body]))})
+        self.store.save_op(op)
+        self.store.audit(op)
+        self.store.event(op["operation_id"], "status", {"status": "queued", "at": now()})
+        return 202, op
+
+    def resume(self, op, job):
+        try:
+            self.mutate(job["key"], job["action"], job["body"], job["route"], op)
+        except Problem as exc:
+            if exc.status == 423:
+                return
+            op.update(status="failed", error=exc.body["error"])
+            self.store.save_op(op)
+            self.store.event(op["operation_id"], "done", {"status": "failed", "exit_code": None, "final_segments": []})
+
+    @staticmethod
+    def validate_note(note):
+        if note is not None and (not isinstance(note, str) or "\n" in note or "\r" in note or len(note) > 2000):
+            raise Problem(400, "bad_request", "Note invalide.")
+
+    @staticmethod
+    def snooze_due(body):
+        if ("due" in body) == ("workdays" in body):
+            raise Problem(400, "bad_request", "Choisis une date ou un nombre de jours ouvrés.")
+        try:
+            if "due" in body:
+                return dt.date.fromisoformat(body["due"])
+            count = body["workdays"]
+            if type(count) is not int or not 1 <= count <= 366:
+                raise ValueError()
+            due = dt.date.today()
+            for _ in range(count):
+                due += dt.timedelta(days=1)
+                while due.weekday() >= 5:
+                    due += dt.timedelta(days=1)
+            return due
+        except (ValueError, TypeError):
+            raise Problem(400, "bad_request", "Échéance invalide.")
+
+    def mutate(self, key, action, body, route, queued_op=None):
         self.check_lock()
         with lock(self.cfg.locks, "pending", False):
             version = self.version()
@@ -221,8 +282,7 @@ class Pending:
                 expected = cells.get("Attendu", " / ".join(v for v in cells.values() if v != title))
                 text = title + " : " + expected if item["kind"] == "table_row" else record["raw"][2:].rstrip()
                 note = body.get("note")
-                if note is not None and (not isinstance(note, str) or "\n" in note or "\r" in note or len(note) > 2000):
-                    raise Problem(400, "bad_request", "Note invalide.")
+                self.validate_note(note)
                 inserted = "- " + dt.date.today().strftime("%d/%m") + " " + text + (" (" + note + ")" if note else "") + newline
                 del updated[record["start"]:record["end"]]
                 done = next((s for s in document["sections"] if s["kind"] == "done"), None)
@@ -234,29 +294,17 @@ class Pending:
                     position += 2
                 updated[position:position] = [inserted]
             else:
-                if ("due" in body) == ("workdays" in body):
-                    raise Problem(400, "bad_request", "Choisis une date ou un nombre de jours ouvrés.")
-                try:
-                    if "due" in body:
-                        due = dt.date.fromisoformat(body["due"])
-                    else:
-                        count = body["workdays"]
-                        if type(count) is not int or not 1 <= count <= 366:
-                            raise ValueError()
-                        due = dt.date.today()
-                        for _ in range(count):
-                            due += dt.timedelta(days=1)
-                            while due.weekday() >= 5:
-                                due += dt.timedelta(days=1)
-                except (ValueError, TypeError):
-                    raise Problem(400, "bad_request", "Échéance invalide.")
+                due = self.snooze_due(body)
                 parts = re.split(r'(?<!\\)\|', record["raw"])
                 offset = 1 + item["columns"].index("Échéance")
                 cell = parts[offset]
                 parts[offset] = re.sub(r'\S.*\S|\S', due.strftime("%d/%m"), cell, count=1) if cell.strip() else cell + due.strftime("%d/%m")
                 updated[record["start"]:record["end"]] = ["|".join(parts)]
             after = "".join(updated).encode()
-            op = self.store.operation("pending." + action, body, ("Réglé : " if action == "done" else "Reporté : ") + item["title"], item["topic_id"])
+            op = queued_op or self.store.operation("pending." + action, body, "", item["topic_id"], self.cfg.dry)
+            op.update(status="running", summary=("Réglé : " if action == "done" else "Reporté : ") + item["title"])
+            for step in op["steps"]:
+                step.update(status="succeeded", ended_at=now())
             inverse = {"record": record, "inserted": inserted, "replacement": "".join(updated[record["start"]:record["end"]]) if action == "snooze" else None,
                        "original_count": record["original_group_size"]}
             op["items"] = [{"ref": {"kind": "pending", "id": key}, "status": "succeeded", "detail": "ligne déplacée dans Réglé récemment" if action == "done" else "échéance reportée"}]
@@ -289,7 +337,8 @@ class Pending:
         backup = "EN_ATTENTE." + dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%f") + ".md"
         result = {"doc_rev_before": digest(before, "d_"), "doc_rev_after": digest(after, "d_"), "backup": backup}
         op["result"] = result
-        intent = {"request_hash": digest(canonical([route, body])), "before": digest(before), "after": digest(after), "inverse": inverse}
+        request_hash = self.store.get("intents", op["operation_id"], {}).get("request_hash", digest(canonical([route, body])))
+        intent = {"request_hash": request_hash, "before": digest(before), "after": digest(after), "inverse": inverse}
         self.store.put("intents", op["operation_id"], intent)
         self.store.save_op(op)
         atomic(self.cfg.state / "backups" / backup, before)

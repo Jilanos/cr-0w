@@ -146,3 +146,17 @@ checkpoint. A missing mail never proves an action succeeded.
 SQLite. It returns a completed `state.visit` operation. Reads never move this
 checkpoint. The browser reads the delta before posting the new visit and retains
 that delta during the open page's lifetime. Reloading starts the next visit.
+
+## Pending clicks during updates
+
+`done` and `snooze` accept `queue: true`. A locked writer returns 202 with a durable
+queued operation. Without this opt-in, a locked request still returns 423. The
+queue captures the item revision and converts relative snooze dates at click time.
+After the lock clears, the worker rechecks that exact revision under the writer
+lock. An edited or ambiguous line fails visibly without writing. Unrelated edits
+are preserved. The undo window starts after the queued edit is applied.
+
+Queued clicks survive restart and appear in Jobs with `waiting_for: maj`. Use the
+operation's `/cancel` route to remove a click before application. Undo itself is
+never queued. Buttons explain that the click will wait; rows stay visible while
+waiting. No mail action is placed in this pending-file queue.

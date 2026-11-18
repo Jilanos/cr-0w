@@ -446,9 +446,12 @@ const SCEN = {
     await open(page, base, { view: 'pending', scenario: 'locked', sel: { pending: 'p_k3m9x2qa' } });
     await expect(page, '.banner-lock', 'Mise à jour en cours');
     const dis = await page.eval(`[...document.querySelectorAll('.detail .btn')].find((b) => b.textContent.includes('Réglé')).disabled`);
-    if (!dis) throw new Error('Réglé actif pendant une maj');
+    if (dis) throw new Error('Réglé doit pouvoir rejoindre la file pendant une maj');
     const maj = await page.eval(`[...document.querySelectorAll('.topbar-actions .btn')].find((b) => b.textContent.includes('Mise à jour')).disabled`);
     if (!maj) throw new Error('bouton Mise à jour actif pendant une maj');
+    await page.click('.detail .btn', 'Réglé');
+    await expect(page, '.toast', 'Clic en file');
+    await expect(page, '#pane-list .row[data-key="p_k3m9x2qa"]', null, 'ligne conservée pendant la file');
     await page.shot('scenario-locked');
   },
   partial: async (page, base) => {

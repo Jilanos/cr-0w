@@ -61,7 +61,7 @@ export function makeViews(ctx) {
       type: 'button', class: 'row-quick', title: w.ok ? 'Réglé (e)' : w.reason, 'aria-label': `Réglé : ${it.title}`,
       onclick: (e) => { e.stopPropagation(); ctx.pendingDone(it); },
     }, icon('check')) : null;
-    if (quick && !w.ok) disable(quick, w.reason);
+    if (quick && !w.ok && !w.queueable) disable(quick, w.reason);
     return h('div', { class: 'row-body' },
       h('div', { class: 'row-line' }, prioDot(it.prio), h('span', { class: 'row-title', text: it.title }),
         opts.sectionChip ? chip(opts.sectionChip, 'quiet') : null, dueChip(it)),
@@ -102,10 +102,10 @@ export function makeViews(ctx) {
     const acts = it.actions || [];
     const bar = h('div', { class: 'actions' });
     if (acts.includes('done')) {
-      bar.append(btn('Réglé', { icon: 'check', primary: true, key: 'e', disabled: w.ok ? null : w.reason, onclick: () => ctx.pendingDone(it) }));
+      bar.append(btn('Réglé', { icon: 'check', primary: true, key: 'e', title: w.reason, disabled: w.ok || w.queueable ? null : w.reason, onclick: () => ctx.pendingDone(it) }));
     }
     if (acts.includes('snooze')) {
-      const b = btn('Reporter', { icon: 'clock', disabled: w.ok ? null : w.reason });
+      const b = btn('Reporter', { icon: 'clock', title: w.reason, disabled: w.ok || w.queueable ? null : w.reason });
       b.addEventListener('click', () => snoozeMenu(b, it));
       bar.append(b);
     }

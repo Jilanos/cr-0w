@@ -143,7 +143,7 @@ function writable() {
   const lock = (p && p.lock) || (st && st.locks && st.locks.pending);
   if (p && p.writable === false || lock) {
     const since = lock && lock.since ? ` depuis ${fmtDate(lock.since)}` : '';
-    return { ok: false, reason: `Mise à jour en cours${since} : actions sur la liste suspendues` };
+    return { ok: false, queueable: !!lock, reason: lock ? `Mise à jour en cours${since} : clics placés en file` : 'Liste indisponible' };
   }
   return { ok: true, reason: null };
 }
@@ -386,23 +386,23 @@ function handleWriteError(err, what) {
 
 async function pendingDone(item) {
   const w = writable();
-  if (!w.ok) { toast(w.reason, { kind: 'warn' }); return; }
+  if (!w.ok && !w.queueable) { toast(w.reason, { kind: 'warn' }); return; }
   if (!item || !(item.actions || []).includes('done')) return;
   // Optimistic removal: the row disappears at once, next row gets the selection.
   const rows = listEntries.filter((e) => !e.header);
   const idx = rows.findIndex((e) => e.key === item.id);
-  store.hidden.add(item.id);
-  if (store.sel[store.view] === item.id) {
+  if (w.ok) store.hidden.add(item.id);
+  if (w.ok && store.sel[store.view] === item.id) {
     const next = rows[idx + 1] || rows[idx - 1];
     store.sel[store.view] = next && next.key !== item.id ? next.key : null;
   }
   render();
   try {
-    const op = await api.post(`/api/pending/${encodeURIComponent(item.id)}/done`, { item_rev: item.item_rev });
+    const op = await api.post(`/api/pending/${encodeURIComponent(item.id)}/done`, { item_rev: item.item_rev, queue: true });
     await refresh(['pending', 'state', 'dues']);
     store.hidden.delete(item.id);
     render();
-    undoToast(op);
+    pendingResult(op);
   } catch (err) {
     store.hidden.delete(item.id);
     render();
@@ -412,13 +412,28 @@ async function pendingDone(item) {
 
 async function pendingSnooze(item, body) {
   const w = writable();
-  if (!w.ok) { toast(w.reason, { kind: 'warn' }); return; }
+  if (!w.ok && !w.queueable) { toast(w.reason, { kind: 'warn' }); return; }
   try {
-    const op = await api.post(`/api/pending/${encodeURIComponent(item.id)}/snooze`, Object.assign({ item_rev: item.item_rev }, body));
+    const op = await api.post(`/api/pending/${encodeURIComponent(item.id)}/snooze`, Object.assign({ item_rev: item.item_rev, queue: true }, body));
     await refresh(['pending', 'state', 'dues']);
     render();
-    undoToast(op);
+    pendingResult(op);
   } catch (err) { handleWriteError(err, item.title); }
+}
+
+function pendingResult(op) {
+  if (op.status !== 'queued') { undoToast(op); return; }
+  toast('Clic en file pendant la mise à jour', { kind: 'info', key: op.operation_id, ttl: 12000,
+    action: { label: 'Retirer de la file', run: async () => {
+      try { await api.post(op.links.status_url + '/cancel', {}); await refresh(['runs', 'state']); render(); }
+      catch (err) { toastError(err, 'Retrait de la file'); }
+    } } });
+  trackOp(op, async (final) => {
+    await refresh(['pending', 'state', 'dues', 'runs']); render();
+    if (final.status === 'succeeded') undoToast(final);
+    else if (final.status === 'failed') toast(final.error?.message || 'Clic en échec', { kind: 'error', key: op.operation_id });
+    else toast('Clic retiré de la file', { kind: 'info', key: op.operation_id });
+  });
 }
 
 function undoToast(op) {

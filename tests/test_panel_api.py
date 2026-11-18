@@ -130,6 +130,52 @@ def test_lock_blocks_display_and_mutation(panel):
         assert err.value.status == 423
 
 
+@pytest.mark.parametrize("action,extra", [("done", {}), ("snooze", {"workdays": 2})])
+def test_pending_queue_survives_restart_then_applies_once(panel, action, extra):
+    app, fake = panel
+    item = next(i for s in app.pending.view()["sections"] for i in s["items"] if action in i["actions"])
+    route = "/api/pending/" + item["id"] + "/" + action
+    body = {"request_id": "queued-pending", "queue": True, "item_rev": item["item_rev"], **extra}
+    before = Path(app.cfg["pending_md"]).read_bytes()
+    with lock(app.cfg.locks, "pending"):
+        status, op = post(app, route, body)
+        assert status == 202 and op["status"] == "queued"
+        assert post(app, route, body) == (status, op)
+        assert app.readers.runs()["queue"][0]["waiting_for"] == "maj"
+        restarted = App(app.cfg, fake)
+        restarted.launcher.tick()
+        assert restarted.operation(op["operation_id"])["status"] == "queued"
+        assert Path(app.cfg["pending_md"]).read_bytes() == before
+    restarted.launcher.tick()
+    result = restarted.operation(op["operation_id"])
+    assert result["status"] == "succeeded" and result["undo"]["available"]
+    assert len(list((app.cfg.state / "backups").glob("*"))) == 1
+    restarted.launcher.tick()
+    post(restarted, result["links"]["status_url"] + "/undo", {"request_id": "queued-undo"})
+    assert Path(app.cfg["pending_md"]).read_bytes() == before
+    assert not any(c[1] == "run" for c in fake.calls)
+    restarted.store.db.close()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_queued_pending_cancels_or_conflicts_without_writing(panel, cancel):
+    app, _ = panel
+    item = pending_item(app)
+    with lock(app.cfg.locks, "pending"):
+        _, op = post(app, "/api/pending/" + item["id"] + "/done", {"request_id": "queued", "queue": True, "item_rev": item["item_rev"]})
+    if cancel:
+        post(app, op["links"]["status_url"] + "/cancel", {"request_id": "cancel-pending"})
+    else:
+        path = Path(app.cfg["pending_md"])
+        path.write_text(path.read_text().replace(item["title"], "Edited subject"))
+    before = Path(app.cfg["pending_md"]).read_bytes()
+    app.launcher.tick()
+    result = app.operation(op["operation_id"])
+    assert result["status"] == ("cancelled" if cancel else "failed")
+    assert Path(app.cfg["pending_md"]).read_bytes() == before
+    assert not list((app.cfg.state / "backups").glob("*"))
+
+
 def test_chat_queue_cancel_admission_and_continuation(panel):
     app, fake = panel
     topic = pending_item(app)["topic_id"]

@@ -31,6 +31,7 @@ class App:
         self.launcher = Launcher(cfg, self.store, command)
         self.pending = Pending(cfg, self.store, self.files, self.launcher.topic)
         self.pending.active_maj = self.launcher.maj
+        self.launcher.pending = self.pending.resume
         self.mail = Mail(cfg, self.store, self.launcher)
         self.launcher.complete = self.mail.complete
         self.readers = Readers(self)
@@ -133,7 +134,7 @@ class App:
             return 200, self.visits.visit(body)
         match = re.fullmatch(r'/api/pending/([^/]+)/(done|snooze)', path)
         if match:
-            return 200, self.pending.mutate(match[1], match[2], body, route)
+            return self.pending.submit(match[1], match[2], body, route)
         match = re.fullmatch(r'/api/operations/([^/]+)/(undo|cancel|reconcile)', path)
         if match:
             op = self.operation(match[1])
