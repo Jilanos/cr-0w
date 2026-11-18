@@ -413,6 +413,16 @@ class Pending:
                 position = prev[-1] + 1 if len(prev) == 1 else nex[0] if len(nex) == 1 else end
                 updated[position:position] = [record["raw"]]
                 hint = {position: record["id"]}
+            for survivor, _, _ in entries:
+                if survivor["id"] == record["id"]:
+                    continue
+                pos = survivor["start"]
+                if original["kind"] != "pending.snooze":
+                    if pos >= removed["end"]:
+                        pos -= removed["end"] - removed["start"]
+                    if pos >= position:
+                        pos += len(record["raw"].splitlines())
+                hint[pos] = survivor["id"]
             op = self.store.operation("pending.undo", body, "Annulé : ligne remise à sa place", original["topic_id"])
             op["items"] = original["items"]
             self.write(op, before, "".join(updated).encode(), {"undoes": original["operation_id"]}, route, body, version)

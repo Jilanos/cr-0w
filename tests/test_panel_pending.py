@@ -152,3 +152,15 @@ def test_same_bytes_with_concurrent_mtime_change_are_rejected(tmp_path, monkeypa
         writer.mutate(item["id"], "done", {"request_id": "race", "item_rev": item["item_rev"]}, "/done")
     assert err.value.body["error"]["code"] == "conflict"
     assert writer.path.read_text() == DOCUMENT
+
+
+def test_undo_preserves_the_other_duplicate_row_identity(tmp_path):
+    writer, _, _ = setup(tmp_path)
+    document = DOCUMENT.replace("| Second |", "| Keep [link](https://example.org/) and escaped \\| pipe |")
+    writer.path.write_text(document)
+    first, second, _ = items(writer)
+    op = writer.mutate(first["id"], "done", {"request_id": "first", "item_rev": first["item_rev"]}, "/done")
+    writer.undo(op, {"request_id": "undo-first"}, "/undo")
+    assert [i["id"] for i in items(writer)[:2]] == [first["id"], second["id"]]
+    writer.mutate(second["id"], "done", {"request_id": "second", "item_rev": second["item_rev"]}, "/done")
+    assert items(writer)[0]["id"] == first["id"]
