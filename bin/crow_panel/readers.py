@@ -263,10 +263,11 @@ class Readers:
         except Problem:
             active, admission = None, False
         queued = sum(o["status"] == "queued" for o in self.store.all("operations"))
-        limit = (dt.date.today() + dt.timedelta(days=7 - dt.date.today().weekday())).isoformat()
+        # Same window as the Échéances 7 jours card: today to today + 7 days, both included.
+        limit = (dt.date.today() + dt.timedelta(days=8)).isoformat()
         calendar, _ = Calendar(self.cfg).view(7)
         afk = self.afk()
-        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items) + sum(i["date"] < limit for i in calendar), "decisions": len(decisions),
+        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items) + sum(dt.date.today().isoformat() <= i["date"] < limit for i in calendar), "decisions": len(decisions),
                   "inbox": len(self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None, "inbox_unread": sum(i["unread"] for i in self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None,
                   "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": len(draft_rows), "drafts_unverified": sum(i["state"] == "missing" for i in synced_drafts),
                   "runs_active": active, "runs_queued": queued, "afk_decisions": sum(not d["answered"] for d in afk["decisions"])}

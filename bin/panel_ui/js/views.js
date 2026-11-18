@@ -36,6 +36,10 @@ export function makeViews(ctx) {
   };
   const findPending = (id) => allPending().find((x) => x.id === id) || null;
 
+  // Account quota resets are shown in Comptes; Échéances lists them only on request.
+  const showResets = () => localStorage.getItem('crow.showResets') === 'true';
+  const visibleDues = () => ((cached('dues') || {}).items || []).filter((d) => d.kind !== 'reset' || showResets());
+
   const mailPolicyKinds = new Set(['drafts', 'followups']);
   const pendingTopic = (it) => it.topic_id ? { topic_id: it.topic_id, title: it.title, kind: 'pending',
     mailOnly: mailPolicyKinds.has(it.section), context: segText(it.cells.Attendu || it.cells.text) } : { topic_id: null, title: it.title };
@@ -263,7 +267,7 @@ export function makeViews(ctx) {
         opts.sub ? h('span', { class: 'kpi-sub muted', text: opts.sub }) : null);
       wrap.append(h('div', { class: 'kpis' },
         kpi('En retard', c.overdue, 'pending', { alert: true }),
-        kpi('Cette semaine', c.due_week, 'pending', { onclick: () => { store.pendingTab = 'dues'; ctx.go('pending'); } }),
+        kpi('Échéances 7 j', c.due_week, 'pending', { onclick: () => { store.pendingTab = 'dues'; ctx.go('pending'); } }),
         kpi('Brouillons à envoyer', c.drafts, 'drafts'),
         kpi('Propositions de tri', c.triage_proposals, 'mail', { onclick: () => { store.mailMode = 'triage'; ctx.go('mail'); } }),
         kpi('Mails', c.inbox, 'mail', { sub: c.inbox_unread ? `${c.inbox_unread} non lus` : null, onclick: () => { store.mailMode = 'inbox'; ctx.go('mail'); } }),
@@ -291,7 +295,7 @@ export function makeViews(ctx) {
           prioDot(it.prio), h('span', { class: 'grow', text: it.title }), chip(`${it.overdue_workdays} j ouvrés`, 'late'))), 'Rien en retard.'), 'card-late'));
 
       // Échéances 7 jours
-      const dues = ((cached('dues') || {}).items || []).filter((d) => !d.overdue && daysFromNow(d.date) != null && daysFromNow(d.date) <= 7);
+      const dues = visibleDues().filter((d) => !d.overdue && daysFromNow(d.date) != null && daysFromNow(d.date) <= 7);
       grid.append(card('Échéances 7 jours', linkBtn('Toutes', () => { store.pendingTab = 'dues'; ctx.go('pending'); }),
         h('div', null, h('p', { class: 'muted small', text: cached('dues')?.calendar?.note }),
         cardList(dues.map((d) => cardRow(() => openRef(d.ref), h('span', { class: 'date-col', text: fmtDay(d.date) }),
@@ -379,8 +383,11 @@ export function makeViews(ctx) {
       const dues = cached('dues');
       return h('div', { class: 'list-head' },
         segmented([{ label: 'Liste', value: 'list', count: doc ? allPending().filter((x) => x.section !== 'done').length : null },
-          { label: 'Échéances 14 j', value: 'dues', count: dues ? dues.items.length : null }], store.pendingTab, (v) => { store.pendingTab = v; ctx.render(); }),
+          { label: 'Échéances 14 j', value: 'dues', count: dues ? visibleDues().length : null }], store.pendingTab, (v) => { store.pendingTab = v; ctx.render(); }),
         store.pendingTab === 'dues' && dues?.calendar ? h('p', { class: 'muted small list-note', text: dues.calendar.note }) : null,
+        store.pendingTab === 'dues' && dues ? h('label', { class: 'toggle small list-note' },
+          h('input', { type: 'checkbox', checked: showResets(), onchange: (e) => { localStorage.setItem('crow.showResets', String(e.target.checked)); ctx.render(); } }),
+          h('span', { text: 'Afficher les resets de comptes' })) : null,
         doc && doc.updated_note ? h('p', { class: 'muted small list-note', text: `${doc.file_label || 'En attente'} · mis à jour ${doc.updated_note}` }) : null);
     },
     items() {
@@ -429,7 +436,7 @@ export function makeViews(ctx) {
     const out = [];
     const groups = [['En retard', (d) => d.overdue], ['Cette semaine', (d) => !d.overdue && daysFromNow(d.date) <= 7], ['Plus tard', (d) => !d.overdue && daysFromNow(d.date) > 7]];
     for (const [title, test] of groups) {
-      const items = dues.items.filter(test);
+      const items = visibleDues().filter(test);
       if (!items.length) continue;
       out.push(groupHeader(title, items.length));
       items.forEach((d, i) => {
