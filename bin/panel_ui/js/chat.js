@@ -143,15 +143,31 @@ function renderComposer(doc, foot, topic, ctx, log) {
   const accounts = (chatCfg.accounts || [{ name: 'claude', kinds: ['chat'] }]).filter((a) => (a.kinds || []).includes('chat'));
   const d = drafts.get(topic.topic_id) || {};
   drafts.set(topic.topic_id, d);
-  const model = d.model || doc.default_model || chatCfg.default_model || 'sonnet';
+  const requestedModel = d.model || doc.default_model || chatCfg.default_model || 'sonnet';
   let account = d.account || doc.default_account || chatCfg.default_account || 'claude';
   if (topic.mailOnly) account = 'claude';
 
+  const modelsFor = (name) => {
+    const a = accounts.find(x => x.name === name) || {};
+    return a.models || (a.provider === 'codex' ? [a.model || 'gpt-5'] : models);
+  };
+  const initialModels = modelsFor(account);
+  const model = initialModels.includes(requestedModel) ? requestedModel
+    : initialModels.includes(chatCfg.default_model) ? chatCfg.default_model : initialModels[0];
+
   const modelSel = h('select', { class: 'select select-small', 'aria-label': 'Modèle', title: 'Modèle de ce message',
     onchange: () => { d.model = modelSel.value; updateDefaultBtn(); } },
-  models.map((m) => { const o = h('option', { value: m, text: m }); if (m === model) o.selected = true; return o; }));
+  initialModels.map((m) => { const o = h('option', { value: m, text: m }); if (m === model) o.selected = true; return o; }));
   const accSel = h('select', { class: 'select select-small', 'aria-label': 'Compte', title: topic.mailOnly ? 'Sujet mail : compte claude seulement' : 'Compte',
-    onchange: () => { d.account = accSel.value; updateDefaultBtn(); } },
+    onchange: () => {
+      d.account = accSel.value;
+      const allowed = modelsFor(d.account);
+      const chosen = allowed.includes(modelSel.value) ? modelSel.value
+        : allowed.includes(chatCfg.default_model) ? chatCfg.default_model : allowed[0];
+      clear(modelSel).append(...allowed.map(m => h('option', { value: m, text: m })));
+      modelSel.value = chosen; d.model = chosen;
+      updateDefaultBtn();
+    } },
   accounts.map((a) => {
     const o = h('option', { value: a.name, text: a.name });
     if (topic.mailOnly && a.name !== 'claude') { o.disabled = true; o.textContent = `${a.name} (pas de mail)`; }
