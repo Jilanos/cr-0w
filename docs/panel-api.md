@@ -222,3 +222,28 @@ A second follow-up on an active or uncertain subject returns 409. Unknown result
 are never retried automatically. `/reconcile` runs only the read check. Observing
 no draft does not authorize a retry after a lost write. The UI's Relancer button
 opens this dedicated form; Chat remains separately available.
+
+## Calendar deadlines
+
+`/api/dues` adds `calendar: {synced_at, stale, coverage, time_zone, note}`. Calendar
+rows have `kind: calendar`, an opaque occurrence reference, local `date`, `start`,
+`end`, `all_day`, `location`, `url` and `stale`. Finished and cancelled events are
+excluded. Ongoing events appear on today. Recurring instances remain distinct.
+Only HTTPS links are exposed. Calendar rows have no pending-file actions.
+
+The default source is `CROW_HOME/local/state/maj/calendar.json`. Override it with
+`calendar.snapshot`, the display zone with `calendar.time_zone` (IANA), and age
+with `calendar.stale_after_minutes`. No server request calls Outlook. The night
+`/maj` prompt collects 16 days of occurrences using read tools and writes an
+incoming JSON file. The launcher validates and atomically publishes it after a
+successful run. `crow-maj calendar schema` prints the format; `calendar import
+<file>` publishes a collected file for interactive use.
+
+The snapshot envelope contains `synced_at`, `time_zone`, `coverage` with `status`,
+`window_start`, `window_end`, and `events`. Events carry `id`, `subject`, `start`,
+`end`, `all_day`, `cancelled`, `location`, `web_link`. Times require explicit UTC
+offsets. All-day dates may use ISO dates with an IANA snapshot zone; end is
+exclusive. Partial or invalid imports preserve a valid previous snapshot and
+record the failed attempt. An older snapshot cannot overwrite a newer one.
+Missing data is shown as unavailable. A short collection window is labelled
+partial even when the source exhausted that shorter window.

@@ -60,6 +60,23 @@ registry with its operation and subject identifiers. **Jobs** shows the journal
 and report. **Comptes** shows quotas, resets and capability evidence. Unknown
 values stay unknown. No reset credit is consumed automatically.
 
+The home page retains changes since the previous page visit. Pending clicks made
+during an update join a durable queue. Rows stay visible until applied; remove a
+queued click from its toast or Jobs. Changed rows fail without editing the file.
+The ten-second undo period starts when the queued edit is applied.
+
+Relancer opens a dedicated form. It checks Drafts and Sent before the three draft
+steps. An existing draft, proven reply or uncertain check prevents a new draft.
+All four steps are simulated in trial mode. Structured AFK questions offer option
+buttons. Trial answers write an overlay and backups under the panel state folder.
+
+Configure `dossiers.<slug>.path` within allowed roots to show ten recent files at
+two subdirectory levels. Set `last_crow_at` or `crow_version_file` to enable the
+modified-since signal. An absent reference remains unknown. Calendar events enter
+deadlines from `local/state/maj/calendar.json`; the page shows coverage and age.
+The night update publishes that snapshot. See [maj-routine](maj-routine.md) for
+the interactive import command and [panel-api](../docs/panel-api.md) for formats.
+
 ## Activate live mode
 
 Review the private acceptance report and capability reasons first. Stop the server,

@@ -50,6 +50,11 @@ dossiers: {}
 #     last_crow_at: '2026-01-01T12:00:00+00:00'
 #     # Or use the mtime of a known crow version inside the dossier:
 #     # crow_version_file: /path/to/allowed/project/review.md
+calendar:
+  # Defaults to CROW_HOME/local/state/maj/calendar.json, written by maj.
+  snapshot: null
+  time_zone: null  # Use the snapshot's IANA time zone.
+  stale_after_minutes: 120
 max_parallel: 2
 routines:
   maj: {argv: []}

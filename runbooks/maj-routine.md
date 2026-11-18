@@ -16,6 +16,14 @@ Skill: `local/hub-skills/maj/SKILL.md` (private, linked as `.claude/skills/maj`)
   (`powercfg /q SCHEME_CURRENT SUB_SLEEP BD3B718A-0680-4D9D-8AB2-E1D2B4AC806D`; typical default: AC yes, battery no).
 - `crow-maj night` runs `cdx run <account> --model sonnet --permission full --prompt "/maj mode=nuit"` with `CROW_RETRO=1`
   (no retro of the run), then renders the board. Log: `local/state/maj/night.log`.
+- The night prompt also requests a read-only calendar snapshot for the next 16 days.
+  After a successful run, the launcher validates and publishes it to
+  `local/state/maj/calendar.json`. Set `calendar_time_zone` (IANA, default UTC) or
+  `calendar_snapshot` in the private maj config when needed. Partial reads preserve
+  the previous published snapshot. Invalid or missing output is reported in the log.
+- For interactive `/maj`, request the same contract with `bin/crow-maj calendar schema`.
+  Save the collected JSON to a private temporary file, then publish it with
+  `bin/crow-maj calendar import <file>`. This command only validates local JSON.
 - Headless connector check (tested): mail search, Teams chat list and SharePoint search all work in a `cdx run` Claude session.
 
 ## Guardrails

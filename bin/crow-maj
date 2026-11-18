@@ -8,6 +8,8 @@
   crow-maj stage [YYYY-MM-DD]     create and print the attachment staging folder
   crow-maj board                  render the pending file and every a-ranger.md as HTML (bin/crow-board)
   crow-maj relay                  print today's attachment manifest path (the relay itself runs in `night`)
+  crow-maj calendar import FILE   validate and publish a read-only calendar snapshot
+  crow-maj calendar schema        print the calendar snapshot contract for /maj
   crow-maj night                  unattended run: headless /maj, then board, log in local/state/maj/night.log
 """
 import datetime as dt
@@ -73,12 +75,38 @@ def relay_start():
     return m, p
 
 
+def calendar_contract():
+    return {"synced_at": "ISO timestamp with offset", "time_zone": CFG.get("calendar_time_zone", "UTC"),
+            "coverage": {"status": "complete or partial", "window_start": "ISO timestamp with offset", "window_end": "ISO timestamp with offset"},
+            "events": [{"id": "occurrence id", "subject": "plain text", "start": "ISO timestamp with offset", "end": "ISO timestamp with offset",
+                        "all_day": False, "cancelled": False, "location": "plain text", "web_link": "HTTPS Outlook link or null"}]}
+
+
+def calendar_import(source):
+    from crow_panel.calendar import publish
+    from crow_panel.core import atomic, canonical
+    target = Path(CFG.get("calendar_snapshot", STATE / "calendar.json"))
+    try:
+        result = publish(target, json.loads(Path(source).read_text()))
+        print(json.dumps(result))
+        return 0 if result["published"] else 1
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        atomic(target.with_suffix(".attempt.json"), canonical({"checked_at": now().isoformat(), "status": "failed"}))
+        print("Calendar snapshot rejected: " + type(exc).__name__, file=sys.stderr)
+        return 2
+
+
 def _night():
     from crow_panel.core import lock, shared_locks
     log("start")
     manifest, relay = relay_start()
     log(f"relay on {manifest}")
-    prompt = "/maj mode=nuit"
+    import secrets
+    calendar_incoming = STATE / ("calendar.incoming." + secrets.token_hex(8) + ".json")
+    prompt = ("/maj mode=nuit\n\nCalendar snapshot for the panel: read Outlook calendar occurrences from today through the next 16 days, "
+              "including recurring instances and all-day events. Use only calendar read tools. Never create, update, respond to or delete an event. "
+              "Follow every page. Report partial coverage when access or pagination is incomplete. Do not invent events or infer an empty calendar from a failed read. "
+              "Write this JSON contract to " + str(calendar_incoming) + " using actual ISO dates with offsets, IANA time zone and HTTPS links: " + json.dumps(calendar_contract()))
     cmd = ["cdx", "run", CFG.get("account", "claude"), "--cwd", str(HOME), "--model", CFG.get("model", "sonnet"),
            "--permission", "full", "--prompt", prompt, "--detach", "--max-parallel", os.environ.get("CROW_MAX_RUNS", "2"), "--json"]
     env = dict(os.environ, HOME=crow_lib.real_home(), CROW_RETRO="1", CROW_MAJ_NIGHT="1")
@@ -135,6 +163,8 @@ def _night():
         relay.wait(timeout=120)
     except subprocess.TimeoutExpired:
         relay.kill()
+    if exit_code == 0:
+        log("calendar import exit=" + str(calendar_import(calendar_incoming)))
     b = board()
     log(f"board {'ok' if b.returncode == 0 else 'failed: ' + b.stderr[-200:]}")
     log("end")
@@ -186,6 +216,10 @@ def main(argv):
         print(d / "manifest.tsv")
     elif cmd == "night":
         return night()
+    elif cmd == "calendar" and len(argv) == 2 and argv[1] == "schema":
+        print(json.dumps(calendar_contract(), indent=2))
+    elif cmd == "calendar" and len(argv) == 3 and argv[1] == "import":
+        return calendar_import(argv[2])
     else:
         print(__doc__)
         return 2

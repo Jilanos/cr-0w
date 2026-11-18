@@ -88,6 +88,9 @@
     },
     "visit": {
       "GET /api/state": "state-visit.json"
+    },
+    "calendar": {
+      "GET /api/dues": "dues-calendar.json"
     }
   }
 }

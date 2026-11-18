@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from .core import ACTIVE, Problem, now, read_json
+from .calendar import Calendar
 
 
 class Readers:
@@ -241,7 +242,9 @@ class Readers:
                 date = account[field]
                 if date and today.isoformat() <= date[:10] <= end:
                     rows.append({"date": date[:10], "kind": "reset", "text": account["name"] + " : " + label, "overdue": False, "ref": {"kind": "account", "id": account["name"]}})
-        return {"generated_at": now(), "days": days, "items": sorted(rows, key=lambda r: r["date"])}
+        calendar, metadata = Calendar(self.cfg).view(days)
+        rows.extend(calendar)
+        return {"generated_at": now(), "days": days, "items": sorted(rows, key=lambda r: (r["date"], r.get("start", ""))), "calendar": metadata}
 
     def state(self):
         pending = self.app.pending.view()
@@ -256,8 +259,9 @@ class Readers:
             active, admission = None, False
         queued = sum(o["status"] == "queued" for o in self.store.all("operations"))
         limit = (dt.date.today() + dt.timedelta(days=7 - dt.date.today().weekday())).isoformat()
+        calendar, _ = Calendar(self.cfg).view(7)
         afk = self.afk()
-        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items), "decisions": len(decisions),
+        counts = {"pending": len(items), "overdue": len(overdue), "due_week": sum(bool(i["due"] and dt.date.today().isoformat() <= i["due"] < limit) for i in items) + sum(i["date"] < limit for i in calendar), "decisions": len(decisions),
                   "inbox": len(self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None, "inbox_unread": sum(i["unread"] for i in self.app.mail.raw()["items"]) if mail["snapshot_rev"] else None,
                   "triage_proposals": sum(i["proposal"] is not None for i in self.app.mail.raw()["items"]), "drafts": sum(i["state"] == "draft" for i in self.app.mail.drafts()["items"]),
                   "runs_active": active, "runs_queued": queued, "afk_decisions": sum(not d["answered"] for d in afk["decisions"])}

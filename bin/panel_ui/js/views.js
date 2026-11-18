@@ -284,8 +284,9 @@ export function makeViews(ctx) {
       // Échéances 7 jours
       const dues = ((cached('dues') || {}).items || []).filter((d) => !d.overdue && daysFromNow(d.date) != null && daysFromNow(d.date) <= 7);
       grid.append(card('Échéances 7 jours', linkBtn('Toutes', () => { store.pendingTab = 'dues'; ctx.go('pending'); }),
+        h('div', null, h('p', { class: 'muted small', text: cached('dues')?.calendar?.note }),
         cardList(dues.map((d) => cardRow(() => openRef(d.ref), h('span', { class: 'date-col', text: fmtDay(d.date) }),
-          h('span', { class: 'grow', text: d.text }), chip(d.kind === 'reset' ? 'reset' : 'relance', 'quiet'))), 'Aucune échéance cette semaine.')));
+          h('span', { class: 'grow', text: d.text }), chip(d.kind === 'reset' ? 'reset' : d.kind === 'calendar' ? 'calendrier' : 'relance', 'quiet'))), 'Aucune échéance cette semaine.'))));
 
       // Brouillons
       const drafts = ((cached('drafts') || {}).items || []).filter((d) => d.state !== 'sent');
@@ -344,6 +345,7 @@ export function makeViews(ctx) {
       case 'account': ctx.go('accounts', 'acc:' + ref.id); break;
       case 'run': ctx.go('jobs', 'run:' + ref.id); break;
       case 'mail': store.mailMode = 'inbox'; ctx.go('mail', ref.id); break;
+      case 'calendar': store.pendingTab = 'dues'; ctx.go('pending', 'calendar:' + ref.id); break;
       case 'view': ctx.go(ref.id === 'settings' ? 'accounts' : ref.id); break;
       default: break;
     }
@@ -368,6 +370,7 @@ export function makeViews(ctx) {
       return h('div', { class: 'list-head' },
         segmented([{ label: 'Liste', value: 'list', count: doc ? allPending().filter((x) => x.section !== 'done').length : null },
           { label: 'Échéances 14 j', value: 'dues', count: dues ? dues.items.length : null }], store.pendingTab, (v) => { store.pendingTab = v; ctx.render(); }),
+        store.pendingTab === 'dues' && dues?.calendar ? h('p', { class: 'muted small list-note', text: dues.calendar.note }) : null,
         doc && doc.updated_note ? h('p', { class: 'muted small list-note', text: `${doc.file_label || 'En attente'} · mis à jour ${doc.updated_note}` }) : null);
     },
     items() {
@@ -422,15 +425,20 @@ export function makeViews(ctx) {
       items.forEach((d, i) => {
         const it = d.ref && d.ref.kind === 'pending' ? findPending(d.ref.id) : null;
         out.push({
-          key: `due:${d.date}:${d.ref ? d.ref.id : i}`, text: `${d.text} ${d.date}`, pending: it && (it.actions || []).includes('done') ? it : null,
+          key: d.kind === 'calendar' ? 'calendar:' + d.ref.id : `due:${d.date}:${d.ref ? d.ref.id : i}`, text: `${d.text} ${d.date}`, pending: it && (it.actions || []).includes('done') ? it : null,
           topic: it ? pendingTopic(it) : { topic_id: null, title: d.text },
           row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' },
             h('span', { class: ['date-col', d.overdue && 'late'], text: fmtDay(d.date) }), h('span', { class: 'row-title', text: d.text }),
-            chip(d.kind === 'reset' ? 'reset compte' : 'relance', 'quiet'))),
+            chip(d.kind === 'reset' ? 'reset compte' : d.kind === 'calendar' ? 'calendrier' : 'relance', 'quiet'))),
           detail: () => it ? pendingDetail(it) : h('article', { class: 'detail' }, h('header', { class: 'detail-head' },
-            h('div', { class: 'eyebrow', text: d.kind === 'reset' ? 'Reset de quota' : 'Échéance' }), h('h2', { text: d.text }),
+            h('div', { class: 'eyebrow', text: d.kind === 'reset' ? 'Reset de quota' : d.kind === 'calendar' ? 'Calendrier Outlook' : 'Échéance' }), h('h2', { text: d.text }),
             h('p', { class: 'due-line' }, icon('clock'), h('span', { text: fmtDay(d.date) }))),
-          h('div', { class: 'actions' }, d.ref ? btn('Ouvrir', { icon: 'external', onclick: () => openRef(d.ref) }) : null)),
+          d.kind === 'calendar' ? h('div', null,
+            h('p', { text: d.all_day ? 'Toute la journée' : `${fmtDate(d.start)} → ${fmtDate(d.end)}` }),
+            d.location ? h('p', { text: d.location }) : null,
+            d.stale ? h('p', { class: 'muted', text: 'Instantané ancien. Vérifie Outlook.' }) : null,
+            safeHref(d.url) ? h('a', { class: 'btn', href: safeHref(d.url), target: '_blank', rel: 'noopener noreferrer', text: 'Ouvrir dans Outlook' }) : null)
+            : h('div', { class: 'actions' }, d.ref ? btn('Ouvrir', { icon: 'external', onclick: () => openRef(d.ref) }) : null)),
         });
       });
     }

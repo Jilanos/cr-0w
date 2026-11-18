@@ -214,6 +214,19 @@ add('flow-afk-answer', DESK, async (page, base) => {
   await page.shot('decision-answered');
 });
 
+add('flow-calendar', DESK, async (page, base) => {
+  await open(page, base, { scenario: 'calendar' });
+  await expect(page, '.card', 'Calendrier : à jour');
+  await page.click('.card-row', 'Revue du projet exemple');
+  await expect(page, '.detail', 'Calendrier Outlook');
+  await expect(page, '.detail', 'Salle projet');
+  await page.shot('calendar-detail');
+  const link = await page.eval(`document.querySelector('.detail a').href`);
+  if (!link.startsWith('https://outlook.')) throw new Error('Lien calendrier invalide');
+  const done = await page.eval(`[...document.querySelectorAll('.detail button')].some(b => b.textContent.includes('Réglé'))`);
+  if (done) throw new Error('Un rendez-vous ne doit pas proposer Réglé');
+});
+
 // Every view, light and dark, desktop.
 for (const dark of [false, true]) {
   for (const v of VIEWS) {

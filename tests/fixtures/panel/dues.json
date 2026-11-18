@@ -52,5 +52,12 @@
         "id": "claude"
       }
     }
-  ]
+  ],
+  "calendar": {
+    "synced_at": null,
+    "stale": true,
+    "coverage": "none",
+    "time_zone": null,
+    "note": "Calendrier absent. Lance une mise à jour pour le lire."
+  }
 }
