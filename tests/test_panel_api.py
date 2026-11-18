@@ -176,6 +176,53 @@ def test_queued_pending_cancels_or_conflicts_without_writing(panel, cancel):
     assert not list((app.cfg.state / "backups").glob("*"))
 
 
+def test_dossier_recent_files_sorted_bounded_and_rooted(panel, tmp_path):
+    import os
+    app, _ = panel
+    root = tmp_path / "dossier"
+    root.mkdir()
+    for n in range(13):
+        file = root / (str(n) + ".txt")
+        file.write_text(str(n))
+        os.utime(file, (1000 + n, 1000 + n))
+    nested = root / "one/two"
+    nested.mkdir(parents=True)
+    (nested / "inside.txt").write_text("depth two")
+    (nested / "three").mkdir()
+    (nested / "three/excluded.txt").write_text("too deep")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("another folder")
+    (root / "escape.txt").symlink_to(outside)
+    (root / "loop").symlink_to(root, target_is_directory=True)
+    result, note = app.readers.recent_files(app.files.register(root), {"last_crow_at": "1970-01-01T00:16:49+00:00"})
+    assert len(result) == 10 and result[0]["name"] == "one/two/inside.txt"
+    assert [f["modified"] for f in result] == sorted((f["modified"] for f in result), reverse=True)
+    assert all(f["name"] not in ("escape.txt", "loop") and "excluded" not in f["name"] for f in result)
+    assert result[1]["modified_after_crow"] is True
+    assert result[-1]["modified_after_crow"] is False
+    assert all(app.files.resolve(f["file_id"]).is_relative_to(root) for f in result)
+    unknown, note = app.readers.recent_files(app.files.register(root), {})
+    assert all(f["modified_after_crow"] is None for f in unknown) and "inconnue" in note
+    assert app.readers.recent_files(None, {})[0] is None
+
+
+def test_dossier_detail_uses_private_folder_and_version_reference(panel, tmp_path):
+    app, _ = panel
+    root = tmp_path / "project"
+    root.mkdir()
+    version = root / "review.md"
+    version.write_text("review")
+    path = Path(app.cfg["pending_md"])
+    path.write_text(path.read_text() + "\n## 📁 Dossiers\n### Example project\n- Open item\n")
+    app.cfg["dossiers"] = {"example-project": {"path": str(root), "label": "Project", "crow_version_file": str(version)}}
+    result = app.readers.dossier("example-project")
+    assert result["recent_files"][0]["modified_after_crow"] is False
+    assert str(root) not in canonical(result)
+    version.unlink()
+    result = app.readers.dossier("example-project")
+    assert result["recent_files"] == [] and "inconnue" in result["recent_files_note"]
+
+
 def test_chat_queue_cancel_admission_and_continuation(panel):
     app, fake = panel
     topic = pending_item(app)["topic_id"]

@@ -971,10 +971,11 @@ export function makeViews(ctx) {
       items.length ? h('ul', { class: 'linked' }, items.map((it) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.go('pending', it.id) },
         prioDot(it.prio), h('span', { class: 'grow' }, segments(it.cells.Sujet || it.cells.text)), h('span', { class: 'muted small', text: segText(it.cells.Attendu) }))))) : h('p', { class: 'muted', text: 'Aucune ligne ouverte.' }),
       h('h3', { class: 'h3', text: 'Fichiers récents' }),
-      full.recent_files ? h('ul', { class: 'linked' }, full.recent_files.map((f) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.openFile(f.file_id, f.name) },
+      full.recent_files_note ? h('p', { class: 'muted small', text: full.recent_files_note }) : null,
+      full.recent_files?.length ? h('ul', { class: 'linked' }, full.recent_files.map((f) => h('li', null, h('button', { type: 'button', class: 'card-row', onclick: () => ctx.openFile(f.file_id, f.name) },
         icon('file', 'icon-sm'), h('span', { class: 'grow', text: f.name }), f.modified_after_crow ? chip('modifié depuis', 'warn') : null,
         h('span', { class: 'muted small', text: `${fmtDate(f.modified)} · ${bytes(f.size)}` })))))
-        : h('p', { class: 'muted small', text: 'Prévu en v1.1.' }));
+        : h('p', { class: 'muted small', text: full.recent_files ? 'Aucun fichier dans ce périmètre.' : 'Fichiers indisponibles.' }));
   }
 
   // ------------------------------------------------------------ Jobs

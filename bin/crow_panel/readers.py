@@ -1,5 +1,6 @@
 """Public view models built from local state and bounded cdx reads."""
 import datetime as dt
+import os
 from pathlib import Path
 import re
 
@@ -156,8 +157,67 @@ class Readers:
         if not row:
             raise Problem(404, "not_found", "Dossier introuvable.")
         items = [i for s in self.app.pending.view()["sections"] for i in s["items"] if i["id"] in row["item_ids"]]
+        recent, note = self.recent_files(row["folder_file_id"], self.cfg.get("dossiers", {}).get(slug, {}))
         return {"generated_at": now(), "slug": slug, "title": row["title"], "folder_file_id": row["folder_file_id"], "folder_label": row["folder_label"],
-                "items": items, "topic_id": row["topic_id"], "recent_files": None, "recent_files_note": "Fichiers récents disponibles dans une prochaine version."}
+                "items": items, "topic_id": row["topic_id"], "recent_files": recent, "recent_files_note": note}
+
+    def recent_files(self, file_id, config):
+        if not file_id:
+            return None, "Dossier local non configuré ou hors des racines autorisées."
+        try:
+            root = self.app.files.resolve(file_id)
+        except Problem:
+            return None, "Dossier local indisponible."
+        if not root.is_dir():
+            return None, "Le chemin configuré n'est pas un dossier."
+        reference = None
+        try:
+            if config.get("last_crow_at"):
+                stamp = dt.datetime.fromisoformat(config["last_crow_at"].replace("Z", "+00:00"))
+                if stamp.tzinfo:
+                    reference = stamp.timestamp()
+            elif config.get("crow_version_file"):
+                version = self.app.files.allowed(config["crow_version_file"])
+                if version and version.is_file() and version.is_relative_to(root):
+                    reference = version.stat().st_mtime
+        except (OSError, ValueError, TypeError):
+            pass
+        candidates, pending, inspected, partial = [], [(root, 0)], 0, False
+        while pending and inspected < 10000:
+            folder, depth = pending.pop()
+            try:
+                with os.scandir(folder) as entries:
+                    for entry in entries:
+                        inspected += 1
+                        if inspected > 10000:
+                            partial = True
+                            break
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False) and depth < 2:
+                            pending.append((Path(entry.path), depth + 1))
+                        elif entry.is_file(follow_symlinks=False):
+                            stat = entry.stat(follow_symlinks=False)
+                            candidates.append((stat.st_mtime_ns, Path(entry.path), stat.st_size))
+            except OSError:
+                partial = True
+        partial = partial or bool(pending)
+        files = []
+        for modified_ns, path, size in sorted(candidates, key=lambda r: (-r[0], str(r[1])))[:10]:
+            key = self.app.files.register(path)
+            if key:
+                modified = modified_ns / 1_000_000_000
+                files.append({"file_id": key, "name": str(path.relative_to(root)),
+                              "modified": dt.datetime.fromtimestamp(modified, dt.timezone.utc).isoformat(), "size": size,
+                              "modified_after_crow": modified > reference if reference is not None else None})
+        notes = ["10 fichiers au maximum, deux niveaux de sous-dossiers."]
+        if reference is None:
+            notes.append("Date de la dernière version crow inconnue.")
+        else:
+            notes.append("Dernière version crow : " + dt.datetime.fromtimestamp(reference, dt.timezone.utc).isoformat())
+        if partial:
+            notes.append("Lecture partielle : limite de parcours ou accès indisponible.")
+        return files, " ".join(notes)
 
     def afk(self):
         root = Path(self.cfg.get("afk_dir", self.cfg.home / "local/state/afk"))

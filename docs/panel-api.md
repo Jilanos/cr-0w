@@ -160,3 +160,16 @@ Queued clicks survive restart and appear in Jobs with `waiting_for: maj`. Use th
 operation's `/cancel` route to remove a click before application. Undo itself is
 never queued. Buttons explain that the click will wait; rows stay visible while
 waiting. No mail action is placed in this pending-file queue.
+
+## Recent dossier files
+
+Set each private `dossiers.<slug>.path` to an existing directory within `files.roots`.
+The detail's `recent_files` contains the ten newest files by mtime, including two
+levels of subdirectories. Symlinks are skipped. Each row has an opaque `file_id`,
+a relative `name`, `modified`, `size` and `modified_after_crow`. The latter is null
+unless `last_crow_at` supplies a timezone-aware timestamp or `crow_version_file`
+identifies a reference version inside that dossier. It is true only for later
+mtimes. No date is inferred from a filename. `recent_files_note` explains the
+reference or its absence. A scan inspects at most 10,000 entries and reports
+partial access or truncation. An unavailable folder returns null; an empty one
+returns an empty array. Dossier lists do not recursively scan directories.

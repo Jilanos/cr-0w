@@ -43,6 +43,13 @@ chat:
   by_kind: {}
 projects: {}
 dossiers: {}
+# dossiers:
+#   example-project:
+#     path: /path/to/allowed/project
+#     label: Project
+#     last_crow_at: '2026-01-01T12:00:00+00:00'
+#     # Or use the mtime of a known crow version inside the dossier:
+#     # crow_version_file: /path/to/allowed/project/review.md
 max_parallel: 2
 routines:
   maj: {argv: []}

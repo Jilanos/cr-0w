@@ -348,6 +348,9 @@ add('flow-keys-help', DESK, async (page, base) => {
 add('flow-file-open', DESK, async (page, base) => {
   await open(page, base, { view: 'dossiers', sel: { dossiers: 'faisceau-serie-a' } });
   await expect(page, '.detail', 'Lignes liées');
+  await expect(page, '.detail', 'Check_faisceau_2026-11-03.xlsx');
+  await expect(page, '.detail', 'modifié depuis');
+  await page.shot('recent-files');
   await page.click('.detail .btn-primary', 'Ouvrir le dossier');
   await sleep(300);
   await expect(page, '.toast', 'Windows');
