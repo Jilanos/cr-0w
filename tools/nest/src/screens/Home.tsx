@@ -105,8 +105,8 @@ function Agenda({ m }: { m: HomeModel }) {
   )
 }
 
-// Phone Home (item_171, pass 3b option D). Cover: one column. Inner: holotable
-// column on the left (HUD, holotable, agenda), needs and running on the right.
+// Phone Home (item_176, boards home-F-cover and home-G-inner). Cover: one column.
+// Inner: HUD, holotable and Ask bar full width, then needs + agenda | running.
 function HomeCompact({ snap }: { snap: Snapshot }) {
   const { missions, inbox, now } = snap
   const inner = useMedia(INNER)
@@ -118,9 +118,14 @@ function HomeCompact({ snap }: { snap: Snapshot }) {
   const holo = <div className="hwrap"><Hero missions={missions} inbox={inbox} now={now} say={say} sections={snap.sections} /></div>
   if (inner) {
     return (
-      <div className="screen home-ph a2">
-        <div className="hside"><HudRow m={m} />{holo}<Agenda m={m} /></div>
-        <div className="stack"><Needs m={m} /><Running m={m} /></div>
+      <div className="screen home-ph col g1">
+        <HudRow m={m} />
+        {holo}
+        <AskBar />
+        <div className="c2">
+          <div className="stack"><Needs m={m} /><Agenda m={m} /></div>
+          <div className="stack"><Running m={m} /></div>
+        </div>
       </div>
     )
   }

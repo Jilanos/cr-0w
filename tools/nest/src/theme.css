@@ -1011,12 +1011,11 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 [data-theme='cyber'] .desk .pq, [data-theme='cyber'] .desk .pqc { border-radius: 0; }
 .desk .pq *:not(.pqc) { white-space: normal; overflow-wrap: anywhere; }
 
-/* Phone Home (item_171, pass 3b option D) */
-.home-ph.a2 { display: grid; grid-template-columns: 330px 1fr; gap: 14px; padding: 12px; align-items: start; }
+/* Phone Home (item_176: cover D, Fold inner G) */
 .home-ph.col { display: flex; flex-direction: column; gap: 14px; padding: 12px; }
-.home-ph .hside { display: flex; flex-direction: column; gap: 10px; height: calc(100dvh - 44px - 24px - env(safe-area-inset-top)); min-height: 480px; position: sticky; top: 12px; }
 .home-ph .hwrap { position: relative; height: 400px; flex: none; }
-.home-ph .hside .hwrap { flex: 1; min-height: 0; height: auto; }
+.home-ph.g1 .hwrap { height: 420px; }
+.home-ph .c2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .home-ph .ph .r { display: flex; gap: 8px; align-items: baseline; }
 .hrow { display: flex; gap: 8px; }
 .hrow > .hq:first-child { flex: 1; }
