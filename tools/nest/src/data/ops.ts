@@ -77,19 +77,20 @@ export function isoWeek(day: string): string {
   return `${y}-W${String(n).padStart(2, '0')}`
 }
 
-// The axis window in hours: the day's spans, widened to whole hours. Today runs until
-// 20:00 at least so the planned lanes fit after the now line.
-export function axis(ls: OpsLane[], today: boolean, nowH: number): [number, number] {
-  let lo = 24, hi = 0
+// The axis window in hours. 'full' is the whole day. 'work' is a fixed 08:00-20:00 so days
+// compare at a glance, widened to whole hours when a span or the now line falls outside.
+export type Scale = 'work' | 'full'
+export function axis(ls: OpsLane[], today: boolean, nowH: number, scale: Scale = 'work'): [number, number] {
+  if (scale === 'full') return [0, 24]
+  let lo = 8, hi = 20
   for (const l of ls) for (const s of l.spans) {
     lo = Math.min(lo, parisHour(s.start))
     hi = Math.max(hi, parisHour(s.end) || 24)
   }
   if (today) {
     lo = Math.min(lo, nowH)
-    hi = Math.max(hi, nowH + 0.5, 20)
+    hi = Math.max(hi, nowH + 0.5)
   }
-  if (lo >= hi) return [8, 20]
   return [Math.floor(lo), Math.min(24, Math.ceil(hi))]
 }
 

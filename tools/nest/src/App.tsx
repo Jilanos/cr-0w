@@ -41,8 +41,9 @@ export function App() {
     else body = <Placeholder name={LATER[route.tab][0]} note={LATER[route.tab][1]} />
   }
   // Butler rail on every laptop screen (item_176); Home keeps its own hero, so no head there.
+  // Ops is a full page (item_190): no rail.
   const home = route.tab === 'home'
-  const rail = laptop && snap ? <ButlerRail snap={snap} head={!home} pinned={home} /> : null
+  const rail = laptop && snap && route.tab !== 'ops' ? <ButlerRail snap={snap} head={!home} pinned={home} /> : null
   // Phone and Fold: a header badge and a chat sheet instead of the rail.
   const badge = !laptop && snap ? <ButlerBadge snap={snap} /> : null
   return (

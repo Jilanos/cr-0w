@@ -17,11 +17,12 @@ describe('ops helpers', () => {
     expect(shiftDay('2026-11-30', 1)).toBe('2026-12-01')
   })
 
-  it('fits the axis to the spans, today until 20:00 at least', () => {
-    const ls = [lane('a', 'p', 'run', 'done', [['working', '09:20', '10:10']])]
-    expect(axis(ls, false, 0)).toEqual([9, 11])
-    expect(axis(ls, true, 16.2)).toEqual([9, 20])
+  it('keeps a fixed 08-20 axis, widened by spans and now; full is 24h', () => {
+    const ls = [lane('a', 'p', 'run', 'done', [['working', '06:20', '10:10']])]
+    expect(axis(ls, false, 0)).toEqual([6, 20])
+    expect(axis([], true, 21.2)).toEqual([8, 22])
     expect(axis([], false, 0)).toEqual([8, 20])
+    expect(axis(ls, false, 0, 'full')).toEqual([0, 24])
   })
 
   it('groups by project, busiest first, live lanes first', () => {
