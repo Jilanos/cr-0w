@@ -224,6 +224,46 @@ def test_codex_report_skips_a_one_line_postscript(cr, monkeypatch, tmp_path, tex
     assert cr.report("abc") == want
 
 
+def _codex_report(cr, monkeypatch, out, cwd, last):
+    row = {"run_id": "abc123", "ended_at": "t", "provider": "codex", "cwd": str(cwd),
+           "artifacts": {"stdout_path": str(out)}}
+    monkeypatch.setattr(cr, "finished", lambda since: {"abc123": row})
+    monkeypatch.setattr(cr, "sh", lambda *a, **k: json.dumps({"report": {"final_message": last}}))
+    monkeypatch.setattr(cr, "mark_seen", lambda *a: None)
+    return cr.report("abc")
+
+
+def test_codex_stopped_before_final_message_reads_the_report_file(cr, monkeypatch, tmp_path):
+    """item_230 bug 2: the run wrote its report to a file, then stopped on a one-line message."""
+    rep = tmp_path / "wt" / "reports" / "night.md"
+    rep.parent.mkdir(parents=True)
+    rep.write_text("Shipped:\n- a\n- b\nLeft: none\n")
+    out = tmp_path / "o.log"
+    _codex_log(out, "Writing the report now.", "Now checking the last test.")
+    with out.open("a") as fh:
+        fh.write(json.dumps({"type": "item.completed", "item": {"id": "f", "type": "file_change",
+                             "changes": [{"path": "reports/night.md", "kind": "add"}]}}) + "\n")
+    got = _codex_report(cr, monkeypatch, out, tmp_path / "wt", "Now checking the last test.")
+    assert got.startswith(f"Report file: {rep}\n")
+    assert "Shipped:\n- a\n- b" in got
+
+
+def test_codex_report_file_named_in_a_message(cr, monkeypatch, tmp_path):
+    rep = tmp_path / "run-report.md"
+    rep.write_text("Summary\n- done\n")
+    out = tmp_path / "o.log"
+    _codex_log(out, f"Full report in {rep}.", "Stopping here.")
+    got = _codex_report(cr, monkeypatch, out, tmp_path, "Stopping here.")
+    assert got == f"Report file: {rep}\n\nSummary\n- done\n"
+
+
+def test_codex_without_report_file_keeps_the_last_message(cr, monkeypatch, tmp_path):
+    out = tmp_path / "o.log"
+    _codex_log(out, "Edited notes.md.", "Stopping here.")
+    (tmp_path / "notes.md").write_text("plain notes\n")
+    assert _codex_report(cr, monkeypatch, out, tmp_path, "Stopping here.") == "Stopping here."
+
+
 def test_headless_session_without_id_is_listed_as_setup(cr, monkeypatch, tmp_path):
     """item_240: a Nest session stuck on a first-run dialog has no session id yet; a plain helper is dropped."""
     proc = {"provider": "claude", "argv": ["claude"], "cwd": str(tmp_path), "home": str(tmp_path / "home"),
