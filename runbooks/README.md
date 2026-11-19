@@ -57,3 +57,4 @@ want to trigger it by name.
 - [nest-phone-install](nest-phone-install.md): serve Nest on the tailnet and install it as an app on Android (Play parks it while the VPN is up)
 - [vault-sync-new-device](vault-sync-new-device.md): add a machine to the vault Syncthing mesh (direct pairing, ignore patterns, conflict cleanup)
 - [remote-computer-use-windows](remote-computer-use-windows.md): give a Windows Claude Code session desktop control from the phone (RC + Windows-MCP, no admin)
+- [office-documents](office-documents.md): office brick: DOCX build (`simpledoc.py`), tracked-changes redline (`crow-docx-redline`), mail text (`crow-mailtxt`), PDF render and xlsx form gotchas; needs `uv`
