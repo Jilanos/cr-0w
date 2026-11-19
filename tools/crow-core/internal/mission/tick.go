@@ -18,6 +18,15 @@ import (
 // research and review; 2 = review-fix and write; 3 = build and repair).
 const LivePhase = 1
 
+// NewLive creates a mission the tick starts. A kind above LivePhase is refused before
+// anything is written. Linked missions (Ensure) use New: the tick never runs them.
+func (env Env) NewLive(s Spec) (contract.Mission, error) {
+	if k, err := env.Kinds(s.Kind); err == nil && k != nil && k.Phase > LivePhase {
+		return contract.Mission{}, failf(ErrInvalid, "kind %s is phase %d; not started by the tick yet", k.Name, k.Phase)
+	}
+	return env.New(s)
+}
+
 // Dispatch is one `crow-runs dispatch` call for a mission run.
 type Dispatch struct {
 	Mission, Project, Label, PromptFile string

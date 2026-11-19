@@ -77,6 +77,7 @@ func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 	bg, stopBg := context.WithCancel(context.Background())
 	defer stopBg()
 	go srv.Run(bg)
+	startTicker(bg, srv, env, cfg.Engine)
 	errc := make(chan error, 2)
 	for i, l := range []net.Listener{tcp, sock} {
 		go func(s *http.Server, l net.Listener) { errc <- s.Serve(l) }(servers[i], l)
@@ -97,6 +98,33 @@ func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 		return nil
 	}
 	return err
+}
+
+// startTicker runs the mission tick every CROW_TICK_INTERVAL (default 2 min, 0 off)
+// until ctx ends. A pass that started or finished runs refreshes the dispatch section.
+func startTicker(ctx context.Context, srv *api.Server, env mission.Env, engine string) {
+	every, err := tickInterval(os.Getenv)
+	if err != nil {
+		log.Printf("tick: %v; using %s", err, every)
+	}
+	if every == 0 {
+		log.Printf("tick off (CROW_TICK_INTERVAL=0)")
+		return
+	}
+	if engine == "" {
+		log.Printf("tick off: no engine checkout (CROW_ENGINE) to find crow-runs")
+		return
+	}
+	t := &ticker{
+		env:     env,
+		runner:  crowRuns{bin: filepath.Join(engine, "bin", "crow-runs")},
+		maxRuns: func() int { return maxRuns(os.Getenv) },
+		locked:  srv.Locked,
+		after:   func(mission.TickReport) { go srv.Refresh("dispatch") },
+		logf:    log.Printf,
+	}
+	log.Printf("tick every %s", every)
+	go t.loop(ctx, every)
 }
 
 func orNone(s string) string {

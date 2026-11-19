@@ -117,6 +117,11 @@ func tickCmd(env mission.Env, engine string, args []string, stdout io.Writer) er
 	if engine == "" {
 		return fmt.Errorf("tick: no engine checkout (CROW_ENGINE) to find crow-runs")
 	}
+	unlock, err := tickLock(env)
+	if err != nil {
+		return fmt.Errorf("tick: %w", err)
+	}
+	defer unlock()
 	rep, err := env.Tick(crowRuns{bin: filepath.Join(engine, "bin", "crow-runs")}, maxRuns(os.Getenv))
 	if err != nil {
 		return err

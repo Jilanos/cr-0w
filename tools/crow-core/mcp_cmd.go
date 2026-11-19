@@ -58,9 +58,9 @@ func mcpTools() []mcpTool {
 			call: func(c *coreClient, in map[string]any) (string, error) {
 				return c.get("/api/missions/" + url.PathEscape(arg(in, "mission_id")))
 			}},
-		{Name: "mission_new", Description: "Create a core mission when the owner asks for one (review, build, plan, design, repair). It is queued under its kind's gates: a plan or mockup gate waits in the owner's inbox before any work; the reply says so with inbox true. Never create one the owner did not ask for.",
+		{Name: "mission_new", Description: "Create a core mission when the owner asks for one (review, plan, design, research). It is queued under its kind's gates and the core tick starts it within minutes: a plan or mockup gate waits in the owner's inbox before any work; the reply says so with inbox true. Kinds the tick does not start yet (build, repair, review-fix, write) are refused with the reason: use dispatch_run or session_new for them. Never create one the owner did not ask for.",
 			InputSchema: obj([]string{"kind", "project", "goal", "end_state"}, map[string]any{
-				"kind": strProp("review, build, plan, design or repair"), "project": strProp("registry project name (see brief projects)"),
+				"kind": strProp("review, plan, design or research"), "project": strProp("registry project name (see brief projects)"),
 				"goal": strProp("one line, the owner's words"), "end_state": strProp("what done looks like"),
 				"key": strProp("short id part, e.g. api-412; optional"),
 			}),
