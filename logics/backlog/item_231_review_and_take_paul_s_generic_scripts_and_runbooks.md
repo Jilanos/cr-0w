@@ -1,14 +1,15 @@
 ## item_231_review_and_take_paul_s_generic_scripts_and_runbooks - Review and take Paul's generic scripts and runbooks
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 85
-> Confidence: 80
-> Progress: 0%
+> Status: Done
+> Understanding: 95
+> Confidence: 90
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 15:27:46
+> Indicators reviewed: 2026-11-19 16:04:21
+> Owner: crow
 
 # AI Context
 - Summary: Decide each of Paul's new generic files (crow-board, crow-mailtxt, crow-maj, crow-docx-redline, simpledoc, runbooks office-documents, can-log-audit, android-adb-from-wsl, maj-routine): take as is, take into a module, or leave with Paul.
@@ -23,6 +24,19 @@
 - Patch received: `local/state/paul-patches/2-office-scripts.patch` (applies on main).
 - Take crow-mailtxt, crow-docx-redline, simpledoc.py and runbooks/office-documents.md as a separate optional `office` brick (bricks.tsv rows, adr_002 brick list).
 - Leave crow-board with its author: Nest Inbox and item_238 cover it; it becomes part of his own manager module.
+
+# Decisions
+| File | Decision | Reason |
+| --- | --- | --- |
+| `bin/crow-mailtxt` | module office | Generic mail-to-text for saved M365 connector results; tested, English labels. |
+| `bin/crow-docx-redline` | module office | Generic tracked-changes DOCX where LibreOffice compare crashes; needs `uv` for python-docx. |
+| `bin/simpledoc.py` | module office | Generic A4 DOCX builder; colours are parameters with neutral defaults. |
+| `runbooks/office-documents.md` | module office | DOCX, PDF render and xlsx form gotchas that apply to any hub. |
+| `bin/crow-board` | leave | Nest Inbox and item_238 cover pending items; it joins its author's manager module. |
+| `bin/crow-maj` | leave | Drives his private maj skill, out of scope. |
+| `maj-routine` | leave | Same private maj routine, out of scope. |
+| `can-log-audit` | leave | CAN log audit is his domain only. |
+| `android-adb-from-wsl` | leave | Specific to his WSL and Android setup. |
 
 # Scope
 - In:
@@ -39,6 +53,7 @@
 
 # AC Traceability
 - req_064_paul_s_feedback_and_a_modular_public_crow-AC -> This backlog slice. Proof: Each file has a decision with a one-line reason.
+- AC1: Decisions table above (9 files). AC2: kept files in ab2c870 and 6c96047, tests `tests/test_crow_mailtxt.py` and `tests/test_crow_docx_redline.py` (skips without python-docx), `bin/crow-check` green, deny-list grep clean; office brick in bricks.tsv and adr_002 (ae260bd). AC3: runbooks index in db23de6.
 
 # Dependencies
 - Module design item (for the module column).
