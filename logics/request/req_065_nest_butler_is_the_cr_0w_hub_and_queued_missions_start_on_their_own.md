@@ -16,6 +16,8 @@
 
 # Needs
 - Owner, 2026-11-19: "I want butler to be CR-0W hub, not some random tool. It needs to be as smart as you, know everything about all my projects and run everything else. Today it forces me to keep a hub session open on the side, so back to the terminal."
+- Owner, 2026-11-19: the butler orchestrates more than it works. It knows everything and starts the right run or session; repo work happens there.
+- Owner, 2026-11-19: the butler chat rail is too thin to read; make it resizable.
 - Owner, 2026-11-19: asked the butler to run review threads on !235 and !239 and find why their pipelines were red. It queued two missions that never started, told the owner crow would pick them up, then retracted.
 - Queued missions must start on their own when slots are free.
 - Starting background work from Nest must not fail with an unexplained 409.
@@ -36,6 +38,8 @@
 - AC3: When the butler needs a permission or a hub-guard OK, the prompt shows in the Nest chat and the owner answers it there; nothing waits silently.
 - AC4: Asked "start review threads and check the red pipelines on my MRs", the butler starts the work and reports run ids and accounts that exist, with no terminal open.
 - AC5: Two dispatches in a row from Nest both start when two slots are free; a refusal names its cause.
+- AC7: Delegated work reports back into the chat when it ends.
+- AC8: The butler chat width is adjustable on the laptop.
 - AC6: The butler keeps under the context cap: it wraps and restarts fresh from the open threads without the owner losing the chat.
 
 # Scope
@@ -48,7 +52,9 @@
 - `item_252_butler_runs_as_a_hub_session_in_cr_0w`
 - `item_253_butler_permission_prompts_answered_from_nest`
 - `item_254_butler_context_cap_wrap_and_fresh_start`
-- Order: 250 and 251 first (small, unblock missions today), then 252, 253, 254.
+- `item_255_butler_hears_when_delegated_runs_and_sessions_finish`
+- `item_256_resizable_butler_chat_rail_in_nest`
+- Order: 250, 251 and 256 first (small, independent), then 252 with 253 and 255 together, then 254.
 
 # Companion docs
 - Product brief(s): `prod_005_crow_jarvis_layer`
