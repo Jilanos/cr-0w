@@ -16,6 +16,7 @@ One note in the vault crow folder: `Open Threads.md` (`bin/crow-state path threa
 - `## Crow`: the hub or a project session acts. Point to the Logics item (`item_047`) when one exists instead of restating it.
 - `## Waiting`: someone else acts. The text starts with the person's name, then a colon.
 - Moving an item to another actor means moving the line and re-dating it.
+- Optional due date: `📅 YYYY-MM-DD` at the end of the line (Obsidian Tasks marker). `crow-pending` reads it and the brief lists the line once it is past due (runbooks/pending-items.md).
 
 ## Rules
 - Done means gone. A ticked item leaves the file in the same write and is logged with `bin/crow-log "[project] done: text"` (daily note, CR-0W section).
@@ -37,5 +38,6 @@ One note in the vault crow folder: `Open Threads.md` (`bin/crow-state path threa
 | `wrap`, `eod` | Write: add, update, move, remove done lines |
 | `brief` | Read: Me first, then Waiting with age in days, then stale lines |
 | `afk` | Read: the Crow section only |
+| `crow-pending` | Read: every section through the pending schema; `crow-tidy --apply` purges `- [x]` lines older than `pending_settled_days` |
 
 Any new writer follows this runbook and does not add other sections.
