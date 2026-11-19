@@ -50,6 +50,8 @@ def pieces():
         out.append(("script", p.name, desc))
     for d in (".claude/skills", "skills"):
         for p in sorted((ROOT / d).iterdir()):
+            if p.resolve().is_relative_to(ROOT / "local"):
+                continue  # private skill linked from local/, not an engine piece
             if p.is_dir() and (p / "SKILL.md").exists():
                 out.append(("skill", p.name, skill_desc(p / "SKILL.md")))
     out.append(("skill-list", "skills/ext.list", "third-party design skills bundle"))
