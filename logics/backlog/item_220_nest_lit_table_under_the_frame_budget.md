@@ -8,7 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 17:31:49
+> Indicators reviewed: 2026-11-19 17:38:42
 
 # AI Context
 - Summary: Bring the lit holotable (`?table=a|b`) under the item_159 frame budget: 10 ms laptop, 16 ms fold, median, live path. Today 16.1 ms laptop, 15.2 ms fold.
@@ -51,6 +51,7 @@
 - Measure on an idle machine: check `ps -eo pcpu,args --sort=-pcpu | head` first. Stuck image viewers once doubled the numbers.
 - Headless scripts need `PLAYWRIGHT_BROWSERS_PATH` set to the local Playwright browser cache.
 - 2026-11-19: frame times with the lit table as default, before the table fit: laptop 7.4/18.0 ms, inner 20.1/32.5 ms, phone 8.4/12.4 ms (drawScene median/max). Inner was the worst; the item_259 fit (c292f40) shrinks its planets, so measure again on an idle machine first. Top self time on inner: fillText 15.7%, fillRect 5.7%, draw 4.2%, castPlanets 3.2%.
+- 2026-11-19: `hero-table.mjs bench a` measures under load (frame/calib ratio + exact canvas call counts). Baseline, 3 runs on a loaded machine (load avg 8), frame now includes the raster flush: laptop ratio 5.7-7.0 (p10 4.3-5.0), inner 6.3-6.7 (p10 4.2-4.9), cover 4.2-4.4 (p10 3.2-3.3). Per frame: laptop 3674 fillText / 879 fillRect / 6024 chars, inner 4826 / 1828 / 7308, cover 3237 / 1057 / 5105. Use these to judge each change; AC1 absolute ms still needs one idle run.
 - Next in order: item_220, then item_259 (mockups first), then item_221 (owner 2026-11-19).
 
 # Outcome (2026-11-17)

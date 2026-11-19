@@ -3,11 +3,18 @@
 //                                             (no table = the current default, for the pixel-identity check)
 //   node scripts/hero-table.mjs perf [table]   median/max drawScene ms per size at dpr 2, live-head path
 //   OUT=dir node scripts/hero-table.mjs shot [table]   PNG of one live frame per size into OUT (before/after diffs)
+//   node scripts/hero-table.mjs bench [table]  load-proof perf: each frame is timed right after a fixed
+//                                             reference workload (calib), and reported as frame/calib.
+//                                             A busy machine slows both, so the ratio holds. Also counts
+//                                             canvas calls per frame (exact, load-free). Compare ratios
+//                                             and counts before/after; `idle` = ratio x CAL_IDLE_MS.
 //   node scripts/hero-table.mjs prof [table]   CPU profile of the perf frames at 1440x900: top self time per function
 import { spawn } from 'node:child_process'
 import { chromium } from 'playwright-core'
 const [mode = 'hash', table] = process.argv.slice(2)
 const PORT = 4393
+// Reference workload time on this machine when idle (median ms); set from an idle `bench` run.
+const CAL_IDLE_MS = Number(process.env.CAL_IDLE_MS ?? 0)
 const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', cwd: new URL('..', import.meta.url).pathname })
 const base = `http://localhost:${PORT}`
 for (let i = 0; i < 80; i++) { try { await fetch(base); break } catch { await new Promise((r) => setTimeout(r, 200)) } }
@@ -42,6 +49,33 @@ try {
         }
         return { W, H, hash: out.join(' ') }
       }
+      if (mode === 'bench') {
+        // Reference workload: fixed math and text drawing, independent of Nest code.
+        const rc = document.createElement('canvas'); rc.width = 900; rc.height = 600; const rx = rc.getContext('2d')
+        rx.font = '13px monospace'
+        const calib = () => {
+          const a = performance.now(); let acc = 0
+          for (let i = 0; i < 120000; i++) acc += Math.sin(i * 0.37) * Math.sqrt(i + 1)
+          for (let i = 0; i < 1500; i++) { rx.fillStyle = `rgba(${i % 255},120,200,0.8)`; rx.fillText('abc:#-=*@', (i * 37) % 880, (i * 53) % 590) }
+          rx.getImageData(0, 0, 1, 1)
+          return acc === -1 ? 0 : performance.now() - a
+        }
+        const frame = (i) => { const a = performance.now(); sc.drawScene(cv, W, H, 2, m, heads, pal, undefined, opt(i, true)); cv.getContext('2d').getImageData(0, 0, 1, 1); return performance.now() - a }
+        for (let i = 0; i < 6; i++) { calib(); frame(i) }
+        const ratio = [], fr = [], cal = []
+        for (let i = 0; i < 80; i++) { const c = calib(), f = frame(i % 40); cal.push(c); fr.push(f); ratio.push(f / c) }
+        const q = (t, p) => { const u = [...t].sort((a, b) => a - b); return u[Math.min(u.length - 1, Math.floor(p * u.length))] }
+        // Exact work per frame: wrap the 2D context methods for one pass (not timed).
+        const P = CanvasRenderingContext2D.prototype, names = ['fillText', 'fillRect', 'drawImage', 'getImageData', 'putImageData', 'arc', 'fill'], orig = {}, n = {}
+        let chars = 0
+        for (const k of names) { orig[k] = P[k]; n[k] = 0; P[k] = function (...a) { n[k]++; if (k === 'fillText') chars += String(a[0]).length; return orig[k].apply(this, a) } }
+        const N = 10
+        for (let i = 0; i < N; i++) sc.drawScene(cv, W, H, 2, m, heads, pal, undefined, opt(i * 4, true))
+        for (const k of names) P[k] = orig[k]
+        const per = Object.fromEntries(Object.entries(n).filter(([, v]) => v).map(([k, v]) => [k, Math.round(v / N)]))
+        per.chars = Math.round(chars / N)
+        return { W, H, ratio: +q(ratio, 0.5).toFixed(3), ratioP10: +q(ratio, 0.1).toFixed(3), frame: `${q(fr, 0.1).toFixed(1)}/${q(fr, 0.5).toFixed(1)}/${q(fr, 0.95).toFixed(1)}`, calib: +q(cal, 0.5).toFixed(2), per }
+      }
       const med = (t) => { t.sort((a, b) => a - b); return `${t[t.length >> 1].toFixed(1)}/${t[t.length - 1].toFixed(1)}` }
       const live = []
       sc.drawScene(cv, W, H, 2, m, heads, pal, undefined, opt(-1, true))
@@ -49,6 +83,7 @@ try {
       return { W, H, live: med(live) }
     }, { mode, table })
     if (r.png) { const f = `${process.env.OUT ?? '.'}/table-${table ?? 'default'}-${w}.png`; (await import('node:fs')).writeFileSync(f, Buffer.from(r.png.split(',')[1], 'base64')); delete r.png; r.file = f }
+    if (mode === 'bench') r.idle = +(r.ratio * CAL_IDLE_MS).toFixed(1)
     console.log(w, h, JSON.stringify(r))
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop'), self = new Map(), dt = new Map()

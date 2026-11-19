@@ -34,6 +34,7 @@ Run from `tools/nest` with `PLAYWRIGHT_BROWSERS_PATH` set as above.
 
 - `node scripts/hero-layout.mjs <out_dir> [size]`: rest, hover and card shots at cover, cover-cyber, inner and laptop.
   It waits for `.hero-pl[data-c]` (planets placed) before shooting; without it `dataset` is null and the script crashes.
+- `node scripts/hero-table.mjs bench [a]`: load-proof frame cost. Each frame is timed right after a fixed reference workload and reported as `ratio` (frame/calib) and `ratioP10`, plus exact canvas calls per frame (`per`). Works on a busy machine: raw ms swung 2x across runs, ratios held within about 10%. Compare ratios and `per` counts before/after; run it 2-3 times. Set `CAL_IDLE_MS` (the idle `calib`) to get `idle` ms estimates.
 - `node scripts/hero-fit.mjs <out_dir>`: the hero alone at cover, inner, laptop, and laptop/1920 with the chat folded. Use it to check the table fits its frame (`QS='?x=y'` appends a query).
 - `node scripts/hero-idle.mjs`: paints per second at rest. Expect 0 with reduced motion; otherwise the slow tick (rim sweep, working pulse) paints about 10/s. It also blurs then refocuses the window: expect 0 and 0 after blur, the idle rates back after focus. The hero and the rail head stop when the tab is hidden, the window loses focus or they scroll off screen (`src/hero/active.ts`).
 - `node scripts/hero-perf.mjs`: median and max draw time per frame per size. Baseline 2026-11-12 (1.25x grid): laptop about 18 ms, inner and phone about 16 ms. Budget 20 ms; medians drift 1 to 2 ms between runs.
