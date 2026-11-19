@@ -2,10 +2,11 @@
 
 Pieces: bin/ scripts, skills (.claude/skills and skills/), runbooks, Claude hooks, git hooks,
 crow-core routes and script sections, tools/ apps, integrations.
-Tags live in bricks.tsv next to this file (kind, name, brick).
+Tags come from the engine module manifests, modules/<brick>.yaml (one list field per kind).
 
 Usage: python3 inventory.py [--check] [--markdown]  (tests/test_module_inventory.py runs --check)
-  --check     exit 1 when a piece has no tag or a tag names no piece
+  --check     exit 1 when a piece has no brick, a manifest lists no such piece, a piece is in two
+              manifests or a manifest name differs from its file
   --markdown  print the ADR table (default: tab-separated rows)
 """
 import json
@@ -13,11 +14,15 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-BRICKS = {
-    "core", "git", "forge", "vault", "mail", "team", "afk", "retro", "design",
-    "releases", "deck", "nest", "core-api", "integration-shell",
+MODULES = ROOT / "modules"
+FIELDS = {
+    "script": "scripts", "skill": "skills", "skill-list": "skill_lists", "runbook": "runbooks",
+    "claude-hook": "claude_hooks", "git-hook": "git_hooks", "core-route": "core_routes",
+    "core-section": "core_sections", "app": "apps", "integration": "integrations",
 }
 
 
@@ -89,29 +94,36 @@ def pieces():
 
 
 def tags():
-    t = {}
-    for ln in (HERE / "bricks.tsv").read_text().splitlines():
-        if ln.strip() and not ln.startswith("#"):
-            kind, name, brick = ln.split("\t")[:3]
-            t[(kind, name)] = brick
-    return t
+    """((kind, name) -> brick, problems) from modules/*.yaml."""
+    t, problems = {}, []
+    for f in sorted(MODULES.glob("*.yaml")):
+        m = yaml.safe_load(f.read_text()) or {}
+        brick = m.get("name")
+        if brick != f.stem:
+            problems.append(f"modules/{f.name}: name {brick!r} differs from the file name")
+        for kind, field in FIELDS.items():
+            for name in m.get(field) or []:
+                if (kind, name) in t:
+                    problems.append(f"{kind}\t{name}: in {t[(kind, name)]} and {brick}")
+                t[(kind, name)] = brick
+    return t, problems
 
 
 def main(argv):
-    ps, t = pieces(), tags()
+    ps, (t, problems) = pieces(), tags()
     keys = {(k, n) for k, n, _ in ps}
     missing = [f"{k}\t{n}" for k, n, _ in ps if (k, n) not in t]
     stale = [f"{k}\t{n}" for (k, n) in t if (k, n) not in keys]
-    unknown = [f"{k}\t{n}\t{b}" for (k, n), b in t.items() if b not in BRICKS]
     if "--check" in argv:
-        for label, rows in (("untagged", missing), ("stale tag", stale), ("unknown brick", unknown)):
+        for label, rows in (("no brick", missing), ("stale entry", stale), ("manifest", problems)):
             for r in rows:
                 print(f"{label}: {r}")
-        print(f"{len(ps)} pieces, {len(missing)} untagged, {len(stale)} stale, {len(unknown)} unknown brick")
-        return 1 if missing or stale or unknown else 0
+        print(f"{len(ps)} pieces, {len(missing)} without a brick, {len(stale)} stale, "
+              f"{len(problems)} manifest problems")
+        return 1 if missing or stale or problems else 0
     if "--markdown" in argv:
         print("| Brick | Kind | Piece | What it is |\n| --- | --- | --- | --- |")
-        order = sorted(BRICKS)
+        order = sorted({f.stem for f in MODULES.glob("*.yaml")})
         for k, n, d in sorted(ps, key=lambda r: (order.index(t.get((r[0], r[1]), "core")), r[0], r[1])):
             print(f"| {t.get((k, n), '?')} | {k} | `{n}` | {d.replace('|', '/')} |")
         return 0

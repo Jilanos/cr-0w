@@ -1,0 +1,21 @@
+# Module manifest of the deck brick (adr_002).
+name: deck
+summary: crow-deck and crow-watch terminal front.
+default: true
+requires: []
+scripts: []
+skills: []
+skill_lists: []
+runbooks: [tui-agents-ux, tui-home-ux, tui-projects-ux, tui-render, tui-review-ux, tui-themes-ux, tui-usage-ux]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: [tools/crow-deck, tools/crow-watch]
+integrations: []
+gather: {}
+doctor: {}
+nest: {}
+deck:
+  pages: [Home, Agents, Projects, Usage]
+config: {}

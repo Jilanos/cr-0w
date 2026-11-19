@@ -1,0 +1,21 @@
+# Module manifest of the retro brick (adr_002).
+name: retro
+summary: Session retros, digest, cost audit and tool update watch.
+default: true
+requires: []
+scripts: [crow-cost-audit, crow-digest, crow-retro, crow-toolwatch]
+skills: [retro]
+skill_lists: []
+runbooks: [cost-audit, session-retros, tool-update-watch]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [retros, toolwatch]
+doctor: {}
+nest: {}
+deck: {}
+config: {}

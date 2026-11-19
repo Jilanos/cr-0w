@@ -1,0 +1,48 @@
+# Module manifest of the core-api brick (adr_002).
+name: core-api
+summary: "crow-core: store, inbox, missions, butler, every /api route and the contract."
+default: true
+requires: []
+scripts: [crow-contract, crow_contract.py]
+skills: []
+skill_lists: []
+runbooks: [core-service, mission-e2e-scratch]
+claude_hooks: []
+git_hooks: []
+core_sections: [sessions, dispatch, usage, projects, accounts, ready, jobs]
+core_routes:
+  - GET /api/butler/{conv}
+  - POST /api/butler/{conv}/say
+  - GET /api/sessions/{pid}/conversation
+  - GET /api/missions/{id}/conversation
+  - POST /api/sessions
+  - POST /api/sessions/{id}/resume
+  - POST /api/sessions/{pid}/send
+  - POST /api/sessions/{pid}/interrupt
+  - POST /api/sessions/{pid}/stop
+  - POST /api/sessions/{pid}/attach
+  - POST /api/sessions/{pid}/answer
+  - POST /api/dispatch
+  - POST /api/dispatch/{run}/stop
+  - POST /api/dispatch/{run}/retry
+  - POST /api/missions
+  - POST /api/missions/{id}/answer
+  - POST /api/missions/{id}/stop
+  - POST /api/missions/{id}/cancel
+  - POST /api/inbox/{id...}
+  - GET /api/state
+  - GET /api/state/{section}
+  - GET /api/runs/{id}
+  - GET /api/missions/{id}
+  - GET /api/missions/{id}/artifacts/{path...}
+  - GET /api/events
+  - GET /api/sessions/{pid}/screen
+  - POST /api/sessions/{pid}/keys
+  - POST /api/sessions/{pid}/resize
+apps: [tools/crow-core]
+integrations: []
+gather: {}
+doctor: {}
+nest: {}
+deck: {}
+config: {}

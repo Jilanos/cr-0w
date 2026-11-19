@@ -1,0 +1,25 @@
+# Module manifest of the git brick (adr_002). Applies to repo projects only.
+name: git
+summary: Commit-msg, pre-commit and pre-push hooks, git activity, crow-tidy, identity check and worktrees.
+default: true
+requires: []
+scripts: [crow-activity, crow-commit-msg-check, crow-precommit-check, crow-prepush-check, crow-tidy]
+skills: []
+skill_lists: []
+runbooks: [repo-tidy]
+claude_hooks: []
+git_hooks: [commit-msg, pre-commit, pre-push]
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [activity, tidy]
+  daily: [activity]
+  weekly: [activity]
+doctor:
+  checks: [identity, worktrees]
+  needs: [git]
+nest: {}
+deck: {}
+config: {}

@@ -1,0 +1,21 @@
+# Module manifest of the nest brick (adr_002).
+name: nest
+summary: Nest web front.
+default: true
+requires: [core-api]
+scripts: []
+skills: []
+skill_lists: []
+runbooks: [nest-phone-install, nest-screenshots]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: [tools/nest]
+integrations: []
+gather: {}
+doctor: {}
+nest: {}
+deck: {}
+config:
+  core_url: http://127.0.0.1:8787  # crow-core address Nest talks to

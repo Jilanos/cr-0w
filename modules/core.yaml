@@ -1,0 +1,73 @@
+# Module manifest of the core brick (adr_002). Always on.
+name: core
+summary: Dispatcher, runs, sessions, accounts, registry, doctor, check, state, memory, usage, room, prompts, hub guard, gather, brief and wrap skills, install and update.
+default: true
+requires: []
+scripts:
+  - crow
+  - crow-accounts
+  - crow-check
+  - crow-ctx
+  - crow-doctor
+  - crow-download-relay
+  - crow-focus
+  - crow-gather
+  - crow-hub-guard
+  - crow-isolation-probe
+  - crow_lib.py
+  - crow-memory
+  - crow-open
+  - crow-project
+  - crow-prompt
+  - crow-ready
+  - crow-registry
+  - crow-relaunch
+  - crow-room
+  - crow-runs
+  - crow_schema_lite.py
+  - crow-screen
+  - crow-secret
+  - crow-sessions
+  - crow_sidecar.py
+  - crow-state
+  - crow_term.py
+  - crow-update
+  - crow-usage
+skills: [brief, wrap]
+skill_lists: []
+runbooks:
+  - agent-tooling
+  - claude-and-codex
+  - codex-download-relay
+  - dispatch-background-runs
+  - install-and-update
+  - interrupted-sessions
+  - live-claude-session-test
+  - logics-task-closeout
+  - long-sessions
+  - memory
+  - new-account
+  - open-project-session
+  - own-routines
+  - remote-computer-use-windows
+  - service-tokens
+  - sub-project-work
+claude_hooks:
+  - crow-hub-guard
+  - crow-runs inbox --hook
+  - crow-relaunch hook
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [today_priorities, fleet, long_sessions, accounts, usage_split, runs]
+  daily: [tracker, activity_logs]
+  weekly: [tracker, activity_logs]
+doctor:
+  checks: [accounts, quota, profiles, data, modules]
+  needs: [cdx]
+nest: {}
+deck: {}
+config: {}

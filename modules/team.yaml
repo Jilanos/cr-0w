@@ -1,0 +1,24 @@
+# Module manifest of the team brick (adr_002).
+name: team
+summary: "Team rituals: sprint, 1:1s, mail to answer (crow-checks)."
+default: true
+requires: []
+scripts: [crow-checks, crow_checks.py]
+skills: []
+skill_lists: []
+runbooks: []
+claude_hooks: []
+git_hooks: []
+core_sections: [checks]
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [checks]
+doctor: {}
+nest:
+  sections:
+    - {id: checks, page: home, source: checks}
+deck:
+  boxes: [checks]
+config: {}

@@ -58,7 +58,7 @@ flowchart LR
 Defaults are the values for an existing setup with no `crow.yaml`. The install writes a starter file (see Install).
 
 ## Inventory
-Source of truth: `logics/specs/module_inventory/bricks.tsv` (kind, name, brick). `logics/specs/module_inventory/inventory.py` lists every bin/ script, skill, runbook, Claude hook, git hook, core route, core section, app and integration, and joins the tags. `tests/test_module_inventory.py` fails on an untagged piece, a stale tag or an unknown brick, so `bin/crow-check` keeps the table complete. `python3 logics/specs/module_inventory/inventory.py --markdown` prints the full table (170 rows on 2026-11-19).
+Source of truth: the engine module manifests `modules/<brick>.yaml` (bricks.tsv until item_260). `logics/specs/module_inventory/inventory.py` lists every bin/ script, skill, runbook, Claude hook, git hook, core route, core section, app and integration, and joins them with the manifests. `tests/test_module_inventory.py` fails on a piece with no brick, a stale manifest entry or a piece in two manifests, so `bin/crow-check` keeps the table complete. `python3 logics/specs/module_inventory/inventory.py --markdown` prints the full table (170 rows on 2026-11-19).
 
 | Brick | Pieces | Scripts | Skills | Runbooks | Hooks | Core routes and sections | Apps |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -206,6 +206,6 @@ Each split is one backlog item, run in this order, interleaved with req_063 as i
 # References
 - Related request: `req_064_paul_s_feedback_and_a_modular_public_crow`
 - Related backlog: `item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds`
-- Inventory: `logics/specs/module_inventory/bricks.tsv`, `logics/specs/module_inventory/inventory.py`, `tests/test_module_inventory.py`
+- Inventory: `modules/<brick>.yaml`, `logics/specs/module_inventory/inventory.py`, `tests/test_module_inventory.py`
 - Contracts: `logics/specs/core_contract`, `logics/specs/script_contract`
 - Prior decision: `adr_001_core_missions_and_inbox_architecture`

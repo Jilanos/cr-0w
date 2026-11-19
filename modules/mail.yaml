@@ -1,0 +1,25 @@
+# Module manifest of the mail brick (adr_002).
+name: mail
+summary: Calendar and mail counts (crow-today), today done and snooze, Today box.
+default: true
+requires: []
+scripts: [crow-today]
+skills: []
+skill_lists: []
+runbooks: [graph-today]
+claude_hooks: []
+git_hooks: []
+core_sections: [today]
+core_routes:
+  - POST /api/today/{id}/done
+  - POST /api/today/{id}/snooze
+apps: []
+integrations: []
+gather: {}
+doctor: {}
+nest:
+  sections:
+    - {id: today, page: home, source: today}
+deck:
+  boxes: [today]
+config: {}

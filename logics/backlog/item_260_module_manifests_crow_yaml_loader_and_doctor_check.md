@@ -1,13 +1,15 @@
 ## item_260_module_manifests_crow_yaml_loader_and_doctor_check - Module manifests, crow.yaml loader and doctor check
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 85
 > Confidence: 80
 > Progress: 0%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Owner: crow
+> Indicators reviewed: 2026-11-19 15:49:06
 
 # AI Context
 - Summary: Split step 1 of adr_002: engine module manifests per brick, the crow.yaml loader in Python, Go and `crow modules`, and a doctor modules check. No behaviour change.

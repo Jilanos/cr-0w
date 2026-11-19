@@ -1,0 +1,20 @@
+# Module manifest of the integration-shell brick (adr_002).
+name: integration-shell
+summary: Shell integration (integrations/archeotech) and its runbooks.
+default: false
+requires: []
+scripts: []
+skills: []
+skill_lists: []
+runbooks: [archeotech-crow-agents, archeotech-crow-usage]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: [integrations/archeotech]
+gather: {}
+doctor: {}
+nest: {}
+deck: {}
+config: {}

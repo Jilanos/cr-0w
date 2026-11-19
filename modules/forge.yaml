@@ -1,0 +1,25 @@
+# Module manifest of the forge brick (adr_002).
+name: forge
+summary: Merge requests and reviews on GitLab or GitHub.
+default: true
+requires: [git]
+scripts: [crow-forge-read, crow-mrs, crow-review-check, crow-review-run]
+skills: [mr, review, review-threads]
+skill_lists: []
+runbooks: [ci-secrets, review-findings]
+claude_hooks: []
+git_hooks: []
+core_sections: [mrs]
+core_routes: []
+apps: []
+integrations: []
+gather: {}
+doctor:
+  needs_any: [glab, gh]
+nest:
+  sections:
+    - {id: mrs, page: mrs, source: mrs}
+deck:
+  pages: [MRs]
+config:
+  hosts: {}  # forge name -> host, empty = public hosts

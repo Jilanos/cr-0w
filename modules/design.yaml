@@ -1,0 +1,20 @@
+# Module manifest of the design brick (adr_002).
+name: design
+summary: Screenshot, crop and compare tools, design notes hook, third-party design skills.
+default: false
+requires: []
+scripts: [ansi-shot, crow-compare, crow-crop, crow-design-notes, crow-skills-ext]
+skills: []
+skill_lists: [skills/ext.list]
+runbooks: [design-canvas, design-references-in-items, design-sessions, headless-webgl-render, visual-concepts]
+claude_hooks: [crow-design-notes hook]
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather: {}
+doctor: {}
+nest: {}
+deck: {}
+config: {}

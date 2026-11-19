@@ -1,0 +1,21 @@
+# Module manifest of the releases brick (adr_002).
+name: releases
+summary: Changelog, release propose and releases view.
+default: true
+requires: []
+scripts: [crow-changelog, crow-release-propose, crow-releases]
+skills: []
+skill_lists: []
+runbooks: [readme-showcase, releases]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [releases]
+doctor: {}
+nest: {}
+deck: {}
+config: {}

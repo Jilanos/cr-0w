@@ -1,0 +1,21 @@
+# Module manifest of the afk brick (adr_002).
+name: afk
+summary: "AFK and night runs: page, preflight, keep-awake, afk and night skills."
+default: true
+requires: []
+scripts: [crow-afk-page, crow-afk-preflight, crow-keep-awake, crow-night-page, crow-night-preflight]
+skills: [afk, night]
+skill_lists: []
+runbooks: [afk-runs]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather:
+  brief: [afk]
+doctor: {}
+nest: {}
+deck: {}
+config: {}
