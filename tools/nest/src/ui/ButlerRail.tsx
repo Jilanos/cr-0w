@@ -8,6 +8,7 @@ import { heroLiveOf, heroModel, type HeroModel } from '../hero/model'
 import { RailHead } from '../hero/RailHead'
 import { Link, navigate } from '../router'
 import { enterSubmits, rowsOf } from './keys'
+import { useRailWidth } from './railWidth'
 import { stickBottom } from './stickBottom'
 
 const FOLD_KEY = 'nest.rail'
@@ -64,7 +65,7 @@ function Msg({ m }: { m: ButlerMsg }) {
 
 // Butler rail (item_176, board desk-rail-a): CR-0W on the right of every laptop screen.
 // Hero on top (none on Home, which has its own), the hero line, the conversation, then the
-// account and the input. Ctrl+B folds it to a strip, remembered. Pinned (Home, where the rail
+// account and the input. A grip on the left edge sets the width (item_256). Ctrl+B folds it to a strip, remembered. Pinned (Home, where the rail
 // is the right column): no hero line (the hero says it already), and folded while the chat is
 // empty until the owner picks open or folded (owner 2026-11-18).
 export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapshot; head?: boolean; pinned?: boolean }) {
@@ -72,6 +73,7 @@ export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapsh
   const [folded, fold] = useFold(pinned && !!b && b.messages.length === 0 && !b.busy)
   const m = useMemo(() => heroModel(snap.missions, snap.inbox, heroLiveOf(snap.sections), snap.now), [snap])
   const working = m.projects.some((p) => p.state === 'working')
+  const grip = useRailWidth()
 
   if (!b) return null
   const label = railLabel(m)
@@ -91,6 +93,7 @@ export function ButlerRail({ snap, head = true, pinned = false }: { snap: Snapsh
 
   return (
     <aside className="b-rail" aria-label="CR-0W">
+      <div className="rl-grip" {...grip} />
       <div className="rl-top">
         <span className={`rl-mood m-${m.mood}`}><i className="dia" aria-hidden="true" />{label}</span>
         <button type="button" className="rl-kbd" onClick={fold} title="Fold (Ctrl+B)" aria-expanded="true">Ctrl B</button>
