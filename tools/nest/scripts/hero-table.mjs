@@ -3,6 +3,7 @@
 //                                             (no table = the current default, for the pixel-identity check)
 //   node scripts/hero-table.mjs perf [table]   median/max drawScene ms per size at dpr 2, live-head path
 //   OUT=dir node scripts/hero-table.mjs shot [table]   PNG of one live frame per size into OUT (before/after diffs)
+//   TABLEGL=on|off forces the WebGL grid or the 2D path for the lit table (item_270)
 //   node scripts/hero-table.mjs bench [table]  load-proof perf: each frame is timed right after a fixed
 //                                             reference workload (calib), and reported as frame/calib.
 //                                             A busy machine slows both, so the ratio holds. Also counts
@@ -27,9 +28,14 @@ try {
     await page.waitForTimeout(800)
     const cdp = mode === 'prof' ? await ctx.newCDPSession(page) : undefined
     if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 100 }); await cdp.send('Profiler.start') }
-    const r = await page.evaluate(async ({ mode, table }) => {
+    const r = await page.evaluate(async ({ mode, table, tablegl, bloomk, bloomg }) => {
+      // TABLEGL=on|off picks the WebGL grid or the 2D path (item_270); BLOOMK tunes its blur scale.
+      if (tablegl) localStorage.setItem('nest.tablegl', tablegl)
+      if (bloomk) globalThis.__bloomK = Number(bloomk)
+      if (bloomg) globalThis.__bloomGain = Number(bloomg)
       const sc = await import('/src/hero/scene.ts'); const md = await import('/src/hero/model.ts'); const fx = await import('/src/data/fixtures.ts')
       const heads = (await import('/src/hero/heads.json')).default
+      sc.resetTableGl?.()
       const src = fx.fixtureSource(); const m = md.heroModel(await src.missions(), await src.inbox(), undefined, src.now())
       const box = document.querySelector('.hero-box'); const W = box.clientWidth, H = box.clientHeight
       const cv = document.createElement('canvas')
@@ -81,7 +87,7 @@ try {
       sc.drawScene(cv, W, H, 2, m, heads, pal, undefined, opt(-1, true))
       for (let i = 0; i < 40; i++) { const a = performance.now(); sc.drawScene(cv, W, H, 2, m, heads, pal, undefined, opt(i, true)); live.push(performance.now() - a) }
       return { W, H, live: med(live) }
-    }, { mode, table })
+    }, { mode, table, tablegl: process.env.TABLEGL, bloomk: process.env.BLOOMK, bloomg: process.env.BLOOMG })
     if (r.png) { const f = `${process.env.OUT ?? '.'}/table-${table ?? 'default'}-${w}.png`; (await import('node:fs')).writeFileSync(f, Buffer.from(r.png.split(',')[1], 'base64')); delete r.png; r.file = f }
     if (mode === 'bench') r.idle = +(r.ratio * CAL_IDLE_MS).toFixed(1)
     console.log(w, h, JSON.stringify(r))

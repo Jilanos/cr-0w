@@ -2,6 +2,8 @@ import type { UiState } from '../data/state'
 import { moonsOf, type HeroModel, type HeroProject } from './model'
 import { elapsed } from '../format'
 import { castPlanets, type Body } from './planets'
+import { createGrid, type GridGL, type GridLayer } from './gl/grid'
+import { liveHeadOk } from './gl/head'
 import { add, clamp, cross, dot, LIGHT, mix, mul, norm, sub, V, type RGB, type V3 } from './vec'
 
 // Static ASCII scene, ported from the approved hero pass 7 renderer (item_139) with the
@@ -591,6 +593,23 @@ const rgba = (col: RGB, a: number) => {
   return v
 }
 const BLOOM_DIV = 4
+// WebGL grid (item_270): lit table only. localStorage nest.tablegl = 'off' | 'on' overrides the GPU check.
+let gridGl: GridGL | null | undefined
+const tableGl = (): GridGL | null => {
+  if (gridGl === undefined) {
+    let pref: string | null = null
+    try { pref = localStorage.getItem('nest.tablegl') } catch { /* storage off */ }
+    gridGl = pref === 'off' || typeof document === 'undefined' ? null : pref === 'on' || liveHeadOk() ? createGrid() : null
+  }
+  if (gridGl?.lost()) gridGl = null
+  return gridGl
+}
+// Re-read the override (bench, manual toggle).
+export const resetTableGl = () => { gridGl = undefined }
+// Bloom blur in 1/BLOOM_DIV px per CSS blur px of paint() (window.__bloomK for tuning).
+const bloomK = () => (globalThis as { __bloomK?: number }).__bloomK ?? 1 / BLOOM_DIV
+// Bloom strength (window.__bloomGain, 0 = off) for pixel diffs of the sharp layer.
+const bloomGain = () => (globalThis as { __bloomGain?: number }).__bloomGain ?? 1
 // One reusable cols x rows canvas for the cell backgrounds of a grid pass (cleared per pass).
 let bgCv: HTMLCanvasElement | undefined, bgData: ImageData | undefined
 function bgImage(gr: Grid) {
@@ -617,6 +636,21 @@ function bgImage(gr: Grid) {
 function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, runs = false) {
   const ctx = cv.getContext('2d')
   if (!ctx) return
+  const G = runs ? tableGl() : null
+  if (G) {
+    const base = new DOMMatrix().scale(dpr, dpr)
+    const layers: GridLayer[] = [{ g, keep: (z) => !head || z > head.zSplit, m: base }]
+    if (head) {
+      const hk = head.g.k ?? 1, hw = head.g.cols * CW * hk * head.scale, hh = head.g.rows * CH * hk * head.scale
+      const m = base.translate(head.x + hw / 2, head.y + hh).rotate((head.lean * 180) / Math.PI).translate(-hw / 2, -hh).scale(head.scale, head.scale)
+      layers.push({ g: head.g, keep: () => true, m }, { g, keep: (z) => z <= head.zSplit, m: base })
+    }
+    const k = bloomK()
+    if (G.render({ w: cv.width, h: cv.height, dpr, cw: CW, ch: CH, font: FONT, layers, bloom: { div: BLOOM_DIV, wide: ((14 * dpr) / BLOOM_DIV) * k, tight: ((3 * dpr) / BLOOM_DIV) * k, gain: bloomGain() } })) {
+      ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(G.canvas, 0, 0)
+      return
+    }
+  }
   const L = (offscreen ??= document.createElement('canvas'))
   if (L.width !== cv.width || L.height !== cv.height) { L.width = cv.width; L.height = cv.height }
   const l = L.getContext('2d')!
@@ -698,8 +732,8 @@ function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, ru
   ctx.clearRect(0, 0, cv.width, cv.height)
   ctx.save()
   ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingQuality = 'high'
-  ctx.filter = `blur(${(14 * dpr) / BLOOM_DIV}px)`; ctx.globalAlpha = 0.55; ctx.drawImage(B, 0, 0, cv.width, cv.height)
-  ctx.filter = `blur(${(3 * dpr) / BLOOM_DIV}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(B, 0, 0, cv.width, cv.height)
+  ctx.filter = `blur(${(14 * dpr) / BLOOM_DIV}px)`; ctx.globalAlpha = 0.55 * bloomGain(); ctx.drawImage(B, 0, 0, cv.width, cv.height)
+  ctx.filter = `blur(${(3 * dpr) / BLOOM_DIV}px)`; ctx.globalAlpha = 0.6 * bloomGain(); ctx.drawImage(B, 0, 0, cv.width, cv.height)
   ctx.restore()
   ctx.drawImage(L, 0, 0)
 }
