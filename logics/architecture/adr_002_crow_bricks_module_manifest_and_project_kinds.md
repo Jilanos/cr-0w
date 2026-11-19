@@ -7,6 +7,7 @@
 > Related task: (none yet)
 > Drivers: a second user installs only what fits; a folder without git is a valid project; the owner's setup keeps working unchanged; one switch per brick; Nest and deck show nothing for a brick that is off.
 > Reminder: Update status, linked refs, decision rationale, consequences, and follow-up work when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:20:34
 
 # Overview
 Crow is one always-on core plus optional bricks. One manifest, `crow.yaml` at the CROW_HOME root (`local/crow.yaml` in a checkout), turns bricks on and holds their config. Each brick ships an engine-side module manifest that lists what it owns. Projects are `repo` or `folder`. crow-core is the back brick with a versioned contract; Nest and the deck are front bricks that hide what is off.
@@ -176,8 +177,8 @@ Each split is one backlog item, run in this order, interleaved with req_063 as i
 # Alternatives considered
 - **Flags in `projects.yaml`**: one file less, but bricks are per install and projects are per repo; mixing them grows a file that is already long. Rejected.
 - **One `modules:` block inside `policy.yaml`**: policy is about permissions; a missing policy falls back to defaults while a wrong module set should fail loudly. Rejected.
-- **Separate repos or packages per brick**: clean for a public release, heavy while the engine changes daily. Deferred until the manifests are stable.
-- **Runtime plugins in Nest** (load a brick's JS at runtime): flexible, but a second build system and a code trust boundary. Rejected for the generic list view plus built-in views.
+- **Separate repos or packages per brick**: clean for a public release, heavy while the engine changes daily. Deferred until the manifests are stable; integration-shell is the pilot (item_266).
+- **Runtime plugins in Nest** (load a brick's JS at runtime): flexible, but a second build system and a code trust boundary. Rejected. Brick pages, heroes and themes compile in at Nest build time instead (decision 7).
 - **Rename `kind` to free it for repo or folder**: touches every registry and Nest planet code. Rejected for the new `layout` key.
 
 # Consequences
@@ -194,6 +195,8 @@ Each split is one backlog item, run in this order, interleaved with req_063 as i
 3. Deck pages: a page whose brick is off is hidden, same rule as Nest.
 4. Project kind key: new `layout: repo | folder`, default from the presence of `.git`.
 5. Vault off: notes go to `CROW_HOME/notes/` as plain Markdown.
+6. User modules: a user brick lives in `CROW_HOME/modules/<name>/` with the engine manifest schema, or installs from a git url with `crow modules add`, pinned in `CROW_HOME/modules.lock` (item_265). Integration-shell moves to its own repo as the pilot (item_266).
+7. Nest customization: a brick's `nest/` folder adds pages, sections, a hero and themes; themes are token files; `crow.yaml` `nest:` picks theme, hero and page list. All of it compiles in at Nest build time; no runtime code loading (item_267).
 
 # Follow-up work
 - Items in Migration order, linked from req_064.

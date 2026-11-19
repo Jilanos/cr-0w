@@ -7,7 +7,7 @@
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
-> Indicators reviewed: 2026-11-17 16:53:11
+> Indicators reviewed: 2026-11-19 15:20:33
 
 # AI Context
 - Summary: Take what Paul built and asked for (feedback 2026-11-17), fix the bugs he hit, and split crow into a core plus optional bricks so another user can install only what fits.
@@ -66,10 +66,14 @@
 - `item_261_skills_hooks_and_gather_follow_the_module_switch`
 - `item_262_mail_team_and_vault_bricks_optional`
 - `item_263_optional_tool_bricks_and_install_profiles`
+- `item_265_user_modules_from_a_local_folder_or_a_git_url`
+- `item_266_move_the_shell_integration_brick_to_its_own_git_repo`
+- `item_267_nest_themes_hero_and_module_pages_built_from_the_user_s_modules`
 
 # Execution order
 1. Interleaved with req_063; see its Execution order.
 2. Module splits (adr_002 Migration order), each after the owner accepts adr_002: item_260, item_261, item_236, item_237, item_262, item_263.
+3. User modules after the splits: item_265, then item_266 and item_267.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
