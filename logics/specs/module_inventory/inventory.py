@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 BRICKS = {
     "core", "git", "forge", "vault", "mail", "team", "afk", "retro", "design",
-    "releases", "deck", "nest", "core-api", "integration-shell",
+    "releases", "deck", "nest", "core-api", "integration-shell", "office",
 }
 
 

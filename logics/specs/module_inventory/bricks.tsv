@@ -18,6 +18,7 @@ script	crow-crop	design
 script	crow-ctx	core
 script	crow-design-notes	design
 script	crow-digest	retro
+script	crow-docx-redline	office
 script	crow-doctor	core
 script	crow-download-relay	core
 script	crow-focus	core
@@ -28,6 +29,7 @@ script	crow-isolation-probe	core
 script	crow_lib.py	core
 script	crow-keep-awake	afk
 script	crow-log	vault
+script	crow-mailtxt	office
 script	crow-memory	core
 script	crow-mrs	forge
 script	crow-night-page	afk
@@ -64,6 +66,7 @@ script	crow-update	core
 script	crow-usage	core
 script	crow-vault-migrate	vault
 script	crow_vault.py	vault
+script	simpledoc.py	office
 skill	afk	afk
 skill	brief	core
 skill	eod	vault
@@ -100,6 +103,7 @@ runbook	nest-phone-install	nest
 runbook	nest-screenshots	nest
 runbook	new-account	core
 runbook	open-project-session	core
+runbook	office-documents	office
 runbook	open-threads	vault
 runbook	own-routines	core
 runbook	readme-showcase	releases
