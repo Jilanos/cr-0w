@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Read-only GitLab data for one MR, for sandboxed runs that may not call `glab api` themselves.
+
+Usage:
+  crow-forge-read threads  <iid>          unresolved review threads (JSON: id, path, line, notes)
+  crow-forge-read pipeline <iid>          latest MR pipeline and its jobs (JSON)
+  crow-forge-read trace    <job-id> [-n N] last N lines of a job log (default 200)
+
+Run it from inside the project checkout or worktree: glab resolves the project from the git remote.
+Every call is a GET. cdx remaps HOME, so glab runs with the real home where its login lives.
+"""
+import json
+import os
+import pwd
+import subprocess
+import sys
+
+ENV = {**os.environ, "HOME": pwd.getpwuid(os.getuid()).pw_dir}
+
+
+def api(path, paginate=False, raw=False):
+    cmd = ["glab", "api", "--method", "GET"] + (["--paginate"] if paginate else []) + [path]
+    r = subprocess.run(cmd, env=ENV, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"crow-forge-read: glab api {path}: {r.stderr.strip()}")
+    if raw:
+        return r.stdout
+    # --paginate concatenates JSON arrays page by page
+    out = r.stdout.strip().replace("][", ",")
+    return json.loads(out or "null")
+
+
+def threads(iid):
+    ds = api(f"projects/:id/merge_requests/{iid}/discussions?per_page=100", paginate=True) or []
+    rows = []
+    for d in ds:
+        notes = d.get("notes") or []
+        if not notes or not notes[0].get("resolvable") or notes[0].get("resolved"):
+            continue
+        pos = notes[0].get("position") or {}
+        rows.append({"id": d["id"], "path": pos.get("new_path") or pos.get("old_path"),
+                     "line": pos.get("new_line") or pos.get("old_line"),
+                     "notes": [{"author": n["author"]["username"], "body": n["body"], "at": n["created_at"]}
+                               for n in notes if not n.get("system")]})
+    return rows
+
+
+def pipeline(iid):
+    ps = api(f"projects/:id/merge_requests/{iid}/pipelines?per_page=1") or []
+    if not ps:
+        return None
+    p = ps[0]
+    jobs = api(f"projects/:id/pipelines/{p['id']}/jobs?per_page=100&include_retried=false", paginate=True) or []
+    return {"id": p["id"], "status": p["status"], "sha": p.get("sha"), "ref": p.get("ref"),
+            "jobs": [{"id": j["id"], "name": j["name"], "stage": j["stage"], "status": j["status"],
+                      "failure_reason": j.get("failure_reason")} for j in jobs]}
+
+
+def main(argv):
+    if len(argv) < 2 or argv[0] not in ("threads", "pipeline", "trace") or not argv[1].isdigit():
+        sys.exit(__doc__)
+    cmd, ref = argv[0], argv[1]
+    if cmd == "trace":
+        n = int(argv[3]) if len(argv) > 3 and argv[2] == "-n" else 200
+        log = api(f"projects/:id/jobs/{ref}/trace", raw=True)
+        print("\n".join(log.splitlines()[-n:]))
+        return
+    print(json.dumps(threads(ref) if cmd == "threads" else pipeline(ref), indent=1))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

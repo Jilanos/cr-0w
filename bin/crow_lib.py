@@ -599,10 +599,14 @@ _SHELL_READ = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "sort", "uniq", 
                "date", "diff"]
 # Hub scripts that write the activity log, daily notes and state paths.
 _CROW_LOG = ["bin/crow-log", "bin/crow-note", "bin/crow-state"]
+# Read-only forge data (MR threads, pipeline jobs, job log) for runs in any project; glab api stays denied.
+_FORGE_READ = ["bin/crow-forge-read", os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                                                    "bin", "crow-forge-read"),
+               "glab ci view", "glab ci get", "glab ci list", "glab ci trace", "glab mr view", "glab mr diff",
+               "gh pr view", "gh pr checks", "gh run view"]
 RUN_SANDBOX = {
     "review": {"tools": ["Read", "Grep", "Glob", "TodoWrite"],
-               "bash": _GIT_READ + _SHELL_READ + ["git fetch", "gh pr view", "gh pr diff", "gh pr checks",
-                                                  "glab mr view", "glab mr diff", "logics-manager"],
+               "bash": _GIT_READ + _SHELL_READ + ["git fetch", "gh pr diff", "logics-manager"] + _FORGE_READ,
                "mcp": []},
     "task": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "TodoWrite"],
              "bash": _GIT_READ + _SHELL_READ + ["git add", "git commit", "git switch", "git checkout", "git restore",
@@ -614,7 +618,7 @@ RUN_SANDBOX = {
                                                 "node scripts/hero-table.mjs", "node tools/nest/scripts/hero-table.mjs",
                                                 "npx tsc", "npx vitest",
                                                 # load check before a bench (owner OK 2026-11-17)
-                                                "ps", "top -b", "uptime"],
+                                                "ps", "top -b", "uptime"] + _FORGE_READ,
              "mcp": []},
     "retro": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "TodoWrite", "Skill"],
               "bash": _SHELL_READ + _CROW_LOG + ["bin/crow-digest", "git status", "git diff", "git add",
