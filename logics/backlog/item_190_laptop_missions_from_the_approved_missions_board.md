@@ -37,7 +37,9 @@
 # Build notes (2026-11-19)
 - Core gaps fixed first (commits 9b5e7c2, 4861a24): worktree lanes fold into their repo, runs join their session lane, AFK titles from the job file, usage buckets kept a week.
 - Nest: tab and route are Ops (/ops); /missions and /missions/<id> redirect. Screen src/screens/Ops.tsx: day timeline grouped by project, live lanes hatched with a now line and OPEN to the chat, planned routines dashed, week strip, queue, totals by project or kind, lane sheet with the run report and cost.
-- Not built, no core route yet: routine pause and run now, AFK edit and delete, mission run now and reorder, worktree and diff stat, AFK stop times. Mission cancel works (crow mission cancel).
+- Queue actions (commits 9e5ba22, 0d7ced9): routines PAUSE/RESUME and RUN NOW (bin/crow-routine via POST /api/routines/{unit}/{verb}), AFK EDIT and skip (GET/PUT /api/afk, POST /api/afk/skip), mission cancel. Routines show their unit description; the queue lists only pending AFK jobs.
+- Week view uses the day graph: one 22px row per day on the same axis and scale toggle. Day/week switch keeps the old view until the new data lands, then fades in.
+- Not built, needs a design: mission run now and reorder (the tick starts by creation order, no priority or slot override). Also missing: worktree and diff stat, AFK stop times.
 - Past waiting spans: item_264. The state log records them from now on.
 - Left: owner review on live data (AC1, AC3), then the missing actions as core routes.
 
