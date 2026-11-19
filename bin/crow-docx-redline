@@ -16,18 +16,18 @@ import difflib
 import itertools
 import re
 import sys
+from pathlib import Path
 
 import docx
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-old_path, new_path, out_path, author = sys.argv[1:5]
-OLD, NEW = docx.Document(old_path), docx.Document(new_path)
-DATE = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:00Z")
+USAGE = "usage: crow-docx-redline <old.docx> <new.docx> <out.docx> <author>"
+REV = {"author": "", "date": ""}
 ids = itertools.count(9000)
 
 def mark(tag):
-    e = OxmlElement(tag); e.set(qn("w:id"), str(next(ids))); e.set(qn("w:author"), author); e.set(qn("w:date"), DATE); return e
+    e = OxmlElement(tag); e.set(qn("w:id"), str(next(ids))); e.set(qn("w:author"), REV["author"]); e.set(qn("w:date"), REV["date"]); return e
 
 def runs_of(p):
     return [r for r in p._p.iter(qn("w:r"))]
@@ -154,10 +154,37 @@ def apply(olds, news):
         placed[i] = el
     return len(pairs), len(odel), len(nins)
 
-print("body", apply(OLD.paragraphs, NEW.paragraphs))
-for to, tn in zip(OLD.tables, NEW.tables):
-    for ro, rn in zip(to.rows, tn.rows):
-        for co, cn in zip(ro.cells, rn.cells):
-            apply(co.paragraphs, cn.paragraphs)
-# turn on change display
-NEW.save(out_path)
+def parse_args(argv):
+    """Return (old, new, out, author) or None when the arguments are invalid."""
+    if len(argv) != 4 or not argv[3].strip():
+        return None
+    return tuple(argv)
+
+
+def main(argv):
+    if argv and argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    args = parse_args(argv)
+    if args is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+    old_path, new_path, out_path, author = args
+    for p in (old_path, new_path):
+        if not Path(p).is_file():
+            print(f"crow-docx-redline: no such file: {p}", file=sys.stderr)
+            return 2
+    REV["author"] = author
+    REV["date"] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:00Z")
+    old, new = docx.Document(old_path), docx.Document(new_path)
+    print("body", apply(old.paragraphs, new.paragraphs))
+    for to, tn in zip(old.tables, new.tables):
+        for ro, rn in zip(to.rows, tn.rows):
+            for co, cn in zip(ro.cells, rn.cells):
+                apply(co.paragraphs, cn.paragraphs)
+    new.save(out_path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

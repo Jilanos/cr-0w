@@ -47,29 +47,57 @@ def addr(lst):
     return ", ".join(f"{r.get('name', '')} <{r.get('address', '')}>" for r in lst or [])
 
 
+USAGE = "usage: crow-mailtxt <file> [--full] [--max N]"
+
+
+def parse_args(argv):
+    """Return (path, full, max_chars) or None when the arguments are invalid."""
+    path, full, mx, rest = None, False, 6000, list(argv)
+    while rest:
+        a = rest.pop(0)
+        if a == "--full":
+            full = True
+        elif a == "--max":
+            if not rest or not rest[0].isdigit():
+                return None
+            mx = int(rest.pop(0))
+        elif a.startswith("-") or path is not None:
+            return None
+        else:
+            path = a
+    return (path, full, mx) if path else None
+
+
 def main(argv):
-    if not argv or argv[0] in ("-h", "--help"):
+    if argv and argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
-    full = "--full" in argv
-    mx = int(argv[argv.index("--max") + 1]) if "--max" in argv else 6000
-    d = load(argv[0])
+    args = parse_args(argv)
+    if args is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+    path, full, mx = args
+    try:
+        d = load(path)
+    except OSError as e:
+        print(f"crow-mailtxt: {e}", file=sys.stderr)
+        return 2
     s = d.get("sender") or {}
-    print(f"Objet : {d.get('subject', '')}")
+    print(f"Subject: {d.get('subject', '')}")
     if s:
-        print(f"De : {s.get('name', '')} <{s.get('address', '')}>  ·  {d.get('receivedDateTime', '')}")
+        print(f"From: {s.get('name', '')} <{s.get('address', '')}>  ·  {d.get('receivedDateTime', '')}")
     if d.get("toRecipients"):
-        print(f"À : {addr(d['toRecipients'])}")
+        print(f"To: {addr(d['toRecipients'])}")
     if d.get("ccRecipients"):
-        print(f"Cc : {addr(d['ccRecipients'])}")
+        print(f"Cc: {addr(d['ccRecipients'])}")
     atts = [a for a in d.get("attachments") or [] if not a.get("isInline")]
     for a in atts:
-        print(f"PJ : {a.get('name')} ({a.get('size', 0) // 1024} Ko) {a.get('uri', '')}")
+        print(f"Attachment: {a.get('name')} ({a.get('size', 0) // 1024} KB) {a.get('uri', '')}")
     if d.get("webLink"):
-        print(f"Lien : {d['webLink']}")
+        print(f"Link: {d['webLink']}")
     body = (d.get("body") or {}).get("content", "") or d.get("html", "")
     text = to_text(body if full else cut(body))
-    print("\n" + text[:mx] + ("\n[…tronqué]" if len(text) > mx else ""))
+    print("\n" + text[:mx] + ("\n[…truncated]" if len(text) > mx else ""))
     return 0
 
 

@@ -1,12 +1,21 @@
+"""simpledoc: one- or two-page A4 DOCX (title, headings, paragraphs, bullets, tables).
+
+Run under `uv run -q --with python-docx python3`. `Doc(accent="RRGGBB")` sets the colour of
+the title, headings and table header text; `header_fill` sets the table header shading.
+Both default to neutral greys.
+"""
 import docx
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-NAVY = RGBColor(0x00,0x24,0x51)
+DEFAULT_ACCENT = "333333"
+DEFAULT_HEADER_FILL = "E6E6E6"
 class Doc:
-    def __init__(self):
+    def __init__(self, accent=DEFAULT_ACCENT, header_fill=DEFAULT_HEADER_FILL):
+        self.accent = RGBColor.from_string(accent.lstrip("#").upper())
+        self.header_fill = header_fill.lstrip("#").upper()
         self.d = docx.Document()
         s = self.d.sections[0]
         s.page_width, s.page_height = Cm(21), Cm(29.7)
@@ -16,12 +25,12 @@ class Doc:
             self.d.styles[sn].font.name='Arial'; st.font.size = Pt(10.5)
         st.paragraph_format.space_after = Pt(4)
     def title(self, t, sub):
-        p = self.d.add_paragraph(); r = p.add_run(t); r.bold = True; r.font.size = Pt(17); r.font.color.rgb = NAVY
+        p = self.d.add_paragraph(); r = p.add_run(t); r.bold = True; r.font.size = Pt(17); r.font.color.rgb = self.accent
         p.paragraph_format.space_after = Pt(2)
         p = self.d.add_paragraph(); r = p.add_run(sub); r.font.size = Pt(10); r.font.color.rgb = RGBColor(0x55,0x55,0x55)
         p.paragraph_format.space_after = Pt(10)
     def h(self, t):
-        p = self.d.add_paragraph(); r = p.add_run(t); r.bold = True; r.font.size = Pt(12); r.font.color.rgb = NAVY
+        p = self.d.add_paragraph(); r = p.add_run(t); r.bold = True; r.font.size = Pt(12); r.font.color.rgb = self.accent
         p.paragraph_format.space_before = Pt(10); p.paragraph_format.space_after = Pt(4); p.paragraph_format.keep_with_next = True
     def p(self, t, bold_lead=None, size=None, italic=False):
         p = self.d.add_paragraph()
@@ -44,8 +53,8 @@ class Doc:
                 r = para.add_run(str(val)); r.font.size = Pt(9.5)
                 if j in align_right and i > 0: para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 if (header and i == 0) or i in bold_rows: r.bold = True
-                fill = 'DCE3EE' if (header and i == 0) else ('F2F2F2' if i in shade_rows else None)
-                if header and i == 0: r.font.color.rgb = NAVY
+                fill = self.header_fill if (header and i == 0) else ('F2F2F2' if i in shade_rows else None)
+                if header and i == 0: r.font.color.rgb = self.accent
                 if fill:
                     tcPr = c._tc.get_or_add_tcPr(); sh = OxmlElement('w:shd')
                     sh.set(qn('w:val'), 'clear'); sh.set(qn('w:color'), 'auto'); sh.set(qn('w:fill'), fill); tcPr.append(sh)
