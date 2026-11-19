@@ -1,14 +1,14 @@
 ## req_066_panel_visualization_and_shared_hub_terminal - Panel visualization and shared hub terminal
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
 > Owner: panel
-> Indicators reviewed: 2026-11-19 14:45:10
+> Indicators reviewed: 2026-11-19 14:48:44
 
 # AI Context
 - Summary: Keep hub requests in the terminal; make the portable panel a visualisation and feedback surface.
@@ -71,6 +71,6 @@
 - AC3: Removed routes return 404; legacy queued model jobs fail before launch. Settled-topic and read-only-history regression tests preserve stored conversations.
 - AC4: Native mail/calendar sync has no proposal-model stage. Rules, history, snapshot preservation and stale model-suggestion removal are covered.
 - AC5: The existing feedback, dossier, notifications, native move/undo, draft proof, routines and account-admission tests remain green.
-- AC6: `python -m pytest -q tests`: 895 passed, 3 skipped. Final affected regression suite: 190 passed. Browser fixtures and disposable-server checks cover the complete retained flows.
+- AC6: `python -m pytest -q tests`: 895 passed, 3 skipped. Final affected regression suite: 190 passed. Browser fixtures: 62/62 scenarios, including 144 scenario/view combinations; disposable-server integration: 16/16. Detached live-runtime probe and Terminal browser check passed after commit `5af218f`.
 - Documentation: `runbooks/panel.md`, `bin/panel_ui/README.md`, `docs/panel-api.md` and the example configuration describe the final behavior.
 - Corpus-wide lint/audit still report pre-existing findings in other documents. Scoped validation of this request has no finding.

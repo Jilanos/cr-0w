@@ -1,14 +1,14 @@
 ## item_260_panel_visualization_and_shared_hub_terminal - Panel visualization and shared hub terminal
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 90%
+> Progress: 100%
 > Complexity: High
 > Theme: Operator workflow and runtime integration
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 14:45:29
+> Indicators reviewed: 2026-11-19 14:48:44
 
 # AI Context
 - Summary: Shared hub Terminal, read-only history and deterministic Outlook sync.
@@ -56,8 +56,8 @@ Preserve local feedback, settled history, dossiers, runs, accounts, agenda, fili
 # Links
 - Product brief(s): (none yet)
 - Architecture decision(s): (none yet)
-- Request: `logics/request/req_066_panel_visualization_and_shared_hub_terminal.md`
-- Primary task(s): (none yet)
+- Request: `req_066_panel_visualization_and_shared_hub_terminal`
+- Primary task(s): `task_025_panel_visualization_and_shared_hub_terminal`
 
 # Priority
 - Priority: High
@@ -67,6 +67,7 @@ Preserve local feedback, settled history, dossiers, runs, accounts, agenda, fili
 - Hybrid rationale: Derived from request `req_066_panel_visualization_and_shared_hub_terminal` and kept bounded to one coherent delivery slice.
 - Source file: `logics/request/req_066_panel_visualization_and_shared_hub_terminal.md`.
 - Generated locally by logics-manager.
+- Task `task_025_panel_visualization_and_shared_hub_terminal` was finished via `logics-manager flow finish task` on 2026-11-19.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
