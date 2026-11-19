@@ -297,7 +297,7 @@ func (av agentsView) window(port bool) (t0, t1 int) {
 	if av.full {
 		first := t0
 		for _, l := range av.fx.Lanes {
-			if f := l.first(); f >= 0 {
+			if f := l.First(); f >= 0 {
 				first = min(first, f*10/60*60)
 			}
 		}
@@ -366,7 +366,7 @@ func laneCells(l laneRow, now time.Time, t0, t1, rw int) []byte {
 			}
 		}
 	}
-	f, la := l.first(), l.last()
+	f, la := l.First(), l.Last()
 	if !l.Run && f >= 0 {
 		for b := f; b <= la; b++ {
 			paint(b, 'i')
@@ -406,7 +406,7 @@ func (av agentsView) laneBars(l laneRow, c laneCols, t0, t1 int) line {
 	switch {
 	case l.Run:
 		work = lk.cyan
-	case l.live():
+	case l.Live():
 		work = lk.ok
 	}
 	var out line
@@ -454,12 +454,12 @@ func (av agentsView) laneLine(l laneRow, c laneCols, t0, t1 int, sel bool) line 
 		switch k.name {
 		case "model":
 			m := ""
-			if l.live() {
+			if l.Live() {
 				m = l.Model
 			}
 			out = append(out, seg{fit(m, k.w), lk.sub})
 		case "context":
-			if l.live() && !l.Run && l.Ctx > 0 {
+			if l.Live() && !l.Run && l.Ctx > 0 {
 				out = append(out, av.ctxBar(l.Ctx, 7)...)
 				out = append(out, seg{fmt.Sprintf(" %-9s", ctxLabel(l.Ctx)), lk.sub})
 			} else {
@@ -472,17 +472,17 @@ func (av agentsView) laneLine(l laneRow, c laneCols, t0, t1 int, sel bool) line 
 			}
 			out = append(out, seg{fmt.Sprintf("%*s", k.w, s), lk.sub})
 		case "time":
-			s := dur(l.mins())
+			s := dur(l.Mins())
 			if l.Runs > 1 {
 				s = fmt.Sprintf("x%d", l.Runs)
-			} else if l.mins() == 0 {
+			} else if l.Mins() == 0 {
 				s = "-"
 			}
 			out = append(out, seg{fmt.Sprintf("%*s", k.w, s), lk.sub})
 		}
 	}
 	out = append(out, spc(1))
-	if f := l.first(); f >= 0 && f*10 < t0 && l.last()*10+10 > t0 {
+	if f := l.First(); f >= 0 && f*10 < t0 && l.Last()*10+10 > t0 {
 		out = append(out, seg{"<", lk.sub})
 	} else {
 		out = append(out, spc(1))
@@ -555,7 +555,7 @@ func (av agentsView) laneSpec(iw, rows int, port bool) boxSpec {
 	}
 	nlive := 0
 	for _, l := range av.fx.Lanes {
-		if l.live() {
+		if l.Live() {
 			nlive++
 		}
 	}
@@ -593,7 +593,7 @@ func (av agentsView) laneSpec(iw, rows int, port bool) boxSpec {
 		var shown []int
 		for _, i := range g.Lanes {
 			l := av.fx.Lanes[i]
-			if la := l.last(); la >= 0 && la*10+10 <= t0 && !l.live() {
+			if la := l.Last(); la >= 0 && la*10+10 <= t0 && !l.Live() {
 				hidden++
 				pos++
 				continue
@@ -665,7 +665,7 @@ func (av agentsView) laneRowsNeed(port bool) int {
 		k := 0
 		for _, i := range g.Lanes {
 			l := av.fx.Lanes[i]
-			if la := l.last(); la >= 0 && la*10+10 <= t0 && !l.live() {
+			if la := l.Last(); la >= 0 && la*10+10 <= t0 && !l.Live() {
 				continue
 			}
 			k++
@@ -1071,7 +1071,7 @@ func (av agentsView) detailRows(l *laneRow, iw, n int) []line {
 		kv("account", acct...)
 	}
 	if !l.Start.IsZero() {
-		s := clock(l.Start) + "  ·  " + dur(l.mins()) + " active today"
+		s := clock(l.Start) + "  ·  " + dur(l.Mins()) + " active today"
 		if !l.End.IsZero() {
 			s += "  ·  last activity " + shortAge(av.now.Sub(l.End)) + " ago"
 		}
@@ -1085,7 +1085,7 @@ func (av agentsView) detailRows(l *laneRow, iw, n int) []line {
 		s += fmt.Sprintf("  ·  cache read %d%%  ·  %d %s", l.CachePct, l.Compactions, plural(l.Compactions, "compaction", "compactions"))
 		kv("tokens", seg{s, lk.plain})
 	}
-	if f, la := l.first(), l.last(); f >= 0 && len(l.Tok) > 0 {
+	if f, la := l.First(), l.Last(); f >= 0 && len(l.Tok) > 0 {
 		rows = append(rows, av.tokChart(l, f, la, iw)...)
 	}
 	rows = append(rows, nil)

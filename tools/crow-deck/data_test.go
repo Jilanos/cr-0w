@@ -189,7 +189,7 @@ func TestLanesJoinAgentsAndMergeRuns(t *testing.T) {
 	if !w.WaitFrom.Equal(testNow().Add(-time.Minute)) {
 		t.Errorf("wait from %v", w.WaitFrom)
 	}
-	if d := by["s-done"]; d.State != lsDone || d.Agent != -1 || d.mins() != 20 {
+	if d := by["s-done"]; d.State != lsDone || d.Agent != -1 || d.Mins() != 20 {
 		t.Errorf("done lane %+v", d)
 	}
 	if r := by["r1"]; r.Runs != 2 || len(r.Cells) != 2 || r.Cost != 0.75 {

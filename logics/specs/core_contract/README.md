@@ -81,7 +81,8 @@ core applies these rules to every sidecar. The values are defaults in the core c
 ## Shared Go module boundary with crow-deck
 
 - Package `crow-core/contract` holds the types of this contract and their strict decoders. It imports only the standard library and `gopkg.in/yaml.v3`, and does no I/O beyond decoding bytes it is given.
-- crow-deck imports `crow-core/contract` and nothing else from crow-core, through a `replace crow-core => ../crow-core` line in its `go.mod`, when the deck first reads missions or the inbox. Store, event log, tick and dispatch live under `crow-core/internal/`, which Go forbids other modules to import.
+- crow-deck imports `crow-core/contract` and `crow-core/lanes` and nothing else from crow-core, through a `replace crow-core => ../crow-core` line in its `go.mod`, when the deck first reads missions or the inbox. Store, event log, tick and dispatch live under `crow-core/internal/`, which Go forbids other modules to import.
+- Package `crow-core/lanes` (item_257) builds the day lanes of the deck Agents tab and the core ops answer. It imports only the standard library and does no I/O. The deck imports it through the same `replace` line and maps its own rows to `lanes.Session` and `lanes.Agent`.
 - The deck keeps its own UI types. Its read-only fallback over the store decodes rows with the `contract` types.
 - The UI kit of req_020 stays a separate module and never depends on core.
 

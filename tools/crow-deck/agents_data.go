@@ -1,306 +1,80 @@
 package main
 
-// Day lanes: one row per session that worked today, from crow-usage's 10-minute activity
-// buckets, joined to the live agents from crow-runs. Background runs with the same title
-// in the same project share one lane.
+// Day lanes: the shared crow-core/lanes builder over today's crow-usage sessions and the
+// live agents from crow-runs.
 
 import (
-	"fmt"
 	"os/exec"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"crow-core/lanes"
 )
 
 // Lane states, in the glyph legend's terms.
 const (
-	lsNeeds   = "needs"   // waits for the owner's answer
-	lsWorking = "working" // interactive, busy
-	lsIdle    = "idle"    // interactive, waits for the next prompt
-	lsRun     = "run"     // background run at work
-	lsPaused  = "paused"  // stopped on a usage limit
-	lsDone    = "done"    // ended today
+	lsNeeds   = lanes.Needs
+	lsWorking = lanes.Working
+	lsIdle    = lanes.Idle
+	lsRun     = lanes.Run
+	lsPaused  = lanes.Paused
+	lsDone    = lanes.Done
 )
 
 // laneRow is one session (or a set of same-titled runs) across today.
-type laneRow struct {
-	Key         string // session id, or the agent's session/run id
-	Project     string
-	Title       string
-	State       string
-	Account     string
-	Model       string // "opus-5-5"
-	Branch      string
-	Cwd         string
-	Agent       int // index in fixtures.Agents, -1 none
-	Run         bool
-	Runs        int // runs folded into this lane
-	Ctx         int // context tokens, live sessions only
-	Cost        float64
-	Priced      bool
-	Cells       map[int]bool // 10-minute buckets with activity
-	Tok         map[int]int  // tokens per bucket
-	Tokens      int
-	CachePct    int
-	Compactions int
-	Files       map[string]int // edited file basename → edits
-	Start, End  time.Time
-	WaitFrom    time.Time // needs: when the agent started waiting
-	Next        string
-	NextYou     bool
+type laneRow = lanes.Lane
+
+func bucketTime(day time.Time, b int) time.Time { return lanes.BucketTime(day, b) }
+
+// ShortName and PathOf let the registry resolve names for the lanes package.
+func (r *registry) ShortName(name string) string { return r.shortName(name) }
+
+func (r *registry) PathOf(name string) (string, bool) {
+	p, ok := r.find(name)
+	return p.Path, ok
 }
 
-func (l laneRow) first() int {
-	f := -1
-	for b := range l.Cells {
-		if f < 0 || b < f {
-			f = b
-		}
-	}
-	return f
-}
-
-func (l laneRow) last() int {
-	f := -1
-	for b := range l.Cells {
-		if b > f {
-			f = b
-		}
-	}
-	return f
-}
-
-// mins is the active time today: ten minutes per bucket.
-func (l laneRow) mins() int { return 10 * len(l.Cells) }
-
-func (l laneRow) live() bool {
-	switch l.State {
-	case lsNeeds, lsWorking, lsIdle, lsRun:
-		return true
-	}
-	return false
-}
-
-// shortModel picks the session's main model and drops the family prefix.
-func shortModel(models []string) string {
-	best, rank := "", -1
-	for _, m := range models {
-		r := 0
-		for i, fam := range []string{"haiku", "sonnet", "opus", "fable"} {
-			if strings.Contains(m, fam) {
-				r = i + 1
-			}
-		}
-		if r > rank {
-			best, rank = m, r
-		}
-	}
-	best = strings.TrimPrefix(best, "claude-")
-	if i := strings.Index(best, "["); i > 0 {
-		best = best[:i]
-	}
-	return best
-}
-
-func bucketTime(day time.Time, b int) time.Time {
-	y, mo, d := day.Local().Date()
-	return time.Date(y, mo, d, 0, b*10, 0, 0, day.Location())
-}
-
-// lanesOf builds today's lanes. Live agents without activity yet still get a lane.
+// lanesOf builds today's lanes with the shared builder. Live agents without activity yet
+// still get a lane. A live agent with no model takes its lane's.
 func lanesOf(now time.Time, sessions []usageSession, agents []agentRow, slots [2]int, reg *registry) []laneRow {
 	day := now.Local().Format("2006-01-02")
-	bySess := map[string]int{}
-	for i, a := range agents {
-		if a.Session != "" && a.Group != gDone {
-			bySess[a.Session] = i
-		}
-	}
-	used := map[int]bool{}
-	var lanes []laneRow
-	runLane := map[string]int{}
+	in := make([]lanes.Session, 0, len(sessions))
 	for _, s := range sessions {
-		b := s.Activity[day]
-		ai, isLive := bySess[s.ID]
-		if len(b) == 0 && !isLive {
-			continue
-		}
-		l := laneRow{Key: s.ID, Project: reg.shortName(s.Project), Title: whoName(s, reg), Account: s.Account,
-			Model: shortModel(s.Models), Branch: s.Branch, Agent: -1, Run: s.Kind == "run", Runs: 1,
-			Cost: s.Today.CostUSD, Priced: true, Cells: map[int]bool{}, Tok: map[int]int{},
-			Tokens: s.Tokens, CachePct: s.CachePct, Compactions: s.Compactions, Files: s.FilesEdited}
-		l.Start, _ = parseTime(s.Start)
-		l.End, _ = parseTime(s.End)
-		for _, x := range b {
-			l.Cells[x] = true
-		}
+		ls := lanes.Session{ID: s.ID, Account: s.Account, Project: s.Project, Title: s.Title, Kind: s.Kind,
+			Branch: s.Branch, Models: s.Models, Buckets: s.Activity[day], BucketTokens: map[int]int{},
+			Cost: s.Today.CostUSD, Tokens: s.Tokens, CachePct: s.CachePct, Compactions: s.Compactions, Files: s.FilesEdited}
+		ls.Start, _ = parseTime(s.Start)
+		ls.End, _ = parseTime(s.End)
 		for k, v := range s.ActivityTokens[day] {
 			if n, err := strconv.Atoi(k); err == nil {
-				l.Tok[n] += v
+				ls.BucketTokens[n] += v
 			}
 		}
-		if isLive {
-			l.Agent, used[ai] = ai, true
-		}
-		if l.Run {
-			key := l.Project + "\x00" + l.Title
-			if j, ok := runLane[key]; ok {
-				lanes[j] = mergeRun(lanes[j], l)
-				continue
-			}
-			runLane[key] = len(lanes)
-		}
-		lanes = append(lanes, l)
+		in = append(in, ls)
 	}
+	ag := make([]lanes.Agent, len(agents))
 	for i, a := range agents {
-		if used[i] || a.Group == gDone {
-			continue
+		ag[i] = lanes.Agent{Session: a.Session, Group: a.Group, State: a.State, Interrupted: a.Interrupted,
+			Doing: a.Doing, Project: a.Project, Name: a.Name, Title: a.Title, Short: a.Short, Account: a.Account,
+			Cwd: a.Cwd, Ctx: a.Ctx, Started: a.Started, Quiet: a.Quiet}
+	}
+	out := lanes.Build(in, ag, slots, reg)
+	for _, l := range out {
+		if l.Agent >= 0 && agents[l.Agent].Model == "" {
+			agents[l.Agent].Model = l.Model
 		}
-		lanes = append(lanes, laneRow{Key: a.Session, Project: cmpOr(a.Project, a.Name), Title: cmpOr(a.Title, a.Short),
-			Account: a.Account, Agent: i, Run: a.Group == gRuns && !a.Interrupted, Runs: 1, Ctx: a.Ctx,
-			Cells: map[int]bool{}, Tok: map[int]int{}, Start: a.Started})
-	}
-	for i := range lanes {
-		l := &lanes[i]
-		if l.Agent >= 0 {
-			a := agents[l.Agent]
-			l.Ctx = a.Ctx
-			l.Cwd = a.Cwd
-			l.Project = cmpOr(a.Project, l.Project)
-			if a.Model == "" {
-				agents[l.Agent].Model = l.Model
-			}
-		}
-		if l.Cwd == "" {
-			if p, ok := reg.find(l.Project); ok {
-				l.Cwd = p.Path
-			}
-		}
-		l.State, l.Next, l.NextYou = laneState(*l, agents, slots)
-		if l.State == lsNeeds && l.Agent >= 0 {
-			l.WaitFrom = agents[l.Agent].Quiet
-		}
-	}
-	return lanes
-}
-
-func mergeRun(a, b laneRow) laneRow {
-	for k := range b.Cells {
-		a.Cells[k] = true
-	}
-	for k, v := range b.Tok {
-		a.Tok[k] += v
-	}
-	a.Runs++
-	a.Cost += b.Cost
-	a.Tokens += b.Tokens
-	if b.Agent >= 0 {
-		a.Agent, a.Key = b.Agent, b.Key
-	}
-	if b.End.After(a.End) {
-		a.End, a.Branch = b.End, cmpOr(b.Branch, a.Branch)
-	}
-	if a.Start.IsZero() || (!b.Start.IsZero() && b.Start.Before(a.Start)) {
-		a.Start = b.Start
-	}
-	return a
-}
-
-// laneState is the lane's glyph state and its "next" column: who acts next.
-func laneState(l laneRow, agents []agentRow, slots [2]int) (state, next string, you bool) {
-	if l.Agent < 0 {
-		return lsDone, "nobody", false
-	}
-	a := agents[l.Agent]
-	switch {
-	case a.Interrupted:
-		return lsPaused, cmpOr(strings.TrimPrefix(backAt(a.Doing), "back "), "paused"), false
-	case a.Group == gNeeds:
-		return lsNeeds, "answer", true
-	case a.Group == gRuns:
-		return lsRun, fmt.Sprintf("background %d/%d", slots[0], max(slots[1], 1)), false
-	case a.State == "idle":
-		return lsIdle, "next prompt", true
-	}
-	return lsWorking, "working", false
-}
-
-// backAt finds "back HH:MM" in a paused row's text.
-func backAt(s string) string {
-	if i := strings.Index(s, "back "); i >= 0 {
-		rest := s[i:]
-		if j := strings.Index(rest, ","); j > 0 {
-			rest = rest[:j]
-		}
-		return rest
-	}
-	return ""
-}
-
-// laneGroup is one project's lanes, in display order.
-type laneGroup struct {
-	Project       string
-	Lanes         []int // indexes in fixtures.Lanes
-	Need, Running int
-	LastAt        int
-}
-
-// groupLanes orders projects: most lanes that need the owner first, then running ones,
-// then the latest activity. Inside a project, lanes run by start.
-func groupLanes(lanes []laneRow) []laneGroup {
-	idx := map[string]int{}
-	var gs []laneGroup
-	for i, l := range lanes {
-		j, ok := idx[l.Project]
-		if !ok {
-			j = len(gs)
-			idx[l.Project] = j
-			gs = append(gs, laneGroup{Project: l.Project, LastAt: -1})
-		}
-		g := &gs[j]
-		g.Lanes = append(g.Lanes, i)
-		if l.NextYou {
-			g.Need++
-		}
-		if l.State == lsWorking || l.State == lsRun {
-			g.Running++
-		}
-		g.LastAt = max(g.LastAt, l.last())
-	}
-	for _, g := range gs {
-		sort.SliceStable(g.Lanes, func(a, b int) bool {
-			la, lb := lanes[g.Lanes[a]], lanes[g.Lanes[b]]
-			fa, fb := la.first(), lb.first()
-			if fa < 0 {
-				fa = 1 << 20
-			}
-			if fb < 0 {
-				fb = 1 << 20
-			}
-			return fa < fb
-		})
-	}
-	sort.SliceStable(gs, func(a, b int) bool {
-		if gs[a].Need != gs[b].Need {
-			return gs[a].Need > gs[b].Need
-		}
-		if gs[a].Running != gs[b].Running {
-			return gs[a].Running > gs[b].Running
-		}
-		return gs[a].LastAt > gs[b].LastAt
-	})
-	return gs
-}
-
-// laneOrder is the lanes in display order.
-func laneOrder(lanes []laneRow) []int {
-	var out []int
-	for _, g := range groupLanes(lanes) {
-		out = append(out, g.Lanes...)
 	}
 	return out
 }
+
+// laneGroup is one project's lanes, in display order.
+type laneGroup = lanes.Group
+
+func groupLanes(ls []laneRow) []laneGroup { return lanes.Groups(ls) }
+
+// laneOrder is the lanes in display order.
+func laneOrder(ls []laneRow) []int { return lanes.Order(ls) }
 
 // ----- git facts of the selected lane's checkout -----
 
