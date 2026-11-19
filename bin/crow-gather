@@ -25,6 +25,7 @@ import yaml  # noqa: E402
 
 BIN = Path(__file__).resolve().parent
 import crow_lib  # noqa: E402
+import crow_pending  # noqa: E402
 ROOT = Path(crow_lib.data_home())
 LOCAL = ROOT / "local"
 # AC: the JSON stays under 15k tokens. ~3.5 chars per token for this mixed EN/FR text.
@@ -134,6 +135,14 @@ def threads(state, sections=None, width=None, tags=None):
     if skipped:
         out["_skipped_counts"] = skipped
     return out
+
+
+def pending():
+    """Pending items (crow_pending): counts per source, overdue follow-ups, settled rows to purge."""
+    try:
+        return crow_pending.brief(crow_pending.config(), note("threads"), TODAY)
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        return {"error": str(exc)}
 
 
 def activity_days(state):
@@ -292,6 +301,7 @@ def brief(state, vault, apply=True):
         "today_priorities": today_md if dated else None,
         "afk": afk(state),
         "open_threads": threads(state, {"Me", "Waiting"}),
+        "pending": pending(),
         "status": read(note("status"), 4000),
         **sources,
         "targets": {"activity_log": "bin/crow-log '[tag] text'"},

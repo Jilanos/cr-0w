@@ -7,11 +7,13 @@ Report only by default. --apply does the safe moves, never anything else:
   - remove clean worktrees whose branch is merged into the default branch, delete
     that branch, and delete merged branches with no worktree
   - git worktree prune
+  - purge settled pending rows older than pending_settled_days (crow-pending purge)
 It never commits, pushes, merges, switches branches or touches a dirty tree.
 Work-scope projects are report only.
 
 Usage: crow-tidy [--apply] [--brief] [--scope work|personal|all] [--skip NAME ...]
   --brief  only list projects that need attention (used by the brief skill)
+  --skip pending  leaves the pending files alone
 """
 import argparse
 import subprocess
@@ -23,6 +25,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "local" / "projects.yaml"
+sys.path.insert(0, str(ROOT / "bin"))
+import crow_lib  # noqa: E402
+import crow_pending  # noqa: E402
 
 
 def git(repo, *args, check=False):
@@ -154,6 +159,21 @@ def tidy(project, apply):
     return notes, done
 
 
+def pending_lines(apply, cfg=None, threads=None):
+    """Report lines of the settled-row purge of the pending sources; empty when nothing is due."""
+    try:
+        cfg = crow_pending.config() if cfg is None else cfg
+        threads = crow_lib.crow_path("threads") if threads is None else threads
+        done = crow_pending.purge(cfg, threads, apply)
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        return ["## pending", f"- purge skipped: {exc}"]
+    if not done:
+        return []
+    days = cfg["settled_days"]
+    verb = "✔ purged" if apply else "to purge:"
+    return ["## pending"] + [f"- {verb} {n} settled row(s) older than {days} days in {label}" for label, n in done]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true")
@@ -178,6 +198,8 @@ def main():
             continue
         out.append(f"## {p['name']}" + ("" if notes or done else " ✓"))
         out += [f"- ✔ {d}" for d in done] + [f"- {n}" for n in notes]
+    if "pending" not in args.skip:
+        out += pending_lines(args.apply)
     print("\n".join(out) if out else "All repos clean.")
 
 
