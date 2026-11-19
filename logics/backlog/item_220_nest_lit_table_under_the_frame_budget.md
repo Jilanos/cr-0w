@@ -8,10 +8,12 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 17:31:49
 
 # AI Context
 - Summary: Bring the lit holotable (`?table=a|b`) under the item_159 frame budget: 10 ms laptop, 16 ms fold, median, live path. Today 16.1 ms laptop, 15.2 ms fold.
 - Keywords: nest, hero, holotable, frame time, perf, cache, table flag
+- Note: the lit table is now the default (no flag); the budget applies to the live hero.
 - Use when: speeding up the lit table in `tools/nest/src/hero/scene.ts` and `planets.ts`.
 - Skip when: changing the look (owner picks in item_217 are locked: C2 board, moons B, labels B).
 
@@ -33,6 +35,7 @@
 - AC2: No flag stays pixel-identical (`scripts/hero-table.mjs hash` vs baseline).
 - AC3: Real-app shots of `?table=a` (laptop, phone, with injected sessions) match the current look; any difference shown to the owner before commit.
 - AC4: tsc clean, vitest green.
+- AC5 (from item_218): when a device misses the budget, the hero falls back to the plain table; proven by a forced slow run.
 
 # Dependencies
 - item_216, item_217 (built). Budget: item_159.
@@ -47,6 +50,8 @@
 # Notes
 - Measure on an idle machine: check `ps -eo pcpu,args --sort=-pcpu | head` first. Stuck image viewers once doubled the numbers.
 - Headless scripts need `PLAYWRIGHT_BROWSERS_PATH` set to the local Playwright browser cache.
+- 2026-11-19: frame times with the lit table as default, before the table fit: laptop 7.4/18.0 ms, inner 20.1/32.5 ms, phone 8.4/12.4 ms (drawScene median/max). Inner was the worst; the item_259 fit (c292f40) shrinks its planets, so measure again on an idle machine first. Top self time on inner: fillText 15.7%, fillRect 5.7%, draw 4.2%, castPlanets 3.2%.
+- Next in order: item_220, then item_259 (mockups first), then item_221 (owner 2026-11-19).
 
 # Outcome (2026-11-17)
 - Profile (`hero-table.mjs prof a`, new mode): fillText and the canvas flush (drawImage) were ~40% of the lit frame. With no glyph drawing at all the frame was 6.4 ms.

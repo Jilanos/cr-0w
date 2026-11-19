@@ -1,10 +1,10 @@
 ## item_218_nest_holotable_options_budget_fallback_and_recordings - Nest holotable options budget, fallback and recordings
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 85%
 > Confidence: 75%
-> Progress: 0%
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -38,3 +38,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Closeout (2026-11-19)
+- Owner pick done: table A (C2 board) is the default. Recordings for a pick are no longer needed.
+- The remaining scope (fall back to the plain table when a device misses the budget, proven by a forced slow run) moved to item_220 as AC5. Closed by the owner.

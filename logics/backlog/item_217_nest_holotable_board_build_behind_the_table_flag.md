@@ -1,10 +1,10 @@
 ## item_217_nest_holotable_board_build_behind_the_table_flag - Nest holotable board build behind the table flag
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 85%
+> Progress: 100%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -59,3 +59,6 @@
 - 2026-11-17 wrap: labels B and moons without hex marker done (331a733). Open: owner OK on the whole board (AC3), hover/select/ping recheck by hand, fold device check. Frame-time miss moved to item_220.
 - 2026-11-17: lit table is the default with no URL flag (043ba84), old table code kept until the owner says. Moons B everywhere incl. members and hover, tighter lanes, hover trails, hover moons = asks + sessions + missions (455ac16, 4429c06). Open: owner OK on the whole board, fold device check.
 - 2026-11-17: owner OK on the whole board except labels (item_221). Open here: hover/select/ping recheck by hand, fold device check.
+
+# Closeout (2026-11-19)
+- AC3: the owner runs the C2 board as the default and closed this item. Board polish (labels) goes on in item_221; fit and Home layout in item_259.

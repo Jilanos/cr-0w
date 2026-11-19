@@ -1,10 +1,10 @@
 ## item_212_nest_hero_holotable_with_detailed_3d_planets_and_table_options_next_to_the_current_one - Nest hero holotable with detailed 3D planets and table, options next to the current one
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 85%
 > Confidence: 75%
-> Progress: 55%
+> Progress: 100%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -94,3 +94,6 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Closeout (2026-11-19)
+- Option A (C2 board, lit planets) shipped as the default via items 216, 217. Budget and fallback continue in item_220. Closed by the owner.

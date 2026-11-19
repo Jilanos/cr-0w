@@ -1,10 +1,10 @@
 ## item_216_nest_lit_planets_renderer_behind_the_table_flag - Nest lit planets renderer behind the table flag
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
+> Status: Done
 > Understanding: 95%
 > Confidence: 90%
-> Progress: 90%
+> Progress: 100%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -75,3 +75,6 @@
   | `?table=a`, no planets | 12.6 / 26.5 | 11.9 / 28.0 | 11.7 / 27.2 |
 
   Split of the ~9 ms the lit table adds: planets ~3.5 ms, hex foot fill ~1.5 ms, the rest of the board (hex grid, radar, stalks, moons) ~4 ms. The table misses the item_159 laptop budget (10 ms) and sits just under the fold budget (16 ms); maxes miss both. Reported to the owner per item_159 AC4. Earlier same-day runs (22-36 ms) were taken with two stuck image viewers on two cores and are discarded.
+
+# Closeout (2026-11-19)
+- The lit table became the default (`TABLE = 'a'` in `Hero.tsx`); AC2 (no-flag identity) no longer applies. AC3 frame numbers live in item_220, which carries the budget work. Owner closed it.
