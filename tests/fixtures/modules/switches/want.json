@@ -1,7 +1,7 @@
 {
   "on": ["core", "core-api", "deck", "design", "forge", "git", "nest", "releases", "retro", "vault"],
   "config": {
-    "core": {}, "core-api": {}, "deck": {}, "design": {}, "forge": {"hosts": {"gitlab.example.com": "gitlab"}},
+    "core": {"pending_files": [], "pending_settled_days": 14, "pending_sections": {}, "pending_columns": {}}, "core-api": {}, "deck": {}, "design": {}, "forge": {"hosts": {"gitlab.example.com": "gitlab"}},
     "git": {}, "nest": {"core_url": "http://127.0.0.1:9999"}, "releases": {}, "retro": {}, "vault": {}
   },
   "errors": []

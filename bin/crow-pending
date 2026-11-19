@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""crow-pending: pending items and follow-ups as one schema (runbooks/pending-items.md).
+
+Sources: the Open Threads note, then the files of `modules.core.pending_files` in crow.yaml.
+FILE arguments replace the configured sources.
+
+Usage:
+  crow-pending list [FILE ...] [--kind K] [--json]   items of the schema
+  crow-pending check FILE ...                         loss check: counts only, exit 1 on loss
+  crow-pending inbox [FILE ...]                       open follow-ups as Inbox `followup` rows (JSON)
+  crow-pending brief [FILE ...]                       the summary crow-gather brief embeds (JSON)
+  crow-pending purge [FILE ...] [--days N] [--apply]  drop settled rows older than N days
+                                                      (default pending_settled_days, 14); dry run without --apply
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import crow_lib  # noqa: E402
+import crow_pending as cp  # noqa: E402
+
+
+def settings(files, days=None):
+    cfg = cp.config()
+    threads = None
+    if files:
+        cfg["files"] = files
+    else:
+        threads = crow_lib.crow_path("threads")
+    if days is not None:
+        cfg["settled_days"] = days
+    return cfg, threads
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("cmd", choices=("list", "check", "inbox", "brief", "purge"))
+    ap.add_argument("files", nargs="*")
+    ap.add_argument("--kind", choices=cp.KINDS)
+    ap.add_argument("--days", type=int)
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args()
+    if a.cmd == "check" and not a.files:
+        ap.error("check wants at least one FILE")
+    cfg, threads = settings(a.files, a.days)
+
+    if a.cmd == "brief":
+        print(json.dumps(cp.brief(cfg, threads), ensure_ascii=False))
+        return 0
+    if a.cmd == "purge":
+        done = cp.purge(cfg, threads, a.apply)
+        verb = "purged" if a.apply else "would purge"
+        for label, n in done:
+            print(f"{label}: {verb} {n} settled row(s) older than {cfg['settled_days']} days")
+        if not done:
+            print(f"nothing settled older than {cfg['settled_days']} days")
+        return 0
+
+    docs, errors = cp.load(cfg, threads)
+    for e in errors:
+        print(f"crow-pending: {e}", file=sys.stderr)
+    if a.cmd == "check":
+        reports = [cp.report(d) for d in docs]
+        print(json.dumps(reports, ensure_ascii=False, indent=1))
+        return 0 if not errors and all(r["lossless"] for r in reports) else 1
+    items = [it for d in docs for it in d["items"]]
+    if a.cmd == "inbox":
+        rows = [cp.to_inbox(it) for it in items if it["kind"] == "waiting"]
+        rows.sort(key=lambda r: (-(r["overdue_days"] or 0), r["due"] or "9999"))
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        return 0
+    if a.kind:
+        items = [it for it in items if it["kind"] == a.kind]
+    if a.json:
+        print(json.dumps(items, ensure_ascii=False, indent=1))
+        return 0
+    for it in items:
+        late = f" LATE {it['overdue_days']}d" if it.get("overdue_days") else ""
+        due = f" due {it['due']}" if it["due"] else ""
+        who = f"{it['who']}: " if it["who"] else ""
+        title = (it["title"] or "").replace("\n", " ")[:120]
+        print(f"{it['source']}:{it['line']} {it['kind']}{due}{late} {who}{title}")
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

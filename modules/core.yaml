@@ -18,6 +18,8 @@ scripts:
   - crow-memory
   - crow-modules
   - crow-open
+  - crow-pending
+  - crow_pending.py
   - crow-project
   - crow-prompt
   - crow-ready
@@ -49,6 +51,7 @@ runbooks:
   - memory
   - new-account
   - open-project-session
+  - pending-items
   - own-routines
   - remote-computer-use-windows
   - service-tokens
@@ -63,7 +66,7 @@ core_routes: []
 apps: []
 integrations: []
 gather:
-  brief: [today_priorities, fleet, long_sessions, accounts, usage_split, runs]
+  brief: [today_priorities, fleet, long_sessions, accounts, usage_split, runs, pending]
   daily: [tracker, activity_logs]
   weekly: [tracker, activity_logs]
 doctor:
@@ -71,4 +74,8 @@ doctor:
   needs: [cdx]
 nest: {}
 deck: {}
-config: {}
+config:
+  pending_files: []         # pending files read with the Open Threads note (path, or {path, label})
+  pending_settled_days: 14  # crow-tidy --apply purges settled rows older than this
+  pending_sections: {}      # heading prefix -> kind, added to the English defaults
+  pending_columns: {}       # table column name -> schema field, added to the English defaults

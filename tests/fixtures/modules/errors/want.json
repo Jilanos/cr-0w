@@ -1,7 +1,7 @@
 {
   "on": ["afk", "core", "deck", "forge", "git", "mail", "nest", "releases", "retro", "team", "vault"],
   "config": {
-    "afk": {}, "core": {}, "deck": {}, "forge": {"hosts": {}}, "git": {}, "mail": {},
+    "afk": {}, "core": {"pending_files": [], "pending_settled_days": 14, "pending_sections": {}, "pending_columns": {}}, "deck": {}, "forge": {"hosts": {}}, "git": {}, "mail": {},
     "nest": {"core_url": "http://127.0.0.1:8787"}, "releases": {}, "retro": {}, "team": {}, "vault": {}
   },
   "errors": ["colour", "modules.billing", "modules.core", "modules.forge.on", "modules.forge.token",
