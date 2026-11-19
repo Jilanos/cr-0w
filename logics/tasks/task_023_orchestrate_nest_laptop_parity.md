@@ -8,7 +8,7 @@
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
-> Indicators reviewed: 2026-11-12 11:08:32
+> Indicators reviewed: 2026-11-19 17:14:02
 
 # AI Context
 - Summary: (unfilled: replace before this doc is used)
@@ -59,6 +59,7 @@
 
 # Report
 - 2026-11-12: item_187 done (f8cd300). Owner raised AskUserQuestion answers from Nest; filed item_193, runs next before 188.
+- item_190: queue actions live (routine pause/resume/run now, AFK edit/skip, mission cancel), week graph, day/week switch keeps the old view dimmed then fades (9e5ba22, 0d7ced9, df1ddd4, 057d80a). Open: panel height snaps on switch (needs JS measure to animate), mission run now/reorder needs a priority and slot-override design, owner review on live data.
 
 # Links
 - Request: `req_057_nest_on_the_laptop_replaces_the_owner_s_terminals`
@@ -68,3 +69,6 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Notes
+- item_190: week view uses the day graph (one 22px row per day, same axis and 08-20/24H toggle) at the owner's request; lanes overlap per day.
