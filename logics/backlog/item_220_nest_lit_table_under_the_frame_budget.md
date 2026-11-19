@@ -8,7 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 17:44:53
+> Indicators reviewed: 2026-11-19 17:46:49
 
 # AI Context
 - Summary: Bring the lit holotable (`?table=a|b`) under the item_159 frame budget: 10 ms laptop, 16 ms fold, median, live path. Today 16.1 ms laptop, 15.2 ms fold.
@@ -54,7 +54,7 @@
 - 2026-11-19: `hero-table.mjs bench a` measures under load (frame/calib ratio + exact canvas call counts). Baseline, 3 runs on a loaded machine (load avg 8), frame now includes the raster flush: laptop ratio 5.7-7.0 (p10 4.3-5.0), inner 6.3-6.7 (p10 4.2-4.9), cover 4.2-4.4 (p10 3.2-3.3). Per frame: laptop 3674 fillText / 879 fillRect / 6024 chars, inner 4826 / 1828 / 7308, cover 3237 / 1057 / 5105. Use these to judge each change; AC1 absolute ms still needs one idle run.
 - 2026-11-19 change: in the lit table, each pass draws its planet cell backgrounds as one cols x rows image, scaled up without smoothing, instead of one fillRect per cell. Their glyphs then join the text runs. Per frame: fillRect 879/1828/1057 → 0, fillText 3674/4826/3237 → 3518/4367/3032. Bench p10 ratio (load avg 10): laptop 4.2-4.9, inner 3.7-3.8, cover 2.6-2.8. Pixel diff: 0.16-0.40% of pixels, on planet rims only; identical at 3x zoom. Default hash unchanged.
 - Tried, reverted: 16-step alpha for text runs. It cut fillText by another 15% but changed 2.5-3.5% of pixels (a look change).
-- Remaining lever: about 3000-4400 fillText calls per frame, mostly single glyphs (distinct alpha per cell). Only a WebGL cell-grid renderer (glyph atlas, the gl/head.ts pipeline) removes them. Owner pick.
+- Remaining lever: about 3000-4400 fillText calls per frame, mostly single glyphs (distinct alpha per cell). Only a WebGL cell-grid renderer (glyph atlas, the gl/head.ts pipeline) removes them. Owner chose WebGL: item_270.
 - Next in order: item_220, then item_259 (mockups first), then item_221 (owner 2026-11-19).
 
 # Outcome (2026-11-17)
