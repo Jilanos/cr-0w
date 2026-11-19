@@ -4,7 +4,7 @@
 > Status: Ready
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 15%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -59,3 +59,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Notes
+- 2026-11-19, table fit done ahead of the layout: the table scale width is `min(w, 1.05 * h)` (`FIT` in `src/hero/scene.ts`). Wide, short heroes (Fold inner 683x420, laptop with the chat folded 1010x816, 1920 folded) keep the table and planets in the frame. Cover and laptop with the chat open are unchanged (width under 1.05x height). Shots: `scripts/hero-fit.mjs`, `local/state/shots/hero-fit/compare.png`.
+- Still open: the Home layout itself (AC0-AC2) and AC4 (no jump on fold/drag).
