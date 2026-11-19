@@ -25,6 +25,7 @@ import (
 	"crow-core/internal/butler"
 	"crow-core/internal/eventlog"
 	"crow-core/internal/mission"
+	"crow-core/internal/ops"
 	"crow-core/internal/work"
 )
 
@@ -65,6 +66,8 @@ type Server struct {
 	}
 	ext   map[string]*ext
 	order []string // every section, in response order
+	// opsLog is the ops state log under StateDir, nil without one.
+	opsLog *ops.Log
 }
 
 // Section is one part of the state with its change marks.
@@ -100,6 +103,9 @@ func New(o Options) *Server {
 		s.order = append(s.order, src.Name)
 	}
 	s.order = append(s.order, WorkSection, OpsSection)
+	if o.StateDir != "" {
+		s.opsLog = &ops.Log{Path: filepath.Join(o.StateDir, ops.LogName)}
+	}
 	return s
 }
 

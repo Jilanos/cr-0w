@@ -197,6 +197,21 @@ func TestServeTickFailureLogsAndGoesOn(t *testing.T) {
 	}
 }
 
+// Every pass records the ops states after the tick, also when the tick fails; an
+// observer error is logged.
+func TestServePassObservesOps(t *testing.T) {
+	tk, _, l, _ := newTicker(t, &fakeRuns{failState: 1})
+	n := 0
+	tk.observe = func() error { n++; return errors.New("disk full") }
+	tk.pass()
+	if n != 1 {
+		t.Fatalf("observed %d times", n)
+	}
+	if !strings.Contains(l.text(), "ops state log: disk full") {
+		t.Errorf("observer error not logged:\n%s", l.text())
+	}
+}
+
 func TestTickInterval(t *testing.T) {
 	for v, want := range map[string]time.Duration{"": 2 * time.Minute, "0": 0, "90s": 90 * time.Second, "300": 5 * time.Minute} {
 		got, err := tickInterval(func(string) string { return v })

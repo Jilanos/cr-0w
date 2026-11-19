@@ -71,7 +71,19 @@ type ticker struct {
 	maxRuns func() int
 	locked  func(func(mission.Env) error) error // the server lock; rebuilds the store sections
 	after   func(mission.TickReport)            // a pass that started or finished runs
+	observe func() error                        // after every pass: the ops state log; nil skips it
 	logf    func(string, ...any)
+}
+
+// pass runs one tick, then records the live lane states, also when the tick was skipped.
+func (t *ticker) pass() {
+	_, _ = t.once()
+	if t.observe == nil {
+		return
+	}
+	if err := t.observe(); err != nil {
+		t.logf("ops state log: %v", err)
+	}
 }
 
 // once runs one pass. A held lock skips it.
@@ -120,7 +132,7 @@ func (t *ticker) loop(ctx context.Context, first, every time.Duration) {
 	case <-ctx.Done():
 		return
 	case <-time.After(first):
-		_, _ = t.once()
+		t.pass()
 	}
 	tk := time.NewTicker(every)
 	defer tk.Stop()
@@ -129,7 +141,7 @@ func (t *ticker) loop(ctx context.Context, first, every time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-tk.C:
-			_, _ = t.once()
+			t.pass()
 		}
 	}
 }

@@ -32,15 +32,37 @@ func (s *Server) ops(r *http.Request) (Section, error) {
 	if err != nil {
 		return Section{}, err
 	}
-	in := ops.Input{Now: now, Days: days, AFK: afkJobs(s.o.StateDir)}
-	var stale []string
-	var updated *string
+	in, updated, stale, err := s.opsInput(now, days, true)
+	if err != nil {
+		return Section{}, err
+	}
+	o := ops.Build(in)
+	if s.opsLog != nil {
+		lines, err := ops.ReadLog(s.opsLog.Path)
+		if err != nil {
+			stale = append(stale, "state log: "+err.Error())
+		}
+		o = ops.Merge(o, lines, now)
+	}
+	o.Day, o.Week = out.Day, out.Week
+	sec := Section{Section: OpsSection, Data: o, UpdatedAt: updated, Version: hash(o)}
+	if len(stale) > 0 {
+		sec.Stale, sec.Error = true, strings.Join(stale, "; ")
+		sec.Version = hash([]any{sec.Version, sec.Error})
+	}
+	return sec, nil
+}
+
+// opsInput reads the ops inputs. ask marks the sections requested; the state log
+// observer only peeks at the last good bodies, so an idle phone costs no script runs.
+func (s *Server) opsInput(now time.Time, days []string, ask bool) (in ops.Input, updated *string, stale []string, err error) {
+	in = ops.Input{Now: now, Days: days, AFK: afkJobs(s.o.StateDir)}
 	for _, name := range opsInputs {
 		e := s.ext[name]
 		if e == nil {
 			continue
 		}
-		sec := s.readExt(e)
+		sec := s.extSection(e, ask)
 		if sec.Stale {
 			stale = append(stale, name+": "+sec.Error)
 		}
@@ -67,17 +89,23 @@ func (s *Server) ops(r *http.Request) (Section, error) {
 		in.Missions = slices.Clone(s.storeMissions())
 	}
 	s.mu.Unlock()
+	return in, updated, stale, err
+}
+
+// ObserveOps appends the state of today's live lanes to the ops state log, one line per
+// state change. The serve tick calls it; it refreshes the dispatch section first. It does
+// nothing without a state dir.
+func (s *Server) ObserveOps() error {
+	if s.opsLog == nil {
+		return nil
+	}
+	s.Refresh("dispatch")
+	now := s.o.Now()
+	in, _, _, err := s.opsInput(now, []string{now.Format(time.DateOnly)}, false)
 	if err != nil {
-		return Section{}, err
+		return err
 	}
-	o := ops.Build(in)
-	o.Day, o.Week = out.Day, out.Week
-	sec := Section{Section: OpsSection, Data: o, UpdatedAt: updated, Version: hash(o)}
-	if len(stale) > 0 {
-		sec.Stale, sec.Error = true, strings.Join(stale, "; ")
-		sec.Version = hash([]any{sec.Version, sec.Error})
-	}
-	return sec, nil
+	return s.opsLog.Observe(now, ops.Build(in).Lanes)
 }
 
 // opsDays reads ?day or ?week into the days to build, in now's location.
