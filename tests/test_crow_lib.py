@@ -92,9 +92,10 @@ def test_oneshot_prompt_codex_without_skill_file_exits(tmp_path):
         crow_lib.oneshot_prompt("codex", _hub(tmp_path), "weekly")
 
 
-def test_permission_and_hub_session_guard_per_provider():
-    assert crow_lib.permission("claude") == "default"
-    assert crow_lib.permission("codex") == "default"
+def test_permission_and_hub_session_guard_per_provider(tmp_path):
+    env = {"CROW_HOME": str(tmp_path)}
+    assert crow_lib.permission("claude", env) == "default"
+    assert crow_lib.permission("codex", env) == "default"
     assert crow_lib.hub_session_refusal("claude") is None
     assert "guard" in crow_lib.hub_session_refusal("codex")
 

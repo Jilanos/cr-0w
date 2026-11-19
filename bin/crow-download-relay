@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# crow-download-relay: hub-side downloader for runs without network (see runbooks/codex-download-relay.md).
+# The run appends download_url<TAB>absolute_dest_path rows to a manifest; this loop fetches them over HTTPS.
+# Usage: crow-download-relay <manifest.tsv> [dest-root]   (dest-root defaults to the manifest's folder)
+# Stops when <manifest>.done exists and every row is handled. A dest outside dest-root is refused, never overwritten.
+set -u
+M="${1:?usage: crow-download-relay <manifest.tsv> [dest-root]}"
+ROOT=$(realpath -m "${2:-$(dirname "$M")}")
+LOG="${M%.tsv}.download.log"; touch "$LOG"
+while true; do
+  if [ -f "$M" ]; then
+    while IFS=$'\t' read -r url dest; do
+      [ -z "${url:-}" ] && continue
+      grep -qxF "OK	$dest" "$LOG" && continue
+      grep -qF "	$dest	try3" "$LOG" && continue
+      grep -qxF "REFUSED	$dest" "$LOG" && continue
+      case "$dest" in /*) ;; *) echo "REFUSED	$dest" >> "$LOG"; continue ;; esac
+      case "$(realpath -m "$dest")/" in "$ROOT"/*) ;; *) echo "REFUSED	$dest" >> "$LOG"; continue ;; esac
+      mkdir -p "$(dirname "$dest")"
+      [ -e "$dest" ] && { echo "OK	$dest" >> "$LOG"; continue; }
+      code=$(curl -s -L --proto =https --proto-redir =https -o "$dest.part" -w '%{http_code}' "$url")
+      if [ "$code" = 200 ]; then mv "$dest.part" "$dest"; echo "OK	$dest" >> "$LOG"
+      else rm -f "$dest.part"; n=$(grep -cF "	$dest	try" "$LOG"); echo "ERR $code	$dest	try$((n+1))" >> "$LOG"; fi
+    done < "$M"
+  fi
+  [ -f "$M.done" ] && break
+  sleep "${CROW_RELAY_POLL_S:-20}"
+done
+echo "finished: $(grep -c '^OK' "$LOG") ok, $(grep -c 'try3' "$LOG") failed, $(grep -c '^REFUSED' "$LOG") refused"

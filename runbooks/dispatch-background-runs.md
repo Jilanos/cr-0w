@@ -70,6 +70,8 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
   the account's rank for that scope, then cdx priority, then room (same pick as `crow-accounts pick --scope <scope>`,
   which prints the deciding factor). An ask-first pick is never taken unasked. `--failover` is on every run.
   Two medium runs launched together can exhaust a session window in about 90 seconds. Stagger them if the window was recently used.
+- **Permission**: `permission` in `local/headless.json` picks `default` (also when the file is absent) or `full` for
+  every headless launch (runbooks/claude-and-codex.md). `--permission review` and isolated runs keep their own mode.
 - **Deletions in auto mode**: the permission classifier blocks deleting files with real content, so the run stops and reports.
   If the prompt already expects deletions, name the exact files in it, or plan for the owner to approve them afterwards.
 - **Odd infra failures inside a run** (e.g. Docker networking): check `uname -r` against `/usr/lib/modules`. A kernel upgraded without a reboot breaks module loading.

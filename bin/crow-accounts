@@ -7,7 +7,7 @@
   crow-accounts allowed            names crow may target (policy use or ask-first)
   crow-accounts require <name>     exit 1 unless crow may target the account
   crow-accounts provider <name>    claude | codex (from cdx; claude when cdx does not say)
-  crow-accounts permission <name>  cdx permission for hub one-shots: default (the run sandbox allowlist decides)
+  crow-accounts permission <name>  cdx permission for hub one-shots: local/headless.json (default: run sandbox)
   crow-accounts hub-session <name> exit 1 when the account's provider cannot run a guarded hub session
   crow-accounts prompt <name> <skill> [args]   prompt that runs a hub skill on that provider
   crow-accounts check-model <name> <model>     exit 1 when the model belongs to the other provider

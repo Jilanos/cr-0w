@@ -499,7 +499,14 @@ def report(run_id, since="7d"):
         if full:
             return full
     if provider == "codex" and "Shipped" not in result:
-        return codex_report(crow_lib.codex_messages(text), result)
+        msgs = crow_lib.codex_messages(text)
+        out = codex_report(msgs, result)
+        if "Shipped" not in out and "\n" not in out.strip():
+            cwd = r.get("cwd") or next((x.get("cwd") for x in ledger() if x.get("run_id") == r["run_id"]), "")
+            f = codex_report_file(text, msgs, cwd or "")
+            if f:
+                return f"Report file: {f}\n\n{Path(f).read_text(errors='replace')}"
+        return out
     return result
 
 
@@ -510,6 +517,29 @@ def codex_report(msgs, result):
         return shaped[-1]
     full = [m for m in msgs if "\n" in m.strip()]
     return full[-1] if full and "\n" not in result.strip() else result
+
+
+MD_PATH = re.compile(r"(?<![\w/.-])((?:/|\./)?[\w./-]+\.md)\b")
+
+
+def codex_report_file(text, msgs, cwd=""):
+    """The report a Codex run wrote to a file when it stopped before its final message: the last markdown file it
+    changed or named that holds a report (`Shipped`), else the last one it named with 'report' in the file name."""
+    paths = []
+    for o in crow_lib._json_objects(text):
+        item = o.get("item") if o.get("type") == "item.completed" else None
+        if isinstance(item, dict) and item.get("type") == "file_change":
+            paths += [c.get("path") for c in item.get("changes") or [] if isinstance(c, dict) and c.get("path")]
+    for m in msgs:
+        paths += MD_PATH.findall(m)
+    found = []
+    for p in paths:
+        f = Path(p) if os.path.isabs(p) or not cwd else Path(cwd) / p
+        if f.suffix == ".md" and f.is_file():
+            found = [x for x in found if x != str(f)] + [str(f)]
+    shaped = [f for f in found if "Shipped" in Path(f).read_text(errors="replace")]
+    named = [f for f in found if "report" in Path(f).name.lower()]
+    return (shaped or named or [None])[-1]
 
 
 def final_of(target, provider=None, since="7d"):
