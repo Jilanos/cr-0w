@@ -1,10 +1,10 @@
 ## item_260_module_manifests_crow_yaml_loader_and_doctor_check - Module manifests, crow.yaml loader and doctor check
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: In progress
-> Understanding: 85
-> Confidence: 80
-> Progress: 0%
+> Status: Done
+> Understanding: 90
+> Confidence: 85
+> Progress: 100%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -37,8 +37,17 @@
 - AC4: The inventory test passes against the manifests.
 
 # AC Traceability
-- req_064_paul_s_feedback_and_a_modular_public_crow-AC2 -> This backlog slice. Proof: inventory test reads the module manifests.
-- req_064_paul_s_feedback_and_a_modular_public_crow-AC3 -> This backlog slice. Proof: loader and doctor check that later splits build on.
+- req_064_paul_s_feedback_and_a_modular_public_crow-AC2 -> This backlog slice. Proof: inventory test reads the module manifests (8c3dd2f).
+- req_064_paul_s_feedback_and_a_modular_public_crow-AC3 -> This backlog slice. Proof: loader in Python and Go (0183467, 1a0687c) and doctor modules check (6ff9a9a). Acting on an off brick stays with item_261 onward.
+- AC1: `tests/test_crow_modules.py` (defaults fixture, `crow modules json` without crow.yaml); the full suite passes unchanged. 0183467.
+- AC2: `tests/test_crow_doctor.py` modules tests: unknown brick, unknown key, unmet `requires` and a parse error fail with `file: key: error`. 6ff9a9a.
+- AC3: `tests/fixtures/modules/<case>` read by `tests/test_crow_modules.py` and `internal/config/modules_test.go`. 1a0687c.
+- AC4: `tests/test_module_inventory.py` reads `modules/*.yaml`; `bricks.tsv` removed. 8c3dd2f.
+
+# Validation
+- `bin/crow-check` passed on 2026-11-19: 750 tests, shellcheck, ruff, leak, commits, version green.
+- `go test ./...` in `tools/crow-core` passed on 2026-11-19: 273 tests in 14 packages.
+- Missing tools for an on brick warn and do not fail, so a setup without glab or gh keeps a passing doctor.
 
 # Dependencies
 - adr_002 accepted by the owner.
