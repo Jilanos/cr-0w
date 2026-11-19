@@ -123,8 +123,8 @@ func startTicker(ctx context.Context, srv *api.Server, env mission.Env, engine s
 		after:   func(mission.TickReport) { go srv.Refresh("dispatch") },
 		logf:    log.Printf,
 	}
-	log.Printf("tick every %s", every)
-	go t.loop(ctx, every)
+	log.Printf("tick every %s, first in %s", every, min(firstTickDelay, every))
+	go t.loop(ctx, firstTickDelay, every)
 }
 
 func orNone(s string) string {

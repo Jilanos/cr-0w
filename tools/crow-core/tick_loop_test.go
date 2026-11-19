@@ -110,7 +110,8 @@ func TestServeTickStartsQueuedMission(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go tk.loop(ctx, 10*time.Millisecond)
+	// first pass at once, next one an hour later: the mission starts on the startup pass
+	go tk.loop(ctx, 0, time.Hour)
 	deadline := time.Now().Add(5 * time.Second)
 	for !hasState(section[[]contract.Mission](t, srv, "missions"), m.ID, "running") {
 		if time.Now().After(deadline) {

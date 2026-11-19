@@ -107,9 +107,21 @@ func (t *ticker) once() (rep mission.TickReport, err error) {
 	return rep, nil
 }
 
-// loop runs a pass every interval until ctx ends. Passes run in this goroutine, so two
-// never overlap; a slow pass delays the next one.
-func (t *ticker) loop(ctx context.Context, every time.Duration) {
+// firstTickDelay lets serve finish starting before the first pass after a restart.
+const firstTickDelay = 30 * time.Second
+
+// loop runs a first pass after first (capped at every), then one every interval until ctx
+// ends. Passes run in this goroutine, so two never overlap; a slow pass delays the next one.
+func (t *ticker) loop(ctx context.Context, first, every time.Duration) {
+	if first > every {
+		first = every
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(first):
+		_, _ = t.once()
+	}
 	tk := time.NewTicker(every)
 	defer tk.Stop()
 	for {

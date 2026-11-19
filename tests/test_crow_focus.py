@@ -322,7 +322,8 @@ def test_kitty_keys_args_map_names_and_keep_text_literal():
 
 
 def test_crow_screen_refuses_a_pid_without_a_window(tmp_path):
-    import json, subprocess
+    import json
+    import subprocess
     r = subprocess.run([sys.executable, str(BIN / "crow-screen"), "show", "--pid", "1"], capture_output=True, text=True,
                        env={**os.environ, "TMUX_TMPDIR": str(tmp_path), "XDG_RUNTIME_DIR": str(tmp_path)})
     assert r.returncode == 1 and json.loads(r.stdout)["ok"] is False
@@ -330,7 +331,8 @@ def test_crow_screen_refuses_a_pid_without_a_window(tmp_path):
 
 def test_resume_headless_prints_json_with_the_tmux_session(tmp_path):
     """item_240: core resumes with CROW_TERMINAL=headless; no window, one JSON line."""
-    import json, subprocess
+    import json
+    import subprocess
     fakebin, calls = tmp_path / "bin", tmp_path / "tmux.log"
     fakebin.mkdir()
     (fakebin / "tmux").write_text(f"#!/bin/sh\necho \"$@\" >> {calls}\n")

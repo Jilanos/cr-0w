@@ -214,7 +214,7 @@ def test_api_state_fixture():
     assert set(st) == {"version", "sections"}
     assert set(st["sections"]) == {
         "inbox", "missions", "runs", "sessions", "dispatch", "usage", "today",
-        "mrs", "checks", "projects", "accounts", "jobs", "work"}
+        "mrs", "checks", "projects", "accounts", "jobs", "work", "ready"}
     for name, sec in st["sections"].items():
         assert sec["section"] == name
         check_section(sec)
