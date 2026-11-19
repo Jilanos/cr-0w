@@ -30,6 +30,15 @@ var clock = time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
 
 // newServer serves the two fixture missions with their spec files, and fixed accounts
 // and jobs.
+// stateDir is a machine state dir with one AFK job waiting.
+func stateDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "afk", "job-01-audit.md"), []byte("# Audit the runbooks\n\nRead each runbook.\n"))
+	writeFile(t, filepath.Join(dir, "afk", "archive", "2026-11-09", "job-01-old.md"), []byte("# Old job\n"))
+	return dir
+}
+
 func newServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	root := testfix.MissionsRoot(t)
@@ -54,7 +63,8 @@ func newServer(t *testing.T) (*Server, string) {
 			return ParseTimers([]byte(`[{"next":1794330227942489,"last":0,"unit":"crow-retro.timer","activates":"crow-retro.service"},
 				{"next":1,"last":2,"unit":"other.timer","activates":"other.service"}]`))
 		}}),
-		Now: func() time.Time { return clock },
+		Now:      func() time.Time { return clock },
+		StateDir: stateDir(t),
 	})
 	for _, name := range srv.Sections() {
 		srv.Refresh(name)
@@ -164,6 +174,9 @@ func TestResponseFixtures(t *testing.T) {
 		"state-checks":        {path: "/api/state/checks"},
 		"state-projects":      {path: "/api/state/projects"},
 		"state-work":          {path: "/api/state/work"},
+		"state-ops":           {path: "/api/state/ops?day=2026-11-10"},
+		"state-ops-week":      {path: "/api/state/ops?week=2026-W46"},
+		"error-ops-bad-week":  {path: "/api/state/ops?week=2026-46"},
 		"mission":             {path: "/api/missions/20261109-build-item-095"},
 		"mission-questions":   {path: "/api/missions/20261109-research-android-push-options"},
 		"events":              {path: "/api/events?limit=3"},

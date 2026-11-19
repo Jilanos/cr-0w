@@ -32,7 +32,7 @@ const (
 // Names resolves project names against the registry. A nil-safe implementation may
 // answer names unchanged.
 type Names interface {
-	ShortName(name string) string            // registry short name, the name itself when unknown
+	ShortName(name string) string              // registry short name, the name itself when unknown
 	PathOf(name string) (path string, ok bool) // checkout of a project name, short name or folder
 }
 
@@ -68,7 +68,8 @@ type Agent struct {
 
 // Lane is one session (or a set of same-titled runs) across the day.
 type Lane struct {
-	Key         string // session id, or the agent's session/run id
+	Key         string   // session id, or the agent's session/run id
+	Keys        []string // every session and run id folded into the lane
 	Project     string
 	Title       string
 	State       string
@@ -149,9 +150,9 @@ func ShortModel(models []string) string {
 	return best
 }
 
-// BucketTime is the start of bucket b on the local day of day.
+// BucketTime is the start of bucket b on the day of day, in day's location.
 func BucketTime(day time.Time, b int) time.Time {
-	y, mo, d := day.Local().Date()
+	y, mo, d := day.Date()
 	return time.Date(y, mo, d, 0, b*10, 0, 0, day.Location())
 }
 
@@ -187,7 +188,7 @@ func Build(sessions []Session, agents []Agent, slots [2]int, names Names) []Lane
 		if len(s.Buckets) == 0 && !isLive {
 			continue
 		}
-		l := Lane{Key: s.ID, Project: names.ShortName(s.Project), Title: Who(s.Title, s.Project, names), Account: s.Account,
+		l := Lane{Key: s.ID, Keys: []string{s.ID}, Project: names.ShortName(s.Project), Title: Who(s.Title, s.Project, names), Account: s.Account,
 			Model: ShortModel(s.Models), Branch: s.Branch, Agent: -1, Run: s.Kind == "run", Runs: 1,
 			Cost: s.Cost, Priced: true, Cells: map[int]bool{}, Tok: map[int]int{},
 			Tokens: s.Tokens, CachePct: s.CachePct, Compactions: s.Compactions, Files: s.Files,
@@ -215,7 +216,7 @@ func Build(sessions []Session, agents []Agent, slots [2]int, names Names) []Lane
 		if used[i] || a.Group == GroupDone {
 			continue
 		}
-		lanes = append(lanes, Lane{Key: a.Session, Project: or(a.Project, a.Name), Title: or(a.Title, a.Short),
+		lanes = append(lanes, Lane{Key: a.Session, Keys: []string{a.Session}, Project: or(a.Project, a.Name), Title: or(a.Title, a.Short),
 			Account: a.Account, Agent: i, Run: a.Group == GroupRuns && !a.Interrupted, Runs: 1, Ctx: a.Ctx,
 			Cells: map[int]bool{}, Tok: map[int]int{}, Start: a.Started})
 	}
@@ -248,6 +249,7 @@ func merge(a, b Lane) Lane {
 		a.Tok[k] += v
 	}
 	a.Runs++
+	a.Keys = append(a.Keys, b.Keys...)
 	a.Cost += b.Cost
 	a.Tokens += b.Tokens
 	if b.Agent >= 0 {

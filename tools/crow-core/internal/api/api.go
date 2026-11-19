@@ -50,6 +50,7 @@ type Options struct {
 	Now       func() time.Time
 	Script    Script          // runs the bin/ scripts of the live actions (live.go); nil refuses them
 	ActionLog string          // core action log the live actions append to
+	StateDir  string          // machine state dir (local/state): AFK jobs for ops; empty skips them
 	Butler    *butler.Manager // butler chat (item_176); nil disables it
 }
 
@@ -98,7 +99,7 @@ func New(o Options) *Server {
 		s.ext[src.Name] = &ext{src: src}
 		s.order = append(s.order, src.Name)
 	}
-	s.order = append(s.order, WorkSection)
+	s.order = append(s.order, WorkSection, OpsSection)
 	return s
 }
 
@@ -184,6 +185,11 @@ func (s *Server) section(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sec, err := s.read(name, r)
+	var bad badParam
+	if errors.As(err, &bad) {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
@@ -199,6 +205,9 @@ func (s *Server) read(name string, r *http.Request) (Section, error) {
 	}
 	if name == WorkSection {
 		return s.work()
+	}
+	if name == OpsSection {
+		return s.ops(r)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -47,6 +47,7 @@ func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 		Sources:   sources(cfg),
 		Script:    scriptRunner(cfg.Engine),
 		ActionLog: filepath.Join(filepath.Dir(env.Store.Root()), api.ActionLogName),
+		StateDir:  filepath.Dir(env.Store.Root()),
 	})
 	tcp, err := net.Listen("tcp", cfg.Serve.Listen)
 	if err != nil {

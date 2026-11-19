@@ -18,6 +18,8 @@ Contract version: **1**. It is the `v` field of every sidecar message and the `c
 | `fixtures/errors/<case>.request.json`, `<case>.reply.json` | Error replies |
 | `fixtures/events/<mission>.jsonl` | A full mission log for slices 1 and 2 |
 | `fixtures/records/missions.json`, `runs.json`, `inbox.json` | List outputs |
+| `schemas/ops.schema.json` | Data of `GET /api/state/ops` (item_257) |
+| `fixtures/records/ops.json` | One ops answer |
 
 Fixtures from `../req_037_run_contract/` read by both sides: the 8 kind files, every crow block under `examples/`, `examples/gates/questions.json`, `examples/20261109-build-item-095/events.jsonl`.
 
@@ -77,6 +79,7 @@ core applies these rules to every sidecar. The values are defaults in the core c
 - **Run entry:** `run` (cdx run id), `mission`, `account`, `version`, `cold`, `started`, `ended`, `cause`, `exit`. The last three are null while the run is live.
 - **Inbox row:** id `<mission>/v<N>` for a gate, `<mission>/v<N>/<question id>` for a parked question. `type` follows the source: plan is `approval`, report is `review` (`fyi` for a straight-through kind), mockup and questions are `choice`. `verbs` are the gate verbs of req_037; a parked question takes `answer`.
 - **Live action line** (`live-action.schema.json`, item_170): `{ts, actor, surface, action, target, text?, account?, project?, ok, code, message, run_id?}` in `<state>/actions.jsonl`, one line per session, run or mail action the owner ran through core. `actor` is `owner`. `code` follows the script contract: 0 done, 1 refused, 2 failed. Fixtures: `fixtures/api/live-*.json`, requests `send`, `run`, `session`.
+- **Ops answer** (`ops.schema.json`, item_257): `GET /api/state/ops?day=YYYY-MM-DD` or `?week=YYYY-Www` (ISO week, Monday first), today when neither is set, 400 on a bad value. One lane per session or same-titled run set per day, from the shared lanes package over crow-usage activity buckets. Spans: active buckets are `working`, gaps between them `idle`, a live lane waiting on the owner is `waiting` from when it went quiet until now, and a finished run's crow-runs status sets its last span (`done`/`stopped` done, `stuck`/`limit` stuck, `failed`/`budget` failed). A session with cost on a day but no buckets (crow-usage keeps buckets two days) gets a lane without spans. Kind is `mission` when a store mission ran it, `routine` when its title names a crow timer, else `run` or `interactive`. The queue lists queued and preflight missions, crow timers by next start, then AFK jobs (`<state>/afk/job-*.md`). Totals per project and per kind are the sums of the lanes. Fixtures: `fixtures/api/state-ops*.json`.
 
 ## Shared Go module boundary with crow-deck
 
