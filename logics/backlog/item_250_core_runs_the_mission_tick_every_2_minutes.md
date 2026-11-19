@@ -1,10 +1,10 @@
 ## item_250_core_runs_the_mission_tick_every_2_minutes - Core runs the mission tick every 2 minutes
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -33,6 +33,10 @@
 
 # AC Traceability
 - request-AC1 -> AC1, AC3. Proof: serve test with a fake runner; MCP test for the refusal.
+- AC1 -> Proof: `TestServeTickStartsQueuedMission` (tools/crow-core/tick_loop_test.go): the serve loop with a fake runner moves a queued research mission to running, the runs section shows the run, the dispatch section refreshes.
+- AC2 -> Proof: `TestServeTicksNeverOverlap` (a second pass and a CLI tick are refused while the tick lock is held) and `TestServeTickFailureLogsAndGoesOn` (a failing pass and a panic are logged, the next pass runs).
+- AC3 -> Proof: `TestMissionNewRefusesKindsAboveLivePhase`: CLI, API (400) and MCP refuse review-fix and build with "kind X is phase N; not started by the tick yet" and write nothing.
+- AC4 -> Proof: `TestMissionsSectionMarksLinked`: the missions section carries `linked: true` on an ensured mission with no core run; core missions carry no flag.
 
 # Decision framing
 - Product framing: Not needed
@@ -53,4 +57,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19T09:41:35.792547+00:00 | session | 5c3427f | Serve tick, live-kind refusal, linked flag | succeeded |  | AC1-AC4 built; go test 238 passed; not pushed |
 
