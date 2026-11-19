@@ -54,7 +54,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-19T17:21:04+00:00 | claude (second user) | - | item-238-pending | succeeded |  | fork branch item-238-pending, 4 commits e800aeb..fe04fa9; patch sent; Inbox core adapter left to item_223 |
+| 2026-11-19T17:21:04+00:00 | second user | - | item-238-pending | succeeded |  | fork branch item-238-pending, 4 commits e800aeb..fe04fa9; patch sent; Inbox core adapter left to item_223 |
 
 # Delivery (2026-11-19)
 - Branch `item-238-pending` from main 1569e72, sent as a patch for review here.
