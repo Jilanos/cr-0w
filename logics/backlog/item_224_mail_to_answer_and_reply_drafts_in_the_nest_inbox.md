@@ -1,14 +1,14 @@
 ## item_224_mail_to_answer_and_reply_drafts_in_the_nest_inbox - Mail to answer and reply drafts in the Nest Inbox
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 85
-> Confidence: 80
-> Progress: 0%
+> Status: In progress
+> Understanding: 90
+> Confidence: 85
+> Progress: 40%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 15:27:47
+> Indicators reviewed: 2026-11-19 18:09:16
 
 # AI Context
 - Summary: Mail that needs an answer shows in Inbox; the owner asks for a draft, reads and edits it in Nest, and crow saves it as a draft in the mailbox. Never sends. Backend is configurable so Paul's M365 setup and the owner's Graph setup both work.
@@ -58,3 +58,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19T17:18:15.712328+00:00 | second user | item-224-com | Outlook COM backend and draft pipeline | succeeded | https://github.com/Jilanos/cr-0w/tree/item-224-com | crow-mail-draft + COM bridge; live COM draft created, checked, deleted |
+
+# Tasks
+- `task_025_mail_to_answer_and_reply_drafts_in_the_nest_inbox`
