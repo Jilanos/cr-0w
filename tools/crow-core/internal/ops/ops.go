@@ -147,7 +147,7 @@ func Agents(now time.Time, dispatch, sessions map[string]any, reg lanes.Names) (
 	var out []lanes.Agent
 	for _, a := range rows(dispatch, "agents") {
 		r := lanes.Agent{Account: str(a, "account"), Session: str(a, "session_id"), Cwd: str(a, "cwd"),
-			Project: reg.ShortName(str(a, "project")), Title: str(a, "title")}
+			Project: reg.ShortName(repoOf(str(a, "cwd"), str(a, "project"))), Title: str(a, "title")}
 		ctx, _ := num(a, "context_tokens")
 		r.Ctx = int(ctx)
 		r.Started, _ = parseTime(str(a, "started_at"))

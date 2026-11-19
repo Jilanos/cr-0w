@@ -42,6 +42,7 @@ func (s *Server) ops(r *http.Request) (Section, error) {
 		}
 		o = ops.Merge(o, lines, now)
 	}
+	o = ops.Tidy(o, in.Projects)
 	o.Day, o.Week = out.Day, out.Week
 	sec := Section{Section: OpsSection, Data: o, UpdatedAt: updated, Version: hash(o)}
 	if len(stale) > 0 {
