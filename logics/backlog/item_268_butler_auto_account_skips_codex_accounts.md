@@ -1,10 +1,10 @@
 ## item_268_butler_auto_account_skips_codex_accounts - Butler auto account skips Codex accounts
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 70
-> Confidence: 70
-> Progress: 0%
+> Status: In progress
+> Understanding: 95
+> Confidence: 90
+> Progress: 90%
 > Complexity: Small
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -31,6 +31,21 @@
 - AC2: With only Codex accounts, the rail shows "no account can run the butler" and the turn ends.
 - AC3: crow-core tests and crow-check pass.
 
+# Cause
+- crow-core's auto account ran `crow-accounts pick --on-busy fail`, which ranks every allowed account with no runner filter. A Codex account first in the policy was picked.
+- Every cdx profile has a `claude-home`, so the launcher's profile check passed and `claude` started on an account with no Claude login.
+
+# Fix
+- `crow-accounts pick --provider claude|codex` keeps only accounts on that runner (provider from `cdx status`, claude when cdx does not say), in the usual pick order. Filtered accounts show as `<name>: runs codex` in the reasons. None left: exit 1 with `crow: no allowed account runs claude (...)`.
+- crow-core's butler picks with `--provider claude` (`butlerPickArgs`, `butlerPick` in `tools/crow-core/butler_cmd.go`). A failed pick returns `no account can run the butler: <reasons>`.
+- No Nest change: the core keeps a start failure as a `note` message (202), `useButler` polls after `say`, and `ButlerRail` renders note text (`tools/nest/src/ui/ButlerRail.tsx:53`).
+
+# AC proofs
+- AC1: `tests/test_crow_accounts_pick_provider.py::test_butler_pick_skips_a_codex_account_first_in_the_policy` (Codex first, picks the first claude account) and `::test_butler_pick_keeps_policy_order_among_claude_accounts`. The test reads the args from `butler_cmd.go`, so it runs the exact butler command. `TestButlerPickAsksForAClaudeAccount` checks the Go side passes `--provider claude`.
+- AC2: `::test_butler_pick_with_only_codex_accounts_fails_with_the_reason`, `TestButlerPickWithNoClaudeAccountSaysWhy`, and `internal/butler TestAutoPickFailureEndsTheTurnWithANote` (the note reads "butler could not start: auto account: no account can run the butler: ...", turn not busy, no process launched).
+- AC3: `go test ./...` and `go vet ./...` in tools/crow-core green (265 tests); `bin/crow-check` green (710 passed).
+- Left: restart crow-core to deploy, then confirm on the second user's install with auto account.
+
 # AC Traceability
 - req_064_paul_s_feedback_and_a_modular_public_crow-AC1 -> This backlog slice. Proof: the butler starts on a second user's install with auto account.
 
@@ -47,3 +62,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19T14:27:32.280392+00:00 | cdx | 28d3b1184ae74e07b014fd29a073839b | item-268-butler-auto | succeeded |  | Steps 1-3 committed on branch item-268-butler-auto; core not restarted |
+
