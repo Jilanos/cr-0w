@@ -149,7 +149,7 @@ export function Ops({ snap }: { snap: Snapshot }) {
           {error && <div className="err" role="alert">{error}</div>}
           {!data && !error && <div className="sub">Loading…</div>}
           {view && (
-            <div key={view.mode} className={`ops-view${view.query !== query ? ' stale' : ''}`}>
+            <div key={view.mode} className={`ops-view${view.query !== query ? ' ops-stale' : ''}`}>
               {view.mode === 'day'
                 ? <Day lanes={lanes} queue={queue} day={view.day} today={today} now={now} scale={scale} dispatch={dispatch} onOpen={setOpen} />
                 : <Week days={view.data.days} lanes={lanes} today={today} now={now} scale={scale} onDay={(d) => { setDay(d); setMode('day') }} />}
