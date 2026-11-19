@@ -1,13 +1,14 @@
 ## item_256_resizable_butler_chat_rail_in_nest - Resizable butler chat rail in Nest
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 90%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 10:45:04
 
 # AI Context
 - Summary: The butler rail on laptop Nest (Home and every screen that shows it) gets a drag handle on its left edge; the width is kept per device.
@@ -34,6 +35,8 @@
 
 # AC Traceability
 - Owner ask 2026-11-19 -> AC1 to AC4. Proof: unit test for the clamp and storage; screenshots in the vault Research folder.
+- AC1 to AC3 proof: `tools/nest/src/ui/railWidth.test.ts` (clamp, storage, blocked storage) and `npm run shots -- <out> --fixtures --rail=320,480,640` grip checks (drag to 600px, reload keeps 600px, cap 768px at 1280, double-click 320px, arrows 24px, folded 56px), both themes.
+- AC2 and AC4 proof: the same run checks rail width, no sideways scroll, hero visible and left column rows fit at 320, 480 and 640px. Shots in `local/state/shots/item-256/home-1280-rail{320,480,640}-{modern,cyber}.png`. AC4 waits for the owner review.
 
 # Decision framing
 - Product framing: Not needed
@@ -54,4 +57,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19T09:45:07.850477+00:00 | cdx | item-256-rail | Resizable rail built; shots wait for owner review | succeeded |  | 236 tests, build OK, 44 shot checks PASS (2 themes) |
 

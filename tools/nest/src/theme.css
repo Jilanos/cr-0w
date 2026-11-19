@@ -550,7 +550,8 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .lp .row.past { color: var(--dim); }
 .lp .row.card { flex-direction: column; align-items: stretch; gap: 4px; white-space: normal; padding: 5px 8px; }
 .lp .row.card .line { display: flex; gap: 8px; align-items: center; min-width: 0; }
-.lp .row.card .line b { font-weight: 600; white-space: nowrap; }
+.lp .row.card .line b { font-weight: 600; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lp .row.card .line .tag { flex: none; }
 .lp .row.card .tag { margin-left: auto; }
 .lp .edge-n { border: 1px solid var(--c-n); }
 .lp .edge-f { border: 1px solid var(--c-f); }
@@ -1182,13 +1183,19 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 /* Butler rail (item_176, boards desk-rail-a and desk-rail-a-cyber). Laptop only. */
 .b-rail { display: none; }
 @media (min-width: 1200px) {
-  .app.has-rail { grid-template-columns: minmax(0, 1fr) auto; }
+  /* --rail-w: the width the owner dragged (item_256), kept between 280px and 60% of the window. */
+  .app.has-rail { --rail-col: clamp(280px, var(--rail-w, 320px), 60vw); grid-template-columns: minmax(0, 1fr) auto; }
+  .app.has-rail:has(> .b-rail:not(.folded)) { grid-template-columns: minmax(0, 1fr) var(--rail-col); }
   .app.has-rail > .top { grid-column: 1 / -1; }
   .b-rail {
-    display: flex; flex-direction: column; width: 320px; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; width: var(--rail-col); min-height: 0; overflow: hidden; position: relative;
     background: var(--hdr); border-left: 1px solid var(--line);
   }
   .b-rail.folded { width: 56px; }
+  .rl-grip { position: absolute; inset: 0 auto 0 0; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }
+  .rl-grip::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: transparent; transition: background 0.15s; }
+  .rl-grip:hover::after, .rl-grip:focus-visible::after, .rl-grip:active::after { background: var(--accent); }
+  .rl-grip:focus-visible { outline: none; }
 }
 /* Rail parts, shared with the phone and Fold chat sheet. */
 @media all {
@@ -1302,7 +1309,8 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 [data-theme='cyber'] .b-sheet .rl-mood .dia, [data-theme='cyber'] .bb-frame .dia, [data-theme='cyber'] .bs-head .dia { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
 
 /* Home with the butler rail (item_176): one column and the hero; the rail is the right column. */
-.home-lp { grid-template-columns: 320px 1fr; }
+/* A wide rail narrows the left column first, down to 240px, so the hero keeps room (item_256). */
+.home-lp { grid-template-columns: clamp(240px, 32%, 320px) minmax(0, 1fr); }
 .home-lp .rail .more { align-self: flex-end; font-size: 0.9em; }
 .lp .next-ev { display: flex; align-items: baseline; gap: 10px; }
 .lp .next-ev .tm { font-size: 1.4em; }
