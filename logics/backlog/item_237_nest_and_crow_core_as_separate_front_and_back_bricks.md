@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:28:24
 
 # AI Context
 - Summary: Package crow-core (API) and Nest (web front) as their own bricks: own install step, config for the core URL and auth, Nest reads enabled modules from core, works on a setup without MR or mail modules.
@@ -23,10 +24,11 @@
   - `/api/modules` in core (shape in adr_002); Nest builds its navigation from it and hides sections of off modules; a page shows when one of its sections is on.
   - Off modules: core does not serve their sections, their routes answer 404 `module off`.
   - Nest sections come from module manifests: built-in views plus a generic list view over section JSON; no runtime code loading.
+  - Section actions: a manifest section declares actions (label, bin/ script, args, confirm yes/no); core runs them through a generic `POST /api/modules/<brick>/actions/<id>` under the script contract; the list view shows them as buttons. No Go change per module.
   - Deck reads `crow modules json` and hides pages and boxes of off modules.
   - Nest config: core URL, token; build once, serve anywhere (static dist).
   - Install docs per brick; contract versioned and checked in CI.
-  - Try it on Paul's setup (WSL, no forge) as the acceptance run.
+  - Try it on the second user's setup (WSL, no forge) as the acceptance run.
 - Out:
   - Hosting outside the tailnet.
 
