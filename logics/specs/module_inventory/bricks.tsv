@@ -1,0 +1,171 @@
+# kind	name	brick (adr_002). tests/test_module_inventory.py fails on an untagged or stale row.
+script	ansi-shot	design
+script	crow	core
+script	crow-accounts	core
+script	crow-activity	git
+script	crow-afk-page	afk
+script	crow-afk-preflight	afk
+script	crow-changelog	releases
+script	crow-check	core
+script	crow-checks	team
+script	crow_checks.py	team
+script	crow-commit-msg-check	git
+script	crow-compare	design
+script	crow-contract	core-api
+script	crow_contract.py	core-api
+script	crow-cost-audit	retro
+script	crow-crop	design
+script	crow-ctx	core
+script	crow-design-notes	design
+script	crow-digest	retro
+script	crow-doctor	core
+script	crow-focus	core
+script	crow-forge-read	forge
+script	crow-gather	core
+script	crow-hub-guard	core
+script	crow-isolation-probe	core
+script	crow_lib.py	core
+script	crow-log	vault
+script	crow-memory	core
+script	crow-mrs	forge
+script	crow-night-page	afk
+script	crow-night-preflight	afk
+script	crow-note	vault
+script	crow-notes	vault
+script	crow-open	core
+script	crow-precommit-check	git
+script	crow-prepush-check	git
+script	crow-project	core
+script	crow-prompt	core
+script	crow-ready	core
+script	crow-registry	core
+script	crow-relaunch	core
+script	crow-release-propose	releases
+script	crow-releases	releases
+script	crow-retro	retro
+script	crow-review-check	forge
+script	crow-review-run	forge
+script	crow-room	core
+script	crow-runs	core
+script	crow_schema_lite.py	core
+script	crow-screen	core
+script	crow-secret	core
+script	crow-sessions	core
+script	crow_sidecar.py	core
+script	crow-skills-ext	design
+script	crow-state	core
+script	crow_term.py	core
+script	crow-tidy	git
+script	crow-today	mail
+script	crow-toolwatch	retro
+script	crow-update	core
+script	crow-usage	core
+script	crow-vault-migrate	vault
+script	crow_vault.py	vault
+skill	afk	afk
+skill	brief	core
+skill	eod	vault
+skill	night	afk
+skill	retro	retro
+skill	mr	forge
+skill	review	forge
+skill	review-threads	forge
+skill	wrap	core
+skill-list	skills/ext.list	design
+runbook	afk-runs	afk
+runbook	agent-tooling	core
+runbook	archeotech-crow-agents	integration-shell
+runbook	archeotech-crow-usage	integration-shell
+runbook	ci-secrets	forge
+runbook	claude-and-codex	core
+runbook	core-service	core-api
+runbook	cost-audit	retro
+runbook	design-canvas	design
+runbook	design-references-in-items	design
+runbook	design-sessions	design
+runbook	dispatch-background-runs	core
+runbook	graph-today	mail
+runbook	headless-webgl-render	design
+runbook	install-and-update	core
+runbook	interrupted-sessions	core
+runbook	live-claude-session-test	core
+runbook	logics-task-closeout	core
+runbook	long-sessions	core
+runbook	memory	core
+runbook	mission-e2e-scratch	core-api
+runbook	nest-phone-install	nest
+runbook	nest-screenshots	nest
+runbook	new-account	core
+runbook	open-project-session	core
+runbook	open-threads	vault
+runbook	own-routines	core
+runbook	readme-showcase	releases
+runbook	releases	releases
+runbook	remote-computer-use-windows	core
+runbook	repo-tidy	git
+runbook	review-findings	forge
+runbook	service-tokens	core
+runbook	session-retros	retro
+runbook	sub-project-work	core
+runbook	tool-update-watch	retro
+runbook	tui-agents-ux	deck
+runbook	tui-home-ux	deck
+runbook	tui-projects-ux	deck
+runbook	tui-render	deck
+runbook	tui-review-ux	deck
+runbook	tui-themes-ux	deck
+runbook	tui-usage-ux	deck
+runbook	vault-capture	vault
+runbook	vault-sync-new-device	vault
+runbook	visual-concepts	design
+claude-hook	crow-hub-guard	core
+claude-hook	crow-runs inbox --hook	core
+claude-hook	crow-relaunch hook	core
+claude-hook	crow-design-notes hook	design
+git-hook	commit-msg	git
+git-hook	pre-commit	git
+git-hook	pre-push	git
+core-route	GET /api/butler/{conv}	core-api
+core-route	POST /api/butler/{conv}/say	core-api
+core-route	GET /api/sessions/{pid}/conversation	core-api
+core-route	GET /api/missions/{id}/conversation	core-api
+core-route	POST /api/sessions	core-api
+core-route	POST /api/sessions/{id}/resume	core-api
+core-route	POST /api/sessions/{pid}/send	core-api
+core-route	POST /api/sessions/{pid}/interrupt	core-api
+core-route	POST /api/sessions/{pid}/stop	core-api
+core-route	POST /api/sessions/{pid}/attach	core-api
+core-route	POST /api/sessions/{pid}/answer	core-api
+core-route	POST /api/dispatch	core-api
+core-route	POST /api/dispatch/{run}/stop	core-api
+core-route	POST /api/dispatch/{run}/retry	core-api
+core-route	POST /api/today/{id}/done	mail
+core-route	POST /api/today/{id}/snooze	mail
+core-route	POST /api/missions	core-api
+core-route	POST /api/missions/{id}/answer	core-api
+core-route	POST /api/missions/{id}/stop	core-api
+core-route	POST /api/missions/{id}/cancel	core-api
+core-route	POST /api/inbox/{id...}	core-api
+core-route	GET /api/state	core-api
+core-route	GET /api/state/{section}	core-api
+core-route	GET /api/missions/{id}	core-api
+core-route	GET /api/missions/{id}/artifacts/{path...}	core-api
+core-route	GET /api/events	core-api
+core-route	GET /api/sessions/{pid}/screen	core-api
+core-route	POST /api/sessions/{pid}/keys	core-api
+core-route	POST /api/sessions/{pid}/resize	core-api
+core-section	sessions	core-api
+core-section	dispatch	core-api
+core-section	usage	core-api
+core-section	today	mail
+core-section	mrs	forge
+core-section	checks	team
+core-section	projects	core-api
+core-section	accounts	core-api
+core-section	ready	core-api
+core-section	jobs	core-api
+app	tools/crow-core	core-api
+app	tools/crow-deck	deck
+app	tools/crow-watch	deck
+app	tools/nest	nest
+integration	integrations/archeotech	integration-shell
