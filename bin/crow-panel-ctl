@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# crow-panel-ctl: run the local panel in the background.
+#   crow panel start [--port N] [--open]   start it unless already running, print the URL
+#   crow panel stop                        stop the server recorded in the PID file
+#   crow panel restart [--port N] [--open] stop, then start
+#   crow panel status                      running or not, PID, URL
+#   crow panel open                        open the URL in the browser (Windows browser under WSL)
+#   crow panel logs [-f]                   last lines of the server log
+# Data: CROW_HOME (config local/panel.yaml, PID and log under local/state). Engine: this checkout.
+set -euo pipefail
+
+ENGINE="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+: "${CROW_HOME:?CROW_HOME must point to the data home}"
+CONFIG="${CROW_PANEL_CONFIG:-$CROW_HOME/local/panel.yaml}"
+STATE="$CROW_HOME/local/state"
+PIDFILE="$STATE/panel-server.pid"
+PORTFILE="$STATE/panel-server.port"
+LOG="$STATE/panel-server.log"
+
+die() { echo "crow panel: $*" >&2; exit 1; }
+
+# PID of the recorded server, only if that PID is still a panel server (never a name pattern).
+live_pid() {
+  [[ -f "$PIDFILE" ]] || return 1
+  local pid; pid="$(tr -dc 0-9 < "$PIDFILE")"
+  [[ -n "$pid" ]] && ps -o cmd= -p "$pid" 2>/dev/null | grep -q "crow-panel serve" || return 1
+  echo "$pid"
+}
+
+url() { echo "http://127.0.0.1:$(cat "$PORTFILE" 2>/dev/null || echo 8790)/"; }
+
+open_url() {
+  local u; u="$(url)"
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    cmd.exe /c start "" "$u" >/dev/null 2>&1 || true
+  elif command -v xdg-open >/dev/null; then xdg-open "$u" >/dev/null 2>&1 || true
+  elif command -v open >/dev/null; then open "$u" >/dev/null 2>&1 || true
+  fi
+}
+
+start() {
+  local port=8790 open=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port) port="${2:?--port needs a value}"; shift 2 ;;
+      --open) open=1; shift ;;
+      *) die "unknown option: $1" ;;
+    esac
+  done
+  local pid
+  if pid="$(live_pid)"; then echo "already running (PID $pid) on $(url)"; [[ $open == 1 ]] && open_url; return 0; fi
+  [[ -f "$CONFIG" ]] || die "config not found: $CONFIG"
+  mkdir -p "$STATE"
+  "$ENGINE/bin/crow-panel" check-config --config "$CONFIG" >/dev/null || die "invalid config: $CONFIG"
+  setsid "$ENGINE/bin/crow-panel" serve --config "$CONFIG" --port "$port" --no-browser \
+    > "$LOG" 2>&1 < /dev/null &
+  pid=$!
+  echo "$pid" > "$PIDFILE"; echo "$port" > "$PORTFILE"
+  local i
+  for i in $(seq 40); do
+    kill -0 "$pid" 2>/dev/null || { tail -n 20 "$LOG" >&2; die "server exited at start"; }
+    curl -s -o /dev/null --max-time 1 "$(url)" && break
+    sleep 0.25
+  done
+  echo "started (PID $pid) on $(url)"
+  echo "reload open browser tabs: the session token changed"
+  [[ $open == 1 ]] && open_url
+  return 0
+}
+
+stop() {
+  local pid i
+  pid="$(live_pid)" || { echo "not running"; rm -f "$PIDFILE"; return 0; }
+  kill "$pid"
+  for i in $(seq 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
+  kill -0 "$pid" 2>/dev/null && die "PID $pid did not stop"
+  rm -f "$PIDFILE"; echo "stopped (PID $pid)"
+}
+
+status() {
+  local pid
+  if pid="$(live_pid)"; then echo "running (PID $pid) on $(url)"; else echo "not running"; return 3; fi
+}
+
+cmd="${1:-status}"; shift || true
+case "$cmd" in
+  start) start "$@" ;;
+  stop) stop ;;
+  restart) stop; start "$@" ;;
+  status) status ;;
+  open) live_pid >/dev/null || die "not running (crow panel start)"; open_url; url ;;
+  logs) if [[ "${1:-}" == "-f" ]]; then exec tail -f "$LOG"; else tail -n 40 "$LOG"; fi ;;
+  *) die "unknown command: $cmd (start|stop|restart|status|open|logs)" ;;
+esac

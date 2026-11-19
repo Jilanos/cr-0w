@@ -11,6 +11,17 @@ Run from the checkout containing the panel code:
 
 ```sh
 export CROW_HOME=/path/to/private/data
+bin/crow panel restart          # start, or stop then start; prints the URL
+bin/crow panel status           # running or not (exit 3 when not)
+bin/crow panel stop | open | logs [-f]
+```
+
+`start` and `restart` take `--port N` and `--open` (Windows browser under WSL).
+The PID, port and log live in `$CROW_HOME/local/state/panel-server.{pid,port,log}`.
+`stop` only signals the recorded PID, and only when it is still a `crow-panel serve`
+process. By hand, the equivalent is:
+
+```sh
 bin/crow panel check-config --config "$CROW_HOME/local/panel.yaml"
 setsid bin/crow panel serve --config "$CROW_HOME/local/panel.yaml" \
   --port 8790 --no-browser > "$CROW_HOME/local/state/panel-server.log" 2>&1 < /dev/null &

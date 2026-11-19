@@ -15,6 +15,7 @@
 #   crow work <project>  index of a repo's own tools (skills, CLAUDE.md, hooks) for hub work on it
 # See
 #   crow panel [serve|probe|check-config] [options]   local browser panel (default: serve)
+#   crow panel start|stop|restart|status|open|logs [--port N] [--open]   run the panel in the background
 #   crow deck [--theme t] control room: 5 tabs, 4 themes (? for keys); alias crow watch
 #   crow runs [--all]    background runs: status, task, commits so far
 #   crow runs sessions [...]   sessions cut off by a usage limit (see crow-sessions)
@@ -61,7 +62,9 @@ case "${1:-}" in
   version|--version) echo "crow $(cat "$CROW_ENGINE/VERSION" 2>/dev/null || echo unknown)"
                      echo "engine: $CROW_ENGINE"; echo "data:   $CROW_HOME"; exit 0 ;;
   update) shift; exec "$CROW_ENGINE/bin/crow-update" "$@" ;;
-  panel) shift; [[ $# -gt 0 ]] || set -- serve; exec "$CROW_ENGINE/bin/crow-panel" "$@" ;;
+  panel) shift; [[ $# -gt 0 ]] || set -- serve
+         case "$1" in start|stop|restart|status|open|logs) export CROW_HOME; exec "$CROW_ENGINE/bin/crow-panel-ctl" "$@" ;; esac
+         exec "$CROW_ENGINE/bin/crow-panel" "$@" ;;
 esac
 # launch() gives a session its account as CROW_SESSION_ACCOUNT, so a CROW_ACCOUNT seen here is a choice.
 # Sessions started before that inherit CROW_ACCOUNT: there it is dropped when it names the session's own
