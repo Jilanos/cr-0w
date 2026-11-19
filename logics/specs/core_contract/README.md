@@ -18,6 +18,10 @@ Contract version: **1**. It is the `v` field of every sidecar message and the `c
 | `fixtures/errors/<case>.request.json`, `<case>.reply.json` | Error replies |
 | `fixtures/events/<mission>.jsonl` | A full mission log for slices 1 and 2 |
 | `fixtures/records/missions.json`, `runs.json`, `inbox.json` | List outputs |
+| `schemas/ops.schema.json` | Data of `GET /api/state/ops` (item_257) |
+| `fixtures/records/ops.json` | One ops answer |
+| `schemas/run-report.schema.json` | Data of `GET /api/runs/{id}` (item_257) |
+| `fixtures/records/run-report.json` | One run report |
 
 Fixtures from `../req_037_run_contract/` read by both sides: the 8 kind files, every crow block under `examples/`, `examples/gates/questions.json`, `examples/20261109-build-item-095/events.jsonl`.
 
@@ -77,11 +81,15 @@ core applies these rules to every sidecar. The values are defaults in the core c
 - **Run entry:** `run` (cdx run id), `mission`, `account`, `version`, `cold`, `started`, `ended`, `cause`, `exit`. The last three are null while the run is live.
 - **Inbox row:** id `<mission>/v<N>` for a gate, `<mission>/v<N>/<question id>` for a parked question. `type` follows the source: plan is `approval`, report is `review` (`fyi` for a straight-through kind), mockup and questions are `choice`. `verbs` are the gate verbs of req_037; a parked question takes `answer`.
 - **Live action line** (`live-action.schema.json`, item_170): `{ts, actor, surface, action, target, text?, account?, project?, ok, code, message, run_id?}` in `<state>/actions.jsonl`, one line per session, run or mail action the owner ran through core. `actor` is `owner`. `code` follows the script contract: 0 done, 1 refused, 2 failed. Fixtures: `fixtures/api/live-*.json`, requests `send`, `run`, `session`.
+- **Ops answer** (`ops.schema.json`, item_257): `GET /api/state/ops?day=YYYY-MM-DD` or `?week=YYYY-Www` (ISO week, Monday first), today when neither is set, 400 on a bad value. One lane per session or same-titled run set per day, from the shared lanes package over crow-usage activity buckets. Spans: active buckets are `working`, gaps between them `idle`, a live lane waiting on the owner is `waiting` from when it went quiet until now, and a finished run's crow-runs status sets its last span (`done`/`stopped` done, `stuck`/`limit` stuck, `failed`/`budget` failed). A session with cost on a day but no buckets (crow-usage keeps buckets two days) gets a lane without spans. Kind is `mission` when a store mission ran it, `routine` when its title names a crow timer, else `run` or `interactive`. The queue lists queued and preflight missions, crow timers by next start, then AFK jobs (`<state>/afk/job-*.md`). Totals per project and per kind are the sums of the lanes. Fixtures: `fixtures/api/state-ops*.json`.
+- **Ops state log** (item_257): every serve tick appends today's live lanes to `<state>/ops-states.jsonl`, one line `{ts, lane, keys, project, title, account, kind, state}` per lane per state change. `needs` and `idle` lanes log `waiting`, `working` and `run` lanes log `working`. A lane that is no longer live gets a closing line: `stuck` when it ended paused or stuck, `failed` when failed, else `done`. At 4 MiB the file moves to `ops-states.jsonl.1`, replacing the older one. The ops answer lays the logged spans over the derived spans between the first and last logged instant of a lane on each day; days without lines keep the derived spans. A lane only the log knows gets its own lane.
+- **Run report** (`run-report.schema.json`, item_257): `GET /api/runs/{id}` reads the crow-runs ledger `<state>/runs.jsonl` first. The id matches exactly, or as a prefix of at least 6 characters naming one run (400 when it names several). The dispatch section adds the status (`running` for a live run, the crow-runs status for a run finished in its window, else `unknown`), end, cost and commits; `crow-runs final` gives the report, empty when its stdout is gone. Without a ledger match a mission run of the core store answers with `source` `mission`, its cause as status and its mission's goal, branch and worktree. 404 when neither knows the id. Fixtures: `fixtures/api/run-report*.json`, `error-no-run.json`.
 
 ## Shared Go module boundary with crow-deck
 
 - Package `crow-core/contract` holds the types of this contract and their strict decoders. It imports only the standard library and `gopkg.in/yaml.v3`, and does no I/O beyond decoding bytes it is given.
-- crow-deck imports `crow-core/contract` and nothing else from crow-core, through a `replace crow-core => ../crow-core` line in its `go.mod`, when the deck first reads missions or the inbox. Store, event log, tick and dispatch live under `crow-core/internal/`, which Go forbids other modules to import.
+- crow-deck imports `crow-core/contract` and `crow-core/lanes` and nothing else from crow-core, through a `replace crow-core => ../crow-core` line in its `go.mod`, when the deck first reads missions or the inbox. Store, event log, tick and dispatch live under `crow-core/internal/`, which Go forbids other modules to import.
+- Package `crow-core/lanes` (item_257) builds the day lanes of the deck Agents tab and the core ops answer. It imports only the standard library and does no I/O. The deck imports it through the same `replace` line and maps its own rows to `lanes.Session` and `lanes.Agent`.
 - The deck keeps its own UI types. Its read-only fallback over the store decodes rows with the `contract` types.
 - The UI kit of req_020 stays a separate module and never depends on core.
 

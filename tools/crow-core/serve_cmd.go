@@ -47,6 +47,7 @@ func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 		Sources:   sources(cfg),
 		Script:    scriptRunner(cfg.Engine),
 		ActionLog: filepath.Join(filepath.Dir(env.Store.Root()), api.ActionLogName),
+		StateDir:  filepath.Dir(env.Store.Root()),
 	})
 	tcp, err := net.Listen("tcp", cfg.Serve.Listen)
 	if err != nil {
@@ -102,6 +103,7 @@ func serve(env mission.Env, cfg config.Config, stdout io.Writer) error {
 
 // startTicker runs the mission tick every CROW_TICK_INTERVAL (default 2 min, 0 off)
 // until ctx ends. A pass that started or finished runs refreshes the dispatch section.
+// Every pass then appends live lane state changes to the ops state log.
 func startTicker(ctx context.Context, srv *api.Server, env mission.Env, engine string) {
 	every, err := tickInterval(os.Getenv)
 	if err != nil {
@@ -121,6 +123,7 @@ func startTicker(ctx context.Context, srv *api.Server, env mission.Env, engine s
 		maxRuns: func() int { return maxRuns(os.Getenv) },
 		locked:  srv.Locked,
 		after:   func(mission.TickReport) { go srv.Refresh("dispatch") },
+		observe: srv.ObserveOps,
 		logf:    log.Printf,
 	}
 	log.Printf("tick every %s, first in %s", every, min(firstTickDelay, every))

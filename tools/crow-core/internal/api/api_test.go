@@ -30,6 +30,20 @@ var clock = time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
 
 // newServer serves the two fixture missions with their spec files, and fixed accounts
 // and jobs.
+// stateDir is a machine state dir with one AFK job waiting.
+func stateDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "afk", "job-01-audit.md"), []byte("# Audit the runbooks\n\nRead each runbook.\n"))
+	writeFile(t, filepath.Join(dir, "afk", "archive", "2026-11-09", "job-01-old.md"), []byte("# Old job\n"))
+	writeFile(t, filepath.Join(dir, RunsLedger), []byte(
+		`{"run_id":"run_id","project":"project","label":"label","cwd":"/work/project.wt/label","started_at":"2026-01-01T08:00:00+00:00","start_sha":"abc1234","branch":"label","account":"account","prompt_file":"p.md","power":"normal","model":"opus","permission":"auto","kind":"build","context":"","logics_ref":"item_001_x"}
+not json
+{"run_id":"9f8e7d6c5b4a","project":"crow","label":"older run","cwd":"","started_at":"2026-01-01T07:00:00+00:00","account":"work"}
+`))
+	return dir
+}
+
 func newServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	root := testfix.MissionsRoot(t)
@@ -54,7 +68,8 @@ func newServer(t *testing.T) (*Server, string) {
 			return ParseTimers([]byte(`[{"next":1794330227942489,"last":0,"unit":"crow-retro.timer","activates":"crow-retro.service"},
 				{"next":1,"last":2,"unit":"other.timer","activates":"other.service"}]`))
 		}}),
-		Now: func() time.Time { return clock },
+		Now:      func() time.Time { return clock },
+		StateDir: stateDir(t),
 	})
 	for _, name := range srv.Sections() {
 		srv.Refresh(name)
@@ -164,8 +179,14 @@ func TestResponseFixtures(t *testing.T) {
 		"state-checks":        {path: "/api/state/checks"},
 		"state-projects":      {path: "/api/state/projects"},
 		"state-work":          {path: "/api/state/work"},
+		"state-ops":           {path: "/api/state/ops?day=2026-11-10"},
+		"state-ops-week":      {path: "/api/state/ops?week=2026-W46"},
+		"error-ops-bad-week":  {path: "/api/state/ops?week=2026-46"},
 		"mission":             {path: "/api/missions/20261109-build-item-095"},
 		"mission-questions":   {path: "/api/missions/20261109-research-android-push-options"},
+		"run-report":          {path: "/api/runs/run_id"},
+		"run-report-mission":  {path: "/api/runs/a1b2c3d4"},
+		"error-no-run":        {path: "/api/runs/0000000000"},
 		"events":              {path: "/api/events?limit=3"},
 		"error-no-identity":   {path: "/api/state/inbox", header: map[string]string{IdentityHeader: ""}},
 		"error-no-mission":    {path: "/api/missions/20261109-build-nothing"},

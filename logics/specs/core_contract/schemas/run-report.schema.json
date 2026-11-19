@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "crow/core/run-report.schema.json",
+  "title": "run report",
+  "description": "Data of GET /api/runs/{id}: one crow-runs run from its ledger, or a mission run from the core store.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run", "source", "project", "label", "account", "status", "started", "ended", "cost_usd", "commits", "branch", "worktree", "item", "mission", "report"],
+  "properties": {
+    "run": {"type": "string", "minLength": 1, "description": "Full run id."},
+    "source": {"enum": ["dispatch", "mission"]},
+    "project": {"type": "string"},
+    "label": {"type": "string", "description": "crow-runs label, or the mission goal."},
+    "account": {"type": "string"},
+    "status": {"type": "string", "description": "running when live, the crow-runs status or mission run cause when ended, unknown when the dispatch section no longer lists the run."},
+    "started": {"type": "string"},
+    "ended": {"type": ["string", "null"]},
+    "cost_usd": {"type": ["number", "null"]},
+    "commits": {"type": "array", "items": {"type": "string"}, "description": "git log --oneline lines, newest first."},
+    "branch": {"type": ["string", "null"]},
+    "worktree": {"type": ["string", "null"]},
+    "item": {"type": ["string", "null"], "description": "Logics ref of the run."},
+    "mission": {"type": ["string", "null"]},
+    "report": {"type": "string", "description": "The run's final message, empty when unknown."}
+  }
+}

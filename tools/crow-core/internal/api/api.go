@@ -25,6 +25,7 @@ import (
 	"crow-core/internal/butler"
 	"crow-core/internal/eventlog"
 	"crow-core/internal/mission"
+	"crow-core/internal/ops"
 	"crow-core/internal/work"
 )
 
@@ -50,6 +51,7 @@ type Options struct {
 	Now       func() time.Time
 	Script    Script          // runs the bin/ scripts of the live actions (live.go); nil refuses them
 	ActionLog string          // core action log the live actions append to
+	StateDir  string          // machine state dir (local/state): AFK jobs for ops; empty skips them
 	Butler    *butler.Manager // butler chat (item_176); nil disables it
 }
 
@@ -64,6 +66,8 @@ type Server struct {
 	}
 	ext   map[string]*ext
 	order []string // every section, in response order
+	// opsLog is the ops state log under StateDir, nil without one.
+	opsLog *ops.Log
 }
 
 // Section is one part of the state with its change marks.
@@ -98,7 +102,10 @@ func New(o Options) *Server {
 		s.ext[src.Name] = &ext{src: src}
 		s.order = append(s.order, src.Name)
 	}
-	s.order = append(s.order, WorkSection)
+	s.order = append(s.order, WorkSection, OpsSection)
+	if o.StateDir != "" {
+		s.opsLog = &ops.Log{Path: filepath.Join(o.StateDir, ops.LogName)}
+	}
 	return s
 }
 
@@ -112,6 +119,7 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	mux.HandleFunc("GET /api/state", s.state)
 	mux.HandleFunc("GET /api/state/{section}", s.section)
 	mux.HandleFunc("GET /api/missions/{id}", s.mission)
+	mux.HandleFunc("GET /api/runs/{id}", s.runReport)
 	mux.HandleFunc("GET /api/missions/{id}/artifacts/{path...}", s.artifact)
 	mux.HandleFunc("GET /api/events", s.events)
 	s.routeActions(mux)
@@ -184,6 +192,11 @@ func (s *Server) section(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sec, err := s.read(name, r)
+	var bad badParam
+	if errors.As(err, &bad) {
+		fail(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
@@ -199,6 +212,9 @@ func (s *Server) read(name string, r *http.Request) (Section, error) {
 	}
 	if name == WorkSection {
 		return s.work()
+	}
+	if name == OpsSection {
+		return s.ops(r)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

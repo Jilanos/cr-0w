@@ -1,0 +1,69 @@
+{
+  "section": "ops",
+  "version": "09f1078803948a0d",
+  "updated_at": "2026-11-10T09:00:00Z",
+  "data": {
+    "day": "2026-11-10",
+    "days": [
+      "2026-11-10"
+    ],
+    "lanes": [
+      {
+        "id": "session_id",
+        "day": "2026-11-10",
+        "project": "project",
+        "account": "account",
+        "kind": "interactive",
+        "title": "title",
+        "state": "working",
+        "spans": [],
+        "keys": [
+          "session_id"
+        ],
+        "active_s": 0,
+        "wait_s": 0,
+        "cost_usd": 0,
+        "tokens": 0,
+        "commits": 0,
+        "runs": 1
+      }
+    ],
+    "queue": [
+      {
+        "kind": "routine",
+        "id": "crow-retro.timer",
+        "title": "crow-retro.service",
+        "next": "2026-11-10T17:03:47Z"
+      },
+      {
+        "kind": "afk",
+        "id": "job-01-audit.md",
+        "title": "Audit the runbooks"
+      }
+    ],
+    "totals": [
+      {
+        "by": "project",
+        "name": "project",
+        "lanes": 1,
+        "active_s": 0,
+        "wait_s": 0,
+        "stuck": 0,
+        "failed": 0,
+        "cost_usd": 0,
+        "tokens": 0
+      },
+      {
+        "by": "kind",
+        "name": "interactive",
+        "lanes": 1,
+        "active_s": 0,
+        "wait_s": 0,
+        "stuck": 0,
+        "failed": 0,
+        "cost_usd": 0,
+        "tokens": 0
+      }
+    ]
+  }
+}

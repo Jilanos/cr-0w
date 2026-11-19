@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"crow-core/lanes"
 )
 
 func crowHome() string {
@@ -738,17 +740,7 @@ func resetTime(s string) string {
 
 // whoName is the session title without its "project: " prefix; a title that is only a slash
 // command or empty falls back to the project name.
-func whoName(s usageSession, reg *registry) string {
-	proj := reg.shortName(s.Project)
-	title := strings.TrimSpace(s.Title)
-	if i := strings.Index(title, ": "); i >= 0 && i < 24 {
-		title = strings.TrimSpace(title[i+2:])
-	}
-	if title == "" || strings.HasPrefix(title, "/") {
-		return proj
-	}
-	return title
-}
+func whoName(s usageSession, reg *registry) string { return lanes.Who(s.Title, s.Project, reg) }
 
 // openThreads reads the unchecked "- [ ] date [tag] text → next" lines of open-threads.md
 // as the Next list. The "## Me / Crow / Waiting" section sets the actor; a Waiting line

@@ -234,7 +234,7 @@ for p in yaml.safe_load(open('$REGISTRY'))['projects']:
   watch)    exec "$CROW_ENGINE/bin/crow" deck "$@" ;;   # alias of the deck (req_007)
   deck)     # the control room (skeleton): rebuild when its source is newer than the binary
             src="$CROW_ENGINE/tools/crow-deck"; bin="$src/crow-deck"
-            if [[ ! -x "$bin" || -n "$(find "$src" -name '*.go' -newer "$bin" -o -name go.mod -newer "$bin")" ]]; then
+            if [[ ! -x "$bin" || -n "$(find "$src" "$CROW_ENGINE/tools/crow-core/lanes" -name '*.go' -newer "$bin" -o -name go.mod -newer "$bin")" ]]; then
               (cd "$src" && go build -o crow-deck .) || exit 1
             fi
             exec "$bin" "$@" ;;

@@ -1,0 +1,17 @@
+{
+  "run": "a1b2c3d4",
+  "source": "mission",
+  "project": "",
+  "label": "Pick the account for a dispatch from the scope of the target repo (backlog item item_095).",
+  "account": "",
+  "status": "done",
+  "started": "2026-11-09T09:01:00+01:00",
+  "ended": "2026-11-09T09:10:00+01:00",
+  "cost_usd": null,
+  "commits": [],
+  "branch": null,
+  "worktree": null,
+  "item": null,
+  "mission": "20261109-build-item-095",
+  "report": ""
+}

@@ -41,7 +41,32 @@ def test_every_schema_has_fixtures():
     assert {p.name for p in SCHEMAS.glob("*.json")} == {
         "request.schema.json", "reply.schema.json", "event.schema.json",
         "mission.schema.json", "run.schema.json", "inbox.schema.json", "live-action.schema.json",
-        "work-item.schema.json"}
+        "work-item.schema.json", "ops.schema.json", "run-report.schema.json"}
+
+
+def test_run_report_fixtures_valid():
+    docs = [load(FIX / "records" / "run-report.json")] + [load(p) for p in sorted((FIX / "api").glob("run-report*.json"))]
+    assert len(docs) >= 3
+    for doc in docs:
+        errs = errors("run-report.schema.json", doc)
+        assert not errs, "; ".join(errs)
+    doc = load(FIX / "records" / "run-report.json")
+    doc["source"] = "cron"
+    assert errors("run-report.schema.json", doc)
+
+
+def test_ops_fixtures_valid():
+    docs = [load(FIX / "records" / "ops.json")] + [load(p)["data"] for p in sorted((FIX / "api").glob("state-ops*.json"))]
+    assert len(docs) >= 3
+    for doc in docs:
+        errs = errors("ops.schema.json", doc)
+        assert not errs, "; ".join(errs)
+
+
+def test_ops_schema_rejects_unknown_span_state():
+    doc = load(FIX / "records" / "ops.json")
+    doc["lanes"][0]["spans"] = [{"state": "napping", "start": "2026-11-10T08:00:00Z", "end": "2026-11-10T08:10:00Z"}]
+    assert errors("ops.schema.json", doc)
 
 
 def test_work_record_fixture_valid():
@@ -214,7 +239,7 @@ def test_api_state_fixture():
     assert set(st) == {"version", "sections"}
     assert set(st["sections"]) == {
         "inbox", "missions", "runs", "sessions", "dispatch", "usage", "today",
-        "mrs", "checks", "projects", "accounts", "jobs", "work", "ready"}
+        "mrs", "checks", "projects", "accounts", "jobs", "work", "ops", "ready"}
     for name, sec in st["sections"].items():
         assert sec["section"] == name
         check_section(sec)

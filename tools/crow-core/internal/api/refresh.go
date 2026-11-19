@@ -35,12 +35,18 @@ type ext struct {
 
 // read marks the section requested, starts a refresh when one is due and returns the
 // last good body at once. It never waits for a script.
-func (s *Server) readExt(e *ext) Section {
+func (s *Server) readExt(e *ext) Section { return s.extSection(e, true) }
+
+// extSection returns the last good body. ask marks the section requested and starts a
+// due refresh; without it the read changes nothing.
+func (s *Server) extSection(e *ext, ask bool) Section {
 	now := s.o.Now()
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.asked = now
-	s.kick(e, now)
+	if ask {
+		e.asked = now
+		s.kick(e, now)
+	}
 	sec := Section{Section: e.src.Name, Data: e.data, Error: e.err}
 	if !e.have {
 		sec.Data, sec.Stale = []any{}, true

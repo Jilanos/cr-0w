@@ -182,6 +182,22 @@ func TestRecordFixtures(t *testing.T) {
 	roundTrip(t, "inbox.json", read(t, filepath.Join(fix, "records", "inbox.json")), &inbox)
 	var work []WorkItem
 	roundTrip(t, "work.json", read(t, filepath.Join(fix, "records", "work.json")), &work)
+	var ops Ops
+	roundTrip(t, "ops.json", read(t, filepath.Join(fix, "records", "ops.json")), &ops)
+	for _, name := range []string{filepath.Join("records", "run-report.json"), filepath.Join("api", "run-report.json"), filepath.Join("api", "run-report-mission.json")} {
+		var rr RunReport
+		roundTrip(t, name, read(t, filepath.Join(fix, name)), &rr)
+	}
+	for _, l := range ops.Lanes {
+		if !slices.Contains(OpsKinds, l.Kind) || !slices.Contains(OpsLaneStates, l.State) {
+			t.Errorf("ops %s: unknown kind %s or state %s", l.ID, l.Kind, l.State)
+		}
+		for _, s := range l.Spans {
+			if !slices.Contains(OpsSpanStates, s.State) {
+				t.Errorf("ops %s: unknown span state %s", l.ID, s.State)
+			}
+		}
+	}
 	for _, w := range work {
 		if !slices.Contains(WorkKinds, w.Kind) || !slices.Contains(WorkStates, w.State) {
 			t.Errorf("%s: unknown kind %s or state %s", w.ID, w.Kind, w.State)
@@ -419,6 +435,8 @@ func TestTypesMatchSchemas(t *testing.T) {
 		{Run{}, core("run.schema.json")},
 		{InboxItem{}, core("inbox.schema.json")},
 		{WorkItem{}, core("work-item.schema.json")},
+		{Ops{}, core("ops.schema.json")},
+		{RunReport{}, core("run-report.schema.json")},
 		{CrowBlock{}, run("crow-block.schema.json")},
 		{Kind{}, run("kind.schema.json")},
 		{Questions{}, run("questions.schema.json")},
