@@ -156,8 +156,25 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       set('today', { ...t, important: t.important.filter((m) => m.id !== id), flagged: t.flagged.filter((m) => m.id !== id) })
       return reply(verb, id)
     },
+    async routine(unit, verb) {
+      if (!/^crow-[a-z0-9-]+\.timer$/.test(unit)) throw new ApiError(404, `no routine ${unit}`)
+      return reply(`routine_${verb}`, unit)
+    },
+    async afkRead(id) {
+      return { id, text: afkJobs.get(id) ?? `# ${id}\n\nRead the open items and fix the first one.\n` }
+    },
+    async afkSave(id, text) {
+      afkJobs.set(id, text)
+      return reply('afk_edit', id)
+    },
+    async afkSkip(id) {
+      afkJobs.delete(id)
+      return reply('afk_skip', id)
+    },
   }
 }
+
+const afkJobs = new Map<string, string>()
 
 // The board chat (chat-cover): a user turn, folded tools, a list reply, a question.
 const at = (hm: string) => `2026-11-09T${hm}:00+01:00`

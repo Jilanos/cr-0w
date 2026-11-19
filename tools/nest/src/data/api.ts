@@ -75,9 +75,9 @@ export function agendaOf(today: SectionBody): AgendaEvent[] {
 
 // Live actions: same-origin POSTs with the CSRF header core requires (adr_001).
 export function apiActions(base = '/api', get: Fetch = (i, init) => fetch(i, init)): Actions {
-  const post = async <T = LiveReply>(path: string, body?: unknown): Promise<T> => {
+  const post = async <T = LiveReply>(path: string, body?: unknown, method = 'POST'): Promise<T> => {
     const res = await get(`${base}${path}`, {
-      method: 'POST',
+      method,
       headers: { 'X-Crow': '1', 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: 'no-store',
@@ -112,6 +112,14 @@ export function apiActions(base = '/api', get: Fetch = (i, init) => fetch(i, ini
     missionCancel: (mission, reason) => post<unknown>(`/missions/${id(mission)}/cancel`, reason ? { reason } : undefined),
     // Row ids hold slashes (<mission>/v<N>/<question>): each part is escaped, the slashes stay.
     inboxHide: (item) => post<unknown>(`/inbox/${item.split('/').map(id).join('/')}/hide`),
+    routine: (unit, verb) => post(`/routines/${id(unit)}/${verb}`),
+    afkRead: async (job) => {
+      const res = await get(`${base}/afk?id=${id(job)}`, { cache: 'no-store' })
+      if (!res.ok) throw await failure(res)
+      return (await res.json()) as { id: string; text: string }
+    },
+    afkSave: (job, text) => post('/afk', { id: job, text }, 'PUT'),
+    afkSkip: (job) => post(`/afk/skip?id=${id(job)}`),
   }
 }
 

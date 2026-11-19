@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dispatchOf } from '../data/live'
 import {
-  axis, busy, clock, groups, hours, isLive, isoWeek, parisDay, parisHour, runId, shiftDay, stats, usd,
+  axis, clock, groups, hours, isLive, isoWeek, parisDay, parisHour, runId, shiftDay, stats, usd,
   type Ops as OpsData, type Scale, type OpsLane, type OpsQueued, type RunReport,
 } from '../data/ops'
 import { useSource, type Snapshot } from '../data/useData'
@@ -40,20 +40,25 @@ export function Ops({ snap }: { snap: Snapshot }) {
   const [mode, setMode] = useState<Mode>('day')
   const [day, setDay] = useState(today)
   const [by, setBy] = useState<By>('project')
-  const [data, setData] = useState<OpsData | null>(null)
+  const [view, setView] = useState<{ query: string; mode: Mode; day: string; data: OpsData } | null>(null)
+  const data = view?.data ?? null
   const [error, setError] = useState('')
   const [open, setOpen] = useState<OpsLane | null>(null)
   const [sheet, setSheet] = useState<Confirm | null>(null)
   const query = mode === 'day' ? `day=${day}` : `week=${isoWeek(day)}`
 
+  const want = useRef(query)
+  want.current = query
   const load = useCallback(async () => {
     try {
-      setData(await src.ops(query))
+      const d = await src.ops(query)
+      if (want.current !== query) return
+      setView({ query, mode, day, data: d })
       setError('')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [src, query])
+  }, [src, query, mode, day])
   useEffect(() => {
     void load()
     if (!src.poll || !(mode === 'week' ? isoWeek(today) === isoWeek(day) : day === today)) return
@@ -77,6 +82,26 @@ export function Ops({ snap }: { snap: Snapshot }) {
     ok: 'Cancel mission',
     danger: true,
     run: async () => { await src.actions.missionCancel(q.id); await load() },
+  })
+
+  const [edit, setEdit] = useState<OpsQueued | null>(null)
+  const routine = (q: OpsQueued, verb: 'run' | 'pause' | 'resume') => setSheet({
+    title: verb === 'run' ? `Run ${q.title} now?` : verb === 'pause' ? `Pause ${q.title}?` : `Resume ${q.title}?`,
+    lead: verb === 'run' ? 'It starts once now. The timer keeps its schedule.'
+      : verb === 'pause' ? 'The timer stops and stays off until you resume it.' : 'The timer starts again on its schedule.',
+    target: [['Routine', q.id], ...(q.next ? [['Next', when(q.next, now)] as [string, string]] : [])],
+    note: `crow-routine ${verb} ${q.id}`,
+    ok: verb === 'run' ? 'Run now' : verb === 'pause' ? 'Pause' : 'Resume',
+    run: async () => { await src.actions.routine(q.id, verb); await load() },
+  })
+  const skip = (q: OpsQueued) => setSheet({
+    title: 'Drop this AFK job?',
+    lead: 'The job file moves to afk/superseded and its queue row is marked skipped.',
+    target: [['Job', q.id], ...(q.project ? [['Project', q.project] as [string, string]] : [])],
+    note: 'local/state/afk',
+    ok: 'Drop job',
+    danger: true,
+    run: async () => { await src.actions.afkSkip(q.id); await load() },
   })
 
   const [scale, setScale] = useState<Scale>('work')
@@ -105,13 +130,11 @@ export function Ops({ snap }: { snap: Snapshot }) {
             <button type="button" className="icon-btn" aria-label="Later" disabled={shiftDay(day, step) > today && (mode === 'day' || isoWeek(shiftDay(day, step)) > isoWeek(today))}
               onClick={() => setDay(shiftDay(day, step) > today ? today : shiftDay(day, step))}>▶</button>
           </div>
-          {mode === 'day' && (
-            <div className="seg" role="tablist" aria-label="Time scale">
+          <div className="seg" role="tablist" aria-label="Time scale">
               {([['work', '08–20'], ['full', '24H']] as const).map(([k, t]) => (
                 <button key={k} type="button" role="tab" aria-selected={scale === k} className={scale === k ? 'on' : ''} onClick={() => setScale(k)}>{t}</button>
               ))}
             </div>
-          )}
           {project && (
             <button type="button" className="chip-f" onClick={() => navigate('/ops')} aria-label={`Clear filter ${project}`}>
               {project.toUpperCase()} <span aria-hidden="true">×</span>
@@ -125,8 +148,13 @@ export function Ops({ snap }: { snap: Snapshot }) {
         <section className="pn ops-tlp" aria-label="Timeline">
           {error && <div className="err" role="alert">{error}</div>}
           {!data && !error && <div className="sub">Loading…</div>}
-          {data && mode === 'day' && <Day lanes={lanes} queue={queue} day={day} today={today} now={now} scale={scale} dispatch={dispatch} onOpen={setOpen} />}
-          {data && mode === 'week' && <Week data={data} lanes={lanes} today={today} now={now} onDay={(d) => { setDay(d); setMode('day') }} />}
+          {view && (
+            <div key={view.mode} className={`ops-view${view.query !== query ? ' stale' : ''}`}>
+              {view.mode === 'day'
+                ? <Day lanes={lanes} queue={queue} day={view.day} today={today} now={now} scale={scale} dispatch={dispatch} onOpen={setOpen} />
+                : <Week days={view.data.days} lanes={lanes} today={today} now={now} scale={scale} onDay={(d) => { setDay(d); setMode('day') }} />}
+            </div>
+          )}
           <div className="ops-legend" aria-label="Legend">
             {LEGEND.map(([k, t]) => <span key={k}><i className={`sw st-${k}`} />{t}</span>)}
             <span><i className="sw st-working live" />live</span>
@@ -139,14 +167,23 @@ export function Ops({ snap }: { snap: Snapshot }) {
           <section className="pn" aria-labelledby="oq">
             <h2 className="ph" id="oq"><span>Queue</span><span className="sm num">{qsum || 'empty'} · slots {dispatch.slots.busy}/{dispatch.slots.max}</span></h2>
             {queue.length === 0 && <div className="sub">Nothing waits to run.</div>}
+            <div className="sub ops-qhelp">What starts next: missions take the next free slot, routines start on their timer, AFK jobs run at the next AFK go.</div>
             {queue.map((q) => (
-              <div key={`${q.kind}-${q.id}`} className={`ops-q k-${q.kind}`}>
+              <div key={`${q.kind}-${q.id}`} className={`ops-q k-${q.kind}${q.paused ? ' paused' : ''}`}>
                 <span className="ops-qi num">{q.kind === 'mission' ? ++qn : q.kind === 'routine' ? '↻' : '☾'}</span>
-                <span className="ops-qt">{q.title}</span>
-                <span className="sm num">{q.kind === 'afk' ? 'job' : q.kind}{q.project ? ` · ${q.project}` : ''}{q.next ? ` · ${when(q.next, now)}` : q.kind === 'mission' ? ' · when a slot frees' : ''}</span>
-                {q.kind === 'mission'
-                  ? <button type="button" className="btn sm" aria-label={`Cancel ${q.title}`} onClick={() => cancel(q)}>✕</button>
-                  : <span />}
+                <span className="ops-qt">{q.kind === 'afk' ? 'afk · ' : ''}{q.title}</span>
+                <span className="sm num">{queueWhen(q, now)}</span>
+                <span className="ops-qa">
+                  {q.kind === 'mission' && <button type="button" className="btn sm" aria-label={`Cancel ${q.title}`} onClick={() => cancel(q)}>✕</button>}
+                  {q.kind === 'routine' && <>
+                    <button type="button" className="btn sm" onClick={() => routine(q, q.paused ? 'resume' : 'pause')}>{q.paused ? 'RESUME' : 'PAUSE'}</button>
+                    <button type="button" className="btn sm" onClick={() => routine(q, 'run')}>RUN NOW</button>
+                  </>}
+                  {q.kind === 'afk' && <>
+                    <button type="button" className="btn sm" onClick={() => setEdit(q)}>EDIT</button>
+                    <button type="button" className="btn sm" aria-label={`Skip ${q.title}`} onClick={() => skip(q)}>✕</button>
+                  </>}
+                </span>
               </div>
             ))}
           </section>
@@ -183,6 +220,59 @@ export function Ops({ snap }: { snap: Snapshot }) {
       </div>
       {open && <LaneSheet lane={open} now={now} onClose={() => setOpen(null)} />}
       {sheet && <Sheet c={sheet} onClose={() => setSheet(null)} />}
+      {edit && <AfkSheet job={edit} src={src} onClose={() => setEdit(null)} />}
+    </>
+  )
+}
+
+// The when column of a queue row: what kind of entry and when it starts.
+function queueWhen(q: OpsQueued, now: Date): string {
+  const at = q.project ? ` · ${q.project}` : ''
+  if (q.kind === 'mission') return `mission${at} · when a slot frees`
+  if (q.kind === 'routine') return q.paused ? 'routine · paused' : `routine · ${q.next ? when(q.next, now) : 'no next start'}`
+  return `job${at} · next afk go`
+}
+
+// Edit an AFK job prompt in place (core PUT /api/afk).
+function AfkSheet({ job, src, onClose }: { job: OpsQueued; src: { actions: { afkRead: (id: string) => Promise<{ text: string }>; afkSave: (id: string, text: string) => Promise<unknown> } }; onClose: () => void }) {
+  const [text, setText] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    src.actions.afkRead(job.id).then((j) => setText(j.text), (e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+  }, [job.id, src])
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    addEventListener('keydown', key)
+    return () => removeEventListener('keydown', key)
+  }, [busy, onClose])
+  const save = async () => {
+    if (text === null) return
+    setBusy(true)
+    setError('')
+    try {
+      await src.actions.afkSave(job.id, text)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <div className="scrim" onClick={busy ? undefined : onClose} aria-hidden="true" />
+      <div className="sheet ops-afk" role="dialog" aria-modal="true" aria-labelledby="afk-t">
+        <div className="grab" aria-hidden="true" />
+        <h2 id="afk-t" className="sh">Edit AFK job</h2>
+        <div className="sub num">local/state/afk/{job.id}</div>
+        {text === null && !error && <div className="sub">Loading…</div>}
+        {text !== null && <textarea className="field" aria-label="Job prompt" value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />}
+        {error && <div className="err" role="alert">{error}</div>}
+        <div className="btns">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+          <button type="button" className="btn p" onClick={save} disabled={busy || text === null || !text.trim()} aria-busy={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
     </>
   )
 }
@@ -268,41 +358,47 @@ function Day({ lanes, queue, day, today, now, scale, dispatch, onOpen }: { lanes
   )
 }
 
-function Week({ data, lanes, today, now, onDay }: { data: OpsData; lanes: OpsLane[]; today: string; now: Date; onDay: (d: string) => void }) {
-  const ax: [number, number] = [6, 24]
-  const ticks = [6, 9, 12, 15, 18, 21, 24]
+// Week: one row per day on the same axis and row height as Day, every lane's spans overlaid.
+const LAYER: Record<string, number> = { idle: 0, working: 1, waiting: 2, done: 3, stuck: 4, failed: 5 }
+function Week({ days, lanes, today, now, scale, onDay }: { days: string[]; lanes: OpsLane[]; today: string; now: Date; scale: Scale; onDay: (d: string) => void }) {
+  const nowH = parisHour(now)
+  const ax = axis(lanes, days.includes(today), nowH, scale)
+  const step = ax[1] - ax[0] > 14 ? 2 : 1
+  const ticks = Array.from({ length: ax[1] - ax[0] + 1 }, (_, i) => ax[0] + i)
+  const labels = ticks.filter((h) => (h - ax[0]) % step === 0 && h < ax[1])
+  const grid = ticks.map((h) => <i key={h} className="ops-grid" style={{ left: pct(h, ax) }} />)
   return (
-    <table className="ops-week num">
-      <thead>
-        <tr>
-          <th>day</th>
-          <th className="ops-wtrack">{ticks.map((h) => <span key={h} className="ops-tick" style={{ left: pct(h, ax) }}>{String(h % 24).padStart(2, '0')}</span>)}</th>
-          <th>lanes</th><th>sess/runs</th><th>active</th><th>done</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.days.map((d) => {
-          const ls = lanes.filter((l) => l.day === d)
-          const s = stats(ls)
-          const future = d > today
-          return (
-            <tr key={d} className={future ? 'future' : ''} onClick={future ? undefined : () => onDay(d)}>
-              <td><button type="button" className="ops-wday" disabled={future}>{WEEKDAY.format(new Date(`${d}T12:00:00Z`))} {d.slice(8)}</button></td>
-              <td className="ops-wtrack">
-                <div className="ops-track">
-                  {busy(ls).map(([a, b], i) => <i key={i} className="ops-span st-working" style={{ left: pct(a, ax), width: `calc(${pct(b, ax)} - ${pct(a, ax)})` }} />)}
-                  {d === today && <i className="ops-now" style={{ left: pct(parisHour(now), ax) }} />}
-                </div>
-              </td>
-              <td>{future ? '' : s.lanes}</td>
-              <td>{future ? '' : `${s.sessions}/${s.runs}`}</td>
-              <td>{future ? '' : `${hours(s.active_s)}h`}</td>
-              <td>{future ? '' : s.done}</td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
+    <div className="ops-tl ops-wk">
+      <div className="ops-row ops-axis" aria-hidden="true">
+        <span className="ops-lh">Day</span>
+        <div className="ops-track">
+          {labels.map((h) => <span key={h} className={`ops-tick num${(h - ax[0]) % 3 ? ' minor' : ''}`} style={{ left: pct(h, ax) }}>{String(h).padStart(2, '0')}<span className="ops-mm">:00</span></span>)}
+        </div>
+      </div>
+      {days.map((d) => {
+        const ls = lanes.filter((l) => l.day === d)
+        const s = stats(ls)
+        const future = d > today
+        const spans = ls.flatMap((l) => l.spans.map((sp) => ({ ...sp, live: isLive(l) && sp === l.spans.at(-1) })))
+          .sort((x, y) => (LAYER[x.state] ?? 1) - (LAYER[y.state] ?? 1))
+        return (
+          <div key={d} className={`ops-row ops-wrow${future ? ' future' : ''}${d === today ? ' is-today' : ''}`}>
+            <button type="button" className="ops-name" disabled={future} onClick={() => onDay(d)}>
+              <span className="ops-lt"><b>{WEEKDAY.format(new Date(`${d}T12:00:00Z`))} {d.slice(8)}</b></span>
+              {!future && <span className="ops-wst num">{s.lanes ? `${s.lanes} lanes · ${hours(s.active_s)}h · ${usd(s.cost)}` : '—'}</span>}
+            </button>
+            <div className="ops-track" onClick={future ? undefined : () => onDay(d)}>
+              {grid}
+              {spans.map((sp, i) => {
+                const a0 = parisHour(sp.start), a1 = parisHour(sp.end) || 24
+                return <i key={i} className={`ops-span st-${sp.state}${sp.live && d === today ? ' live' : ''}`} style={{ left: pct(a0, ax), width: `calc(${pct(a1, ax)} - ${pct(a0, ax)})` }} />
+              })}
+              {d === today && <i className="ops-now" style={{ left: pct(nowH, ax) }} aria-hidden="true" />}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

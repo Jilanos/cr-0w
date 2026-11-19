@@ -167,6 +167,12 @@ export interface Actions {
   missionStop(mission: string): Promise<unknown>
   missionCancel(mission: string, reason?: string): Promise<unknown>
   inboxHide(item: string): Promise<unknown>
+  // Ops queue (item_190, core internal/api/queue.go): routines through crow-routine,
+  // AFK job files under local/state/afk (id "job-x.md" or "queued/job-x.md").
+  routine(unit: string, verb: 'run' | 'pause' | 'resume'): Promise<LiveReply>
+  afkRead(id: string): Promise<{ id: string; text: string }>
+  afkSave(id: string, text: string): Promise<LiveReply>
+  afkSkip(id: string): Promise<LiveReply>
 }
 
 const obj = (b: SectionBody | undefined) => (b?.data && typeof b.data === 'object' ? (b.data as Record<string, unknown>) : {})

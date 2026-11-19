@@ -20,7 +20,7 @@ export interface OpsLane {
   commits: number
   runs: number
 }
-export interface OpsQueued { kind: 'mission' | 'routine' | 'afk'; id: string; project?: string; title: string; next?: string }
+export interface OpsQueued { kind: 'mission' | 'routine' | 'afk'; id: string; project?: string; title: string; next?: string; paused?: boolean }
 export interface OpsTotal { by: 'project' | 'kind'; name: string; lanes: number; active_s: number; wait_s: number; stuck: number; failed: number; cost_usd: number; tokens: number }
 export interface Ops { day?: string; week?: string; days: string[]; lanes: OpsLane[]; queue: OpsQueued[]; totals: OpsTotal[] }
 
