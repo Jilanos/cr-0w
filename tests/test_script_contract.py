@@ -19,7 +19,7 @@ from schema_lite import Validator
 SPEC = REPO / "logics" / "specs" / "script_contract"
 SCHEMAS = SPEC / "schemas"
 FIX = SPEC / "fixtures"
-PAYLOADS = ["accounts", "checks", "mrs", "registry", "runs", "sessions", "today", "usage", "usage_summary"]
+PAYLOADS = ["accounts", "checks", "mrs", "ready", "registry", "runs", "sessions", "today", "usage", "usage_summary"]
 
 STATUS = {"rows": [
     {"session_name": "main", "provider": "claude", "remaining_5h_pct": 80, "reset_5h_at": "Jan 1 12:00",
@@ -134,6 +134,12 @@ def test_accounts(hub, env):
     d = out_of(run(hub, "crow-accounts", "json", env=env))
     assert d["schema"] == 1 and d["accounts"]
     assert not errors("accounts", d)
+
+
+def test_ready(hub, env):
+    d = out_of(run(hub, "crow-ready", "json", env=env))
+    assert d["schema"] == 1 and d["items"] == []
+    assert not errors("ready", d)
 
 
 def test_registry(hub, tmp_path, env):

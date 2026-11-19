@@ -1,5 +1,5 @@
 {
-  "version": "f3bbb3baa9761135",
+  "version": "b0199a5f6b153035",
   "sections": {
     "accounts": {
       "section": "accounts",
@@ -369,6 +369,25 @@
         "schema": 1,
         "state_dir": "state_dir",
         "threads_file": "threads_file"
+      }
+    },
+    "ready": {
+      "section": "ready",
+      "version": "e8ac78f69caaaffc",
+      "updated_at": "2026-11-10T09:00:00Z",
+      "data": {
+        "items": [
+          {
+            "modified": "modified",
+            "path": "path",
+            "progress": "progress",
+            "project": "project",
+            "ref": "ref",
+            "title": "title"
+          }
+        ],
+        "schema": 1,
+        "total": 1
       }
     },
     "runs": {

@@ -32,7 +32,13 @@
      "active",
      "burn_5h_pct_per_h",
      "empty_at"
-    ]
+    ],
+    "properties": {
+     "in_policy": {
+      "type": "boolean",
+      "description": "local/accounts.yaml lists the account; false rows are tagged 'not in policy', not shown as errors."
+     }
+    }
    }
   },
   "today": {

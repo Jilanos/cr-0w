@@ -1019,6 +1019,27 @@ def reset_dt(text, now):
     return t.replace(year=now.year + 1) if t < now - dt.timedelta(days=200) else t
 
 
+def limit_rows(rows, policy):
+    """Claude cdx status rows as limits; in_policy is False for an account accounts.yaml does not list."""
+    return [{
+        "account": r.get("session_name"),
+        "remaining_5h_pct": r.get("remaining_5h_pct"),
+        "reset_5h_at": r.get("reset_5h_at"),
+        "remaining_week_pct": r.get("remaining_week_pct"),
+        "reset_week_at": r.get("reset_week_at"),
+        "active": r.get("active"),
+        "in_policy": policy is None or r.get("session_name") in policy,
+    } for r in rows if r.get("provider") == "claude"]
+
+
+def limit_line(lim):
+    """One text line per account limit; an account outside the policy is tagged, never read as an error."""
+    if not lim.get("in_policy", True):
+        return f"{lim['account']:<8} not in policy"
+    return (f"{lim['account']:<8} 5h {lim['remaining_5h_pct']}% left (↻ {lim['reset_5h_at']})  "
+            f"week {lim['remaining_week_pct']}% left (↻ {lim['reset_week_at']})")
+
+
 def burn_rates(limits):
     """Record a limit sample per account (at most once a minute) and derive the 5h burn over the last hour:
     % per hour and, if it runs out before the reset, when it hits zero."""
@@ -1182,14 +1203,7 @@ def build(days):
     hist_dates = [(dt.date.today() - dt.timedelta(days=i)).isoformat() for i in reversed(range(HISTORY_DAYS))]
     history = [{"date": d, **(days.get(d) or store.get(d) or rollup([]))} for d in hist_dates]
     status = run_json(["cdx", "status", "--json"]) or {}
-    limits = burn_rates([{
-        "account": r.get("session_name"),
-        "remaining_5h_pct": r.get("remaining_5h_pct"),
-        "reset_5h_at": r.get("reset_5h_at"),
-        "remaining_week_pct": r.get("remaining_week_pct"),
-        "reset_week_at": r.get("reset_week_at"),
-        "active": r.get("active"),
-    } for r in status.get("rows", []) if r.get("provider") == "claude"])
+    limits = burn_rates(limit_rows(status.get("rows", []), crow_lib.policy_names()))
     retro_dir = os.path.join(STATE, "retros")
     proposals = os.path.join(retro_dir, "proposals.md")
     pending = 0
@@ -1283,8 +1297,7 @@ def main():
         sys.stdout.write("\n")
         return 0
     for lim in data["limits"]:
-        print(f"{lim['account']:<8} 5h {lim['remaining_5h_pct']}% left (↻ {lim['reset_5h_at']})  "
-              f"week {lim['remaining_week_pct']}% left (↻ {lim['reset_week_at']})")
+        print(limit_line(lim))
     t = data["today"]
     print(f"today    ${t['cost_usd']:.2f} · {human(t['tokens'])} tok ({t['cache_pct']}% cache reads) · {t['sessions']} sessions")
     spark = "▁▂▃▄▅▆▇█"

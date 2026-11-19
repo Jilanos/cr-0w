@@ -18,7 +18,7 @@ and every comment must make the next MR better: each one is matched against the 
 - Branch already checked out elsewhere? Use that worktree. A new worktree goes next to the repo (`<repo>-<ticket>`), never in a temp or scratchpad dir.
 
 ## 1. Gather
-- Unresolved threads: GitLab `glab api --paginate "projects/:id/merge_requests/<iid>/discussions?per_page=100"`, keep `resolvable && !resolved`; GitHub `gh api repos/{o}/{r}/pulls/<n>/comments` + review threads via GraphQL `isResolved`.
+- Unresolved threads: GitLab the hub's `bin/crow-forge-read threads <iid>` (absolute path) from the checkout (unresolved only; works in background runs where `glab api` is denied); GitHub `gh api repos/{o}/{r}/pulls/<n>/comments` + review threads via GraphQL `isResolved`.
 - Failing pipeline: read the failed jobs' logs before believing or dismissing a "job is red" comment.
 - Approval: GitLab's `approved: true` only means no rule is pending (0 required). An MR is approved only when `approvals.approved_by` is non-empty; report who.
 

@@ -23,6 +23,8 @@ export interface Agent {
   projects?: Array<{ name: string; share_pct?: number }> | null
   recent?: Array<{ action: string; ts: string }> | null
   prompt?: Prompt | null
+  // tmux session holding a headless Nest session (item_188); attach opens a terminal on it.
+  tmux?: string | null
 }
 
 // The permission prompt a waiting session shows (item_174, crow-prompt). work_approval
@@ -52,6 +54,27 @@ export type AskAnswer = number[] | { other: string; options?: number[] }
 export interface Dispatch {
   slots: { busy: number; max: number }
   agents: Agent[]
+  // Runs that ended in the last days, newest first (crow-runs json).
+  finished?: FinishedRun[]
+}
+
+export interface FinishedRun {
+  run_id: string
+  project: string
+  label?: string | null
+  account?: string | null
+  status: string
+  ended_at?: string | null
+}
+
+// A Logics backlog item ready to build (crow-ready json).
+export interface ReadyItem {
+  project: string
+  ref: string
+  title: string
+  path: string
+  progress?: string
+  modified: string
 }
 
 // A resumable conversation of `crow-sessions json`.
@@ -64,6 +87,8 @@ export interface Resumable {
   limit?: string | null
   resets_at?: string | null
   last_prompt?: string | null
+  // Last transcript event, RFC 3339.
+  last_event?: string | null
 }
 
 // scope is set on a scoped snapshot (item_206): the mailbox the row came from.
@@ -95,7 +120,23 @@ export interface LiveReply {
   code: number
   message: string
   run_id?: string
+  // start and resume: the detached tmux session the session runs in (item_188, item_240).
+  tmux?: string
 }
+
+// The Terminal tab (item_240): the tmux screen of a session from `crow-screen show`. Lines
+// keep their ANSI SGR codes; the cursor is 0-based within cols x rows.
+export interface Screen {
+  lines: string[]
+  cols: number
+  rows: number
+  cursor: { x: number; y: number; shown: boolean }
+  // Lines above the screen at the start of lines (none on the alternate screen).
+  history?: number
+}
+
+// One key for the session's pane: a tmux key name (Enter, C-c, Up...) or literal text.
+export type TermKey = { key: string } | { text: string }
 
 export interface NewSession { project: string; account?: string; prompt?: string }
 export interface NewRun { project: string; label: string; prompt: string; model?: string; account?: string }
@@ -107,10 +148,18 @@ export interface Actions {
   answer(pid: number, prompt: string, option: 'allow' | 'deny'): Promise<LiveReply>
   ask(pid: number, prompt: string, answers: AskAnswer[]): Promise<LiveReply>
   stop(pid: number): Promise<LiveReply>
+  // Opens a terminal window on the desktop attached to the session's tmux session (item_188).
+  attach(pid: number): Promise<LiveReply>
+  // Terminal tab (item_240, core terminal.go): read the pane, type into it, size it.
+  screen(pid: number): Promise<Screen>
+  keys(pid: number, keys: TermKey[]): Promise<unknown>
+  resize(pid: number, cols: number, rows: number): Promise<unknown>
   resume(id: string, account?: string): Promise<LiveReply>
   start(s: NewSession): Promise<LiveReply>
   dispatch(r: NewRun): Promise<LiveReply>
   stopRun(runId: string): Promise<LiveReply>
+  /** Start a finished run again on its prompt, account and worktree (crow-runs retry). */
+  retryRun(runId: string): Promise<LiveReply>
   mail(id: string, verb: 'done' | 'snooze'): Promise<LiveReply>
   // Mission actions (item_168, core internal/api/actions.go). Replies differ per route;
   // callers only refetch. version is the mission version the owner saw (409 when older).
@@ -126,7 +175,7 @@ const list = <T>(v: unknown) => (Array.isArray(v) ? (v as T[]) : [])
 export function dispatchOf(b: SectionBody | undefined): Dispatch {
   const d = obj(b)
   const slots = (d.slots as Dispatch['slots'] | undefined) ?? { busy: 0, max: 0 }
-  return { slots, agents: list<Agent>(d.agents) }
+  return { slots, agents: list<Agent>(d.agents), finished: list<FinishedRun>(d.finished) }
 }
 
 export const resumableOf = (b: SectionBody | undefined) => list<Resumable>(obj(b).sessions)

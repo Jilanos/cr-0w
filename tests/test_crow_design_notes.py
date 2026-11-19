@@ -11,7 +11,7 @@ BIN = os.path.join(os.path.dirname(__file__), "..", "bin")
 
 def _run(args, stdin=None, env=None):
     return subprocess.run([os.path.join(BIN, args[0]), *args[1:]], input=stdin, capture_output=True,
-                          text=True, env={**os.environ, **(env or {})})
+                          text=True, check=False, env={**os.environ, **(env or {})})
 
 
 def _transcript(tmp_path, texts=(), writes=()):
@@ -71,6 +71,6 @@ def test_crop_and_sheet_stay_under_width(tmp_path):
         imgs.append(str(p))
     out = _run(["crow-crop", *imgs, "--region", "800x600+0+0", "--width", "300", "--out", str(tmp_path / "c")])
     sheet = _run(["crow-crop", "--sheet", *imgs, "--out", str(tmp_path / "s.png")])
-    sizes = [subprocess.run(["magick", "identify", "-format", "%w", p], capture_output=True, text=True).stdout
+    sizes = [subprocess.run(["magick", "identify", "-format", "%w", p], capture_output=True, text=True, check=False).stdout
              for p in out.stdout.split() + sheet.stdout.split()]
     assert [int(s) <= w for s, w in zip(sizes, (300, 300, 800))] == [True, True, True]

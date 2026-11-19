@@ -8,7 +8,7 @@
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-16 18:29:42
+> Indicators reviewed: 2026-11-18 13:47:43
 
 # AI Context
 - Summary: a chat in Nest with the butler (CR-0W persona), run by the req_032 engine: one long-lived `claude -p` stream-json process per conversation, core MCP tools only, a core bridge that streams replies to Nest. The butler starts missions first, and sessions or dispatch only when asked.
@@ -65,11 +65,28 @@
 - Rationale: the main surface the owner asked for.
 
 # Notes
+- 2026-11-18: slice 3 merged to main 03b4ef8 (owner OK), dist built. Home rail folds again (owner: chat hideable), folded while the chat is empty, 10377fe. Remaining: head inside the Desk Ask box.
+- 2026-11-18 boards approved (vault `Research/nest-design/item_176/design-notes.md`, pages `options/round2.html`, `options/round3.html`):
+  - Laptop: rail A, hero on top (320px rail, 240px hero block) showing the whole droid with no background box. The Desk "Ask CR-0W" panel goes; Live sessions takes its space. Alt+B folds to a 56px strip. Home rail has no hero.
+  - Phone: badge top left before the wordmark. Typing in the bottom Ask box opens the chat sheet; on other tabs the badge opens it.
+  - Phone Home: cover is D plus the Desk Ask bar under the holotable. Fold inner is G: HUD row, big centred holotable, Ask bar, then Needs you and Running in two columns. Source `home-phone/mockup.html?v=G`.
+  - Cyber versions approved 18/11 (round 4, `options/round4.html`). Ready to build.
+- Owner 2026-11-18 (slice 2 build):
+  - Fold key is Ctrl+B (Alt+B clashed).
+  - Home: the rail is pinned as the right column. Always open, no fold key, no hero line (the hero says it already). The mood label stays.
+  - Home left column: Needs you (top 3, then "N more in Inbox"), Next event, Running. MRs and reports join as one-line counts once their live data exists. No placeholders, no duplicated info.
+  - The hero stays the main thing on Home; the rest is toned down. Panel boxes and frames stay.
 - Owner 2026-11-16 (header gauges hand-off): free chat needs an account choice like /dispatch and /session.
 - Owner 2026-11-10: "when i talk to the butler i want the hero to respond". Placement on Home under the holotable, transcript on Desk. Layout base: item_171 approved design D.
 
 - Owner 2026-11-12: on the laptop Home is rarely open, so the hero must be visible while working → butler rail on every laptop screen, badge on phone.
+- Progress 2026-11-18: slice 2 built 2c7b7a1 (laptop rail, Home pinned rail), head clip fix 9a86b3d. Open: slice 3 (phone badge + sheet, cover D + Ask bar, Fold inner G); the rail chat opens without scrolling to the bottom (scroll likely runs before the head lays out).
+- Owner 2026-11-18 (slice 3 build): the cover header hides the theme button and the clock at 368px. The Fold inner chat keeps the 380px right side panel. The hub makes the board compares.
+- Progress 2026-11-18: slice 3 built on branch item-176-s3. Rail chat opens at the bottom d0f4ab4 (each message is observed). Phone badge + chat sheet 58190f6. Home cover D + Ask bar 19f54aa. Fold inner G 86c876a. Shots in vault `Research/nest-design/item_176/build-s3/`. Open: the head inside the Desk Ask box waits for the item_246 Desk rewrite.
+
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-18T16:05:00.476127+00:00 | cdx | 1ecba0382a11411cb668ead8ded4746f | item_176-s3b | succeeded |  |  |
+

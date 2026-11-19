@@ -1,6 +1,8 @@
 """crow-runs summarize_tool: a tool call's own description wins over its raw command."""
 import importlib.machinery
 import importlib.util
+import json
+import pathlib
 
 import pytest
 from conftest import BIN
@@ -99,3 +101,165 @@ def test_final_command_reads_both_providers(tmp_path):
                              capture_output=True, text=True,
                              env={"CROW_HOME": str(tmp_path), "CROW_ACCOUNT": "main", "PATH": "/usr/bin:/bin"})
         assert out.stdout.strip() == want, out.stderr
+
+
+def test_final_accepts_a_run_id(cr, monkeypatch):
+    from conftest import FIXTURES
+    row = {"run_id": "abc123", "provider": "codex", "artifacts": {"stdout_path": str(FIXTURES / "run-codex.jsonl")}}
+    monkeypatch.setattr(cr, "finished_rows", lambda since: {"abc123": row})
+    assert cr.final_of("abc") == "Shipped: codex report"
+
+
+def test_final_refuses_an_unknown_id(cr, monkeypatch):
+    monkeypatch.setattr(cr, "finished_rows", lambda since: {})
+    with pytest.raises(SystemExit):
+        cr.final_of("nope")
+
+
+@pytest.mark.parametrize("ids", [[""], ["  "], ["abc", ""]])
+def test_wait_refuses_an_empty_id(cr, monkeypatch, ids):
+    cr.STATE.mkdir(parents=True, exist_ok=True)
+    cr.LEDGER.write_text('{"run_id": "first", "project": "p", "label": "l"}\n')
+    monkeypatch.setattr(cr, "finished", lambda since, ttl=8: pytest.fail("polled with an empty id"))
+    monkeypatch.setattr(cr, "running_runs", lambda: pytest.fail("polled with an empty id"))
+    with pytest.raises(SystemExit):
+        cr.wait(ids, poll=0)
+    with pytest.raises(SystemExit):
+        cr.notify(ids, poll=0)
+
+
+def test_list_marks_a_run_whose_worktree_is_gone(cr, monkeypatch, tmp_path):
+    from datetime import datetime
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    gone = str(tmp_path / "repo.wt" / "removed")
+    cr.STATE.mkdir(parents=True, exist_ok=True)
+    cr.LEDGER.write_text(json.dumps({"run_id": "r1", "project": "p", "label": "l", "cwd": gone,
+                                     "started_at": now, "start_sha": "abc"}) + "\n")
+    row = {"run_id": "r1", "ended_at": now, "exit_code": 0, "cwd": gone, "duration_seconds": 5}
+    monkeypatch.setattr(cr, "finished_rows", lambda since, ttl=8: {"r1": row, "r2": {**row, "run_id": "r2"}})
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr, "agent_procs", lambda proc="/proc": [])
+    data = cr.collect("today", include_unledgered=True)
+    assert [f["worktree_removed"] for f in data["finished"]] == [True, True]
+    assert "worktree removed" in "\n".join(cr.render(data, color=False))
+
+
+REG = {"projects": [{"name": "acme-platform-lambda", "path": "/x/lambda", "scope": "work"},
+                    {"name": "demo-shell", "path": "/x/shell", "scope": "personal", "aliases": ["shell"]}]}
+
+
+@pytest.mark.parametrize(("typo", "hint"), [("lambda", "acme-platform-lambda"), ("demo-shel", "demo-shell"),
+                                            ("hbu", "hub")])
+def test_unknown_project_suggests_the_closest_name(cr, monkeypatch, typo, hint):
+    monkeypatch.setattr(cr, "REG", REG)
+    with pytest.raises(SystemExit) as e:
+        cr.project(typo)
+    assert f"did you mean '{hint}'" in str(e.value.code)
+
+
+def test_alias_and_hub_resolve(cr, monkeypatch):
+    monkeypatch.setattr(cr, "REG", REG)
+    assert cr.project("shell")["name"] == "demo-shell"
+    assert cr.project("hub") == {"name": "hub", "path": str(cr.HOME), "scope": "personal"}
+    hub = {"name": "my-hub", "path": str(cr.HOME), "scope": "personal"}
+    monkeypatch.setattr(cr, "REG", {"projects": [*REG["projects"], hub]})
+    assert cr.project("hub") is hub
+
+
+def test_dispatch_hub_runs_in_the_hub(cr, monkeypatch, capsys):
+    import argparse
+    import subprocess
+    monkeypatch.setattr(cr, "REG", REG)
+    monkeypatch.setattr(cr, "pick_account", lambda a: "main")
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr.crow_lib, "provider_of", lambda acct, status=None: "claude")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0))
+    a = argparse.Namespace(project="hub", label="t", prompt="do it", prompt_file=None, kind="task", power=None,
+                           model=None, budget=None, context="day", dry_run=True, permission=None, force=False,
+                           logics=None, resumes=None, cwd=None, account=None, isolate=False, continue_run=None,
+                           write_dir=None, mission=None, end_state=None, timeout_min=None, json=False)
+    cr.dispatch(a)
+    cmd = capsys.readouterr().out.split()
+    assert cmd[cmd.index("--cwd") + 1] == str(cr.HOME)
+    assert cmd[cmd.index("--label") + 1] == "hub/t"
+
+
+def test_dispatch_continue_run_passes_the_full_id(cr, monkeypatch, capsys):
+    """`crow runs` shows 8-char ids; cdx only continues a run by its full id."""
+    import argparse
+    import subprocess
+    full = "6e3838e9e7d3426b9b438ab5939099c3"
+    monkeypatch.setattr(cr, "REG", REG)
+    monkeypatch.setattr(cr, "ledger", lambda: [{"run_id": full, "account": "main", "permission": "auto"}])
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr.crow_lib, "provider_of", lambda acct, status=None: "claude")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0))
+    a = argparse.Namespace(project="hub", label="t", prompt="go on", prompt_file=None, kind="task", power=None,
+                           model=None, budget=None, context="day", dry_run=True, permission=None, force=False,
+                           logics=None, resumes=None, cwd=None, account=None, isolate=False, continue_run="6e3838e9",
+                           write_dir=None, mission=None, end_state=None, timeout_min=None, json=False)
+    cr.dispatch(a)
+    cmd = capsys.readouterr().out.split()
+    assert cmd[cmd.index("--continue-run") + 1] == full
+
+
+def _codex_log(path, *texts):
+    lines = [{"type": "item.completed", "item": {"id": f"i{n}", "type": "agent_message", "text": t}}
+             for n, t in enumerate(texts)]
+    path.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+
+
+@pytest.mark.parametrize(("texts", "want"), [
+    (("Shipped:\n- a\n- b\nLeft: none", "Done."), "Shipped:\n- a\n- b\nLeft: none"),
+    (("Report\n- a\n- b", "All set."), "Report\n- a\n- b"),
+    (("one line",), "one line"),
+])
+def test_codex_report_skips_a_one_line_postscript(cr, monkeypatch, tmp_path, texts, want):
+    out = tmp_path / "o.log"
+    _codex_log(out, *texts)
+    row = {"run_id": "abc123", "ended_at": "t", "provider": "codex", "artifacts": {"stdout_path": str(out)}}
+    monkeypatch.setattr(cr, "finished", lambda since: {"abc123": row})
+    monkeypatch.setattr(cr, "sh", lambda *a, **k: json.dumps({"report": {"final_message": texts[-1]}}))
+    monkeypatch.setattr(cr, "mark_seen", lambda *a: None)
+    assert cr.report("abc") == want
+
+
+def test_headless_session_without_id_is_listed_as_setup(cr, monkeypatch, tmp_path):
+    """item_240: a Nest session stuck on a first-run dialog has no session id yet; a plain helper is dropped."""
+    proc = {"provider": "claude", "argv": ["claude"], "cwd": str(tmp_path), "home": str(tmp_path / "home"),
+            "account": "rk1", "started": 0}
+    procs = [{**proc, "pid": 11}, {**proc, "pid": 12}, {**proc, "pid": 13}]
+    monkeypatch.setattr(cr, "agent_procs", lambda proc="/proc": procs)
+    monkeypatch.setattr(cr, "running_runs", list)
+    monkeypatch.setattr(cr, "finished_rows", lambda since, ttl=8: {})
+    monkeypatch.setattr(cr.crow_term, "tmux_sessions_by_pid", lambda: {11: "crow-lazytf-101010", 12: "work"})
+    monkeypatch.setattr(cr.crow_term, "tmux_session_for", lambda pid, panes: panes.get(pid))
+    agents = cr.collect("today")["agents"]
+    assert [(a["pid"], a["state"], a["tmux"]) for a in agents] == [(11, "setup", "crow-lazytf-101010")]
+
+
+def test_keep_prompt_copies_a_temp_prompt(cr, tmp_path):
+    f = tmp_path / "p.md"
+    f.write_text("do the thing")
+    a = type("A", (), {"prompt_file": str(f), "prompt": None})()
+    kept = cr.keep_prompt("abcd1234", a)
+    f.unlink()
+    assert pathlib.Path(kept).read_text() == "do the thing"
+
+
+def test_retry_args_rebuild_the_run(cr, tmp_path):
+    p = tmp_path / "kept.md"
+    p.write_text("x")
+    rec = {"run_id": "abcd1234ef", "project": "hub", "label": "fix", "prompt_file": "/gone.md", "prompt_copy": str(p),
+           "account": "spare", "kind": "task", "context": "day", "cwd": str(tmp_path), "logics_ref": "item_1"}
+    args, why = cr.retry_args(rec)
+    assert why == ""
+    assert args[:5] == ["dispatch", "hub", "fix", "--prompt-file", str(p)]
+    for pair in (["--resumes", "abcd1234ef"], ["--account", "spare"], ["--cwd", str(tmp_path)], ["--logics", "item_1"]):
+        i = args.index(pair[0])
+        assert args[i:i + 2] == pair
+
+
+def test_retry_args_refuse_without_prompt(cr):
+    args, why = cr.retry_args({"run_id": "x", "project": "hub", "label": "l", "prompt_file": "/gone.md"})
+    assert args is None and "no prompt" in why

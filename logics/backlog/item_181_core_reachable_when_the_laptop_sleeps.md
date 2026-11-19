@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-18 11:14:28
 
 # AI Context
 - Summary: spike, then a decision: keep core and missions reachable from the phone while the laptop sleeps (tower as host, item_120) or write down the limit and show it in Nest.
@@ -25,6 +26,9 @@
   - Nest shows "core offline since HH:MM" from the service worker when the origin fails.
 - Out:
   - Building the chosen host (new item after the decision).
+
+# Decision so far
+- Owner 2026-11-18: core stays on the laptop for now. The Yoga is old (no battery); a small always-on PC may replace it, decided in the homelab repo. While the laptop sleeps, the fallback is Remote Control on the tower, woken through the Bbox WOL proxy (req_056 AC6).
 
 # Acceptance criteria
 - AC1: The spike note lists each option with cost and breakage, and the owner's pick.

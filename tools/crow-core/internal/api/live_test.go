@@ -15,14 +15,15 @@ import (
 // liveData are the section bodies the live actions check their targets against.
 var liveData = map[string]string{
 	"dispatch": `{"slots":{"busy":1,"max":2},"agents":[
-		{"kind":"session","pid":4242,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-1","run_id":null,
+		{"kind":"session","pid":4242,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-1","run_id":null,"tmux":"crow-demo-101010",
 		 "prompt":{"id":"p1","tool":"Bash","detail":"date +%s > stamp.txt","work_approval":null}},
 		{"kind":"session","pid":6161,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-3","run_id":null,
 		 "prompt":{"id":"p2","tool":"Bash","detail":"git push origin feat","work_approval":"demo"}},
 		{"kind":"session","pid":7171,"account":"main","project":"demo","cwd":"/src/demo","session_id":"s-4","run_id":null,
 		 "prompt":{"id":"p3","tool":"AskUserQuestion","detail":"Pick a color?","work_approval":null,
 		  "questions":[{"header":"Color","question":"Pick a color?","multiSelect":false,"options":[{"label":"Red"},{"label":"Blue"}]}]}},
-		{"kind":"run","pid":5151,"account":"spare","project":"demo","cwd":"/src/demo.wt/r","session_id":"s-2","run_id":"a1b2c3d4"}]}`,
+		{"kind":"run","pid":5151,"account":"spare","project":"demo","cwd":"/src/demo.wt/r","session_id":"s-2","run_id":"a1b2c3d4"}],
+		"finished":[{"run_id":"f00dfeed","project":"demo","account":"spare","state":"failed"}]}`,
 	"sessions": `{"sessions":[{"conversation_id":"c0ffee00-0000-4000-8000-000000000001","account":"main","cwd":"/src/demo","project":"demo","limit":"five_hour"}]}`,
 	"accounts": `{"default":"main","accounts":[{"name":"main","policy":"use"},{"name":"spare","policy":"ask-first"},{"name":"locked","policy":"never"}]}`,
 	"projects": `{"projects":[{"name":"demo","short":"dm"}]}`,
@@ -145,12 +146,15 @@ func TestLiveActionsRunTheirScript(t *testing.T) {
 		{"/api/sessions/7171/answer", `{"prompt":"p3","option":"deny"}`, "crow-prompt",
 			[]string{"answer", "--pid", "7171", "--prompt", "p3", "--option", "deny", "--json"}, nil},
 		{"/api/dispatch/a1b2c3d4/stop", "", "crow-runs", []string{"stop", "a1b2c3d4", "--json"}, nil},
+		{"/api/dispatch/f00dfeed/retry", "", "crow-runs", []string{"retry", "f00dfeed", "--json"}, nil},
 		{"/api/today/mail-1/done", "", "crow-today", []string{"done", "mail-1", "--json"}, nil},
 		{"/api/today/mail-2/snooze", "", "crow-today", []string{"snooze", "mail-2", "--json"}, nil},
 		{"/api/sessions/c0ffee00-0000-4000-8000-000000000001/resume", "", "crow-focus",
-			[]string{"--pid", "0", "--account", "main", "--cwd", "/src/demo", "--session", "c0ffee00-0000-4000-8000-000000000001"}, nil},
+			[]string{"--pid", "0", "--account", "main", "--cwd", "/src/demo", "--session", "c0ffee00-0000-4000-8000-000000000001"}, []string{"CROW_TERMINAL=headless"}},
 		{"/api/sessions", `{"project":"demo","account":"spare","prompt":"look at the build"}`, "crow",
-			[]string{"term", "--on-busy", "fail", "demo", "look at the build"}, []string{"CROW_ACCOUNT=spare"}},
+			[]string{"term", "--on-busy", "fail", "demo", "look at the build"}, []string{"CROW_TERMINAL=headless", "CROW_ACCOUNT=spare"}},
+		{"/api/sessions", `{"project":"demo"}`, "crow", []string{"term", "--on-busy", "fail", "demo"}, []string{"CROW_TERMINAL=headless"}},
+		{"/api/sessions/4242/attach", "", "crow-focus", []string{"--pid", "4242", "--attach", "--json"}, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
@@ -171,6 +175,20 @@ func TestLiveActionsRunTheirScript(t *testing.T) {
 				t.Errorf("log = %+v", evs)
 			}
 		})
+	}
+}
+
+// item_188: a headless start replies with the tmux session it runs in.
+func TestStartRepliesTmux(t *testing.T) {
+	s, _, log := liveServer(t, func(c scriptCall) ([]byte, error) {
+		return []byte("crow: started\n" + `{"ok":true,"message":"started demo on main, no window","account":"main","tmux":"crow-demo-101500"}`), nil
+	})
+	w := do(t, s, post("/api/sessions", `{"project":"demo"}`))
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"tmux":"crow-demo-101500"`) {
+		t.Fatalf("status %d: %s", w.Code, w.Body)
+	}
+	if evs := logLines(t, log); len(evs) != 1 || evs[0].Tmux != "crow-demo-101500" || evs[0].Account != "main" {
+		t.Errorf("log = %+v", evs)
 	}
 }
 
@@ -229,6 +247,7 @@ func TestLiveRefusalsRunNothing(t *testing.T) {
 		{post("/api/sessions/abc/send", `{"text":"x"}`), 404},
 		{post("/api/sessions/4242/send", `{"text":"  "}`), 400},
 		{post("/api/dispatch/nope/stop", ""), 404},
+		{post("/api/dispatch/a1b2c3d4/retry", ""), 404},
 		{post("/api/sessions/4242/answer", `{"prompt":"old","option":"allow"}`), 409},
 		{post("/api/sessions/5151/answer", `{"prompt":"p1","option":"deny"}`), 409},
 		{post("/api/sessions/6161/answer", `{"prompt":"p2","option":"allow"}`), 409},

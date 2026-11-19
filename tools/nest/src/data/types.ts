@@ -53,7 +53,7 @@ export interface AgendaEvent {
 // Core sections served from the deck's bin/ scripts (item_169). data is the script's
 // JSON as is; its shape belongs to the script contract (logics/specs/script_contract).
 // work is core's own feed over those sections (item_202), read the same way (data/work.ts).
-export const SCRIPT_SECTIONS = ['sessions', 'dispatch', 'usage', 'today', 'mrs', 'checks', 'projects', 'accounts', 'jobs', 'work'] as const
+export const SCRIPT_SECTIONS = ['sessions', 'dispatch', 'usage', 'today', 'mrs', 'checks', 'projects', 'accounts', 'jobs', 'work', 'ready'] as const
 export type SectionName = (typeof SCRIPT_SECTIONS)[number]
 
 export interface SectionBody {

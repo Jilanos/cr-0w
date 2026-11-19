@@ -446,11 +446,12 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .home { grid-template-areas: 'a' 'b' 'c'; }
 @media (max-width: 599.98px) {
   .only-inner { display: none !important; }
-  /* Header A on cover: logo, scope chip, two status chips, clock and theme fit 360px. */
+  /* Header A on cover with the butler badge (item_176): badge, logo, scope chip and the two
+     status chips. The clock and the theme button stay on Fold and laptop (owner, 2026-11-18). */
   .top { gap: 6px; padding: 0 8px 0 12px; }
   .top .logo { margin-right: 2px; }
   .top .chip { padding: 2px 7px; }
-  .top .icon-btn { min-width: 34px; }
+  .top > .clock, .top > .icon-btn { display: none; }
 }
 
 @media (min-width: 600px) {
@@ -522,7 +523,6 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 }
 
 .lp { height: 100%; display: grid; gap: 14px; padding: 12px 20px 16px; font-size: 13px; line-height: 1.4; min-height: 0; }
-.home-lp { grid-template-columns: 360px 1fr 360px; }
 .lp .rail { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .lp .pn { padding: 10px 12px; gap: 6px; min-height: 0; overflow: hidden; }
 .lp .pn.grow { flex: 1; }
@@ -550,7 +550,8 @@ button.row { width: 100%; text-align: left; border-top: 0; border-right: 0; bord
 .lp .row.past { color: var(--dim); }
 .lp .row.card { flex-direction: column; align-items: stretch; gap: 4px; white-space: normal; padding: 5px 8px; }
 .lp .row.card .line { display: flex; gap: 8px; align-items: center; min-width: 0; }
-.lp .row.card .line b { font-weight: 600; white-space: nowrap; }
+.lp .row.card .line b { font-weight: 600; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lp .row.card .line .tag { flex: none; }
 .lp .row.card .tag { margin-left: auto; }
 .lp .edge-n { border: 1px solid var(--c-n); }
 .lp .edge-f { border: 1px solid var(--c-f); }
@@ -758,7 +759,7 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .desk .in.ask { padding: 10px 12px; }
 .desk .mic { all: unset; display: inline-grid; place-items: center; color: var(--dim); padding: 0 4px; opacity: 0.55; }
 .desk .term { background: #181926; border: 1px solid #363a4f; border-radius: 8px; padding: 10px 12px; font: 12.5px / 1.55 var(--font-body); display: flex; flex-direction: column; overflow: hidden; }
-.desk .term > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk .term > div { overflow-wrap: anywhere; }
 .desk .tls { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
 .desk .tl { display: flex; gap: 10px; font-size: 12px; align-items: baseline; }
 .desk .tl b { font-weight: 500; color: var(--sub); width: 40px; flex: none; }
@@ -803,6 +804,23 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .desk-in .wrow .wg, .desk-lp .wrow .wg { width: 18px; }
 .desk-in .wrow .wg svg, .desk-lp .wrow .wg svg { width: 16px; height: 16px; }
 .desk-in .wrail, .desk-lp .wrail { margin-left: 12px; padding-left: 10px; }
+/* Compact work rows (laptop Desk B, item_246): the row opens, the button acts. */
+.wrow.wc { cursor: default; padding: 0 8px 0 0; gap: 6px; }
+.wrow.wc .wmain { all: unset; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 10px; cursor: pointer; align-self: stretch; }
+.wrow.wc .wmain:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrow.wc .wact { flex: none; padding: 4px 10px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.wchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.wchip { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); font: 600 11.5px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); }
+.wchip .num { color: var(--fg); }
+.wchip.n .num { color: var(--c-n); }
+.wchip.on { border-color: var(--accent); color: var(--fg); background: var(--row); }
+.wchip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rdy { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.rrow .f1 { display: flex; flex-direction: column; min-width: 0; }
+.rrow .f1 b { font: 600 13.5px var(--font-head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desk-lp .work-pn .wscroll { overflow-y: auto; min-height: 0; flex: 1; }
+[data-theme='cyber'] .wchip { border-radius: 0; clip-path: var(--clip-btn); }
+[data-theme='cyber'] .wchip.on { border-color: #4fc3ff; color: #4fc3ff; }
 .wrail { display: flex; flex-direction: column; gap: 6px; margin-left: 14px; padding-left: 12px; border-left: 3px solid var(--sub); }
 .wrail .wrow { background: color-mix(in srgb, var(--row) 70%, var(--line)); }
 .work-pn { min-height: 0; }
@@ -885,7 +903,11 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   .desk-lp .kp.n { border-color: var(--c-n); }
   .desk-lp .kp .kn { font: 400 24px var(--font-display); }
   .desk-lp .kp.c-sub .kn { color: var(--sub); }
-  .desk-lp .dg { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr 390px; gap: 14px; }
+  .desk-lp .dg { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(360px, 1fr) 2fr; gap: 14px; }
+  .desk-lp .kp { flex: 1; }
+  .desk-lp .kp.f .kn { color: var(--c-f); }
+  .desk-lp .sess-pn .list { max-height: 30vh; overflow-y: auto; }
+  .desk-lp .qline .sm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .desk-lp .pn { padding: 12px 16px; gap: 8px; border-radius: 10px; min-height: 0; overflow: hidden; }
   .desk-lp .ph { font: 600 15px var(--font-head); letter-spacing: 0.04em; color: #a5adcb; }
   .desk-lp .pn.grow .list { overflow-y: auto; }
@@ -1011,12 +1033,11 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 [data-theme='cyber'] .desk .pq, [data-theme='cyber'] .desk .pqc { border-radius: 0; }
 .desk .pq *:not(.pqc) { white-space: normal; overflow-wrap: anywhere; }
 
-/* Phone Home (item_171, pass 3b option D) */
-.home-ph.a2 { display: grid; grid-template-columns: 330px 1fr; gap: 14px; padding: 12px; align-items: start; }
+/* Phone Home (item_176: cover D, Fold inner G) */
 .home-ph.col { display: flex; flex-direction: column; gap: 14px; padding: 12px; }
-.home-ph .hside { display: flex; flex-direction: column; gap: 10px; height: calc(100dvh - 44px - 24px - env(safe-area-inset-top)); min-height: 480px; position: sticky; top: 12px; }
 .home-ph .hwrap { position: relative; height: 400px; flex: none; }
-.home-ph .hside .hwrap { flex: 1; min-height: 0; height: auto; }
+.home-ph.g1 .hwrap { height: 420px; }
+.home-ph .c2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .home-ph .ph .r { display: flex; gap: 8px; align-items: baseline; }
 .hrow { display: flex; gap: 8px; }
 .hrow > .hq:first-child { flex: 1; }
@@ -1134,6 +1155,21 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
 .chat-cv.chat-in .in { min-height: 44px; border-radius: 10px; }
 .chat-cv.chat-in .in .btn { padding: 10px 14px; min-height: 0; }
 .chat-cv.chat-in .term { flex: 1; overflow-y: auto; }
+/* Terminal tab (item_240): the session's tmux screen. Catppuccin Macchiato ANSI palette. */
+.tty {
+  --tty-bg: #1e2030; --tty-fg: #cad3f5; --tty-pad: 10px;
+  --ansi-0: #494d64; --ansi-1: #ed8796; --ansi-2: #a6da95; --ansi-3: #eed49f; --ansi-4: #8aadf4; --ansi-5: #f5bde6; --ansi-6: #8bd5ca; --ansi-7: #b8c0e0;
+  --ansi-8: #5b6078; --ansi-9: #ed8796; --ansi-10: #a6da95; --ansi-11: #eed49f; --ansi-12: #8aadf4; --ansi-13: #f5bde6; --ansi-14: #8bd5ca; --ansi-15: #a5adcb;
+  position: relative; flex: 1; min-height: 240px; overflow: auto; padding: var(--tty-pad); box-sizing: border-box;
+  background: var(--tty-bg); color: var(--tty-fg); border: 1px solid var(--line); border-radius: 10px;
+  font: 13px/1.25 'Fira Code', ui-monospace, monospace; font-variant-ligatures: none; white-space: pre; cursor: text; outline: none;
+}
+.tty.on { border-color: var(--accent); }
+.tty .ln { height: 1.25em; overflow: hidden; }
+.tty .probe { position: absolute; visibility: hidden; white-space: pre; line-height: 1.25; }
+.tty .cur { position: absolute; background: var(--tty-fg); opacity: 0.55; pointer-events: none; }
+.tty .hint { position: absolute; right: 10px; bottom: 8px; font-size: 11px; color: var(--sub); background: var(--tty-bg); padding: 2px 6px; border-radius: 6px; }
+.tty .msg { white-space: normal; }
 .desk-in:has(.chat-in) { height: 100%; min-height: 0; box-sizing: border-box; }
 .desk-in:has(.chat-in) > .col:first-child { overflow-y: auto; }
 /* Laptop: the picked session's chat is the centre column (item_187 board desk-chat-a). */
@@ -1143,3 +1179,139 @@ textarea.field { padding: 8px 10px; min-height: 84px; resize: vertical; }
   .desk-lp .chat-cv.chat-in .msg { font-size: 13.5px; line-height: 1.55; }
   .desk-lp .col .ask-pn { flex: 1; }
 }
+
+/* Butler rail (item_176, boards desk-rail-a and desk-rail-a-cyber). Laptop only. */
+.b-rail { display: none; }
+@media (min-width: 1200px) {
+  /* --rail-w: the width the owner dragged (item_256), kept between 280px and 60% of the window. */
+  .app.has-rail { --rail-col: clamp(280px, var(--rail-w, 320px), 60vw); grid-template-columns: minmax(0, 1fr) auto; }
+  .app.has-rail:has(> .b-rail:not(.folded)) { grid-template-columns: minmax(0, 1fr) var(--rail-col); }
+  .app.has-rail > .top { grid-column: 1 / -1; }
+  .b-rail {
+    display: flex; flex-direction: column; width: var(--rail-col); min-height: 0; overflow: hidden; position: relative;
+    background: var(--hdr); border-left: 1px solid var(--line);
+  }
+  .b-rail.folded { width: 56px; }
+  .rl-grip { position: absolute; inset: 0 auto 0 0; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; }
+  .rl-grip::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: transparent; transition: background 0.15s; }
+  .rl-grip:hover::after, .rl-grip:focus-visible::after, .rl-grip:active::after { background: var(--accent); }
+  .rl-grip:focus-visible { outline: none; }
+}
+/* Rail parts, shared with the phone and Fold chat sheet. */
+@media all {
+  .rl-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 0; position: relative; z-index: 1; }
+  .rl-mood { display: inline-flex; align-items: center; gap: 8px; font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; }
+  .rl-mood.m-fail { color: var(--c-f); }
+  .rl-mood.m-ask { color: var(--c-n); }
+  .rl-mood.m-run { color: var(--c-w); }
+  .rl-mood.m-idle { color: var(--sub); }
+  .b-rail .dia { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+  .b-rail .dia.m-fail { color: var(--c-f); }
+  .b-rail .dia.m-ask { color: var(--c-n); }
+  .b-rail .dia.m-run { color: var(--c-w); }
+  .b-rail .dia.m-idle { color: var(--sub); }
+  .rl-kbd { font: 600 10px var(--font-body); color: var(--sub); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; cursor: pointer; }
+  .rail-head { position: relative; flex: none; margin-top: 4px; border-bottom: 1px solid var(--line); }
+  .rail-head:not(.on) { display: none; }
+  .rail-head canvas { position: absolute; pointer-events: none; }
+  .rl-line { margin: 0; padding: 12px 14px 8px; font: 13px / 1.5 var(--font-body); color: var(--fg); }
+  .rl-line b { color: var(--c-b); }
+  .rl-line .cur { color: var(--c-w); animation: rl-blink 1s steps(1) infinite; }
+  @keyframes rl-blink { 50% { opacity: 0; } }
+  .rl-log { list-style: none; margin: 0; padding: 4px 14px 12px; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .rl-msg { display: flex; flex-direction: column; gap: 6px; max-width: 92%; }
+  .rl-msg p { margin: 0; padding: 9px 12px; font-size: 12px; line-height: 1.5; border: 1px solid var(--line); border-radius: var(--r-row); }
+  .rl-msg.you { align-self: flex-end; align-items: flex-end; }
+  .rl-msg.you p { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .rl-msg.cr { align-self: flex-start; }
+  .rl-msg.cr p { background: var(--panel); }
+  .rl-msg.typing p { color: var(--sub); }
+  .rl-msg.tool, .rl-msg.note { align-self: center; font-size: 11px; color: var(--sub); }
+  .rl-who { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font: 600 10.5px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sub); }
+  .rl-who .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-d); }
+  .rl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rl-chip {
+    font: 700 10.5px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 5px; padding: 3px 8px;
+  }
+  .rl-chip:hover { background: var(--accent-soft); }
+  .rl-err { margin: 0; padding: 4px 14px; font-size: 11px; }
+  .rl-foot { border-top: 1px solid var(--line); padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .rl-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--sub); }
+  .rl-meta label { display: inline-flex; align-items: center; gap: 8px; }
+  .rl-meta select { font: 11px var(--font-body); color: var(--fg); background: var(--btn); border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; }
+  .rl-meta .bare { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--sub); }
+  .rl-in { display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--well); padding: 6px 6px 6px 12px; }
+  .rl-in textarea { flex: 1; resize: none; background: none; border: 0; outline: 0; color: var(--fg); font: 12px / 1.5 var(--font-body); padding: 6px 0; }
+  .rl-in button { font: 700 12px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--r-btn); padding: 8px 14px; cursor: pointer; }
+  .rl-in button:disabled { opacity: 0.55; cursor: default; }
+  .rl-strip { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 14px 0; background: none; border: 0; color: var(--sub); cursor: pointer; }
+  .rl-vert { writing-mode: vertical-rl; font: 700 11px var(--font-head); letter-spacing: 0.12em; text-transform: uppercase; }
+  .rl-busy { width: 6px; height: 6px; border-radius: 50%; background: var(--c-w); animation: rl-blink 1s steps(1) infinite; }
+
+  /* Cyber: cyan edge with glow, square mood diamond, chamfered input, Orbitron labels, no radius. */
+  [data-theme='cyber'] .b-rail { border-left-color: var(--c-w); box-shadow: -6px 0 18px -10px var(--c-w); }
+  [data-theme='cyber'] .b-rail .dia { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
+  [data-theme='cyber'] .rl-mood, [data-theme='cyber'] .rl-who, [data-theme='cyber'] .rl-vert { font-family: var(--font-display); font-size: 10px; }
+  [data-theme='cyber'] .rl-msg p, [data-theme='cyber'] .rl-chip, [data-theme='cyber'] .rl-kbd,
+  [data-theme='cyber'] .rl-meta select, [data-theme='cyber'] .rl-meta .bare { border-radius: 0; }
+  [data-theme='cyber'] .rl-in { border-radius: 0; clip-path: var(--clip-btn); border-color: color-mix(in srgb, var(--c-w) 45%, transparent); }
+  [data-theme='cyber'] .rl-in button { border-radius: 0; clip-path: var(--clip-btn); }
+  [data-theme='cyber'] .rl-line b { color: var(--c-w); }
+  [data-theme='cyber'] .rl-who .dot { border-radius: 0; }
+}
+
+/* Phone and Fold butler (item_176, boards phone-badge-sheet and its cyber twin): header badge
+   before the wordmark, chat sheet. The head shows the face cropped in a frame tinted by mood. */
+.b-badge { position: relative; flex: none; width: 34px; height: 34px; padding: 0; margin-right: 2px; background: none; border: 0; cursor: pointer; }
+.bb-frame, .bs-head {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  border: 1.5px solid var(--mood, var(--line)); border-radius: 7px; background: var(--well);
+}
+.bb-frame { width: 100%; height: 100%; }
+.m-fail { --mood: var(--c-f); } .m-ask { --mood: var(--c-n); } .m-run { --mood: var(--c-w); } .m-idle { --mood: var(--sub); }
+.bb-frame .dia, .bs-head .dia, .b-sheet .rl-mood .dia { width: 9px; height: 9px; border-radius: 50%; background: var(--mood); flex: none; }
+.bb-frame:has(.rail-head.on) .dia, .bs-head:has(.rail-head.on) .dia { display: none; }
+.bb-frame .rail-head, .bs-head .rail-head { position: absolute; left: 50%; margin: 0; border: 0; transform: translateX(-50%); }
+.bb-frame .rail-head { width: 64px; top: -9px; }
+.bs-head .rail-head { width: 116px; top: -16px; }
+.bb-dot { position: absolute; top: -4px; right: -4px; width: 11px; height: 11px; border-radius: 50%; background: var(--mood); box-shadow: 0 0 0 2px var(--panel-solid); }
+.b-sheet { height: 70dvh; max-height: 70dvh; padding: 8px 0 0; gap: 0; overflow: hidden; }
+.b-sheet:focus { outline: none; }
+.bs-top { display: flex; gap: 12px; align-items: center; padding: 6px 14px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.bs-head { width: 66px; height: 58px; flex: none; }
+.bs-say { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.b-sheet .rl-line { padding: 0; font-size: 13px; }
+.b-sheet .rl-log { padding: 6px 14px 12px; gap: 8px; }
+.b-sheet .rl-msg { max-width: 88%; }
+.b-sheet .rl-msg p { font-size: 13px; }
+.b-sheet .rl-foot { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); }
+.b-sheet .rl-in textarea { font-size: 14px; }
+.rl-close { width: 28px; height: 22px; padding: 0; background: none; border: 0; cursor: pointer; display: grid; place-items: center; }
+.rl-close i { width: 16px; height: 2px; background: var(--sub); }
+@media (min-width: 600px) {
+  .b-sheet { height: auto; max-height: none; padding-top: 14px; }
+}
+/* Home Ask bar (item_176, boards home-F-cover and home-G-inner): the Desk Ask box look. */
+.home-ask {
+  display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 3px 3px 3px 14px;
+  border: 1.5px solid var(--accent); border-radius: 14px; background: rgba(24, 25, 38, 0.7);
+}
+.home-ask input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--fg); font: inherit; font-size: 14px; }
+.home-ask input::placeholder { color: var(--sub); }
+.home-ask .mic { all: unset; display: inline-grid; place-items: center; color: var(--dim); padding: 0 6px; opacity: 0.55; }
+.home-ask .btn { align-self: stretch; padding: 0 16px; border-radius: 11px; font-size: 15px; }
+[data-theme='cyber'] .home-ask { border-radius: 0; background: var(--well); }
+[data-theme='cyber'] .home-ask .btn { border-radius: 0; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%); }
+[data-theme='cyber'] .bb-frame, [data-theme='cyber'] .bs-head { border-radius: 0; box-shadow: 0 0 10px -3px var(--mood); }
+[data-theme='cyber'] .bb-dot { border-radius: 50%; }
+[data-theme='cyber'] .b-sheet { border-radius: 0; border-top-color: var(--c-w); }
+[data-theme='cyber'] .b-sheet .rl-mood .dia, [data-theme='cyber'] .bb-frame .dia, [data-theme='cyber'] .bs-head .dia { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
+
+/* Home with the butler rail (item_176): one column and the hero; the rail is the right column. */
+/* A wide rail narrows the left column first, down to 240px, so the hero keeps room (item_256). */
+.home-lp { grid-template-columns: clamp(240px, 32%, 320px) minmax(0, 1fr); }
+.home-lp .rail .more { align-self: flex-end; font-size: 0.9em; }
+.lp .next-ev { display: flex; align-items: baseline; gap: 10px; }
+.lp .next-ev .tm { font-size: 1.4em; }
+.lp .next-ev .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -62,7 +62,7 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request) {
 	}
 	spec := mission.Spec{Kind: b.Kind, Project: b.Project, Goal: b.Goal, EndState: b.EndState,
 		Autonomy: b.Autonomy, Key: b.Key, Gates: b.Gates, Surface: Surface}
-	s.act(w, http.StatusCreated, func(env mission.Env) (any, error) { return env.New(spec) })
+	s.act(w, http.StatusCreated, func(env mission.Env) (any, error) { return env.NewLive(spec) })
 }
 
 func (s *Server) answer(w http.ResponseWriter, r *http.Request) {

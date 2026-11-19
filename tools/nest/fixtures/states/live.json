@@ -15,11 +15,15 @@
           ] } },
       { "kind": "run", "pid": 7171, "account": "work", "project": "cr-0w", "cwd": "/src/cr-0w.wt/flaky-test", "session_id": "s-run", "run_id": "a1b2c3d4", "label": "flaky-test", "title": "Fix the flaky test", "state": "working", "started_at": "2026-11-09T16:06:00+01:00", "last_action": "Edit: tests/test_runs.py", "last_prompt": null }
     ],
-    "finished": []
+    "finished": [
+      { "run_id": "0ff1ce01", "project": "cr-0w", "label": "night job", "account": "main", "status": "failed", "ended_at": "2026-11-09T06:12:00+01:00" },
+      { "run_id": "d0e1a2b3", "project": "nest", "label": "agenda polish", "account": "main", "status": "done", "ended_at": "2026-11-09T08:40:00+01:00" },
+      { "run_id": "d0e1a2b4", "project": "cr-0w", "label": "vault search", "account": "main", "status": "done", "ended_at": "2026-11-09T09:55:00+01:00" }
+    ]
   },
   "sessions": {
     "sessions": [
-      { "conversation_id": "c0ffee00-0000-4000-8000-000000000001", "account": "work", "cwd": "/src/infra", "project": "infra", "branch": "main", "limit": "five_hour", "resets_at": "2026-11-09T17:00:00+01:00", "last_prompt": "plan the backup job" }
+      { "conversation_id": "c0ffee00-0000-4000-8000-000000000001", "account": "work", "cwd": "/src/infra", "project": "infra", "branch": "main", "last_event": "2026-11-09T14:20:00+01:00", "limit": "five_hour", "resets_at": "2026-11-09T17:00:00+01:00", "last_prompt": "plan the backup job" }
     ]
   },
   "today": {
@@ -31,6 +35,16 @@
   "projects": { "projects": [{ "name": "cr-0w", "path": "/src/cr-0w", "status": "active", "scope": "personal", "nest_scope": "both" }, { "name": "demo", "path": "/src/demo", "status": "active", "scope": "personal", "kind": "notes" }, { "name": "nest", "path": "/src/nest", "status": "active", "scope": "personal", "kind": "world" }, { "name": "website", "path": "/src/website", "status": "active", "scope": "personal", "kind": "tool" }, { "name": "lambda", "path": "/src/lambda", "status": "active", "scope": "work" }, { "name": "infra", "path": "/src/infra", "status": "active", "scope": "work" }] },
   "accounts": { "default": "main", "accounts": [{ "name": "main", "policy": "use" }, { "name": "work", "policy": "ask-first" }, { "name": "locked", "policy": "never" }] }
 ,
+  "ready": {
+    "schema": 1,
+    "total": 4,
+    "items": [
+      { "project": "cr-0w", "ref": "item_189_nest_side_by_side_chats", "title": "Nest side by side chats", "path": "/src/cr-0w/logics/backlog/item_189_nest_side_by_side_chats.md", "progress": "0%", "modified": "2026-11-09T14:10:00+00:00" },
+      { "project": "nest", "ref": "item_201_ask_dock_fixes", "title": "Ask dock fixes", "path": "/src/nest/logics/backlog/item_201_ask_dock_fixes.md", "progress": "20%", "modified": "2026-11-09T11:00:00+00:00" },
+      { "project": "lambda", "ref": "item_031_retry_backoff", "title": "Retry backoff on timeouts", "path": "/src/lambda/logics/backlog/item_031_retry_backoff.md", "progress": "0%", "modified": "2026-11-08T09:00:00+00:00" },
+      { "project": "cr-0w", "ref": "item_176_nest_missions", "title": "Nest missions slice 3", "path": "/src/cr-0w/logics/backlog/item_176_nest_missions.md", "progress": "60%", "modified": "2026-11-07T09:00:00+00:00" }
+    ]
+  },
   "usage": {
     "generated_at": "2026-11-09T16:04:00+01:00",
     "limits": [

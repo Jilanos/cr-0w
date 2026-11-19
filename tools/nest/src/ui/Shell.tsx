@@ -41,9 +41,9 @@ function ScopeChip({ scope, setScope }: { scope: ScopeMode; setScope: (m: ScopeM
   )
 }
 
-interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; children: ReactNode }
+interface ShellProps { active: TabKey; snap: Snapshot | null; scope: ScopeMode; setScope: (m: ScopeMode) => void; rail?: ReactNode; badge?: ReactNode; children: ReactNode }
 
-export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
+export function Shell({ active, snap, scope, setScope, rail, badge, children }: ShellProps) {
   const [theme, toggle] = useTheme()
   const b = badges(snap)
   const c = snap ? homeCounts(snap) : null
@@ -51,8 +51,9 @@ export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
   // title; the number turns red when the week runs low.
   const accts = snap ? quotaOf(snap) : []
   return (
-    <div className="app">
+    <div className={`app${rail ? ' has-rail' : ''}`}>
       <header className="top">
+        {badge}
         <Link href="/" className="logo" aria-label="CR-0W home">CR-0W</Link>
         <ScopeChip scope={scope} setScope={setScope} />
         <span className="hdr-sep" aria-hidden="true" />
@@ -95,6 +96,7 @@ export function Shell({ active, snap, scope, setScope, children }: ShellProps) {
         </button>
       </header>
       <main className="main" id="main">{children}</main>
+      {rail}
       <TabBar active={active} b={b} />
     </div>
   )

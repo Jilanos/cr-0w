@@ -1,3 +1,4 @@
+import type { ButlerApi } from './butler'
 import type { ChatTarget, ConversationPage, PageAsk } from './conversation'
 import type { Actions } from './live'
 import type { AgendaEvent, InboxItem, Mission, SectionBody, SectionName } from './types'
@@ -17,6 +18,8 @@ export interface DataSource {
   actions: Actions
   // Reference time for "today" and elapsed clocks. Fixtures pin it, the API uses the wall clock.
   now(): Date
+  // Butler chat (item_176). Absent: no rail, no sheet.
+  butler?: ButlerApi
   // Refresh period in ms while the page is visible. Absent: load once.
   poll?: number
 }

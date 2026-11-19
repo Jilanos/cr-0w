@@ -1,5 +1,6 @@
+import { apiButler } from './butler'
 import { conversationPath, pageQuery, type ConversationPage } from './conversation'
-import type { Actions, LiveReply } from './live'
+import type { Actions, LiveReply, Screen } from './live'
 import type { DataSource } from './source'
 import type { AgendaEvent, InboxItem, Mission, SectionBody, SectionName, TodayEvent } from './types'
 
@@ -90,10 +91,19 @@ export function apiActions(base = '/api', get: Fetch = (i, init) => fetch(i, ini
     answer: (pid, prompt, option) => post(`/sessions/${pid}/answer`, { prompt, option }),
     ask: (pid, prompt, answers) => post(`/sessions/${pid}/answer`, { prompt, answers }),
     stop: (pid) => post(`/sessions/${pid}/stop`),
+    attach: (pid) => post(`/sessions/${pid}/attach`),
+    screen: async (pid) => {
+      const res = await get(`${base}/sessions/${pid}/screen`, { cache: 'no-store' })
+      if (!res.ok) throw await failure(res)
+      return (await res.json()) as Screen
+    },
+    keys: (pid, keys) => post<unknown>(`/sessions/${pid}/keys`, { keys }),
+    resize: (pid, cols, rows) => post<unknown>(`/sessions/${pid}/resize`, { cols, rows }),
     resume: (conv, account) => post(`/sessions/${id(conv)}/resume`, account ? { account } : undefined),
     start: (s) => post('/sessions', s),
     dispatch: (r) => post('/dispatch', r),
     stopRun: (run) => post(`/dispatch/${id(run)}/stop`),
+    retryRun: (run) => post(`/dispatch/${id(run)}/retry`),
     mail: (mail, verb) => post(`/today/${id(mail)}/${verb}`),
     missionAnswer: (mission, item, verb, text, version) =>
       post<unknown>(`/missions/${id(mission)}/answer`, { item, verb, ...(text.trim() ? { text } : {}), version }),
@@ -139,6 +149,7 @@ export function apiSource(base = '/api', get: Fetch = (i, init) => fetch(i, init
     },
     actions: apiActions(base, get),
     now: () => new Date(),
+    butler: apiButler(base, get),
     poll: 5000,
   }
 }

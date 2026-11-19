@@ -1,4 +1,5 @@
 """crow_lib: helpers shared by the crow scripts."""
+import difflib
 import functools
 import glob
 import json
@@ -210,6 +211,26 @@ def final_text(text, provider="claude"):
             if isinstance(item, dict) and item.get("type") == "agent_message":
                 found = item.get("text") or item.get("message")
     return found if found else text[-4000:]
+
+
+def closest_name(name, names):
+    """The registered name a mistyped one most likely meant: a name containing it, else the nearest spelling."""
+    low = name.lower()
+    hits = [n for n in names if low and low in n.lower()]
+    if hits:
+        return min(hits, key=len)
+    near = difflib.get_close_matches(low, names, n=1, cutoff=0.6)
+    return near[0] if near else None
+
+
+def codex_messages(text):
+    """Every agent_message text of a Codex run's stdout, in order."""
+    out = []
+    for o in _json_objects(text):
+        item = o.get("item") if o.get("type") == "item.completed" else o.get("msg")
+        if isinstance(item, dict) and item.get("type") == "agent_message" and (item.get("text") or item.get("message")):
+            out.append(item.get("text") or item.get("message"))
+    return out
 
 
 # ---------- providers ----------
@@ -474,6 +495,18 @@ def pick_accounts(accts, rows, current, now, scope=None):
             "recommended": usable[0]["name"] if usable else None}
 
 
+def policy_names(path=None):
+    """Account names local/accounts.yaml lists; None when the file is missing or unreadable (no filter)."""
+    import yaml
+    path = path or os.path.join(data_home(), "local", "accounts.yaml")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    return {a["name"] for a in cfg.get("accounts") or [] if isinstance(a, dict) and a.get("name")}
+
+
 def account_state(current=None, cached=False, scope=None):
     """pick_accounts on live data: crow-accounts json and `cdx status` (--cached for hooks)."""
     from datetime import datetime
@@ -573,16 +606,26 @@ _SHELL_READ = ["ls", "cat", "head", "tail", "wc", "grep", "rg", "sort", "uniq", 
                "date", "diff"]
 # Hub scripts that write the activity log, daily notes and state paths.
 _CROW_LOG = ["bin/crow-log", "bin/crow-note", "bin/crow-state"]
+# Read-only forge data (MR threads, pipeline jobs, job log) for runs in any project; glab api stays denied.
+_FORGE_READ = ["bin/crow-forge-read", os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                                                    "bin", "crow-forge-read"),
+               "glab ci view", "glab ci get", "glab ci list", "glab ci trace", "glab mr view", "glab mr diff",
+               "gh pr view", "gh pr checks", "gh run view"]
 RUN_SANDBOX = {
     "review": {"tools": ["Read", "Grep", "Glob", "TodoWrite"],
-               "bash": _GIT_READ + _SHELL_READ + ["git fetch", "gh pr view", "gh pr diff", "gh pr checks",
-                                                  "glab mr view", "glab mr diff", "logics-manager"],
+               "bash": _GIT_READ + _SHELL_READ + ["git fetch", "gh pr diff", "logics-manager"] + _FORGE_READ,
                "mcp": []},
     "task": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "TodoWrite"],
              "bash": _GIT_READ + _SHELL_READ + ["git add", "git commit", "git switch", "git checkout", "git restore",
                                                 "git stash", "git rebase", "git mv", "git rm", "mkdir", "touch", "cp",
                                                 "mv", "python3 -m pytest", "pytest", "go test", "go build",
-                                                "go vet", "gofmt", "make", "npm test", "npm run", "logics-manager"],
+                                                "go vet", "gofmt", "make", "npm test", "npm run", "logics-manager",
+                                                # quality gate and Nest bench/typecheck (owner OK 2026-11-17)
+                                                "bin/crow-check", "ruff check", "ruff format",
+                                                "node scripts/hero-table.mjs", "node tools/nest/scripts/hero-table.mjs",
+                                                "npx tsc", "npx vitest",
+                                                # load check before a bench (owner OK 2026-11-17)
+                                                "ps", "top -b", "uptime"] + _FORGE_READ,
              "mcp": []},
     "retro": {"tools": ["Read", "Grep", "Glob", "Edit", "Write", "TodoWrite", "Skill"],
               "bash": _SHELL_READ + _CROW_LOG + ["bin/crow-digest", "git status", "git diff", "git add",
@@ -605,7 +648,7 @@ RUN_KEEP_ENV = {}
 
 # Commands the RTK hook rewrites under another name (`rtk rewrite "cat f"` -> `rtk read f`).
 # rg: rtk 0.x rewrites it to `rtk grep`, 1.x to `rtk rg`.
-_RTK_ALIAS = {"cat": ["read"], "head": ["read"], "rg": ["grep", "rg"]}
+_RTK_ALIAS = {"cat": ["read"], "head": ["read"], "rg": ["grep", "rg"], "npx tsc": ["tsc"], "npx vitest": ["vitest"]}
 
 
 def sandbox_allow(kind):
@@ -720,7 +763,7 @@ def transcript_tokens(path):
     path = str(path)
     for fpath in [path] + sorted(glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl"))):
         try:
-            fh = open(fpath, encoding="utf-8", errors="replace")
+            fh = open(fpath, encoding="utf-8", errors="replace")  # noqa: SIM115 (closed by the with below)
         except OSError:
             continue
         with fh:
@@ -947,7 +990,7 @@ def pending_prompt(pid, meta, home=None):
     return p
 
 
-MISSION_LINE = re.compile(r"^Mission: (\S+)$", re.M)
+MISSION_LINE = re.compile(r"^Mission: (\S+)$", re.MULTILINE)
 
 
 def ensure_mission(project, end_state, logics="", goal=""):

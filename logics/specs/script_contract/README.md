@@ -7,13 +7,14 @@ The deck, crow-core and the phone app read these scripts. Each JSON payload carr
 | accounts | `crow-accounts json` | `schemas/accounts.schema.json` |
 | checks | `crow-checks json [-f] [--now ISO]`, `crow-checks replay FILE` | `schemas/checks.schema.json` |
 | mrs | `crow-mrs json [-f]` (cached 60 s in the machine state dir) | `schemas/mrs.schema.json` |
+| ready | `crow-ready json [--limit N]` (Logics backlog items with status Ready) | `schemas/ready.schema.json` |
 | registry | `crow-registry json` | `schemas/registry.schema.json` |
 | runs | `crow-runs json` (reads `<state>/runs.jsonl` and `cdx runs --json`) | `schemas/runs.schema.json` |
 | sessions | `crow-sessions list --json`, `crow-sessions scan --json` | `schemas/sessions.schema.json` |
 | today | `crow-today json [-f]` | `schemas/today.schema.json` |
 | usage | `crow-usage --json` | `schemas/usage.schema.json` |
 | usage_summary | `crow-usage --json --summary` (under 5 kB) | `schemas/usage_summary.schema.json` |
-| action | `crow-focus --send/--interrupt/--stop --json`, `crow-runs stop ID --json`, `crow-today done/snooze ID --json` | `schemas/action.schema.json` |
+| action | `crow-focus --send/--interrupt/--stop --json`, `crow-runs stop ID --json`, `crow-runs retry ID --json`, `crow-today done/snooze ID --json` | `schemas/action.schema.json` |
 
 ## Action results
 

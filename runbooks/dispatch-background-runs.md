@@ -32,6 +32,14 @@ Use when the user wants work done in project repos without opening a session the
   stops the run after the kind's `call_cap` tool calls (task 60, mech 40) without a confirmed cause or a passing step.
 - End with: report commits, what is left, open questions.
 
+- **Two runs in one repo:** dispatch refuses a second run in a checkout where one is working. Give the second its own
+  worktree (`git worktree add -b <branch> <repo>.wt/<branch> HEAD`, symlink `node_modules` when the run needs it) and
+  pass `--cwd`; merge the branch after. Never `--force` two runs into one tree.
+- **Gate before dispatch:** a run can only commit when the repo's gate is green on main. Run it from the hub first;
+  a red main stops every run at its first commit.
+- **Tools a step needs:** the kind's allowlist is `RUN_SANDBOX` in `bin/crow_lib.py`. If a step needs a command it lacks
+  (bench, linter), add the narrowest prefix with the owner's OK before dispatching, not after the run stops.
+
 ## Dispatch
 `crow dispatch <project> "<short label>" --prompt-file <file> [--kind task|mech|review] [--power medium] [--model <id>] [--cwd <repo>.wt/<name>]`
 This records the run in `<state>/runs.jsonl` so `crow runs` can show its label and commits.

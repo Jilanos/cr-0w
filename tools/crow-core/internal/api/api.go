@@ -22,8 +22,10 @@ import (
 	"time"
 
 	"crow-core/contract"
+	"crow-core/internal/butler"
 	"crow-core/internal/eventlog"
 	"crow-core/internal/mission"
+	"crow-core/internal/work"
 )
 
 // IdentityHeader is the header tailscale serve sets to the caller's tailnet login.
@@ -46,8 +48,9 @@ type Options struct {
 	Nest      string        // built Nest dir served at /; empty serves no app
 	Sources   []Source      // sections outside the store, refreshed in the background
 	Now       func() time.Time
-	Script    Script // runs the bin/ scripts of the live actions (live.go); nil refuses them
-	ActionLog string // core action log the live actions append to
+	Script    Script          // runs the bin/ scripts of the live actions (live.go); nil refuses them
+	ActionLog string          // core action log the live actions append to
+	Butler    *butler.Manager // butler chat (item_176); nil disables it
 }
 
 // Server answers the routes. It is safe for concurrent use.
@@ -114,6 +117,8 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	s.routeActions(mux)
 	s.routeLive(mux)
 	s.routeConversation(mux)
+	s.routeTerminal(mux)
+	s.routeButler(mux)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusNotFound, "no route")
 	})
@@ -211,6 +216,18 @@ func (s *Server) read(name string, r *http.Request) (Section, error) {
 	return Section{Section: name, Version: hash(data), UpdatedAt: s.store.updated, Data: data}, nil
 }
 
+// Locked runs fn on the store under the server lock, then rebuilds the store sections
+// (inbox, missions, runs). The serve tick runs through it.
+func (s *Server) Locked(fn func(mission.Env) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := fn(s.o.Env)
+	if serr := s.syncStore(); err == nil {
+		err = serr
+	}
+	return err
+}
+
 // syncStore applies new events and rebuilds the store sections when the version moved.
 // The caller holds mu.
 func (s *Server) syncStore() error {
@@ -241,6 +258,9 @@ func (s *Server) syncStore() error {
 			u := m.Updated
 			updated = &u
 		}
+	}
+	for i := range d.Missions {
+		d.Missions[i].Linked = work.IsLinked(d.Missions[i])
 	}
 	s.store.version, s.store.updated = v, updated
 	s.store.data = map[string]any{"inbox": inbox, "missions": d.Missions, "runs": runs}

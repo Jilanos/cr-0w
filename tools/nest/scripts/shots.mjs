@@ -1,28 +1,33 @@
 // Headless screenshots of the Nest screens at the three board sizes, both themes.
-// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]
+// Usage: node scripts/shots.mjs <out_dir> [all|work|perso] [--fixtures] [--gl] [--tabs] [--only=inbox,desk]
 //   scope: sets the saved scope filter (nest.scope) before load.
 //   --fixtures: runs vite dev (fixture data, pinned clock) instead of vite preview of dist/.
+//   --gl: live WebGL heads on software GL (nest.head=gl), as on a real screen.
 //   --tabs: phone sizes only, the More sheet states and checks (see moreSheet below).
 //   --only: comma list of SCREENS keys; default all of them.
+//   --rail=320,480,640: Home only at 1280x900 with the butler rail open at each width (item_256),
+//     plus drag, reload, double-click, arrow keys and 60% cap checks.
 // Without --fixtures, run `npm run build` first.
 // Never opens a visible window: uses chromium-headless-shell from playwright-core.
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright-core'
 
-const USAGE = 'usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--tabs] [--only=inbox,desk]'
+const USAGE = 'usage: shots.mjs <out_dir> [all|work|perso] [--fixtures] [--gl] [--tabs] [--only=inbox,desk] [--rail=320,480]'
 const args = process.argv.slice(2)
 const fixtures = args.includes('--fixtures')
+const gl = args.includes('--gl')
 const tabs = args.includes('--tabs')
 const only = args.find((a) => a.startsWith('--only='))?.slice(7).split(',').filter(Boolean)
-const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs' && !a.startsWith('--only='))
-if (!out || out.startsWith('-') || !['', 'all', 'work', 'perso'].includes(scope)) {
+const rails = args.find((a) => a.startsWith('--rail='))?.slice(7).split(',').map(Number)
+const [out, scope = ''] = args.filter((a) => a !== '--fixtures' && a !== '--tabs' && a !== '--gl' && !a.startsWith('--only=') && !a.startsWith('--rail='))
+if (!out || out.startsWith('-') || !['', 'all', 'work', 'perso'].includes(scope) || rails?.some((w) => !(w > 0))) {
   console.error(USAGE)
   process.exit(2)
 }
 mkdirSync(out, { recursive: true })
 
-const PORT = 4317
+const PORT = Number(process.env.SHOTS_PORT) || 4317 // another worktree may be shooting on 4317
 const SIZES = tabs ? { cover: [368, 812], inner: [707, 691] } : { cover: [368, 812], inner: [707, 691], laptop: [1440, 900] }
 const SCREENS = {
   home: '/',
@@ -38,6 +43,11 @@ if (unknown.length || (only && !only.length)) {
 }
 const shoot = Object.entries(SCREENS).filter(([n]) => !only || only.includes(n))
 
+// A server already on the port would be shot instead of this checkout (another worktree's run).
+if (await fetch(`http://localhost:${PORT}`).then(() => true, () => false)) {
+  console.error(`port ${PORT} is busy (another shots run?). Set SHOTS_PORT to a free port.`)
+  process.exit(2)
+}
 const cmd = fixtures ? ['vite', '--port', String(PORT), '--strictPort'] : ['vite', 'preview', '--port', String(PORT), '--strictPort']
 // Own process group, so the kill below also stops vite under npx.
 const server = spawn('npx', cmd, { stdio: 'ignore', cwd: new URL('..', import.meta.url).pathname, detached: true })
@@ -119,15 +129,98 @@ function contrast(page, selectors) {
   }, selectors)
 }
 
-const browser = await chromium.launch({ headless: true })
+// --rail (item_256): Home at 1280x900, rail open at each width, then the grip checks.
+async function railShots(browser, theme) {
+  const [w, h] = [1280, 900]
+  const width = (page) => page.evaluate(() => Math.round(document.querySelector('.b-rail')?.getBoundingClientRect().width ?? 0))
+  const check = (tag, n, pass) => { console.log(`${pass ? 'PASS' : 'FAIL'} ${tag} ${n}`); if (!pass) failed.push(`${tag} ${n}`) }
+  const open = async (page) => {
+    await page.goto(base + '/', { waitUntil: 'networkidle' })
+    await page.evaluate(() => document.fonts.ready)
+    if (fixtures) await page.waitForSelector('.hero-pl[data-c]', { timeout: 15000 }).catch(() => {})
+    await page.waitForTimeout(fixtures ? 600 : 100)
+  }
+  const ctxFor = async (rw) => {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, timezoneId: 'Europe/Paris' })
+    await ctx.addInitScript(([t, s, r]) => {
+      localStorage.setItem('nest.theme', t)
+      localStorage.setItem('nest.rail', 'open')
+      if (s) localStorage.setItem('nest.scope', s)
+      if (r && !sessionStorage.getItem('shots.seeded')) { localStorage.setItem('nest.railw', String(r)); sessionStorage.setItem('shots.seeded', '1') }
+    }, [theme, scope, rw])
+    return ctx
+  }
+  for (const rw of rails) {
+    const tag = `home-1280-rail${rw}-${theme}`
+    const ctx = await ctxFor(rw)
+    const page = await ctx.newPage()
+    await open(page)
+    await page.mouse.move(1, 1)
+    // The hero line repaints late after a wide rail reflows the hero.
+    await page.waitForTimeout(2500)
+    const file = `${out}/${tag}.png`
+    await page.screenshot({ path: file })
+    console.log(file)
+    check(tag, `rail ${rw}px`, (await width(page)) === Math.min(rw, Math.floor(w * 0.6)))
+    check(tag, 'no sideways scroll', (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0)
+    const hero = await page.evaluate(() => Math.round(document.querySelector('.hero-slot')?.getBoundingClientRect().width ?? 0))
+    check(tag, `hero visible (${hero}px)`, hero >= 160)
+    // Hero line inside the hero, nothing wider than its column.
+    const fit = await page.evaluate(() => {
+      const say = document.querySelector('.hero-say')?.getBoundingClientRect(), slot = document.querySelector('.hero-slot')?.getBoundingClientRect()
+      const wide = [...document.querySelectorAll('.home-lp .rail .line > *')].filter((e) => e.getBoundingClientRect().right > e.parentElement.getBoundingClientRect().right + 1).length
+      return { say: !!say && !!slot && say.left >= slot.left && say.right <= slot.right, wide }
+    })
+    check(tag, 'hero line inside the hero', fit.say)
+    check(tag, `left column rows fit (${fit.wide} over)`, fit.wide === 0)
+    await ctx.close()
+  }
+  // Grip: drag to 600, reload keeps it, cap at 60%, double-click, arrows.
+  const tag = `grip-${theme}`
+  const ctx = await ctxFor(0)
+  const page = await ctx.newPage()
+  await open(page)
+  const box = await page.locator('.rl-grip').boundingBox()
+  const x = box.x + box.width / 2, y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 140, y, { steps: 5 })
+  await page.mouse.move(x - 280, y, { steps: 5 })
+  await page.mouse.up()
+  check(tag, 'drag to 600px', (await width(page)) === 600)
+  await open(page)
+  check(tag, 'reload keeps 600px', (await width(page)) === 600)
+  const b2 = await page.locator('.rl-grip').boundingBox()
+  await page.mouse.move(b2.x + 4, y)
+  await page.mouse.down()
+  await page.mouse.move(10, y, { steps: 5 })
+  await page.mouse.up()
+  check(tag, `cap at 60% (${await width(page)}px)`, (await width(page)) === Math.floor(w * 0.6))
+  await page.locator('.rl-grip').dblclick()
+  check(tag, 'double-click resets to 320px', (await width(page)) === 320)
+  await page.locator('.rl-grip').focus()
+  await page.keyboard.press('ArrowLeft')
+  check(tag, 'Left widens by 24px', (await width(page)) === 344)
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('ArrowRight')
+  check(tag, 'Right narrows by 24px', (await width(page)) === 296)
+  await page.keyboard.press('Control+b')
+  await page.waitForTimeout(100)
+  check(tag, 'folded rail stays 56px', (await width(page)) === 56)
+  await ctx.close()
+}
+
+const browser = await chromium.launch({ headless: true, args: gl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [] })
 try {
   for (const theme of ['modern', 'cyber']) {
+    if (rails) { await railShots(browser, theme); continue }
     for (const [size, [w, h]] of Object.entries(SIZES)) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, timezoneId: 'Europe/Paris' })
-      await ctx.addInitScript(([t, s]) => {
+      await ctx.addInitScript(([t, s, g]) => {
         localStorage.setItem('nest.theme', t)
+        if (g) localStorage.setItem('nest.head', 'gl')
         if (s) localStorage.setItem('nest.scope', s)
-      }, [theme, scope])
+      }, [theme, scope, gl])
       const page = await ctx.newPage()
       if (tabs) {
         await moreSheet(page, `${size}-${theme}`, w)
@@ -142,6 +235,37 @@ try {
         const file = `${out}/${name}-${size}-${theme}.png`
         await page.screenshot({ path: file })
         console.log(file)
+        // No sideways scroll: the header and the screen fit the board width.
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+        if (over > 0) { console.log(`FAIL ${name}-${size}-${theme} ${over}px wider than the screen`); failed.push(`${name}-${size}-${theme} width`) }
+        // Butler chat log opens on its last message (rail on laptop, sheet on phone).
+        const gap = await page.evaluate(() => {
+          const el = [...document.querySelectorAll('.rl-log')].find((e) => e.clientHeight > 0)
+          return el && el.scrollHeight > el.clientHeight ? el.scrollHeight - el.clientHeight - el.scrollTop : null
+        })
+        if (gap !== null) {
+          const pass = gap <= 2
+          console.log(`${pass ? 'PASS' : 'FAIL'} ${name}-${size}-${theme} chat log at the bottom (gap ${Math.round(gap)}px)`)
+          if (!pass) failed.push(`${name}-${size}-${theme} chat log`)
+        }
+        // Phone and Fold: the header badge opens the chat sheet (item_176). Shot, checks, Escape.
+        if (name === 'home' && size !== 'laptop' && (await page.locator('.b-badge').count())) {
+          const tag = `chat-${size}-${theme}`
+          const check = (n, pass) => { console.log(`${pass ? 'PASS' : 'FAIL'} ${tag} ${n}`); if (!pass) failed.push(`${tag} ${n}`) }
+          await page.locator('.b-badge').click()
+          await page.waitForTimeout(fixtures ? 600 : 100)
+          check('sheet opens', (await page.locator('.b-sheet').count()) === 1)
+          const g = await page.evaluate(() => { const el = document.querySelector('.b-sheet .rl-log'); return el ? el.scrollHeight - el.clientHeight - el.scrollTop : 0 })
+          check(`log at the bottom (gap ${Math.round(g)}px)`, g <= 2)
+          for (const [s, ratio] of await contrast(page, ['.b-sheet .rl-mood', '.b-sheet .rl-line', '.b-sheet .rl-msg.cr p', '.b-sheet .rl-msg.you p', '.b-sheet .rl-who', '.b-sheet .rl-chip'])) {
+            check(`contrast ${s} ${ratio.toFixed(1)}:1`, ratio >= 4.5)
+          }
+          const file = `${out}/${tag}.png`
+          await page.screenshot({ path: file })
+          console.log(file)
+          await page.keyboard.press('Escape')
+          check('Escape closes', (await page.locator('.b-sheet').count()) === 0)
+        }
       }
       await ctx.close()
     }

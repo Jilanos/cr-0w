@@ -5,13 +5,14 @@
                      [--permission review] [--logics REF] [--mission ID | --end-state E] [--write-dir DIR] [--timeout-min N]
                      [--json] [--dry-run]
                                                      every run carries crow_lib.run_flags (model id, effort, budget, timeout, env)
+                                                     <project>: a registered name or alias; `hub` is the hub checkout
   crow-runs state <run_id>                           JSON: has the run ended, its end state, the usage-limit policy (crow-core tick)
   crow-runs [list] [--since today|7d|DATE] [--all]   one-shot listing
   crow-runs json                                     same data as JSON (schema in logics/specs/script_contract);
                                                      it reads <state>/runs.jsonl, so a watcher can re-read on change
   crow-runs stop <run_id> [--json]                   stop one running run; --json prints the action result
   crow-runs report <run_id>                          final report of a finished run, then its token line
-  crow-runs final <stdout_path> [provider]           final message of a run's stdout log (claude | codex)
+  crow-runs final <stdout_path|run_id> [provider]    final message of a run's stdout log (claude | codex)
   crow-runs wait <run_id>...                         block until the runs finish (run in background to get notified)
   crow-runs inbox [--hook] [--peek]                  finished runs not reported yet (the hook runs it on every prompt)
   crow-runs notify <run_id>...                       wait, then desktop-notify (dispatch starts it detached)
@@ -30,6 +31,7 @@ import yaml
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import crow_lib  # noqa: E402
 import crow_limits  # noqa: E402
+import crow_term  # noqa: E402
 
 HOME = Path(crow_lib.data_home())
 ACCOUNT = os.environ.get("CROW_ACCOUNT") or os.environ.get("CROW_SESSION_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
@@ -52,10 +54,15 @@ def sh(*args, cwd=None):
 
 
 def project(name):
+    """Registry entry by name or alias. `hub` is the hub checkout (CROW_HOME) even when the registry lacks it."""
     for p in REG["projects"]:
-        if p["name"] == name:
+        if p["name"] == name or name in (p.get("aliases") or []):
             return p
-    sys.exit(f"crow: unknown project '{name}' (see: crow ls)")
+    if name == "hub":
+        own = next((p for p in REG["projects"] if Path(p["path"]).resolve() == HOME.resolve()), None)
+        return own or {"name": "hub", "path": str(HOME), "scope": "personal"}
+    near = crow_lib.closest_name(name, [p["name"] for p in REG["projects"]] + ["hub"])
+    sys.exit(f"crow: unknown project '{name}'" + (f"; did you mean '{near}'?" if near else "") + " (see: crow ls)")
 
 
 def project_name(cwd):
@@ -116,6 +123,8 @@ def running_runs():
 def wait(run_ids, poll=20):
     """Block until every given run has finished; print one line per run as it ends.
     Run it as a background command so the caller is notified when it exits."""
+    if any(not i.strip() for i in run_ids):
+        sys.exit("crow: wait needs a run id (got an empty one)")
     recs = {r["run_id"]: r for r in ledger()}
     pending = {next((k for k in recs if k.startswith(i)), i) for i in run_ids}
     while pending:
@@ -350,6 +359,8 @@ def record_run(rec, state):
 def notify(run_ids, poll=20, max_hours=12):
     """Wait for the runs, then raise a desktop notification for each. Survives the session that started it.
     Gives up after `max_hours` so a lost run does not leave a poller behind."""
+    if any(not i.strip() for i in run_ids):
+        sys.exit("crow: notify needs a run id (got an empty one)")
     recs = {r["run_id"]: r for r in ledger()}
     pending = {next((k for k in recs if k.startswith(i)), i) for i in run_ids}
     deadline = time.time() + max_hours * 3600
@@ -500,7 +511,34 @@ def report(run_id, since="7d"):
         full = report_from_transcript(sid)
         if full:
             return full
+    if provider == "codex" and "Shipped" not in result:
+        return codex_report(crow_lib.codex_messages(text), result)
     return result
+
+
+def codex_report(msgs, result):
+    """A Codex run that ends on a one-line postscript: its last report-shaped message, else its last multi-line one."""
+    shaped = [m for m in msgs if "Shipped" in m]
+    if shaped:
+        return shaped[-1]
+    full = [m for m in msgs if "\n" in m.strip()]
+    return full[-1] if full and "\n" not in result.strip() else result
+
+
+def final_of(target, provider=None, since="7d"):
+    """Final message of a stdout log path, or of a run given by its id or id prefix."""
+    if not target.strip():
+        sys.exit("crow: final needs a stdout path or a run id")
+    f = Path(target)
+    if not f.is_file():
+        r = next((v for k, v in finished_rows(since).items() if k.startswith(target)), None)
+        if not r:
+            sys.exit(f"crow: '{target}' is neither a file nor a run id from the last {since}")
+        f = Path(r.get("artifacts", {}).get("stdout_path") or "/nonexistent")
+        if not f.is_file():
+            sys.exit(f"crow: run {r['run_id'][:8]} has no stdout log")
+        provider = provider or r.get("provider")
+    return crow_lib.final_text(f.read_text(errors="replace"), provider or "claude")
 
 
 def run_tokens(run_id, since="7d"):
@@ -717,7 +755,7 @@ def read_transcript(path):
 
 
 def commits_since(cwd, sha, until=None):
-    if not sha:
+    if not sha or not os.path.isdir(cwd or ""):
         return []
     extra = [f"--until={until}"] if until else []
     return sh("git", "log", "--oneline", *extra, f"{sha}..HEAD", cwd=cwd).splitlines()
@@ -749,6 +787,7 @@ def collect(since="today", include_unledgered=False):
     cutoff = datetime.now().astimezone().date() if since == "today" else None
     agents, claimed = [], set()
     titles = session_titles()
+    panes = crow_term.tmux_sessions_by_pid()
 
     for p in agent_procs():
         # Claude keeps <home>/.claude/sessions/<pid>.json current (session id changes on /clear).
@@ -758,16 +797,22 @@ def collect(since="today", include_unledgered=False):
         except (OSError, ValueError):
             pass
         sid = meta.get("sessionId") or arg(p["argv"], "--session-id") or arg(p["argv"], "--resume")
-        if not sid and p["provider"] == "claude":
-            continue  # short-lived helper process, not an agent
         kind = "run" if is_headless(p["argv"]) else "session"
+        tmux = crow_term.tmux_session_for(p["pid"], panes) if kind == "session" else None
+        # No session id yet: a short-lived helper, or a headless Nest session stuck on a
+        # first-run dialog (item_240), listed as "setup" so Nest can answer it in its terminal.
+        setup = not sid and p["provider"] == "claude"
+        if setup and not (tmux or "").startswith(crow_term.HEADLESS_PREFIX):
+            continue
         account = p["account"] or (re.search(r"/profiles/([^/]+)/", p["home"]) or [None, "default"])[1]
         tpath = transcript_path(p["home"], p["cwd"], sid) if sid and p["provider"] == "claude" else None
         mtime = tpath.stat().st_mtime if tpath and tpath.exists() else p["started"]
         t = read_transcript(tpath) if tpath else {}
         idle = now - mtime
         prompt = crow_lib.pending_prompt(p["pid"], meta)
-        if prompt or meta.get("status") == "waiting":
+        if setup:
+            state = "setup"
+        elif prompt or meta.get("status") == "waiting":
             state = "waiting"
         elif meta.get("status") == "busy" or idle < WORKING_S:
             state = "working"
@@ -784,6 +829,7 @@ def collect(since="today", include_unledgered=False):
             "prompt": {k: prompt.get(k) for k in crow_lib.PROMPT_FIELDS} if prompt else None,
             "mission": transcript_mission(tpath) if tpath and kind == "session" else None,
             "branch": t.get("branch") if kind == "session" else None,
+            "tmux": tmux,
         }
         if kind == "run":
             for rec in reversed(recs):
@@ -821,15 +867,18 @@ def collect(since="today", include_unledgered=False):
             "resumed_from": [k for k, v in superseded.items() if v == rec["run_id"]],
             "commits": commits_since(rec["cwd"], rec.get("start_sha"), r.get("ended_at") if r else None),
             "mission": run_mission(rec), "branch": rec.get("branch") or None,
+            "worktree_removed": not os.path.isdir(rec.get("cwd") or ""),
         })
     if include_unledgered:
         known = {rec["run_id"] for rec in recs}
         for rid, r in done.items():
             if rid not in known:
-                past.append({"run_id": rid, "project": project_name(r["cwd"]), "label": "(not dispatched by crow)",
+                cwd = r.get("cwd") or ""
+                past.append({"run_id": rid, "project": project_name(cwd) if cwd else "?", "label": "(not dispatched by crow)",
                              "status": "done" if r.get("exit_code") == 0 else "failed",
                              "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": [],
-                             "cost_usd": run_cost(r), "budget_usd": None, "denials": crow_lib.run_denials(r)})
+                             "cost_usd": run_cost(r), "budget_usd": None, "denials": crow_lib.run_denials(r),
+                             "worktree_removed": not os.path.isdir(cwd)})
 
     slots = crow_limits.slots(running_runs(), crow_limits.load(HOME), recs)
     pu = project_usage()
@@ -898,7 +947,71 @@ def dispatch_fail(a, code, message):
     sys.exit(f"crow: {message}")
 
 
+PROMPTS = STATE / "prompts"
+
+
+def keep_prompt(run_id, a):
+    """Copy of the run's prompt under STATE/prompts (a caller's temp file is gone later): what `retry` restarts from."""
+    try:
+        text = Path(a.prompt_file).read_text() if a.prompt_file else a.prompt
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    PROMPTS.mkdir(parents=True, exist_ok=True)
+    f = PROMPTS / f"{run_id}.md"
+    f.write_text(text)
+    return str(f)
+
+
+def retry_args(rec):
+    """`crow-runs dispatch` arguments that start rec's run again on its prompt, or (None, why)."""
+    src = next((f for f in (rec.get("prompt_copy"), rec.get("prompt_file")) if f and Path(f).is_file()), None)
+    if not src:
+        return None, "no prompt file left to restart from"
+    args = ["dispatch", rec["project"], rec["label"], "--prompt-file", src, "--resumes", rec["run_id"],
+            "--kind", rec.get("kind") or "task", "--context", rec.get("context") or "day"]
+    for flag, key in (("--account", "account"), ("--model", "model"), ("--power", "power"), ("--logics", "logics_ref")):
+        if rec.get(key):
+            args += [flag, rec[key]]
+    if rec.get("cwd") and os.path.isdir(rec["cwd"]):
+        args += ["--cwd", rec["cwd"]]
+    if rec.get("permission") == "review":
+        args += ["--permission", "review"]
+    if rec.get("isolated"):
+        args.append("--isolate")
+    return args, ""
+
+
+def retry(run_id, as_json):
+    """Start a finished run again on the same prompt, project, account and worktree (--resumes hides the old one)."""
+    def out(code, target, msg):
+        if as_json:
+            sys.exit(crow_lib.action_result(code == 0, "retry", target, msg, code))
+        sys.exit(f"crow: {msg}" if code else print(msg))
+    recs = [r for r in ledger() if run_id.strip() and r["run_id"].startswith(run_id)]
+    if len({r["run_id"] for r in recs}) != 1:
+        out(1, run_id, f"{len(recs)} runs match {run_id!r}; give one run id")
+    rec = recs[-1]
+    if any(r.get("run_id") == rec["run_id"] for r in running_runs()):
+        out(1, rec["run_id"], f"run {rec['run_id'][:8]} is still running")
+    args, why = retry_args(rec)
+    if not args:
+        out(1, rec["run_id"], f"cannot retry {rec['run_id'][:8]}: {why}")
+    r = subprocess.run([sys.executable, os.path.realpath(__file__), *args, "--json"], capture_output=True, text=True)
+    try:
+        res = json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        res = {"ok": False, "error": {"message": (r.stderr or r.stdout).strip()[:200]}}
+    if not res.get("ok"):
+        err = res.get("error") or {}
+        out(1, rec["run_id"], f"retry failed: {err.get('message') if isinstance(err, dict) else err}")
+    out(0, rec["run_id"], f"retried {rec['run_id'][:8]} as {res['run_id'][:8]}")
+
+
 def dispatch(a):
+    if a.continue_run:  # cdx only knows full run ids; `crow runs` prints the 8-char prefix
+        a.continue_run = parent_run(a.continue_run).get("run_id") or a.continue_run
     if a.continue_run and parent_run(a.continue_run).get("isolated"):
         a.isolate = True  # cdx continues an isolated run only inside its sandbox, read-only for a review
     rows = crow_lib.cdx_rows() if a.isolate else []
@@ -1017,6 +1130,9 @@ def dispatch(a):
             rec["linked_mission"] = linked
     if a.write_dir:
         rec["write_dir"] = a.write_dir
+    keep = keep_prompt(res["run_id"], a)
+    if keep:
+        rec["prompt_copy"] = keep
     if "--model" in flags:
         rec["model_id"] = flags[flags.index("--model") + 1]
     if "--budget" in flags:
@@ -1113,7 +1229,8 @@ def render(data, color=True, width=None):
             out.append(clip(f"{c[col]}{sym}{c['0']} {f['project']:<20} {f['label']}"))
             cost = fmt_cost(f.get("cost_usd"), f.get("budget_usd"))
             cost = f" · {cost}" if cost else ""
-            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended}{cost} · {len(f['commits'])} commits{resumed} · {f['run_id'][:8]}{c['0']}"))
+            commits = "worktree removed" if f.get("worktree_removed") else f"{len(f['commits'])} commits"
+            out.append(clip(f"    {c['dim']}{f['status']} after {d}{ended}{cost} · {commits}{resumed} · {f['run_id'][:8]}{c['0']}"))
             for x in f.get("denials") or []:  # a tool outside the kind's allowlist: widen it on purpose (runbook)
                 out.append(clip(f"    {c['y']}denied {x}{c['0']}"))
         if len(data["finished"]) > FINISHED_SHOWN:
@@ -1194,12 +1311,15 @@ def main():
     sub.add_parser("state").add_argument("run_id")
     sub.add_parser("report").add_argument("run_id")
     fp = sub.add_parser("final")
-    fp.add_argument("stdout_path")
-    fp.add_argument("provider", nargs="?", default="claude")
+    fp.add_argument("target", metavar="stdout_path|run_id")
+    fp.add_argument("provider", nargs="?", help="claude | codex (default: the run's provider, else claude)")
     sub.add_parser("wait").add_argument("run_ids", nargs="+")
     sp = sub.add_parser("stop")
     sp.add_argument("run_id")
     sp.add_argument("--json", action="store_true", help="print {schema, ok, action, target, message, code}; exit 0 stopped, 1 refused, 2 error")
+    rp = sub.add_parser("retry", help="start a finished run again on its prompt, account and worktree")
+    rp.add_argument("run_id")
+    rp.add_argument("--json", action="store_true", help="print {schema, ok, action, target, message, code}; exit 0 started, 1 refused")
     sub.add_parser("notify").add_argument("run_ids", nargs="+")
     cv = sub.add_parser("conversation", help="one page of a run's or session's conversation, as JSON (crow-core)")
     cv.add_argument("--run"); cv.add_argument("--account"); cv.add_argument("--conversation")
@@ -1221,6 +1341,8 @@ def main():
         wait(a.run_ids)
     elif a.cmd == "stop":
         stop(a.run_id, a.json)
+    elif a.cmd == "retry":
+        retry(a.run_id, a.json)
     elif a.cmd == "state":
         print(json.dumps(run_end_state(a.run_id)))
     elif a.cmd == "conversation":
@@ -1230,7 +1352,7 @@ def main():
     elif a.cmd == "inbox":
         inbox(a.hook, a.peek)
     elif a.cmd == "final":
-        print(crow_lib.final_text(Path(a.stdout_path).read_text(errors="replace"), a.provider))
+        print(final_of(a.target, a.provider))
     elif a.cmd == "report":
         print(report(a.run_id) or "")
         line = token_line(a.run_id)

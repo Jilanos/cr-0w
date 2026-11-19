@@ -47,6 +47,7 @@ const usage = `usage: crow-core <command>
   install           write and start the crow-core systemd user unit, point tailscale serve at it
   status            unit state, listen addresses and tailscale serve config
   restart           restart the unit (crow core rebuilds the binary first)
+  mcp               MCP stdio server of the butler: core tools over the unix socket (item_176)
   config            print the resolved paths as JSON
   version           print the core and contract versions
 `
@@ -80,6 +81,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	if cmd == "config" {
 		return printJSON(stdout, cfg)
+	}
+	if cmd == "mcp" {
+		return mcpServe(cfg.Serve.Socket, stdin, stdout)
 	}
 	kinds := project.KindDirs(cfg.Kinds, cfg.Overrides)
 	s, err := store.Open(cfg.Store, cfg.Missions, kinds)

@@ -28,6 +28,9 @@ type Mission struct {
 	MR         *string  `json:"mr"`
 	Created    string   `json:"created"`
 	Updated    string   `json:"updated"`
+	// Linked marks a mission grouping a handoff or a dispatch, with no core run of its
+	// own. Only the missions section sets it.
+	Linked bool `json:"linked,omitempty"`
 }
 
 // Mission states, in lifecycle order.

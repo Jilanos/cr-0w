@@ -1,19 +1,19 @@
 ## item_188_start_an_interactive_session_that_lives_in_nest - Start an interactive session that lives in Nest
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
-> Understanding: 90%
-> Confidence: 85%
-> Progress: 0%
+> Status: Done
+> Understanding: 100%
+> Confidence: 95%
+> Progress: 100%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
 
 # AI Context
-- Summary: (unfilled: replace before this doc is used)
-- Keywords: start, interactive, session, lives, nest
-- Use when: (unfilled: replace before this doc is used)
-- Skip when: (unfilled: replace before this doc is used)
+- Summary: POST /api/sessions runs `crow term` with CROW_TERMINAL=headless: a detached tmux session (own systemd scope under the core service). crow-runs sets `tmux` on the agent row; Desk opens the new session's chat when it shows up; the chat Terminal button calls POST /api/sessions/{pid}/attach (`crow-focus --attach`, kitty running `tmux attach`).
+- Keywords: start, interactive, session, nest, headless, tmux, attach
+- Use when: changing how Nest starts or attaches to interactive sessions.
+- Skip when: background runs (crow dispatch) or remote hosts.
 
 # Problem
 - POST /api/sessions runs `crow term`, which opens a kitty window on the desktop. A session started from Nest should run without a window and be driven from Nest.
@@ -52,4 +52,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-18 | hub session | - | Headless start, attach, Desk open | Done | - | Live on lazytf/rk1: no window, row with tmux, send got "pong", stop closed the tmux session. First start in a project can show the external CLAUDE.md imports dialog; it blocks the row until answered (attach). Attach not tested live. |
 

@@ -3,8 +3,8 @@ No window is touched: answers run dry or hit the refusal paths before any key pr
 import importlib.machinery
 import importlib.util
 import json
-import pytest
 
+import pytest
 from conftest import BIN
 
 loader = importlib.machinery.SourceFileLoader("crow_prompt", str(BIN / "crow-prompt"))
@@ -185,7 +185,7 @@ def test_a_prompt_is_answered_once_and_a_second_answer_presses_nothing(tmp_path,
     assert cp.answer(42, pid_, answers=ans, backend="tmux", home=tmp_path, meta=ASKING)[0] == 0
     first = list(pressed)
     assert first[-1] == "1"
-    code, msg = cp.answer(42, pid_, answers=ans, backend="tmux", home=tmp_path, meta=ASKING)
+    code, _msg = cp.answer(42, pid_, answers=ans, backend="tmux", home=tmp_path, meta=ASKING)
     assert code == 1 and pressed == first
     cp.hook(json.dumps(event("ls")), home=tmp_path, pid=42, projects=PROJECTS, now=2.0)
     bid = cp.pending(42, home=tmp_path, meta=WAITING)["id"]

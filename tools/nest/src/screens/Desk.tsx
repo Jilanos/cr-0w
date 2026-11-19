@@ -3,12 +3,12 @@ import { ApiError } from '../data/api'
 import { deliveryOf, pendingOf, type Delivery, type Pending } from '../data/delivery'
 import { useConversation } from '../data/useConversation'
 import { DeliveryLine, useDeliveryClock } from '../ui/Delivery'
-import { accountsOf, dispatchOf, projectsOf, resumableOf, type Account, type Agent, type AskAnswer, type LiveReply, type Resumable } from '../data/live'
+import { accountsOf, dispatchOf, projectsOf, resumableOf, type Agent, type AskAnswer, type LiveReply, type ReadyItem, type Resumable } from '../data/live'
 import { useSource, type Snapshot } from '../data/useData'
 import { ago, elapsed, time, title } from '../format'
 import type { Mission } from '../data/types'
 import { missionOfRun } from '../data/state'
-import { Link, navigate } from '../router'
+import { Link, navigate, useQuery } from '../router'
 import { Sheet, type Confirm } from '../ui/Sheet'
 import { AskDock } from '../ui/AskDock'
 import { promptView } from '../ui/prompt'
@@ -16,7 +16,11 @@ import { enterSubmits, rowsOf } from '../ui/keys'
 import { Chat as AgentChat } from './Chat'
 import { LAPTOP, useMedia } from '../ui/useMedia'
 import { deskWork, workCounts, workOf, type WorkItem } from '../data/work'
-import { WorkList } from '../ui/WorkList'
+import { doneToday, inFilter, okRate, readyOf, readyRows, shortRef, type ReadyRow, type WorkFilter } from '../data/ready'
+import { WorkList, type RowAct } from '../ui/WorkList'
+import { AccountField } from '../ui/AccountField'
+import { isCommand } from '../data/butler'
+import { useButler } from '../data/useButler'
 
 // Desk (item_138 boards desk, fold-desk-inner, fold-desk-cover) on the live actions of
 // item_170. Every action goes through the confirm sheet, then the feed refetches.
@@ -24,7 +28,9 @@ const MODELS = ['default', 'sonnet', 'opus', 'haiku']
 const INNER = '(min-width: 600px)'
 const LATER = 'Arrives with the live API'
 const nameOf = (a: Agent) => (a.kind === 'run' ? a.label || a.run_id || String(a.pid) : a.title || a.project)
-const waits = (a: Agent) => a.state === 'waiting'
+// setup (item_240): a headless session stuck on a first-run dialog; its Terminal tab answers it.
+const waits = (a: Agent) => a.state === 'waiting' || a.state === 'setup'
+const said = (a: Agent) => (a.state === 'setup' ? 'waits on setup' : waits(a) ? 'waits' : a.state)
 
 // ---- icons (board paths) ----
 const Ring = ({ dashed, c = 'c-w' }: { dashed?: boolean; c?: string }) => (
@@ -78,7 +84,7 @@ type Form = 'run' | 'session' | null
 function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const src = useSource()
   const act = src.actions
-  const { slots, agents } = dispatchOf(snap.sections.dispatch)
+  const { slots, agents, finished = [] } = dispatchOf(snap.sections.dispatch)
   const runs = agents.filter((a) => a.kind === 'run')
   const sessions = agents.filter((a) => a.kind === 'session')
   const resumable = resumableOf(snap.sections.sessions)
@@ -92,9 +98,12 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
   const [tell, setTell] = useState(() => new URLSearchParams(location.search).get('tell') === '1')
   const [text, setText] = useState('')
   const [ask, setAsk] = useState('')
+  const butler = useButler()
   const [form, setForm] = useState<Form>(null)
   const [run, setRun] = useState({ project: '', label: '', model: 'default', account: '', prompt: '' })
   const [start, setStart] = useState({ project: '', account: '', prompt: '' })
+  // tmux session of a session just started here: its chat opens once a poll shows it (item_188).
+  const [opening, setOpening] = useState<string | null>(null)
 
   const picked = agents.find((a) => a.pid === sel) ?? runs[0] ?? sessions.find((a) => a.state === 'working') ?? agents[0]
   const slotOf = (a: Agent) => (a.kind === 'run' ? `S${runs.indexOf(a) + 1}` : '')
@@ -187,16 +196,23 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       () => { setRun({ project: '', label: '', model: 'default', account: '', prompt: '' }); setForm(null) }),
   })
   const open = () => setSheet({
-    title: 'New session', lead: `Opens a claude session on ${start.project} in a new window.`, quote: start.prompt || undefined,
+    title: 'New session', lead: `Starts a claude session on ${start.project} here, with no window. Its chat opens once it shows up.`, quote: start.prompt || undefined,
     target: [['project', start.project], ['account', start.account || 'auto']],
-    note: 'Fails when that account is busy; nothing else is started.', ok: 'Open session',
-    run: wrap(`/session ${start.project}`, () => act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined }),
-      () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
+    note: 'Fails when that account is busy; nothing else is started. Its Terminal tab shows the session screen.', ok: 'Start session',
+    run: wrap(`/session ${start.project}`, async () => {
+      const r = await act.start({ project: start.project, account: start.account || undefined, prompt: start.prompt || undefined })
+      if (r.tmux) setOpening(r.tmux)
+      return r
+    }, () => { setStart({ project: '', account: '', prompt: '' }); setForm(null) }),
   })
   const resume = (r: Resumable) => setSheet({
-    title: 'Resume session', lead: `Reopens the conversation of ${r.project} in a new window.`,
+    title: 'Resume session', lead: `Reopens the conversation of ${r.project} here, with no window. Its chat opens once it shows up.`,
     target: [['project', r.project], ['account', r.account], ['id', r.conversation_id.slice(0, 8)]],
-    note: 'Same conversation, same account.', ok: 'Resume', run: wrap(`Resume ${r.project}`, () => act.resume(r.conversation_id, r.account)),
+    note: 'Same conversation, same account.', ok: 'Resume', run: wrap(`Resume ${r.project}`, async () => {
+      const res = await act.resume(r.conversation_id, r.account)
+      if (res.tmux) setOpening(res.tmux)
+      return res
+    }),
   })
   // Queued missions sit under the slots; the row's ⋯ cancels one (crow mission cancel).
   const queue = snap.missions.filter((m) => m.state === 'queued' || m.state === 'preflight')
@@ -216,6 +232,13 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     },
   })
   const pick = (a: Agent, talk = false) => { setSel(a.pid); setTell(talk) }
+  const fresh = opening ? agents.find((a) => a.tmux === opening) : undefined
+  useEffect(() => {
+    if (!fresh) return
+    setOpening(null)
+    if (matchMedia(INNER).matches) pick(fresh)
+    else navigate(`/desk/${fresh.pid}`)
+  }, [fresh?.pid])
   // The work feed (item_204) drives the list; null on a core without it (old sections stay).
   const work = workOf(snap.sections.work)
   const groups = deskWork(work ?? [])
@@ -257,22 +280,98 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       .finally(() => setAsking(false))
   }
 
-  // The ask box: /dispatch and /session open their form; free chat waits for the hub API.
+  // ---- laptop Desk, layout B (item_246) ----
+  const ready = readyRows(readyOf(snap.sections.ready), resumable, agents, snap.now)
+  const [filter, setFilter] = useState<WorkFilter | null>(null)
+  const needN = (work ?? []).filter((w) => inFilter(w, 'needs')).length
+  const shownFilter: WorkFilter = filter ?? (needN ? 'needs' : 'all')
+  const filtered = deskWork((work ?? []).filter((w) => inFilter(w, shownFilter)))
+  const filterCounts: Record<WorkFilter, number> = {
+    needs: needN,
+    running: (work ?? []).filter((w) => inFilter(w, 'running')).length,
+    ready: ready.length,
+    all: shown + ready.length,
+  }
+  const kpi = { done: doneToday(finished, snap.now), ok: okRate(snap.missions, snap.now) }
+  const retry = (w: WorkItem) => {
+    const f = finished.find((x) => x.run_id === w.source.ref)
+    setSheet({
+      title: 'Retry run', lead: `Start ${w.title} of ${w.project} again on the same prompt.`,
+      target: [['run', w.source.ref], ['project', w.project], ['account', f?.account || 'same'], ['slots', `${slots.busy} of ${slots.max} busy`]],
+      note: 'A new run with its own worktree. Nothing is pushed.', ok: 'Retry',
+      run: wrap(`Retry ${w.title}`, () => act.retryRun(w.source.ref)),
+    })
+  }
+  const allow = (a: Agent) => {
+    const p = a.prompt!
+    setSheet({
+      title: 'Allow once', lead: `${nameOf(a)} asks to run ${p.tool}${p.description ? `: ${p.description}` : ''}.`, quote: p.detail,
+      target: [['session', nameOf(a)], ['project', a.project], ['account', a.account]],
+      note: 'Same as Allow once in its window.', ok: 'Allow once',
+      run: wrap(`Allow once ${nameOf(a)}: ${p.tool} ${p.detail}`, () => act.answer(a.pid, p.id, 'allow')),
+    })
+  }
+  // The main action of a work row: Retry a failed run, open an MR, allow or answer a session.
+  const rowAct = (w: WorkItem): RowAct | undefined => {
+    if (w.kind === 'run' && w.state === 'failed' && finished.some((x) => x.run_id === w.source.ref)) return { label: 'Retry', run: () => retry(w) }
+    if (w.kind === 'mr') return { label: 'Open MR', run: () => window.open(w.source.ref, '_blank', 'noopener') }
+    if (w.kind === 'session' && w.state === 'needs') {
+      const a = agents.find((x) => String(x.pid) === w.source.ref)
+      if (!a) return undefined
+      if (a.prompt && promptView(a.prompt) === 'options' && a.prompt.options.some((o) => o.key === 'allow')) return { label: 'Allow', run: () => allow(a) }
+      return { label: 'Answer', run: () => pick(a, !a.prompt) }
+    }
+    if (w.kind === 'mission' && w.state === 'needs') return { label: 'Answer', run: () => navigate(`/missions/${encodeURIComponent(w.source.ref)}`) }
+    return undefined
+  }
+  const promptOf = (i: ReadyItem) => `Implement ${shortRef(i.ref)} end to end. Read ${i.path} first.`
+  const runReady = (i: ReadyItem) => setSheet({
+    title: 'Start a run', lead: `Builds ${i.title} in the background.`, quote: promptOf(i),
+    target: [['project', i.project], ['label', shortRef(i.ref)], ['account', 'auto'], ['slots', `${slots.busy} of ${slots.max} busy`]],
+    note: 'Opens a new run on a free allowed account. Nothing is pushed.', ok: 'Start run',
+    run: wrap(`/dispatch ${i.project} ${shortRef(i.ref)}`, () => act.dispatch({ project: i.project, label: shortRef(i.ref), prompt: promptOf(i) })),
+  })
+  const sessionReady = (i: ReadyItem) => setSheet({
+    title: 'New session', lead: `Starts a claude session on ${i.project} for ${i.title}, with no window. Its chat opens once it shows up.`, quote: promptOf(i),
+    target: [['project', i.project], ['item', shortRef(i.ref)], ['account', 'auto']],
+    note: 'Fails when that account is busy; nothing else is started.', ok: 'Start session',
+    run: wrap(`/session ${i.project}`, async () => {
+      const r = await act.start({ project: i.project, prompt: promptOf(i) })
+      if (r.tmux) setOpening(r.tmux)
+      return r
+    }),
+  })
+
+  // /dispatch and /session open their form, prefilled with the project and prompt typed after.
+  const command = (t: string) => {
+    const [cmd, ...rest] = t.trim().split(/\s+/)
+    const words = rest.join(' ')
+    const p = projects.find((x) => x === rest[0])
+    if (cmd === '/dispatch') setRun((r) => ({ ...r, project: p ?? r.project, prompt: (p ? rest.slice(1).join(' ') : words) || r.prompt }))
+    else setStart((s) => ({ ...s, project: p ?? s.project, prompt: (p ? rest.slice(1).join(' ') : words) || s.prompt }))
+    setForm(cmd === '/dispatch' ? 'run' : 'session')
+  }
+
+  // The ask box: commands open their form; anything else goes to the butler (item_176).
   const submitAsk = () => {
     const t = ask.trim()
     if (!t) return
-    const [cmd, ...rest] = t.split(/\s+/)
-    if (cmd === '/dispatch' || cmd === '/session') {
-      const words = rest.join(' ')
-      const p = projects.find((x) => x === rest[0])
-      if (cmd === '/dispatch') setRun((r) => ({ ...r, project: p ?? r.project, prompt: (p ? rest.slice(1).join(' ') : words) || r.prompt }))
-      else setStart((s) => ({ ...s, project: p ?? s.project, prompt: (p ? rest.slice(1).join(' ') : words) || s.prompt }))
-      setForm(cmd === '/dispatch' ? 'run' : 'session')
-    } else {
-      setLog((l) => [...l, { me: true, text: t }, { text: `Free chat with CR-0W: ${LATER.toLowerCase()}. Use /dispatch or /session.` }])
-    }
+    if (isCommand(t)) command(t)
+    else void butler?.say(t, matchMedia(LAPTOP).matches ? 'nest' : 'phone')
     setAsk('')
   }
+
+  // The butler rail sends commands here as /desk?cmd=...: open the form, then drop the param.
+  const cmd = useQuery().get('cmd')
+  useEffect(() => {
+    if (!cmd || !isCommand(cmd)) return
+    command(cmd)
+    const q = new URLSearchParams(location.search)
+    q.delete('cmd')
+    history.replaceState(null, '', location.pathname + (q.size ? `?${q}` : ''))
+    dispatchEvent(new PopStateEvent('popstate'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cmd])
 
   return {
     snap, refresh, slots, agents, runs, sessions, resumable, projects, accounts,
@@ -280,6 +379,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
     form, setForm, run, setRun, start, setStart,
     send, settle, retell, pause, stop, dispatch, open, resume, answer, answerAsk, asking, queue, cancel,
     work, groups, shown, counts, openWork,
+    ready, filter: shownFilter, setFilter, filtered, filterCounts, kpi, rowAct, runReady, sessionReady,
   }
 }
 type D = ReturnType<typeof useDesk>
@@ -423,15 +523,6 @@ function Timeline({ d, a, term }: { d: D; a: Agent; term?: boolean }) {
   )
 }
 
-// Allowed accounts only (accountsOf drops never); auto lets crow pick a free one.
-function AccountField({ value, accounts, set }: { value: string; accounts: Account[]; set: (a: string) => void }) {
-  return (
-    <label>Account<select className="field" value={value} onChange={(e) => set(e.target.value)}>
-      <option value="">auto</option>{accounts.map((a) => <option key={a.name} value={a.name}>{a.name} · {a.policy}</option>)}
-    </select></label>
-  )
-}
-
 function Forms({ d }: { d: D }) {
   if (d.form === 'run') {
     const r = d.run
@@ -544,14 +635,21 @@ function DeskLaptop({ d }: { d: D }) {
       <div className="kps">
         <h1 className="dt">Desk</h1>
         <span className="kp c-w"><span className="kn">{d.counts ? d.counts.working : working.length}</span><span className="sm">working{accts && ` · ${accts}`}</span></span>
-        <span className="kp n"><span className="kn c-n">{needs}</span><span className="sm">need you{oldest && ` · oldest ${ago(oldest, d.snap.now)}`}</span></span>
-        {d.counts && d.counts.failed > 0 && <span className="kp f"><span className="kn c-f">{d.counts.failed}</span><span className="sm">failed</span></span>}
-        <span className="kp c-sub"><span className="kn">{d.slots.busy}/{d.slots.max}</span><span className="sm">slots · {Math.max(0, d.slots.max - d.slots.busy)} free</span></span>
-        <span className="kp c-b"><span className="kn">{d.resumable.length}</span><span className="sm">resumable</span></span>
+        <span className={`kp n${needs ? ' hot' : ''}`}><span className="kn c-n">{needs}</span><span className="sm">need you{oldest && ` · oldest ${ago(oldest, d.snap.now)}`}</span></span>
+        <span className="kp f"><span className="kn c-f">{d.counts ? d.counts.failed : 0}</span><span className="sm">failed</span></span>
+        <span className="kp c-d"><span className="kn">{d.kpi.done}</span><span className="sm">done today</span></span>
+        <span className="kp c-sub"><span className="kn">{d.kpi.ok == null ? '—' : `${d.kpi.ok}%`}</span><span className="sm">ok rate 7d</span></span>
       </div>
       <div className="dg">
         <div className="col">
-          {d.work ? <Work d={d} id="dw" /> : (
+          <Sessions d={d} />
+          {(d.form || d.log.length > 0) && (
+            <section className="pn none launch-pn" aria-labelledby="dk">
+              <Ph id="dk" sm="asks before it acts">Launch</Ph>
+              <Chat d={d} />
+            </section>
+          )}
+          {d.work ? <WorkB d={d} /> : (
             <>
               <section className="pn none" aria-labelledby="dn"><Ph id="dn" className="c-n" sm={<span className="c-n">{needs || ''}</span>}>Needs you</Ph><Needs d={d} /></section>
               <section className="pn grow" aria-labelledby="dr"><Ph id="dr" sm="▶ resume · + queue">Ready to run</Ph><Ready d={d} /></section>
@@ -561,40 +659,89 @@ function DeskLaptop({ d }: { d: D }) {
         {a ? (
           <AgentChat key={a.pid} snap={d.snap} refresh={d.refresh} target={{ pid: a.pid }} log={<Timeline d={d} a={a} term />} />
         ) : (
-          <section className="pn ask-pn" aria-labelledby="da">
-            <Ph id="da" sm="butler · sees missions, queue, inbox, sessions">Ask CR-0W</Ph>
-            <Chat d={d} />
-            <Chips d={d} />
-            <AskBox d={d} ph="Tell CR-0W what to run, ask about a mission…" />
-          </section>
+          <section className="pn" aria-labelledby="dl"><Ph id="dl">Live</Ph><div className="sm">Nothing open. Pick a session, or type /dispatch to CR-0W.</div></section>
         )}
-        <div className="col">
-          <section className="pn none" aria-labelledby="ds"><Ph id="ds" sm="click a slot to open it">Slots and queue</Ph><Slots d={d} /></section>
-          {a ? (
-            <section className="pn grow ask-pn" aria-labelledby="da">
-              <Ph id="da" sm="butler">Ask CR-0W</Ph>
-              <Chat d={d} />
-              <Chips d={d} />
-              <AskBox d={d} ph="Tell CR-0W what to run…" />
-            </section>
-          ) : (
-            <section className="pn grow" aria-labelledby="dl"><Ph id="dl">Live</Ph><div className="sm">Nothing runs. Start one with /dispatch.</div></section>
-          )}
-          <section className="pn none" aria-labelledby="dv">
-            <Ph id="dv" sm={d.sessions.length}>Live sessions</Ph>
-            <div className="list">
-              {d.sessions.length === 0 && <div className="sm">No live session.</div>}
-              {d.sessions.map((s) => (
-                <div key={s.pid} className={`row${s === a ? ' on' : ''}`}>
-                  {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
-                  <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {waits(s) ? 'waits' : s.state}</span>
-                  <button type="button" className={`btn${waits(s) ? ' p' : ''}`} onClick={() => d.pick(s, waits(s) && !s.prompt)}>Open</button>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
       </div>
+    </div>
+  )
+}
+
+// Layout B (item_246): runs in their slots, then the live sessions, then the queue on one line.
+function Sessions({ d }: { d: D }) {
+  return (
+    <section className="pn none sess-pn" aria-labelledby="dss">
+      <Ph id="dss" sm={`slots ${d.slots.busy}/${d.slots.max}${d.queue.length ? ` · ${d.queue.length} queued` : ''}`}>Sessions</Ph>
+      <div className="list">
+        {d.runs.length + d.sessions.length === 0 && <div className="sm">Nothing runs.</div>}
+        {d.runs.map((a) => (
+          <button type="button" key={a.pid} className={`row edge-w${a === d.picked ? ' on' : ''}`} aria-pressed={a === d.picked} onClick={() => d.pick(a)}>
+            <Ring /><span className="sm c-w">{d.slotOf(a)}</span>
+            <span className="f1">{nameOf(a)}</span><span className="sm">{a.account}</span><span className="c-w num">{d.since(a)}</span>
+          </button>
+        ))}
+        {d.sessions.map((s) => (
+          <button type="button" key={s.pid} className={`row${s === d.picked ? ' on' : ''}`} aria-pressed={s === d.picked} onClick={() => d.pick(s, waits(s) && !s.prompt)}>
+            {waits(s) ? <Diamond /> : <Ring c={s.state === 'idle' ? 'c-q' : 'c-w'} />}
+            <span className="f1">{nameOf(s)}</span><span className="sm">{s.account} · {said(s)}</span>
+          </button>
+        ))}
+        {d.queue.length > 0 && (
+          <div className="row q qline">
+            <Ring dashed c="c-q" />
+            <span className="f1 sm">{d.queue.map((m, i) => `Q${i + 1} ${title(m)}`).join(' · ')}</span>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+const FILTERS: [WorkFilter, string][] = [['needs', 'Needs'], ['running', 'Running'], ['ready', 'Ready'], ['all', 'All']]
+
+function WorkB({ d }: { d: D }) {
+  const showReady = d.filter !== 'running'
+  const empty = d.filter === 'needs' ? 'Nothing waits on you, Sir.' : d.filter === 'running' ? 'Nothing runs.' : 'Nothing on the desk, Sir.'
+  return (
+    <section className="pn grow work-pn" aria-labelledby="dw">
+      <Ph id="dw" sm={<span className="num">{d.shown}</span>}>Work</Ph>
+      <div className="wchips" role="group" aria-label="Filter work">
+        {FILTERS.map(([f, label]) => (
+          <button type="button" key={f} className={`wchip${d.filter === f ? ' on' : ''}${f === 'needs' && d.filterCounts.needs ? ' n' : ''}`}
+            aria-pressed={d.filter === f} onClick={() => d.setFilter(f)}>
+            {label}{f !== 'all' && <span className="num">{d.filterCounts[f]}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="wscroll">
+        {d.filter !== 'ready' && <WorkList groups={d.filtered} now={d.snap.now} open={d.openWork} act={d.rowAct} compact empty={empty} />}
+        {showReady && (
+          <div className="rdy" role="group" aria-labelledby="drr">
+            <div className="grp c-m" id="drr">Ready to run <span className="sm">{d.ready.length}</span></div>
+            {d.ready.length === 0 && <div className="sm">No Ready item in Logics.</div>}
+            {d.ready.map((r) => <ReadyLine key={r.key} d={d} r={r} />)}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ReadyLine({ d, r }: { d: D; r: ReadyRow }) {
+  if (r.kind === 'parked') {
+    const s = r.session
+    return (
+      <div className="row rrow">
+        <Play /><span className="f1"><b>{s.last_prompt || s.project}</b><span className="sm">{s.project} · parked {s.last_event ? ago(s.last_event, d.snap.now) : ''}</span></span>
+        <button type="button" className="ib p" title="Resume" aria-label={`Resume ${s.project}`} onClick={() => d.resume(s)}>▶</button>
+      </div>
+    )
+  }
+  const i = r.item
+  return (
+    <div className="row rrow">
+      <Play /><span className="f1"><b>{i.title}</b><span className="sm">{i.project} · {shortRef(i.ref)}</span></span>
+      <button type="button" className="ib p" title="Run in the background" aria-label={`Run ${i.title}`} onClick={() => d.runReady(i)}>▶</button>
+      <button type="button" className="ib" title="New session" aria-label={`New session for ${i.title}`} onClick={() => d.sessionReady(i)}>+</button>
     </div>
   )
 }
@@ -643,7 +790,7 @@ function DeskCover({ d }: { d: D }) {
   const queued = d.resumable.slice(0, 2 - rest.length)
   const hero = a ? (
         <section className={`gcard dhero${waits(a) ? ' n' : ''}`} aria-labelledby="ch">
-          <div className="gt"><span className={waits(a) ? 'c-n' : 'c-w'}>● {d.slotOf(a) || 'Session'} · {waits(a) ? 'waits' : a.state}</span><span>{a.account} · {a.project}</span></div>
+          <div className="gt"><span className={waits(a) ? 'c-n' : 'c-w'}>● {d.slotOf(a) || 'Session'} · {said(a)}</span><span>{a.account} · {a.project}</span></div>
           <div className="hr">
             <div className="ring">
               <svg width="122" height="122" aria-hidden="true">
@@ -689,7 +836,7 @@ function DeskCover({ d }: { d: D }) {
         {rest.map((x) => (
           <button type="button" key={x.pid} className="row r2" onClick={() => navigate(`/desk/${x.pid}`)}>
             <span className={`ic${waits(x) ? ' n' : ''}`}>{waits(x) ? <Diamond s={14} /> : <Spin />}</span>
-            <span className="t"><b>{d.slotOf(x) ? `${d.slotOf(x)} · ` : ''}{nameOf(x)}</b><span>{x.account} · {waits(x) ? 'waits' : x.state}</span></span>
+            <span className="t"><b>{d.slotOf(x) ? `${d.slotOf(x)} · ` : ''}{nameOf(x)}</b><span>{x.account} · {said(x)}</span></span>
             <span className="sm num">{d.since(x)}</span><span className="chev">›</span>
           </button>
         ))}

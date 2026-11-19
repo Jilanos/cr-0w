@@ -38,6 +38,8 @@ type LiveAction struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	RunID   string `json:"run_id,omitempty"`
+	// Tmux names the detached tmux session a Nest start runs in (item_188).
+	Tmux string `json:"tmux,omitempty"`
 }
 
 // ActionLogName is the core action log, next to the missions root.
@@ -87,9 +89,11 @@ func (s *Server) routeLive(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/sessions/{pid}/send", s.send)
 	mux.HandleFunc("POST /api/sessions/{pid}/interrupt", s.agentCtl("interrupt"))
 	mux.HandleFunc("POST /api/sessions/{pid}/stop", s.agentCtl("stop"))
+	mux.HandleFunc("POST /api/sessions/{pid}/attach", s.agentCtl("attach"))
 	mux.HandleFunc("POST /api/sessions/{pid}/answer", s.promptAnswer)
 	mux.HandleFunc("POST /api/dispatch", s.dispatchRun)
 	mux.HandleFunc("POST /api/dispatch/{run}/stop", s.stopRun)
+	mux.HandleFunc("POST /api/dispatch/{run}/retry", s.retryRun)
 	mux.HandleFunc("POST /api/today/{id}/done", s.mail("done"))
 	mux.HandleFunc("POST /api/today/{id}/snooze", s.mail("snooze"))
 }
@@ -326,7 +330,8 @@ func (s *Server) resume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ev := LiveAction{Action: "resume", Target: id, Account: acct, Project: str(row, "project")}
-	s.runAction(w, ev, nil, "crow-focus", "--pid", "0", "--account", acct, "--cwd", str(row, "cwd"), "--session", id)
+	// Headless like a new session (item_240): no desktop window, the reply names the tmux session.
+	s.runAction(w, ev, []string{"CROW_TERMINAL=headless"}, "crow-focus", "--pid", "0", "--account", acct, "--cwd", str(row, "cwd"), "--session", id)
 	s.Refresh("dispatch")
 	s.Refresh("sessions")
 }
@@ -346,9 +351,11 @@ func (s *Server) newSession(w http.ResponseWriter, r *http.Request) {
 		liveFail(w, err, http.StatusBadRequest)
 		return
 	}
-	var env []string
+	// Headless: the session runs in a detached tmux session, no desktop window (item_188).
+	// Send, answer and stop reach it through its tmux pane; attach opens a terminal on it.
+	env := []string{"CROW_TERMINAL=headless"}
 	if b.Account != "" {
-		env = []string{"CROW_ACCOUNT=" + b.Account}
+		env = append(env, "CROW_ACCOUNT="+b.Account)
 	}
 	args := []string{"term", "--on-busy", "fail", b.Project}
 	if b.Prompt != "" {
@@ -440,6 +447,40 @@ func (s *Server) stopRun(w http.ResponseWriter, r *http.Request) {
 	s.Refresh("dispatch")
 }
 
+// retryRun starts a finished run again on its prompt, account and worktree (crow-runs retry).
+func (s *Server) retryRun(w http.ResponseWriter, r *http.Request) {
+	if !decode(w, r, &struct{}{}, true) {
+		return
+	}
+	run := r.PathValue("run")
+	m, err := s.live("dispatch")
+	if err != nil {
+		liveFail(w, err, http.StatusNotFound)
+		return
+	}
+	var row map[string]any
+	for _, a := range rows(m, "finished") {
+		if run != "" && str(a, "run_id") == run {
+			row = a
+		}
+	}
+	if row == nil {
+		fail(w, http.StatusNotFound, fmt.Sprintf("no finished run %q", run))
+		return
+	}
+	if slots, _ := m["slots"].(map[string]any); slots != nil {
+		busy, _ := slots["busy"].(float64)
+		max, _ := slots["max"].(float64)
+		if max > 0 && busy >= max {
+			fail(w, http.StatusConflict, fmt.Sprintf("%d runs already running (max %d)", int(busy), int(max)))
+			return
+		}
+	}
+	ev := LiveAction{Action: "run_retry", Target: run, Account: str(row, "account"), Project: str(row, "project")}
+	s.runAction(w, ev, nil, "crow-runs", "retry", run, "--json")
+	s.Refresh("dispatch")
+}
+
 func (s *Server) mail(action string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !decode(w, r, &struct{}{}, true) {
@@ -474,6 +515,7 @@ type result struct {
 	Message string `json:"message"`
 	RunID   string `json:"run_id"`
 	Account string `json:"account"`
+	Tmux    string `json:"tmux"`
 	Error   *struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
@@ -494,7 +536,7 @@ func (s *Server) runAction(w http.ResponseWriter, ev LiveAction, env []string, n
 	switch {
 	case parsed && res.OK:
 		ev.OK, ev.Code, ev.Message = true, 0, res.Message
-		ev.RunID = res.RunID
+		ev.RunID, ev.Tmux = res.RunID, res.Tmux
 		if ev.Account == "" {
 			ev.Account = res.Account
 		}

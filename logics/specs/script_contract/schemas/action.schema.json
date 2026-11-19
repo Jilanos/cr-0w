@@ -2,14 +2,14 @@
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "crow/scripts/action.schema.json",
  "title": "action result",
- "description": "The --json line of an action script (crow-focus --send|--interrupt|--stop, crow-prompt answer, crow-runs stop, crow-today done|snooze). Exit status equals code: 0 ok, 1 refused, 2 error.",
+ "description": "The --json line of an action script (crow-focus --send|--interrupt|--stop|--attach, crow-prompt answer, crow-runs stop, crow-today done|snooze). Exit status equals code: 0 ok, 1 refused, 2 error.",
  "type": "object",
  "additionalProperties": false,
  "required": ["schema", "ok", "action", "target", "message", "code"],
  "properties": {
   "schema": {"const": 1},
   "ok": {"type": "boolean"},
-  "action": {"enum": ["send", "interrupt", "stop", "answer", "done", "snooze"]},
+  "action": {"enum": ["send", "interrupt", "stop", "attach", "answer", "done", "snooze"]},
   "target": {"type": "string"},
   "message": {"type": "string"},
   "code": {"enum": [0, 1, 2]}

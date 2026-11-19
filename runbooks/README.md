@@ -63,3 +63,4 @@ want to trigger it by name.
 - [android-adb-from-wsl.md](android-adb-from-wsl.md): install an APK on a USB phone from WSL (Windows adb.exe)
 - [can-log-audit](can-log-audit.md): inventory BLF/ASC frames, match DBC definitions, check reserved ID blocks and verify immutable inputs
 - [personal-fork](personal-fork.md): sync a personal worktree with upstream and push only to its fork
+- [remote-computer-use-windows](remote-computer-use-windows.md): give a Windows Claude Code session desktop control from the phone (RC + Windows-MCP, no admin)

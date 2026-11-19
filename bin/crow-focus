@@ -5,24 +5,28 @@
   crow-focus --pid PID --send TEXT [--dry-run]
   crow-focus --pid PID --interrupt [--dry-run]
   crow-focus --pid PID --stop [--dry-run]
-  add --json to --send, --interrupt or --stop: one line {schema, ok, action, target, message, code}
+  crow-focus --pid PID --attach [--dry-run]
+  add --json to --send, --interrupt, --stop or --attach: one line {schema, ok, action, target, message, code}
 
 
 Goes through the terminal backend (crow_term: CROW_TERMINAL=kitty|tmux|print).
 Focus: finds the window (kitty) or pane (tmux) running PID, matching its own process or any
 ancestor of PID (the shell the session was started from). Resume: when no window holds it (the
-process is gone or runs elsewhere), opens a new window in DIR running `cdx ACCOUNT --dir DIR --resume`;
-the print backend prints that command instead. --session resumes that session id (`--resume ID`);
+process is gone or runs elsewhere), opens a new window in DIR running `cdx resume ACCOUNT --project DIR [--conversation ID]`;
+the print backend prints that command instead. --session resumes that session id (`--conversation ID`);
 with --pid 0 it never looks for a window (a History row).
 --send types TEXT and Enter into the window holding PID (the deck's answer to an agent question) and
 never resumes: it exits 1 when no window holds the session (always, on the print backend) or when the
 session waits on a permission or question dialog (the text would land in the dialog).
 --interrupt presses Escape in the window holding PID (pauses the agent's turn; the session stays open).
 --stop sends SIGTERM to PID, only when PID runs the claude CLI; the session can be resumed later.
+--attach opens a kitty window attached to the tmux session holding PID (a headless Nest session);
+closing the window leaves the session running. A PID already in a kitty window is focused instead.
 --dry-run prints what it would do and does nothing.
---json (send, interrupt, stop): exit 0 done, 1 refused (no window, not a claude pid), 2 error (bad
+--json (send, interrupt, stop, attach): exit 0 done, 1 refused (no window, not a claude pid), 2 error (bad
 arguments, the signal failed). Schema: logics/specs/script_contract/schemas/action.schema.json.
 """
+import json
 import os, signal, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
@@ -37,6 +41,21 @@ def interrupt(pid, backend, dry):
     if crow_term.send_escape(pid, backend):
         return 0, "paused"
     return 1, f"no {backend} window holds pid {pid}"
+
+
+def attach(pid, dry):
+    """(exit code, message): 0 done, 1 refused (no tmux session, no kitty), 2 the command failed."""
+    if dry:
+        return 0, f"open a kitty window attached to the tmux session holding pid {pid}"
+    try:
+        how, name = crow_term.attach(pid)
+    except (OSError, subprocess.SubprocessError) as e:
+        return 2, f"could not open a terminal ({e})"
+    if how == "attached":
+        return 0, f"opened a terminal on tmux session {name}"
+    if how == "kitty":
+        return 0, "focused its window"
+    return 1, name
 
 
 def stop(pid, dry):
@@ -79,7 +98,7 @@ def report(action, pid, code, message, as_json):
 
 
 def main(argv):
-    flags = {f for f in ("--dry-run", "--interrupt", "--stop", "--json") if f in argv}
+    flags = {f for f in ("--dry-run", "--interrupt", "--stop", "--attach", "--json") if f in argv}
     dry, as_json = "--dry-run" in flags, "--json" in flags
     opts, args = {}, [a for a in argv if a not in flags]
     for i in range(0, len(args) - 1, 2):
@@ -91,7 +110,7 @@ def main(argv):
         if as_json:
             return crow_lib.action_result(False, "focus", opts.get("pid", ""), "bad --pid or terminal backend", 2)
         sys.exit(__doc__)
-    action = "interrupt" if "--interrupt" in flags else "stop" if "--stop" in flags else "send" if "send" in opts else ""
+    action = next((f[2:] for f in ("--interrupt", "--stop", "--attach") if f in flags), "send" if "send" in opts else "")
     if action:
         if not pid:
             if as_json:
@@ -101,13 +120,15 @@ def main(argv):
             code, msg = interrupt(pid, backend, dry)
         elif action == "stop":
             code, msg = stop(pid, dry)
+        elif action == "attach":
+            code, msg = attach(pid, dry)
         else:
             code, msg = send(pid, opts["send"], backend, dry)
         return report(action, pid, code, msg, as_json)
     account, cwd = opts.get("account"), opts.get("cwd")
     if not account or not cwd:
         sys.exit(__doc__)
-    resume = ["cdx", account, "--dir", cwd, "--resume"] + ([opts["session"]] if opts.get("session") else [])
+    resume = ["cdx", "resume", account, "--project", cwd] + (["--conversation", opts["session"]] if opts.get("session") else [])
     if dry:
         print(f"focus the {backend} window holding pid {pid}, else: {crow_term.print_line(resume, cwd)}")
         return 0
@@ -120,6 +141,11 @@ def main(argv):
         out = crow_term.open_window(resume, f"crow · {os.path.basename(cwd)}", cwd, crow_term.clean_env(), backend=backend)
     except (OSError, subprocess.CalledProcessError) as e:
         sys.exit(f"crow-focus: could not open a {backend} window ({e})")
+    if out.startswith("tmux "):
+        # Headless backend (core, Nest; item_240): one JSON line naming the detached tmux session.
+        print(json.dumps({"ok": True, "message": f"resumed {os.path.basename(cwd)} on {account}, no window",
+                          "account": account, "tmux": out[5:]}))
+        return 0
     print(f"resuming in a new {backend} window" if out == "opened" else f"run this in a new terminal to resume: {out}")
     return 0
 

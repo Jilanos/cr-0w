@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """crow_term: terminal actions behind one backend (open a window, focus or type into a session's window).
 
-Backends, picked by CROW_TERMINAL (kitty, tmux, print) or, when unset, the first that fits:
-  kitty  kitty on PATH. Opens windows with `kitty`, focuses and types through remote control sockets.
-  tmux   inside a tmux session ($TMUX). Opens tmux windows, focuses and types into panes.
-  print  anything else. Prints the command to run in a new terminal; cannot focus or type.
+Backends, picked by CROW_TERMINAL (kitty, tmux, headless, print) or, when unset, the first that fits:
+  kitty     kitty on PATH. Opens windows with `kitty`, focuses and types through remote control sockets.
+  tmux      inside a tmux session ($TMUX). Opens tmux windows, focuses and types into panes.
+  headless  only when named. Opens a detached tmux session (no window); types into its pane.
+            `attach` opens a kitty window on it later. Used by the core for sessions started from Nest.
+  print     anything else. Prints the command to run in a new terminal; cannot focus or type.
 
 As a script (for shell callers such as bin/crow):
   crow_term.py backend
   crow_term.py open --title T [--cwd D] [--set K=V]... -- CMD...
       runs CMD detached from the calling session (clean_env plus the --set vars); on the print
-      backend prints the line to run instead (the --set vars included).
+      backend prints the line to run instead (the --set vars included); on the headless backend
+      prints `tmux <session name>`.
 """
 import glob
 import json
 import os
 import pwd
+import re
 import shlex
 import shutil
 import subprocess
 import sys
 import time
 
-BACKENDS = ("kitty", "tmux", "print")
+BACKENDS = ("kitty", "tmux", "headless", "print")
 
 
 class UnknownBackend(SystemExit):
@@ -190,6 +194,67 @@ def tmux_open_args(argv, title, cwd=None, env=None):
             *(wrap + argv if len(wrap) > 1 else argv)]
 
 
+# Prefix of the tmux sessions the headless backend opens.
+HEADLESS_PREFIX = "crow-"
+
+
+def headless_name(title, now=None):
+    """tmux session name for a headless open: crow-<title word>-<HHMMSS>, safe for tmux targets."""
+    word = "".join(c if c.isalnum() or c == "-" else "-" for c in title.lower()).strip("-")
+    word = "-".join(w for w in word.split("-") if w and w != "crow")[:24].strip("-") or "session"
+    return f"{HEADLESS_PREFIX}{word}-{time.strftime('%H%M%S', time.localtime(now))}"
+
+
+def headless_open_args(argv, name, cwd=None, env=None, cols=200, rows=50):
+    """tmux new-session -d running argv. Under a systemd service (INVOCATION_ID set) it runs in its own
+    user scope, so a tmux server it starts outlives a restart of the service."""
+    added, removed = env_changes(env)
+    added.pop("PATH", None)
+    wrap = ["env", *(a for k in removed for a in ("-u", k)), *(f"{k}={v}" for k, v in sorted(added.items()))]
+    cmd = ["tmux", "new-session", "-d", "-s", name, "-x", str(cols), "-y", str(rows), *(["-c", cwd] if cwd else []),
+           *(wrap + argv if len(wrap) > 1 else argv)]
+    return own_scope(cmd)
+
+
+def own_scope(cmd):
+    """Under a systemd service (INVOCATION_ID set), run cmd in its own user scope so it outlives a
+    restart of the service (the core's cgroup is killed whole)."""
+    if os.environ.get("INVOCATION_ID") and shutil.which("systemd-run"):
+        return ["systemd-run", "--user", "--scope", "--quiet", "--collect", *cmd]
+    return cmd
+
+
+def tmux_session_of(pane):
+    """tmux session name holding pane, else None."""
+    try:
+        r = subprocess.run(["tmux", "display-message", "-p", "-t", pane, "#{session_name}"], check=False,
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.strip() or None if r.returncode == 0 else None
+
+
+def tmux_sessions_by_pid():
+    """{pane pid: tmux session name} over every pane of the default server; {} without one."""
+    try:
+        r = subprocess.run(["tmux", "list-panes", "-a", "-F", "#{pane_pid} #{session_name}"], check=False,
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    out = {}
+    for line in r.stdout.splitlines() if r.returncode == 0 else []:
+        pid, _, name = line.partition(" ")
+        if pid.isdigit() and name:
+            out.setdefault(int(pid), name)
+    return out
+
+
+def tmux_session_for(pid, panes=None, proc="/proc"):
+    """tmux session holding pid or its nearest ancestor, else None. panes: tmux_sessions_by_pid()."""
+    panes = tmux_sessions_by_pid() if panes is None else panes
+    return next((panes[p] for p in ancestors(pid, proc) if p in panes), None) if panes else None
+
+
 def tmux_send_args(pane, text):
     """tmux commands that type text, then press Enter. Several lines go through a paste buffer
     (bracketed when the app asked for it, LF kept) so a line break never submits."""
@@ -221,7 +286,130 @@ def open_window(argv, title, cwd=None, env=None, show_env=(), backend=None):
         subprocess.run(tmux_open_args(argv, title, cwd, env), check=True, env=env,
                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return "opened"
+    if backend == "headless":
+        name = headless_name(title)
+        subprocess.run(headless_open_args(argv, name, cwd, env), check=True, env=env,
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        return f"tmux {name}"
     return print_line(argv, cwd, env, show_env)
+
+
+def attach(pid):
+    """Open a kitty window attached to the tmux session holding pid. Closing the window detaches;
+    the session keeps running. ("attached", session), ("kitty", None) when pid already has a kitty
+    window (focused instead), else (None, reason)."""
+    if hit := kitty_locate(pid):
+        subprocess.run(["kitten", "@", "--to", hit[0], "focus-window", "--match", f"id:{hit[1]}"], check=True)
+        return "kitty", None
+    pane = tmux_locate(pid)
+    name = tmux_session_of(pane) if pane else None
+    if not name:
+        return None, f"no tmux session holds pid {pid}"
+    if not shutil.which("kitty"):
+        return None, "kitty is not on PATH"
+    # Nest's Terminal tab may have fixed the size; let the attached window size it again.
+    subprocess.run(["tmux", "set-option", "-w", "-t", name, "window-size", "latest"], check=False, capture_output=True, timeout=5)
+    detach(own_scope(kitty_open_args(["tmux", "attach-session", "-t", name], f"crow · {name}")), clean_env())
+    return "attached", name
+
+
+# Nest Terminal tab (item_240): the screen of the tmux pane holding a session, keys typed into
+# it, and its size. Keys are named tmux keys from KEYS or literal text, nothing else.
+KEYS = {"Enter", "Escape", "BSpace", "Tab", "BTab", "Up", "Down", "Left", "Right", "Home", "End",
+        "PPage", "NPage", "DC", "IC", "Space", *(f"C-{c}" for c in "abcdefghijklmnopqrstuvwxyz")}
+SCREEN_FMT = "#{cursor_x} #{cursor_y} #{pane_width} #{pane_height} #{cursor_flag}"
+
+
+# Scrollback lines the Terminal tab gets above the screen.
+HISTORY = 500
+
+
+def with_history(scr, lines, rows):
+    """scr with lines cut to HISTORY lines of scrollback plus the screen, and history = how many
+    lines come before the screen (the cursor y counts from the screen's top)."""
+    lines = lines[-(HISTORY + rows):] if rows else lines
+    return {**scr, "lines": lines, "history": max(0, len(lines) - rows)}
+
+
+def screen_of(pane, run=subprocess.run):
+    """{lines (ANSI), history, cols, rows, cursor: {x, y, shown}} of a tmux pane, else None."""
+    cap = run(["tmux", "capture-pane", "-p", "-e", "-N", "-S", f"-{HISTORY}", "-t", pane], capture_output=True, text=True, timeout=5)
+    meta = run(["tmux", "display-message", "-p", "-t", pane, SCREEN_FMT], capture_output=True, text=True, timeout=5)
+    if cap.returncode or meta.returncode:
+        return None
+    x, y, cols, rows, shown = (int(v) for v in meta.stdout.split())
+    lines = cap.stdout.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return with_history({"cols": cols, "rows": rows, "cursor": {"x": x, "y": y, "shown": bool(shown)}}, lines, rows)
+
+
+def keys_args(pane, keys):
+    """tmux commands for keys: a list of {"key": name} (from KEYS) or {"text": str}. ValueError on others."""
+    if not isinstance(keys, list) or not keys or len(keys) > 200:
+        raise ValueError("keys: a list of 1 to 200 items")
+    out = []
+    for k in keys:
+        if isinstance(k, dict) and set(k) == {"key"} and k["key"] in KEYS:
+            out.append(["tmux", "send-keys", "-t", pane, k["key"]])
+        elif isinstance(k, dict) and set(k) == {"text"} and isinstance(k["text"], str) and 0 < len(k["text"]) <= 4000:
+            out.append(["tmux", "send-keys", "-t", pane, "-l", k["text"]])
+        else:
+            raise ValueError(f"keys: bad item {k!r}")
+    return out
+
+
+def resize_args(pane, cols, rows):
+    """tmux command sizing the window of pane to cols x rows (Nest's Terminal tab)."""
+    if not (20 <= cols <= 400 and 5 <= rows <= 200):
+        raise ValueError("size: cols 20 to 400, rows 5 to 200")
+    return ["tmux", "resize-window", "-t", pane, "-x", str(cols), "-y", str(rows)]
+
+
+# kitty windows (sessions started from a terminal): same screen and keys, read with
+# `kitten @ get-text` and typed with send-text / send-key. The window keeps its own size.
+KITTY_KEYS = {"Enter": "enter", "Escape": "escape", "BSpace": "backspace", "Tab": "tab", "BTab": "shift+tab",
+              "Up": "up", "Down": "down", "Left": "left", "Right": "right", "Home": "home", "End": "end",
+              "PPage": "page_up", "NPage": "page_down", "DC": "delete", "IC": "insert", "Space": "space",
+              **{f"C-{c}": f"ctrl+{c}" for c in "abcdefghijklmnopqrstuvwxyz"}}
+# --add-cursor ends the text with the cursor shown/hidden, its position (1-based) and its blink mode.
+KITTY_CURSOR = re.compile(r"\x1b\[\?25([hl])\x1b\[(\d+);(\d+)H(?:\x1b\[\?12[hl])?\n?$")
+
+
+def kitty_screen_of(sock, wid, run=subprocess.run):
+    """{lines (ANSI), history, cols, rows, cursor: {x, y, shown}} of a kitty window, else None."""
+    to = ["kitten", "@", "--to", sock]
+    txt = run([*to, "get-text", "--match", f"id:{wid}", "--ansi", "--add-cursor", "--extent", "all"],
+              capture_output=True, text=True, timeout=5)
+    ls = run([*to, "ls", "--match", f"id:{wid}"], capture_output=True, text=True, timeout=5)
+    if txt.returncode or ls.returncode:
+        return None
+    try:
+        win = next(w for o in json.loads(ls.stdout) for t in o.get("tabs", []) for w in t.get("windows", []) if w.get("id") == wid)
+    except (ValueError, StopIteration):
+        return None
+    text, cursor = txt.stdout, {"x": 0, "y": 0, "shown": False}
+    if m := KITTY_CURSOR.search(text):
+        text = text[:m.start()]
+        cursor = {"x": int(m.group(3)) - 1, "y": int(m.group(2)) - 1, "shown": m.group(1) == "h"}
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    rows = win.get("lines", 0)
+    return with_history({"cols": win.get("columns", 0), "rows": rows, "cursor": cursor}, lines, rows)
+
+
+def kitty_keys_args(sock, wid, keys):
+    """kitten commands for keys (same items as keys_args). Text is sent literally: send-text reads
+    Python escapes, so backslashes are doubled."""
+    to = ["kitten", "@", "--to", sock]
+    out = []
+    for k in keys_args("-", keys):
+        if k[-2] == "-l":
+            out.append([*to, "send-text", "--match", f"id:{wid}", "--", k[-1].replace("\\", "\\\\")])
+        else:
+            out.append([*to, "send-key", "--match", f"id:{wid}", KITTY_KEYS[k[-1]]])
+    return out
 
 
 def focus(pid, backend=None):
@@ -243,7 +431,7 @@ def locate(pid, backend=None):
     backend = backend or choose()
     if backend == "kitty" and (hit := kitty_locate(pid)):
         return "kitty", hit
-    if backend in ("kitty", "tmux") and (pane := tmux_locate(pid)):
+    if backend in ("kitty", "tmux", "headless") and (pane := tmux_locate(pid)):
         return "tmux", pane
     return None
 

@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""crow-screen: the screen of a session, for Nest's Terminal tab (item_240).
+
+  crow-screen show --pid PID              {ok, lines, cols, rows, cursor: {x, y, shown}}
+  crow-screen keys --pid PID --keys JSON  JSON: [{"key": "Enter"} | {"text": "abc"}, ...]
+  crow-screen resize --pid PID --cols C --rows R
+
+Finds the tmux pane running PID or an ancestor, else its kitty window. Each call prints one JSON
+line. Exit 0 done, 1 refused (no pane or window holds PID, bad keys or size), 2 error (tmux or
+kitty failed). Keys are tmux key names from crow_term.KEYS or literal text; nothing else is sent.
+A kitty window keeps its own size: resize answers ok and changes nothing.
+"""
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_term  # noqa: E402
+
+
+def out(ok, code, **kw):
+    print(json.dumps({"ok": ok, "code": code, **kw}))
+    return code
+
+
+def main(argv):
+    if not argv or argv[0] not in ("show", "keys", "resize"):
+        sys.exit(__doc__)
+    verb, opts = argv[0], {}
+    for i in range(1, len(argv) - 1, 2):
+        opts[argv[i].lstrip("-")] = argv[i + 1]
+    try:
+        pid = int(opts.get("pid", ""))
+    except ValueError:
+        return out(False, 2, message="--pid is required")
+    pane = crow_term.tmux_locate(pid)
+    win = None if pane else crow_term.kitty_locate(pid)
+    if not pane and not win:
+        return out(False, 1, message=f"no tmux pane or kitty window holds pid {pid}")
+    tool = "tmux" if pane else "kitty"
+    try:
+        if verb == "show":
+            scr = crow_term.screen_of(pane) if pane else crow_term.kitty_screen_of(*win)
+            return out(True, 0, message="screen", **scr) if scr else out(False, 2, message=f"{tool} capture failed")
+        try:
+            if verb == "keys":
+                keys = json.loads(opts.get("keys", ""))
+                cmds = crow_term.keys_args(pane, keys) if pane else crow_term.kitty_keys_args(*win, keys)
+            else:
+                cmds = [crow_term.resize_args(pane or "-", int(opts.get("cols", "")), int(opts.get("rows", "")))]
+        except ValueError as e:
+            return out(False, 1, message=str(e))
+        if verb == "resize" and not pane:
+            return out(True, 0, message="kept the kitty window size")
+        for c in cmds:
+            subprocess.run(c, check=True, capture_output=True, timeout=5)
+        return out(True, 0, message="sent" if verb == "keys" else "resized")
+    except (OSError, subprocess.SubprocessError) as e:
+        return out(False, 2, message=f"{tool} failed ({e})")
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

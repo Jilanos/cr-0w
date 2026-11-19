@@ -21,8 +21,20 @@ const NO_SECTIONS = Object.fromEntries(
   SCRIPT_SECTIONS.map((n) => [n, { data: null, stale: true, error: 'not loaded yet', updated_at: null }]),
 ) as Record<SectionName, SectionBody>
 
+// One failing section (an older core without it, a script error) shows that panel empty and
+// stale; only missions and inbox decide that the core is down. A repeat failure reuses the
+// stale body so the snapshot does not churn.
+async function readSection(src: DataSource, n: SectionName, prev: SectionBody | undefined): Promise<SectionBody> {
+  try {
+    return await src.section(n)
+  } catch (e) {
+    if (prev?.stale && prev.error) return prev
+    return { ...(prev ?? NO_SECTIONS[n]), stale: true, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 async function readSections(src: DataSource, prev: Record<SectionName, SectionBody> | undefined) {
-  const bodies = await Promise.all(SCRIPT_SECTIONS.map((n) => src.section(n)))
+  const bodies = await Promise.all(SCRIPT_SECTIONS.map((n) => readSection(src, n, prev?.[n])))
   if (prev && bodies.every((b, i) => prev[SCRIPT_SECTIONS[i]] === b)) return prev
   return Object.fromEntries(SCRIPT_SECTIONS.map((n, i) => [n, bodies[i]])) as Record<SectionName, SectionBody>
 }

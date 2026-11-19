@@ -5,6 +5,7 @@ import stateAgenda from '../../fixtures/states/agenda.json'
 import stateLive from '../../fixtures/states/live.json'
 import stateWork from '../../fixtures/states/work.json'
 import { ApiError } from './api'
+import { fixtureButler, type ButlerMsg } from './butler'
 import type { ChatTarget, ConversationPage, Entry, PageAsk } from './conversation'
 import type { Actions, Dispatch, LiveReply } from './live'
 import type { DataSource } from './source'
@@ -77,11 +78,46 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       const a = drop(pid)
       return reply('stop', String(pid), { account: a.account, project: a.project })
     },
+    async attach(pid) {
+      const a = dispatch().agents.find((x) => x.pid === pid)
+      if (!a) throw new ApiError(404, `no agent with pid ${pid}`)
+      return reply('attach', String(pid), { account: a.account, project: a.project, message: a.tmux ? `opened a terminal on tmux session ${a.tmux}` : 'focused its window' })
+    },
+    // A fixed claude screen with colors; keys and resize only check the target (sessions, not runs).
+    async screen(pid) {
+      const a = agent(pid)
+      if (a.kind === 'run') throw new ApiError(409, `${pid} is a background run, it has no screen`)
+      const lines = ['\x1b[38;5;174m╭───────────────────────────────╮\x1b[39m', `\x1b[38;5;174m│\x1b[39m \x1b[1m${a.project}\x1b[22m on ${a.account}`, '\x1b[38;5;174m╰───────────────────────────────╯\x1b[39m', '', '\x1b[2m> \x1b[22m']
+      return { lines, cols: 80, rows: 24, cursor: { x: 2, y: 4, shown: true } }
+    },
+    async keys(pid) {
+      if (agent(pid).kind === 'run') throw new ApiError(409, `${pid} is a background run, it has no screen`)
+      return { ok: true }
+    },
+    async resize(pid) {
+      if (agent(pid).kind === 'run') throw new ApiError(409, `${pid} is a background run, it has no screen`)
+      return { ok: true }
+    },
     async stopRun(run) {
       const a = dispatch().agents.find((x) => x.run_id === run)
       if (!a) throw new ApiError(404, `no running dispatch run ${run}`)
       drop(a.pid)
       return reply('run-stop', run, { account: a.account, project: a.project })
+    },
+    async retryRun(run) {
+      const d = dispatch()
+      const f = (d.finished ?? []).find((x) => x.run_id === run)
+      if (!f) throw new ApiError(404, `no finished run "${run}"`)
+      if (d.slots.busy >= d.slots.max) throw new ApiError(409, `too_many_runs: ${d.slots.busy} runs already running`)
+      const id = `r${String(d.agents.length).padStart(7, '0')}`
+      const account = f.account ?? 'work'
+      set('dispatch', {
+        ...d,
+        slots: { ...d.slots, busy: d.slots.busy + 1 },
+        finished: (d.finished ?? []).filter((x) => x !== f),
+        agents: [...d.agents, { kind: 'run', pid: 9500 + d.agents.length, account, project: f.project, cwd: `/src/${f.project}.wt/${f.label ?? run}`, run_id: id, label: f.label ?? run, title: f.label ?? run, state: 'working', started_at: now.toISOString() }],
+      })
+      return reply('run-retry', run, { account, project: f.project, run_id: id, message: `retried ${run} as ${id}` })
     },
     async resume(id, account) {
       const rows = (data.sessions as { sessions: Array<{ conversation_id: string; account: string; project: string }> }).sessions
@@ -89,8 +125,16 @@ function fixtureActions(data: LiveData, bodies: Map<SectionName, SectionBody>, n
       if (!r) throw new ApiError(404, `no session "${id}"`)
       return reply('resume', id, { account: account ?? r.account, project: r.project, message: `resumed ${r.project}` })
     },
+    // A headless start (item_188): the session shows up at once with its tmux session.
     async start(s) {
-      return reply('start', s.project, { text: s.prompt, account: s.account ?? 'main', project: s.project, message: `opened a window on ${s.project}` })
+      const d = dispatch()
+      const account = s.account ?? 'main'
+      const tmux = `crow-${s.project}-${String(d.agents.length).padStart(6, '0')}`
+      set('dispatch', {
+        ...d,
+        agents: [...d.agents, { kind: 'session', pid: 8000 + d.agents.length, account, project: s.project, cwd: `/src/${s.project}`, state: 'working', started_at: now.toISOString(), last_prompt: s.prompt ?? null, tmux }],
+      })
+      return reply('start', s.project, { text: s.prompt, account, project: s.project, message: `started ${s.project} on ${account}, no window`, tmux })
     },
     async dispatch(r) {
       const d = dispatch()
@@ -153,6 +197,26 @@ function fixtureChats(known: (t: ChatTarget) => void) {
   return { page, said }
 }
 
+// The exchange the desk-rail-a board draws (item_176).
+const BUTLER_SEED: ButlerMsg[] = [
+  { seq: 1, ts: '2026-11-09T14:20:00Z', role: 'you', text: 'Start a review of !224 lambda', surface: 'nest' },
+  { seq: 2, ts: '2026-11-09T14:20:00Z', role: 'crow', text: 'Review mission started for !224, Sir. It runs on main.', account: 'main',
+    chips: [{ label: 'Open mission', href: '/missions/20261109-build-mr-pipeline-badge' }] },
+  { seq: 3, ts: '2026-11-09T14:31:00Z', role: 'you', text: "What's running?", surface: 'nest' },
+  { seq: 4, ts: '2026-11-09T14:31:00Z', role: 'crow', text: 'Two sessions and one run, Sir. S1 Nest waits on you for a Bash approval. The infra push run failed: token rotation.', account: 'main',
+    chips: [{ label: 'Open S1', href: '/desk' }, { label: 'Allow in Inbox', href: '/inbox' }, { label: 'Show failure', href: '/missions/20261109-fix-push-token-refresh' }] },
+  { seq: 5, ts: '2026-11-09T14:33:00Z', role: 'you', text: 'Why did the token rotation fail?', surface: 'nest' },
+  { seq: 6, ts: '2026-11-09T14:33:00Z', role: 'tool', text: 'read run log · infra push · 2 files' },
+  { seq: 7, ts: '2026-11-09T14:34:00Z', role: 'crow', text: 'The refresh call got a 401, Sir. The deploy key expired yesterday at 18:00. A new key in the vault fixes it; the run can retry after that.', account: 'main',
+    chips: [{ label: 'Show failure', href: '/missions/20261109-fix-push-token-refresh' }] },
+  { seq: 8, ts: '2026-11-09T14:36:00Z', role: 'you', text: 'ok rotate it and retry', surface: 'nest' },
+  { seq: 9, ts: '2026-11-09T14:36:00Z', role: 'crow', text: 'That needs your OK on infra, Sir. I put the request in your Inbox.', account: 'main',
+    chips: [{ label: 'Allow in Inbox', href: '/inbox' }] },
+  { seq: 10, ts: '2026-11-09T14:40:00Z', role: 'you', text: 'what is left for today?', surface: 'nest' },
+  { seq: 11, ts: '2026-11-09T14:40:00Z', role: 'crow', text: 'Three things, Sir. The management weekly at 15:00, its prep is ready. Two reviews wait on you: !226 and !231. Sprint planning prep is due at 17:30.', account: 'main',
+    chips: [{ label: 'Open prep', href: '/agenda' }, { label: 'Open reviews', href: '/mrs' }] },
+]
+
 export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[] = INBOX, now: Date = NOW, agenda: AgendaEvent[] = AGENDA, live: LiveData = LIVE): DataSource {
   const data: LiveData = structuredClone(live)
   // One body object per section version, so unchanged sections keep their reference.
@@ -184,6 +248,7 @@ export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[]
     conversation: chats.page,
     actions,
     now: () => now,
+    butler: fixtureButler(now, BUTLER_SEED),
   }
 }
 

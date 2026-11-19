@@ -1,5 +1,5 @@
 import type { Snapshot } from './feed'
-import { registryOf, type Agent, type Mail, type RegProject, type Resumable } from './live'
+import { registryOf, type Agent, type Mail, type ReadyItem, type RegProject, type Resumable } from './live'
 import { projectOfAgent, projectOfCwd } from '../hero/model'
 import type { InboxItem, Mission, SectionBody } from './types'
 import { workOf, type WorkItem } from './work'
@@ -87,7 +87,7 @@ const mailIn = (b: SectionBody, key: string, side: Side, mode: ScopeMode) =>
 // MRs and the Today calendar are not per project and stay whole.
 export function scopeSnapshot(s: Snapshot, mode: ScopeMode): Snapshot {
   if (mode === 'all') return s
-  const { projects, dispatch, sessions, today, work } = s.sections
+  const { projects, dispatch, sessions, today, work, ready } = s.sections
   const registry = arr<RegProject>(projects, 'projects')
   const reg = registryOf(projects)
   const items = workOf(work)
@@ -104,6 +104,7 @@ export function scopeSnapshot(s: Snapshot, mode: ScopeMode): Snapshot {
       projects: withLists(projects, { projects: registry.filter((p) => keep(mode, projectSide(p.name, registry))) }),
       dispatch: withLists(dispatch, { agents: f.agents }),
       sessions: withLists(sessions, { sessions: f.parked }),
+      ready: withLists(ready, { items: arr<ReadyItem>(ready, 'items').filter((i) => keep(mode, projectSide(i.project, reg))) }),
       work: items ? { ...work, data: items.filter((w) => keep(mode, workSide(w, reg, s.missions))) } : work,
       today: withLists(today, {
         flagged: mailIn(today, 'flagged', TODAY_MAIL_SIDE, mode),

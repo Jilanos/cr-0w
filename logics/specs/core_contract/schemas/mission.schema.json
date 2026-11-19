@@ -38,7 +38,8 @@
     "worktree": {"type": ["string", "null"]},
     "mr": {"type": ["string", "null"]},
     "created": {"type": "string", "format": "date-time"},
-    "updated": {"type": "string", "format": "date-time"}
+    "updated": {"type": "string", "format": "date-time"},
+    "linked": {"type": "boolean", "description": "Set in the missions section: the mission groups a handoff or a dispatch and has no core run. Absent otherwise."}
   },
   "$defs": {
     "gates": {"type": "array", "items": {"enum": ["plan", "report", "mockup"]}, "uniqueItems": true},

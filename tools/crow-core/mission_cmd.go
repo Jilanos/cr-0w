@@ -101,7 +101,7 @@ func missionCmd(env mission.Env, args []string, stdout io.Writer) error {
 			}
 			spec.Gates = &g
 		}
-		m, err := env.New(spec)
+		m, err := env.NewLive(spec)
 		if err != nil {
 			return err
 		}

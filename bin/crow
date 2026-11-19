@@ -11,6 +11,7 @@
 #   --account <name> forces one, even the calling session's own account (CROW_ACCOUNT=<name> also
 #   forces one, except when it is only inherited from the calling session). --on-busy fail never asks (scripts).
 #   term, focus and relaunch open windows through CROW_TERMINAL=kitty|tmux|print (unset: kitty, else tmux, else print).
+#   CROW_TERMINAL=headless makes term start a detached tmux session and print one JSON line (core, Nest).
 #   crow work <project>  index of a repo's own tools (skills, CLAUDE.md, hooks) for hub work on it
 # See
 #   crow panel [serve|probe|check-config] [options]   local browser panel (default: serve)
@@ -200,7 +201,12 @@ case "$cmd" in
             pick_account "$(project_scope "$1")"
             line=$(python3 "$CROW_ENGINE/bin/crow_term.py" open --title "crow · $1 · $CROW_ACCOUNT" --set CROW_ACCOUNT="$CROW_ACCOUNT" \
                    -- "$CROW_ENGINE/bin/crow" open ${model[@]+"${model[@]}"} --on-busy "$on_busy" "$@")
-            if [[ -n "$line" ]]; then
+            if [[ "$line" == "tmux "* ]]; then
+              # Headless backend (core, Nest): one JSON line naming the detached tmux session.
+              echo "crow: $1 started on $CROW_ACCOUNT in tmux session ${line#tmux }" >&2
+              jq -nc --arg p "$1" --arg a "$CROW_ACCOUNT" --arg t "${line#tmux }" \
+                '{ok: true, message: "started \($p) on \($a), no window", account: $a, tmux: $t}'
+            elif [[ -n "$line" ]]; then
               echo "crow: no terminal backend (CROW_TERMINAL=kitty|tmux); run this in a new terminal:" >&2
               printf '%s\n' "$line"
             else
