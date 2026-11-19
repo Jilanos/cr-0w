@@ -37,7 +37,7 @@ Record the answers in `local/state/afk/decisions-<today>.md`.
 
 ## 6. Hand over
 Show the owner the queue as a short table (job, account, expected result, stops when) plus the WARNs left. On "go":
-- start the sleep inhibitor printed by the preflight;
+- start `bin/crow-keep-awake` as a background command and check it prints `awake for`;
 - append the start line to `log.md`;
 - orchestrate per `runbooks/afk-runs.md`, rebuilding the morning page after every finished run.
 
