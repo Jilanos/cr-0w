@@ -1,10 +1,8 @@
 package api
 
 import (
-	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -147,7 +145,7 @@ func isoWeek(s string, loc *time.Location) (time.Time, error) {
 }
 
 // afkJobs lists the AFK job prompts waiting in <state>/afk (job-*.md, top level only).
-// The title is the prompt's first line without its heading marks.
+// The title is the file name without "job-" and ".md", order prefix and dashes dropped (job-01-crow-checks.md is "crow checks").
 func afkJobs(state string) []contract.OpsQueued {
 	if state == "" {
 		return nil
@@ -155,22 +153,15 @@ func afkJobs(state string) []contract.OpsQueued {
 	paths, _ := filepath.Glob(filepath.Join(state, "afk", "job-*.md"))
 	var out []contract.OpsQueued
 	for _, p := range paths {
-		out = append(out, contract.OpsQueued{Kind: "afk", ID: filepath.Base(p), Title: firstLine(p)})
+		out = append(out, contract.OpsQueued{Kind: "afk", ID: filepath.Base(p), Title: jobTitle(p)})
 	}
 	return out
 }
 
-func firstLine(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
+func jobTitle(path string) string {
+	n := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "job-"), ".md")
+	if i := strings.IndexByte(n, '-'); i > 0 && strings.Trim(n[:i], "0123456789") == "" {
+		n = n[i+1:] // job order prefix: "01-audit"
 	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		if t := strings.TrimSpace(strings.TrimLeft(sc.Text(), "# ")); t != "" {
-			return t
-		}
-	}
-	return ""
+	return strings.ReplaceAll(n, "-", " ")
 }

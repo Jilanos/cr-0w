@@ -57,6 +57,8 @@ func Build(in Input) contract.Ops {
 			agents, slots = Agents(in.Now, in.Dispatch, in.Sessions, reg)
 		}
 		ls, extra := DayLanes(day, sessions, agents, slots, reg)
+		ls = linkRuns(ls, agents, fin, reg, start)
+		extra = linkRuns(extra, nil, fin, reg, start)
 		for _, i := range lanes.Order(ls) {
 			out.Lanes = append(out.Lanes, lane(in, start, ls[i], agents, fin, runs, routines))
 		}
@@ -100,7 +102,7 @@ func DayLanes(day string, sessions []map[string]any, agents []lanes.Agent, slots
 
 // session cuts one crow-usage session to day: its buckets, bucket tokens, cost and tokens.
 func session(s map[string]any, day string) lanes.Session {
-	out := lanes.Session{ID: str(s, "id"), Account: str(s, "account"), Project: str(s, "project"), Title: str(s, "title"),
+	out := lanes.Session{ID: str(s, "id"), Account: str(s, "account"), Project: repoOf(str(s, "cwd"), str(s, "project")), Title: str(s, "title"),
 		Kind: str(s, "kind"), Branch: str(s, "branch"), BucketTokens: map[int]int{}}
 	for _, m := range list(s, "models") {
 		if v, ok := m.(string); ok {
@@ -195,9 +197,10 @@ func Agents(now time.Time, dispatch, sessions map[string]any, reg lanes.Names) (
 
 // run is one finished crow-runs run.
 type run struct {
-	status  string
-	ended   time.Time
-	commits int
+	status         string
+	ended          time.Time
+	commits        int
+	label, project string
 }
 
 func finished(dispatch map[string]any) map[string]run {
@@ -207,7 +210,71 @@ func finished(dispatch map[string]any) map[string]run {
 		if !ok || str(f, "run_id") == "" {
 			continue
 		}
-		out[str(f, "run_id")] = run{status: str(f, "status"), ended: t, commits: len(list(f, "commits"))}
+		out[str(f, "run_id")] = run{status: str(f, "status"), ended: t, commits: len(list(f, "commits")),
+			label: str(f, "label"), project: str(f, "project")}
+	}
+	return out
+}
+
+// repoOf folds a worktree checkout (<repo>.wt/<name>) into its repo folder name, so the
+// lane groups under the repo. Other sessions keep their project.
+func repoOf(cwd, project string) string {
+	dir := filepath.Dir(filepath.Clean(cwd))
+	if cwd != "" && strings.HasSuffix(dir, ".wt") {
+		return strings.TrimSuffix(filepath.Base(dir), ".wt")
+	}
+	return project
+}
+
+// linkRuns joins each crow-runs run to the session lane its worker wrote: same project and
+// a title equal to the run label. A live run's agent lane folds into that lane, which then
+// follows the agent's state; a finished run ended on the day adds its run id to the keys.
+func linkRuns(ls []lanes.Lane, agents []lanes.Agent, fin map[string]run, reg Names, start time.Time) []lanes.Lane {
+	day := start.Format(time.DateOnly)
+	at := func(project, label string) int {
+		for i, l := range ls {
+			if l.Run && l.Agent < 0 && label != "" && l.Title == label && l.Project == reg.ShortName(project) {
+				return i
+			}
+		}
+		return -1
+	}
+	folded := map[int]bool{}
+	for j, l := range ls {
+		// Only a lane made from a crow-runs agent alone: its key is the run id.
+		if l.Agent < 0 || !l.Run {
+			continue
+		}
+		if a := agents[l.Agent]; a.Group != lanes.GroupRuns || a.Interrupted || a.Session != l.Key || len(l.Cells) > 0 {
+			continue
+		}
+		if i := at(l.Project, agents[l.Agent].Name); i >= 0 {
+			t := &ls[i]
+			t.Keys = append(t.Keys, l.Key)
+			t.Agent, t.State, t.Next, t.NextYou = l.Agent, l.State, l.Next, l.NextYou
+			t.Cwd = or(l.Cwd, t.Cwd)
+			folded[j] = true
+		}
+	}
+	ids := make([]string, 0, len(fin))
+	for id := range fin {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		r := fin[id]
+		if r.ended.In(start.Location()).Format(time.DateOnly) != day {
+			continue
+		}
+		if i := at(r.project, r.label); i >= 0 && !slices.Contains(ls[i].Keys, id) {
+			ls[i].Keys = append(ls[i].Keys, id)
+		}
+	}
+	var out []lanes.Lane
+	for j, l := range ls {
+		if !folded[j] {
+			out = append(out, l)
+		}
 	}
 	return out
 }

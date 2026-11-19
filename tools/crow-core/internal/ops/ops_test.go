@@ -265,3 +265,38 @@ func TestLenientInput(t *testing.T) {
 		t.Fatalf("nil lists: %+v", o)
 	}
 }
+
+// A crow-runs worker writes its session in <repo>.wt/<label>. That session lane groups
+// under the repo, takes the run id as a key, and follows the live agent of its run.
+func TestRunLinksToWorktreeSession(t *testing.T) {
+	in := input(t, "2026-11-10")
+	in.Usage = decode(t, `{"sessions": [
+ {"id": "w1", "account": "personal", "project": "item-9-ops", "cwd": "/p/cr-0w.wt/item-9-ops", "title": "item-9-ops", "kind": "run",
+  "branch": "item-9-ops", "activity": {"2026-11-10": [40, 41]}, "by_day": {"2026-11-10": {"cost_usd": 0.5, "tokens": 10}}},
+ {"id": "w2", "account": "personal", "project": "item-8-docs", "cwd": "/p/cr-0w.wt/item-8-docs", "title": "item-8-docs", "kind": "run",
+  "activity": {"2026-11-10": [30]}, "by_day": {"2026-11-10": {"cost_usd": 0.2, "tokens": 5}}},
+ {"id": "w3", "account": "personal", "project": "item-9-ops", "cwd": "/p/cr-0w.wt/item-9-ops", "title": "item-9-ops-2", "kind": "run",
+  "activity": {"2026-11-10": [20]}, "by_day": {"2026-11-10": {"cost_usd": 0.1, "tokens": 5}}}]}`)
+	in.Sessions = decode(t, `{"sessions": [{"conversation_id": "w3", "project": "item-9-ops", "last_event": "2026-11-10T08:00:00+01:00"}]}`)
+	in.Dispatch = decode(t, `{"slots": {"busy": 1, "max": 2},
+ "agents": [{"kind": "run", "state": "working", "run_id": "aa11", "label": "item-9-ops", "project": "cr-0w",
+  "account": "personal", "started_at": "2026-11-10T06:40:00+01:00", "last_activity_s": 10}],
+ "finished": [{"run_id": "bb22", "status": "failed", "label": "item-8-docs", "project": "cr-0w",
+  "ended_at": "2026-11-10T05:15:00+01:00", "commits": ["c"]}]}`)
+	o := Build(in)
+	if len(o.Lanes) != 3 {
+		t.Fatalf("want 2 lanes, got %+v", o.Lanes)
+	}
+	live := byID(t, o, "2026-11-10", "w1")
+	if live.Project != "crow" || live.State != lanes.Run || !slices.Equal(live.Keys, []string{"w1", "aa11"}) {
+		t.Errorf("live run lane %+v", live)
+	}
+	// An interrupted session in the same worktree keeps its own lane.
+	if p := byID(t, o, "2026-11-10", "w3"); p.State != lanes.Paused || len(p.Keys) != 1 {
+		t.Errorf("paused lane %+v", p)
+	}
+	done := byID(t, o, "2026-11-10", "w2")
+	if done.Project != "crow" || done.State != "failed" || done.Commits != 1 || !slices.Equal(done.Keys, []string{"w2", "bb22"}) {
+		t.Errorf("finished run lane %+v", done)
+	}
+}

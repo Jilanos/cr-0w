@@ -1,5 +1,5 @@
 {
-  "version": "5e4ee41719a9a433",
+  "version": "4e38e679a2fa9d84",
   "sections": {
     "accounts": {
       "section": "accounts",
@@ -324,7 +324,7 @@
     },
     "ops": {
       "section": "ops",
-      "version": "09f1078803948a0d",
+      "version": "296b7d7a03eac70c",
       "updated_at": "2026-11-10T09:00:00Z",
       "data": {
         "day": "2026-11-10",
@@ -362,7 +362,7 @@
           {
             "kind": "afk",
             "id": "job-01-audit.md",
-            "title": "Audit the runbooks"
+            "title": "audit"
           }
         ],
         "totals": [

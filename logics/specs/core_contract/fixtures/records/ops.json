@@ -49,7 +49,7 @@
   "queue": [
     {"kind": "mission", "id": "m-20261110-1", "project": "crow", "title": "Refresh the docs index"},
     {"kind": "routine", "id": "crow-brief.timer", "title": "crow-brief.service", "next": "2026-11-11T07:00:00Z"},
-    {"kind": "afk", "id": "job-01-audit.md", "title": "Audit the runbooks"}
+    {"kind": "afk", "id": "job-01-audit.md", "title": "audit"}
   ],
   "totals": [
     {"by": "project", "name": "crow", "lanes": 2, "active_s": 4200, "wait_s": 600, "stuck": 1, "failed": 0, "cost_usd": 1.65, "tokens": 510000},
