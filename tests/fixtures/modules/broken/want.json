@@ -1,0 +1,8 @@
+{
+  "on": ["afk", "core", "core-api", "deck", "forge", "git", "mail", "nest", "releases", "retro", "team", "vault"],
+  "config": {
+    "afk": {}, "core": {}, "core-api": {}, "deck": {}, "forge": {"hosts": {}}, "git": {}, "mail": {},
+    "nest": {"core_url": "http://127.0.0.1:8787"}, "releases": {}, "retro": {}, "team": {}, "vault": {}
+  },
+  "errors": [""]
+}

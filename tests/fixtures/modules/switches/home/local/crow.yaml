@@ -1,0 +1,15 @@
+# local/crow.yaml in a checkout. YAML 1.1 words switch bricks the same way in Python and Go.
+version: 1
+modules:
+  design: true
+  mail: false
+  team: off
+  afk:
+    on: no
+  retro: yes
+  forge:
+    hosts:
+      gitlab.example.com: gitlab
+  nest:
+    on: true
+    core_url: http://127.0.0.1:9999

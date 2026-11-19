@@ -16,6 +16,7 @@ scripts:
   - crow-isolation-probe
   - crow_lib.py
   - crow-memory
+  - crow-modules
   - crow-open
   - crow-project
   - crow-prompt

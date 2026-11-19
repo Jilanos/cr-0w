@@ -1,0 +1,8 @@
+{
+  "on": ["core", "core-api", "deck", "design", "forge", "git", "nest", "releases", "retro", "vault"],
+  "config": {
+    "core": {}, "core-api": {}, "deck": {}, "design": {}, "forge": {"hosts": {"gitlab.example.com": "gitlab"}},
+    "git": {}, "nest": {"core_url": "http://127.0.0.1:9999"}, "releases": {}, "retro": {}, "vault": {}
+  },
+  "errors": []
+}

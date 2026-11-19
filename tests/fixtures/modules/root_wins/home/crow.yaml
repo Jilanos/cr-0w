@@ -1,0 +1,4 @@
+# crow.yaml at the CROW_HOME root wins over local/crow.yaml.
+version: 1
+modules:
+  vault: false

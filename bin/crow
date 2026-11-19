@@ -41,6 +41,7 @@
 #   crow projects [...]  release tracks: roadmap progress toward public releases
 #   crow release propose  draft the next version and notes from commits since the last tag (no tagging)
 #   crow doctor [--json] identity, accounts, profiles, stale worktrees (read only)
+#   crow modules [json]  which bricks are on: engine manifests plus crow.yaml (read only)
 #   crow version         version, engine path and data dir (CROW_HOME)
 #   crow update [--check] [--to X.Y.Z]  update the engine the way it was installed (never the data dir)
 #   crow secret set|get|list|rm <service> [--user U]   service tokens in the keyring (see runbooks/service-tokens.md)
@@ -60,6 +61,7 @@ case "${1:-}" in
   version|--version) echo "crow $(cat "$CROW_ENGINE/VERSION" 2>/dev/null || echo unknown)"
                      echo "engine: $CROW_ENGINE"; echo "data:   $CROW_HOME"; exit 0 ;;
   update) shift; exec "$CROW_ENGINE/bin/crow-update" "$@" ;;
+  modules) shift; export CROW_HOME; exec "$CROW_ENGINE/bin/crow-modules" "$@" ;;
 esac
 # launch() gives a session its account as CROW_SESSION_ACCOUNT, so a CROW_ACCOUNT seen here is a choice.
 # Sessions started before that inherit CROW_ACCOUNT: there it is dropped when it names the session's own

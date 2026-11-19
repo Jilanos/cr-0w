@@ -1,5 +1,7 @@
 # `local/` is its own private repo (private config and state), never part of this one.
 local/
+# Test homes for the crow.yaml loader carry a fake local/crow.yaml.
+!tests/fixtures/modules/*/*/local/
 .claude/settings.local.json
 *.bak
 tools/crow-watch/crow-watch

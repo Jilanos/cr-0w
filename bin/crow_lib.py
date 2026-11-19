@@ -1029,3 +1029,110 @@ def action_result(ok, action, target, message, code=None):
     print(json.dumps({"schema": ACTION_SCHEMA, "ok": ok, "action": action, "target": str(target), "message": message,
                       "code": code}))
     return code
+
+
+# Bricks (adr_002): engine manifests in modules/<brick>.yaml, owner switches in crow.yaml.
+CORE_BRICK = "core"
+YAML11_BOOLS = {"y": True, "yes": True, "on": True, "true": True, "n": False, "no": False, "off": False,
+                "false": False}
+
+
+def engine_manifests(engine=None):
+    """Engine module manifests, brick name -> manifest dict, read from <engine>/modules/*.yaml."""
+    import yaml
+    out = {}
+    for path in sorted(glob.glob(os.path.join(engine or ENGINE, "modules", "*.yaml"))):
+        with open(path) as f:
+            m = yaml.safe_load(f) or {}
+        out[m.get("name") or os.path.basename(path)[:-5]] = m
+    return out
+
+
+def crow_yaml_path(home=None):
+    """crow.yaml at the CROW_HOME root when present, else local/crow.yaml (a checkout)."""
+    home = home or data_home()
+    root = os.path.join(home, "crow.yaml")
+    return root if os.path.exists(root) else os.path.join(home, "local", "crow.yaml")
+
+
+def _switch(v):
+    """A brick switch as a bool, None when it is not one. YAML 1.1 words count, as in the Go loader."""
+    if isinstance(v, bool):
+        return v
+    return YAML11_BOOLS.get(v.lower()) if isinstance(v, str) else None
+
+
+def load_modules(home=None, engine=None):
+    """Merge the adr_002 defaults, crow.yaml and the engine manifests.
+
+    Returns {file, exists, modules: {brick: {on, default, config}}, errors: [{file, key, error}]}.
+    A broken file or key is listed in errors and keeps the default; `core` stays on."""
+    import yaml
+    manifests = engine_manifests(engine)
+    path = crow_yaml_path(home)
+    mods = {n: {"on": bool(m.get("default")) or n == CORE_BRICK, "default": bool(m.get("default")),
+                "config": dict(m.get("config") or {})} for n, m in manifests.items()}
+    errors = []
+
+    def err(key, msg):
+        errors.append({"file": path, "key": key, "error": msg})
+
+    data = None
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError:
+        pass
+    except yaml.YAMLError as e:
+        err("", f"does not parse: {str(e).splitlines()[0]}")
+    if data is not None and not isinstance(data, dict):
+        err("", "expects a mapping with version and modules")
+        data = None
+    for k in sorted(str(k) for k in (data or {}) if k not in ("version", "modules")):
+        err(k, "unknown key (expected version, modules)")
+    if data and "version" in data and data["version"] != 1:
+        err("version", f"unsupported version {data['version']!r} (expected 1)")
+    given = (data or {}).get("modules")
+    if given is not None and not isinstance(given, dict):
+        err("modules", "expects a mapping of brick to true, false or a mapping")
+        given = None
+    for name, val in (given or {}).items():
+        name = str(name)
+        key = f"modules.{name}"
+        if name not in mods:
+            err(key, f"unknown brick (known: {', '.join(sorted(mods))})")
+            continue
+        on, conf = _switch(val), {}
+        if on is None and isinstance(val, dict):
+            for k, v in val.items():
+                k = "on" if k is True else str(k)
+                if k == "on":
+                    on = _switch(v)
+                    if on is None:
+                        err(f"{key}.on", "expects true or false")
+                elif k not in mods[name]["config"]:
+                    allowed = ", ".join(["on", *sorted(mods[name]["config"])])
+                    err(f"{key}.{k}", f"unknown key (allowed: {allowed})")
+                else:
+                    conf[k] = v
+            if on is None:
+                on = mods[name]["on"]
+        elif on is None:
+            err(key, "expects true, false or a mapping with on and config keys")
+            continue
+        if name == CORE_BRICK and not on:
+            err(key, "core is always on")
+            on = True
+        mods[name]["on"] = on
+        mods[name]["config"].update(conf)
+    for name in sorted(mods):
+        for req in manifests[name].get("requires") or []:
+            if mods[name]["on"] and not mods.get(req, {}).get("on"):
+                err(f"modules.{name}", f"requires {req}, which is off")
+    errors.sort(key=lambda e: (e["key"], e["error"]))
+    return {"file": path, "exists": os.path.exists(path), "modules": mods, "errors": errors}
+
+
+def modules(home=None, engine=None):
+    """The on set with config: brick -> config dict for every brick that is on."""
+    return {n: m["config"] for n, m in load_modules(home, engine)["modules"].items() if m["on"]}

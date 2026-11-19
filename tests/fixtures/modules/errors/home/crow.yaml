@@ -1,0 +1,11 @@
+# Every error a crow.yaml can carry. Broken keys keep the default.
+version: 2
+colour: blue
+modules:
+  core: false
+  core-api: false
+  billing: true
+  forge:
+    on: maybe
+    token: secret
+  mail: 3
