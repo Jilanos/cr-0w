@@ -1,14 +1,14 @@
 ## item_238_pending_items_and_follow_ups_as_one_schema - Pending items and follow-ups as one schema read by brief, routines and Inbox
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 85
 > Confidence: 80
-> Progress: 0%
+> Progress: 10%
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 15:27:47
+> Indicators reviewed: 2026-11-19 18:10:58
 
 # AI Context
 - Summary: Define the 'pending items' schema Paul uses (decisions, follow-ups with due/priority/who/expected, recently settled purged after 14 days) as a crow concept stored as Markdown with a minimal schema, read by brief, routines and the Inbox `followup` kind.
@@ -51,3 +51,6 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
+
+# Tasks
+- `task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox`
