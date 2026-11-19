@@ -36,6 +36,11 @@ func stateDir(t *testing.T) string {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "afk", "job-01-audit.md"), []byte("# Audit the runbooks\n\nRead each runbook.\n"))
 	writeFile(t, filepath.Join(dir, "afk", "archive", "2026-11-09", "job-01-old.md"), []byte("# Old job\n"))
+	writeFile(t, filepath.Join(dir, RunsLedger), []byte(
+		`{"run_id":"run_id","project":"project","label":"label","cwd":"/work/project.wt/label","started_at":"2026-01-01T08:00:00+00:00","start_sha":"abc1234","branch":"label","account":"account","prompt_file":"p.md","power":"normal","model":"opus","permission":"auto","kind":"build","context":"","logics_ref":"item_001_x"}
+not json
+{"run_id":"9f8e7d6c5b4a","project":"crow","label":"older run","cwd":"","started_at":"2026-01-01T07:00:00+00:00","account":"work"}
+`))
 	return dir
 }
 
@@ -179,6 +184,9 @@ func TestResponseFixtures(t *testing.T) {
 		"error-ops-bad-week":  {path: "/api/state/ops?week=2026-46"},
 		"mission":             {path: "/api/missions/20261109-build-item-095"},
 		"mission-questions":   {path: "/api/missions/20261109-research-android-push-options"},
+		"run-report":          {path: "/api/runs/run_id"},
+		"run-report-mission":  {path: "/api/runs/a1b2c3d4"},
+		"error-no-run":        {path: "/api/runs/0000000000"},
 		"events":              {path: "/api/events?limit=3"},
 		"error-no-identity":   {path: "/api/state/inbox", header: map[string]string{IdentityHeader: ""}},
 		"error-no-mission":    {path: "/api/missions/20261109-build-nothing"},

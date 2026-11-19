@@ -1,0 +1,20 @@
+{
+  "run": "4f2a9c1e7b3d",
+  "source": "dispatch",
+  "project": "crow",
+  "label": "ops-lanes",
+  "account": "work",
+  "status": "done",
+  "started": "2026-11-10T08:02:00+00:00",
+  "ended": "2026-11-10T08:47:00+00:00",
+  "cost_usd": 3.42,
+  "commits": [
+    "a21f0b1 new[GO]: ops day and week lanes",
+    "fdecea6 new[GO]: shared lane package"
+  ],
+  "branch": "item-257-ops",
+  "worktree": "/work/crow.wt/item-257-ops",
+  "item": "item_257_core_serves_the_ops_timeline_lanes_and_run_history",
+  "mission": null,
+  "report": "Both steps committed, tests green."
+}

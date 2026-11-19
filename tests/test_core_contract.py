@@ -41,7 +41,18 @@ def test_every_schema_has_fixtures():
     assert {p.name for p in SCHEMAS.glob("*.json")} == {
         "request.schema.json", "reply.schema.json", "event.schema.json",
         "mission.schema.json", "run.schema.json", "inbox.schema.json", "live-action.schema.json",
-        "work-item.schema.json", "ops.schema.json"}
+        "work-item.schema.json", "ops.schema.json", "run-report.schema.json"}
+
+
+def test_run_report_fixtures_valid():
+    docs = [load(FIX / "records" / "run-report.json")] + [load(p) for p in sorted((FIX / "api").glob("run-report*.json"))]
+    assert len(docs) >= 3
+    for doc in docs:
+        errs = errors("run-report.schema.json", doc)
+        assert not errs, "; ".join(errs)
+    doc = load(FIX / "records" / "run-report.json")
+    doc["source"] = "cron"
+    assert errors("run-report.schema.json", doc)
 
 
 def test_ops_fixtures_valid():

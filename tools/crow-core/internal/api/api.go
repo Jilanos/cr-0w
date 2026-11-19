@@ -119,6 +119,7 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	mux.HandleFunc("GET /api/state", s.state)
 	mux.HandleFunc("GET /api/state/{section}", s.section)
 	mux.HandleFunc("GET /api/missions/{id}", s.mission)
+	mux.HandleFunc("GET /api/runs/{id}", s.runReport)
 	mux.HandleFunc("GET /api/missions/{id}/artifacts/{path...}", s.artifact)
 	mux.HandleFunc("GET /api/events", s.events)
 	s.routeActions(mux)

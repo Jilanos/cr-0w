@@ -1,0 +1,17 @@
+{
+  "run": "run_id",
+  "source": "dispatch",
+  "project": "project",
+  "label": "label",
+  "account": "account",
+  "status": "status",
+  "started": "2026-01-01T08:00:00+00:00",
+  "ended": "2026-01-01T09:00:00+00:00",
+  "cost_usd": null,
+  "commits": [],
+  "branch": "label",
+  "worktree": "/work/project.wt/label",
+  "item": "item_001_x",
+  "mission": null,
+  "report": ""
+}
