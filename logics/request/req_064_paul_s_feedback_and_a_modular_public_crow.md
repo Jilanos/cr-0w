@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 85
-> Confidence: 80
+> Understanding: 90
+> Confidence: 85
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
@@ -42,7 +42,7 @@
 
 # Companion docs
 - Product brief(s): (none yet)
-- Architecture decision(s): (none yet)
+- Architecture decision(s): `adr_002_crow_bricks_module_manifest_and_project_kinds` (Proposed, owner review pending)
 
 # References
 - `bin/crow`
@@ -62,9 +62,14 @@
 - `item_236_first_module_split_forge_mrs_optional_and_folder_projects`
 - `item_237_nest_and_crow_core_as_separate_front_and_back_bricks`
 - `item_238_pending_items_and_follow_ups_as_one_schema`
+- `item_260_module_manifests_crow_yaml_loader_and_doctor_check`
+- `item_261_skills_hooks_and_gather_follow_the_module_switch`
+- `item_262_mail_team_and_vault_bricks_optional`
+- `item_263_optional_tool_bricks_and_install_profiles`
 
 # Execution order
 1. Interleaved with req_063; see its Execution order.
+2. Module splits (adr_002 Migration order), each after the owner accepts adr_002: item_260, item_261, item_236, item_237, item_262, item_263.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |

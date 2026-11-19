@@ -2,8 +2,8 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
-> Understanding: 85
-> Confidence: 80
+> Understanding: 90
+> Confidence: 85
 > Progress: 0%
 > Complexity: Medium
 > Theme: General
@@ -20,8 +20,9 @@
 
 # Scope
 - In:
-  - Manifest flag `modules.forge`; when off: MR scripts not run by brief/gather, skills not installed, tabs hidden, doctor quiet.
-  - `kind: folder` projects: crow-activity reads file changes, commit/push rules skip.
+  - Manifest flag `modules.forge`; when off: MR scripts not run by brief/gather, skills not installed, tabs hidden, doctor quiet (generic switch from item_261).
+  - `layout: folder` projects (adr_002; `kind` stays the Nest planet type): crow-activity reads file changes, commit/push rules, identity check and worktrees skip; default `repo` when the path holds `.git`.
+  - Doctor fails on `forge` set for a folder project.
   - Test both settings in crow-check.
 - Out:
   - Other bricks.
@@ -35,10 +36,12 @@
 - req_064_paul_s_feedback_and_a_modular_public_crow-AC -> This backlog slice. Proof: With forge off, brief, gather, doctor and Nest run without any forge call or error.
 
 # Dependencies
-- Module design ADR approved.
+- `adr_002_crow_bricks_module_manifest_and_project_kinds` accepted; `item_261_skills_hooks_and_gather_follow_the_module_switch` done.
 
 # Links
 - Request: req_064_paul_s_feedback_and_a_modular_public_crow.
+- Architecture decision(s): `adr_002_crow_bricks_module_manifest_and_project_kinds` (migration step 3).
+- Next: `item_237_nest_and_crow_core_as_separate_front_and_back_bricks`
 
 # Priority
 - Priority: Medium

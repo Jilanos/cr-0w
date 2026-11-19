@@ -3,7 +3,7 @@
 > Status: Proposed
 > Owner review: pending
 > Related request: `req_064_paul_s_feedback_and_a_modular_public_crow`, `req_047_make_the_hub_rules_configurable_in_local_policy_yaml`, `req_051_adopt_ideas_from_life_distributable`
-> Related backlog: `item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds`, `item_122_crow_home_is_the_private_config_repo_itself`
+> Related backlog: `item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds`, `item_122_crow_home_is_the_private_config_repo_itself`, `item_260_module_manifests_crow_yaml_loader_and_doctor_check`, `item_261_skills_hooks_and_gather_follow_the_module_switch`, `item_236_first_module_split_forge_mrs_optional_and_folder_projects`, `item_237_nest_and_crow_core_as_separate_front_and_back_bricks`, `item_262_mail_team_and_vault_bricks_optional`, `item_263_optional_tool_bricks_and_install_profiles`
 > Related task: (none yet)
 > Drivers: a second user installs only what fits; a folder without git is a valid project; the owner's setup keeps working unchanged; one switch per brick; Nest and deck show nothing for a brick that is off.
 > Reminder: Update status, linked refs, decision rationale, consequences, and follow-up work when you edit this doc.
@@ -166,12 +166,12 @@ modules:
 
 ## Migration order
 Each split is one backlog item, run in this order, interleaved with req_063 as its Execution order says.
-1. Module manifests, crow.yaml loader and doctor check: engine manifests from bricks.tsv, crow.yaml loader in Python, Go and `crow modules`, doctor check. No behaviour change.
-2. Skills, hooks and gather follow the module switch: skill links, `.claude/skills` generation, hook early exit, gather keys, `crow` subcommand guard.
+1. `item_260_module_manifests_crow_yaml_loader_and_doctor_check`: engine manifests from bricks.tsv, crow.yaml loader in Python, Go and `crow modules`, doctor check. No behaviour change.
+2. `item_261_skills_hooks_and_gather_follow_the_module_switch`: skill links, `.claude/skills` generation, hook early exit, gather keys, `crow` subcommand guard.
 3. `item_236_first_module_split_forge_mrs_optional_and_folder_projects`: forge off and `layout: folder`.
 4. `item_237_nest_and_crow_core_as_separate_front_and_back_bricks`: `/api/modules`, Nest and deck hide off bricks, Nest config and install docs.
-5. Mail, team and vault bricks optional, with notes falling back to CROW_HOME.
-6. Optional tool bricks and install profiles: afk, retro, releases, design and shell integration as switches; `install.sh` module prompt.
+5. `item_262_mail_team_and_vault_bricks_optional`: mail, team and vault off, with notes falling back to CROW_HOME.
+6. `item_263_optional_tool_bricks_and_install_profiles`: afk, retro, releases, design and shell integration as switches; `install.sh` module prompt.
 
 # Alternatives considered
 - **Flags in `projects.yaml`**: one file less, but bricks are per install and projects are per repo; mixing them grows a file that is already long. Rejected.
