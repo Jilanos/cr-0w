@@ -12,10 +12,11 @@
   crow-accounts prompt <name> <skill> [args]   prompt that runs a hub skill on that provider
   crow-accounts check-model <name> <model>     exit 1 when the model belongs to the other provider
   crow-accounts scoped             exit 0 when accounts.yaml ranks accounts per scope
-  crow-accounts pick [--scope S] [--on-busy ask|fail]   account for crow open/term/handoff: skips accounts with no quota
+  crow-accounts pick [--scope S] [--on-busy ask|fail] [--provider P]   account for crow open/term/handoff: skips accounts with no quota
                                    left, ranks accounts with a live session after free ones, keeps the default while it has room,
                                    else the one with the most room; an ask-first pick asks on a terminal
-                                   (fail: never ask); exits 1 with the reasons when none fits
+                                   (fail: never ask); exits 1 with the reasons when none fits;
+                                   --provider claude|codex keeps only accounts on that runner (the butler needs claude)
   crow-accounts json               every account with its policy, memory mode and tier (mine | team),
                                    plus fallback/max_5h_pct/max_week_pct/free_5h_min when fallback is auto
 
@@ -111,13 +112,22 @@ def ask(question):
         return False
 
 
-def pick(cfg, on_busy, scope=None):
+def pick(cfg, on_busy, scope=None, provider=None):
     from datetime import datetime
     default = cfg.get("default")
-    st = crow_lib.pick_accounts(accounts(cfg), status_rows(), None, datetime.now().astimezone(), scope)
+    rows = status_rows()
+    accts, other = accounts(cfg), []
+    if provider:
+        runs = {a["name"]: crow_lib.provider_of(a["name"], list(rows.values())) for a in accts}
+        other = [{"name": a["name"], "why": f"runs {runs[a['name']]}"} for a in accts
+                 if runs[a["name"]] != provider and a["policy"] != "never"]
+        accts = [a for a in accts if runs[a["name"]] == provider]
+    st = crow_lib.pick_accounts(accts, rows, None, datetime.now().astimezone(), scope)
     p = crow_lib.launch_pick(st, crow_lib.live_sessions(), default)
-    skipped = "; ".join(f"{s['name']}: {s['why']}" for s in p["skipped"])
+    skipped = "; ".join(f"{s['name']}: {s['why']}" for s in other + p["skipped"])
     name = p["account"]
+    if provider and not st["accounts"]:
+        sys.exit(f"crow: no allowed account runs {provider} ({skipped or 'none allowed'}).")
     if not name:
         sys.exit(f"crow: no allowed account is free with quota left{f' for scope {scope}' if scope else ''} ({skipped}). "
                  "Wait for a reset or pick one: CROW_ACCOUNT=<name> crow ...")
@@ -165,10 +175,14 @@ def main(argv):
         if why:
             sys.exit(f"crow: {why}")
     elif cmd == "pick":
-        rest, scope, busy = argv[1:], None, "ask"
-        while rest and rest[0] in ("--on-busy", "--scope") and len(rest) >= 2:
+        rest, scope, busy, provider = argv[1:], None, "ask", None
+        while rest and rest[0] in ("--on-busy", "--scope", "--provider") and len(rest) >= 2:
             if rest[0] == "--scope":
                 scope = rest[1]
+            elif rest[0] == "--provider":
+                if rest[1] not in crow_lib.PROVIDERS:
+                    break
+                provider = rest[1]
             elif rest[1] in ("ask", "fail"):
                 busy = rest[1]
             else:
@@ -176,7 +190,7 @@ def main(argv):
             rest = rest[2:]
         if rest:
             sys.exit(__doc__)
-        pick(cfg, busy, scope)
+        pick(cfg, busy, scope, provider)
     elif cmd == "scoped":  # exit 0 when any account has a scopes map
         sys.exit(0 if any(a["scopes"] for a in accounts(cfg)) else 1)
     elif cmd == "json":

@@ -24,6 +24,9 @@ var butlerPersona []byte
 
 var accountName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 
+// butlerPickArgs picks the auto account among the accounts claude runs: the butler drives `claude -p`.
+var butlerPickArgs = []string{"pick", "--on-busy", "fail", "--provider", "claude"}
+
 // butlerManager builds the manager, or nil (logged) when claude or the cdx profiles are
 // missing: the rest of the core serves without the butler.
 func butlerManager(cfg config.Config) (*butler.Manager, error) {
@@ -88,7 +91,7 @@ func butlerManager(cfg config.Config) (*butler.Manager, error) {
 		return cmd, nil
 	}
 	pick := func() (string, error) {
-		out, err := exec.Command(filepath.Join(cfg.Engine, "bin", "crow-accounts"), "pick", "--on-busy", "fail").Output()
+		out, err := exec.Command(filepath.Join(cfg.Engine, "bin", "crow-accounts"), butlerPickArgs...).Output()
 		lines := strings.Fields(strings.TrimSpace(string(out)))
 		if err != nil || len(lines) == 0 {
 			var ee *exec.ExitError
