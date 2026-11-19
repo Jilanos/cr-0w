@@ -1,12 +1,13 @@
 ## req_063_panel_persistent_actionable_conversations_and_separate_backup_routine - Panel persistent actionable conversations and separate backup routine
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Draft
+> Status: Done
 > Understanding: 100%
 > Confidence: 95%
 > Complexity: High
 > Theme: Panel
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 11:59:47
 
 # AI Context
 - Summary: Preserve topic identity after completion and selection changes; expose Crow actions and independent maintenance routines.

@@ -19,7 +19,7 @@
 | [prod_007_nest_home_design_pass](product/prod_007_nest_home_design_pass.md) | Nest Home design pass | Proposed |  |  | product/prod_007_nest_home_design_pass.md |
 | [prod_008_crow_on_the_tower](product/prod_008_crow_on_the_tower.md) | crow on the tower | Proposed |  |  | product/prod_008_crow_on_the_tower.md |
 | [prod_009_nest_laptop_parity](product/prod_009_nest_laptop_parity.md) | Nest laptop parity | Proposed |  |  | product/prod_009_nest_laptop_parity.md |
-| [prod_010_panel_conversation_continuity_and_actions](product/prod_010_panel_conversation_continuity_and_actions.md) | Panel conversation continuity and actions | Proposed |  |  | product/prod_010_panel_conversation_continuity_and_actions.md |
+| [prod_010_panel_conversation_continuity_and_actions](product/prod_010_panel_conversation_continuity_and_actions.md) | Panel conversation continuity and actions | Settled |  |  | product/prod_010_panel_conversation_continuity_and_actions.md |
 
 ## Roadmaps
 
@@ -94,7 +94,7 @@
 | [req_060_nest_deck_track_all_work](request/req_060_nest_deck_track_all_work.md) | Nest and deck track all work, missions as auto grouping | Ready |  | 0% | request/req_060_nest_deck_track_all_work.md |
 | [req_061_nest_scope_filter](request/req_061_nest_scope_filter.md) | Nest scope filter: all, work, perso | Done |  |  | request/req_061_nest_scope_filter.md |
 | [req_062_nest_hero_holotable_redesign_detailed_planets_and_a_new_board](request/req_062_nest_hero_holotable_redesign_detailed_planets_and_a_new_board.md) | Nest hero holotable redesign: detailed planets and a new board | Ready |  |  | request/req_062_nest_hero_holotable_redesign_detailed_planets_and_a_new_board.md |
-| [req_063_panel_persistent_actionable_conversations_and_separate_backup_routine](request/req_063_panel_persistent_actionable_conversations_and_separate_backup_routine.md) | Panel persistent actionable conversations and separate backup routine | Draft |  |  | request/req_063_panel_persistent_actionable_conversations_and_separate_backup_routine.md |
+| [req_063_panel_persistent_actionable_conversations_and_separate_backup_routine](request/req_063_panel_persistent_actionable_conversations_and_separate_backup_routine.md) | Panel persistent actionable conversations and separate backup routine | Done |  |  | request/req_063_panel_persistent_actionable_conversations_and_separate_backup_routine.md |
 
 ## Backlog
 
@@ -320,7 +320,7 @@
 | [item_218_nest_holotable_options_budget_fallback_and_recordings](backlog/item_218_nest_holotable_options_budget_fallback_and_recordings.md) | Nest holotable options budget, fallback and recordings | Ready |  | 0% | backlog/item_218_nest_holotable_options_budget_fallback_and_recordings.md |
 | [item_219_design_sessions_survive_compaction](backlog/item_219_design_sessions_survive_compaction.md) | Design sessions survive compaction | In progress |  | 90% | backlog/item_219_design_sessions_survive_compaction.md |
 | [item_220_nest_lit_table_under_the_frame_budget](backlog/item_220_nest_lit_table_under_the_frame_budget.md) | Nest lit table under the frame budget | In progress |  | 70% | backlog/item_220_nest_lit_table_under_the_frame_budget.md |
-| [item_221_deliver_persistent_actionable_panel_chats_and_independent_backup](backlog/item_221_deliver_persistent_actionable_panel_chats_and_independent_backup.md) | Deliver persistent actionable panel chats and independent backup | Ready |  | 0% | backlog/item_221_deliver_persistent_actionable_panel_chats_and_independent_backup.md |
+| [item_221_deliver_persistent_actionable_panel_chats_and_independent_backup](backlog/item_221_deliver_persistent_actionable_panel_chats_and_independent_backup.md) | Deliver persistent actionable panel chats and independent backup | Done |  | 100% | backlog/item_221_deliver_persistent_actionable_panel_chats_and_independent_backup.md |
 
 ## Tasks
 
@@ -349,7 +349,7 @@
 | [task_021_orchestrate_a_work_day_from_nest](tasks/task_021_orchestrate_a_work_day_from_nest.md) | Orchestrate a work day from Nest | Ready |  | 0% | tasks/task_021_orchestrate_a_work_day_from_nest.md |
 | [task_022_orchestrate_crow_on_the_windows_tower](tasks/task_022_orchestrate_crow_on_the_windows_tower.md) | Orchestrate crow on the Windows tower | Ready |  | 0% | tasks/task_022_orchestrate_crow_on_the_windows_tower.md |
 | [task_023_orchestrate_nest_laptop_parity](tasks/task_023_orchestrate_nest_laptop_parity.md) | Orchestrate Nest laptop parity | Ready |  | 0% | tasks/task_023_orchestrate_nest_laptop_parity.md |
-| [task_024_deliver_panel_conversation_continuity_and_actions](tasks/task_024_deliver_panel_conversation_continuity_and_actions.md) | Deliver panel conversation continuity and actions | Ready |  | 0% | tasks/task_024_deliver_panel_conversation_continuity_and_actions.md |
+| [task_024_deliver_panel_conversation_continuity_and_actions](tasks/task_024_deliver_panel_conversation_continuity_and_actions.md) | Deliver panel conversation continuity and actions | Done | Codex | 100% | tasks/task_024_deliver_panel_conversation_continuity_and_actions.md |
 
 ## Runbooks
 

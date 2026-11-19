@@ -1,11 +1,12 @@
 ## prod_010_panel_conversation_continuity_and_actions - Panel conversation continuity and actions
 > Date: 2026-11-19
-> Status: Proposed
+> Status: Settled
 > Related request: `req_063_panel_persistent_actionable_conversations_and_separate_backup_routine`
 > Related backlog: `item_221_deliver_persistent_actionable_panel_chats_and_independent_backup`
 > Related task: `task_024_deliver_panel_conversation_continuity_and_actions`
 > Related architecture: (none yet)
 > Reminder: Update status, linked refs, scope, decisions, success signals, and open questions when you edit this doc.
+> Indicators reviewed: 2026-11-19 11:59:48
 
 # Overview
 Operate Crow through persistent topic chats with visible runs and independent maintenance routines.
@@ -31,7 +32,7 @@ Operate Crow through persistent topic chats with visible runs and independent ma
 - Messages retain their intended topic; machine updates no longer execute backups.
 
 # References
-- Product back-reference: `req_063_panel_persistent_actionable_conversations_and_separate_backup_routine`
+- Product back-reference: `item_221_deliver_persistent_actionable_panel_chats_and_independent_backup`
 - Task back-reference: `task_024_deliver_panel_conversation_continuity_and_actions`
 
 # Flow

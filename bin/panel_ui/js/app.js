@@ -177,7 +177,7 @@ function renderHeader() {
   }
 
   const actions = clear(document.getElementById('topbar-actions'));
-  actions.append(btn('Nouveau chat', { icon: 'chat', small: true, onclick: openConversations }));
+  actions.append(btn('Nouveau chat', { icon: 'chat', small: true, title: 'Nouveau chat et conversations récentes', onclick: openConversations }));
   const routines = (cached('routines') || {}).routines || [];
   const defs = (cfg && cfg.routines) || [{ name: 'maj', label: 'Mise à jour' }, { name: 'daily_update', label: 'Mise à jour machine' }];
   const majLock = st && st.locks && (st.locks.maj || st.locks.pending);
@@ -189,12 +189,13 @@ function renderHeader() {
     if (r.running) reason = `${d.label} déjà en cours`;
     else if (majLock) reason = `Mise à jour en cours depuis ${fmtDate(majLock.since)}`;
     else if (d.name === 'daily_update' && st && st.locks && st.locks.maintenance) reason = 'Maintenance en cours';
-    const b = btn(label, { icon: d.name === 'maj' ? 'moon' : 'bolt', small: true, primary: d.name === 'maj',
-      title: r.description || d.label, onclick: () => runRoutine(d.name, d.label, r.blocked_reason) });
+    const b = btn(label, { icon: d.name === 'maj' ? 'moon' : d.name === 'backup' ? 'folder' : 'bolt', small: true, primary: d.name === 'maj',
+      title: d.label + (r.description ? ' : ' + r.description : ''), onclick: () => runRoutine(d.name, d.label, r.blocked_reason) });
     if (reason) disable(b, reason);
     else if (r.blocked_reason) { b.classList.add('has-warning'); b.title = r.blocked_reason; }
     actions.append(b);
   }
+  for (const b of actions.querySelectorAll('button')) b.setAttribute('aria-label', b.textContent.trim());
 }
 
 async function syncOutlook() {

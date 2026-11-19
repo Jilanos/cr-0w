@@ -354,7 +354,7 @@ export function makeViews(ctx) {
         const active = runs.runs.filter((r) => r.status === 'running');
         const recent = runs.runs.filter((r) => r.status !== 'running');
         moreRuns = Math.max(0, recent.length - 5);
-        for (const r of [...active, ...recent.slice(0, 5)]) runRows.push(cardRow(() => r.topic_id ? ctx.openChat({ topic: { topic_id: r.topic_id, title: r.topic_title || r.label, kind: 'run' } }) : ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
+        for (const r of [...active, ...recent.slice(0, 5)]) runRows.push(cardRow(() => r.topic_id && r.label.startsWith('Chat · ') ? ctx.openChat({ topic: { topic_id: r.topic_id, title: r.topic_title || r.label, kind: 'run' } }) : ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
           h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account || 'script'} · ${RUN_STATE[r.status] || r.status}` })));
         for (const q of runs.queue || []) runRows.push(cardRow(() => ctx.go('jobs', 'queue:' + q.operation_id), runDot('queued'),
           h('span', { class: 'grow', text: q.label }), h('span', { class: 'muted small', text: `en file · position ${q.position}` })));

@@ -195,6 +195,16 @@ const VIEWS = ['today', 'mail', 'drafts', 'pending', 'decisions', 'dossiers', 'j
 const SCENARIOS = [];
 const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });
 
+for (const width of [1280, 1024, 390]) {
+  add('header-routines-' + width, { ...DESK, width, mobile: width < 500 }, async (page, base) => {
+    await open(page, base, { view: 'pending' });
+    const controls = await page.eval(`({width:innerWidth,buttons:[...document.querySelectorAll('#topbar-actions button')].map(b=>({label:b.getAttribute('aria-label'),right:b.getBoundingClientRect().right}))})`);
+    for (const label of ['Nouveau chat', 'Mise à jour machine', 'Save OneDrive']) {
+      if (!controls.buttons.some(b => b.label === label && b.right <= controls.width)) throw new Error('Commande inaccessible : ' + label);
+    }
+  });
+}
+
 for (const [theme, viewport] of [['light', DESK], ['dark', { ...DESK, dark: true }], ['mobile', MOBILE]]) {
   add(`search-${theme}`, viewport, async (page, base) => {
     await open(page, base);
