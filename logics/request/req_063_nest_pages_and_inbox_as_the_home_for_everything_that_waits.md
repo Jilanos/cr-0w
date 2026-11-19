@@ -93,8 +93,8 @@ Done: item_230. bg = background run, live = interactive session with the owner.
 15. live Project page and click routing `item_222_nest_project_page_and_planet_click_routing`
 16. live Home panels `item_228_nest_home_panels_pass_for_phone_and_laptop`
 17. Butler orchestrator items 252, 253, 255 (req_065) once Ops and Inbox are live.
-19. bg Run diff stat `item_269_run_report_shows_the_diff_stat` (after 1)
 18. bg Past owner waits `item_264_recover_past_owner_waits_from_session_transcripts` (after 1)
+19. bg Run diff stat `item_269_run_report_shows_the_diff_stat` (after 1)
 
 Background whenever a slot is free (max 2): `item_229_take_paul_s_ready_dispatch_and_keep_awake_changes`, `item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds`, `item_232_private_skills_from_local_and_capabilities_per_account`, `item_231_review_and_take_paul_s_generic_scripts_and_runbooks`, then `item_236_first_module_split_forge_mrs_optional_and_folder_projects`, `item_237_nest_and_crow_core_as_separate_front_and_back_bricks` (req_064).
 
