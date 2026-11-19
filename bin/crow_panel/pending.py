@@ -128,11 +128,9 @@ class Pending:
                 title_plain = "".join(s["v"] for s in self.files.segments(title))
                 due_raw = cells.get("Échéance")
                 due = due_date(due_raw)
-                actions = ["chat"] if current["kind"] == "done" else ["done", "chat"]
+                actions = ["hub"] if current["kind"] == "done" else ["done", "hub"]
                 if due_raw is not None and current["kind"] == "followups":
                     actions.insert(1, "snooze")
-                if current["kind"] == "followups":
-                    actions.insert(-1, "followup")
                 record = {"section": current["key"], "block": block, "raw": raw, "start": i, "end": end,
                           "prev": lines[i - 1] if i else None, "next": lines[end] if end < len(lines) else None,
                           "item_rev": digest(raw, "r_"), "doc_rev": rev, "raw_cells": cells, "section_kind": current["kind"]}
@@ -153,7 +151,7 @@ class Pending:
                 text = "".join(lines[i:end]).strip()
                 key = digest(text, "b_")[:18]
                 free.append({"id": key, "section": current["key"] if current else None, "title": text.splitlines()[0][:120],
-                             "segments": self.files.segments(text), "topic_id": self.topics("pending", key, text[:120], {"text": text})})
+                             "segments": self.files.segments(text), "topic_id": self.topics("pending", key, text[:120], {"text": text, "start": i})})
                 i = end
                 continue
             i += 1

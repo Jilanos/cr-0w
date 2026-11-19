@@ -34,7 +34,7 @@ class Readers:
             known = h5 is not None or week is not None
             low = h5 is not None and h5 < floor.get("h5", 0) or week is not None and week < floor.get("week", 0)
             accounts.append({"name": name, "provider": row.get("provider") or config.get("provider", "claude"), "in_policy": True,
-                             "kinds": config.get("kinds", []), "quota_status": "known" if known else "unknown",
+                             "kinds": [k for k in config.get("kinds", []) if k != "chat"], "quota_status": "known" if known else "unknown",
                              "remaining_5h_pct": h5, "remaining_week_pct": week,
                              "reset_5h_at": row.get("reset_5h_at_iso"), "reset_week_at": row.get("reset_week_at_iso"),
                              "reset_credits": row.get("reset_credits_available"), "floor_5h_pct": floor.get("h5"), "floor_week_pct": floor.get("week"),
@@ -92,7 +92,7 @@ class Readers:
             if status == "completed":
                 status = "succeeded" if row.get("exit_code") == 0 else "failed"
             result.append({"run_id": key, "kind": "script" if row.get("kind") == "script" else "agent", "label": row.get("label", ""),
-                           "project": row.get("project"), "topic_id": row.get("topic_id"), "operation_id": row.get("operation_id"),
+                           "project": row.get("project"), "topic_id": row.get("topic_id"), "hub_topic_id": self.launcher.topic("run", key, row.get("label") or key, {"run_id": key, "cwd": row.get("cwd"), "report": row.get("task_report")}), "operation_id": row.get("operation_id"),
                            "topic_title": topic.get("title"),
                            "account": row.get("account") or row.get("session"), "provider": row.get("provider"), "model": row.get("model"),
                            "status": status, "started_at": row.get("started_at"), "ended_at": row.get("ended_at"),
@@ -141,7 +141,7 @@ class Readers:
         result = []
         waits = self.cfg["routines"].get("daily_update", {}).get("wait_runs", True)
         for name, label, description in (("maj", "Maj", "Mails, brouillons, relances, fichier en attente"),
-                                         ("daily_update", "Mise à jour machine", "Outils et dépôts, sans sauvegarde." + (" Attend la fin des runs." if waits else "")),
+                                         ("daily_update", "Mise à jour outils", "Outils et dépôts, sans sauvegarde." + (" Attend la fin des runs." if waits else "")),
                                          ("backup", "Save OneDrive", "Sauvegarder le dossier dev vers OneDrive uniquement.")):
             ops = [o for o in self.store.all("operations") if o["kind"] == "routine." + name]
             active = next((o for o in reversed(ops) if o["status"] in ACTIVE), None)

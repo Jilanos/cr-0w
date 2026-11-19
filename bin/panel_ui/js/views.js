@@ -11,7 +11,7 @@ import { folderPicker } from './folder-picker.js';
 
 const PRIO = { red: 'Urgent', yellow: 'Normal', green: 'Bas', blue: 'Info' };
 const ACTION_LABEL = { reply: 'Répondre', keep: 'Garder', move: 'Ranger', archive: 'Archiver', trash: 'Corbeille' };
-const KIND_LABEL = { chat: 'chat', mail_read: 'lecture mail', mail_skeleton: 'squelette de brouillon', mail_triage: 'tri mail', mail_style: 'mise en forme', files: 'fichiers' };
+const KIND_LABEL = { mail_read: 'lecture mail', mail_skeleton: 'squelette de brouillon', mail_triage: 'tri mail', mail_style: 'mise en forme', files: 'fichiers' };
 const RUN_STATE = { running: 'en cours', succeeded: 'terminé', failed: 'échec', queued: 'en file', partial: 'partiel',
   unknown: 'inconnu', cancelled: 'retiré', cancel_requested: 'retrait demandé' };
 const CAP_STATE = { available: 'disponible', limited: 'limité', unavailable: 'indisponible' };
@@ -103,12 +103,6 @@ export function makeViews(ctx) {
     popMenu(anchor, box);
   }
 
-  function followupText(it) {
-    const qui = segText(it.cells.Qui) || it.title;
-    const attendu = segText(it.cells.Attendu).replace(/\s+/g, ' ').trim().replace(/\.$/, '');
-    return `Prépare la relance de ${qui} sur ${attendu || it.title}.`;
-  }
-
   function pendingDetail(it) {
     const w = ctx.writable();
     const acts = it.actions || [];
@@ -121,16 +115,10 @@ export function makeViews(ctx) {
       b.addEventListener('click', () => snoozeMenu(b, it));
       bar.append(b);
     }
-    if (acts.includes('followup')) {
-      bar.append(btn('Relancer', { icon: 'reply', title: 'Contrôle Brouillons et Envoyés, puis prépare un brouillon',
-        onclick: () => { const state = store.followups[it.id] ||= { log: [] };
-          if (['succeeded', 'partial', 'failed', 'cancelled'].includes(state.op?.status)) state.op = null;
-          state.open = true; ctx.renderDetail(); } }));
-    }
     // The first column of a pending row often links to the Outlook message or draft.
     const titleLink = ((it.cells[(it.columns || [])[0]] || []).find((x) => x && x.t === 'link' && safeHref(x.href)) || {}).href;
     if (titleLink) bar.append(h('a', { class: 'btn', href: safeHref(titleLink), target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Ouvrir dans Outlook' })));
-    if (it.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
+    if (it.topic_id) bar.append(btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }));
     if (!w.ok) bar.append(h('span', { class: 'muted small', text: w.reason }));
 
     const fields = h('dl', { class: 'fields' });
@@ -155,56 +143,8 @@ export function makeViews(ctx) {
         h('div', { class: 'eyebrow' }, prioDot(it.prio), h('span', { text: section ? section.title : it.section }),
           it.prio ? h('span', { class: 'muted', text: '· ' + PRIO[it.prio] }) : null),
         h('h2', { text: it.title }), dueLine),
-      bar, acts.includes('followup') ? followupBox(it) : null, fields,
+      bar, fields,
       h('p', { class: 'meta', text: `${(cached('pending') || {}).file_label || 'En attente'} · ligne ${it.source_line ?? '?'}` }));
-  }
-
-  function followupBox(it) {
-    if (!store.followups[it.id]) {
-      const previous = [...(cached('operations')?.operations || [])].reverse().find(o => o.kind === 'mail.followup' && o.topic_id === it.topic_id);
-      if (previous) {
-        // A finished relance from an earlier visit shows as one line; a live one opens its trace.
-        const live = ['queued', 'running', 'cancel_requested'].includes(previous.status);
-        const restored = store.followups[it.id] = { open: live, op: previous, log: [] };
-        if (['queued', 'running', 'cancel_requested'].includes(previous.status)) ctx.trackOp(previous, final => { restored.op = final; ctx.renderDetail(); });
-      }
-    }
-    const state = store.followups[it.id];
-    if (!state?.open && state?.op) {
-      const op = state.op;
-      return h('p', { class: 'muted small followup-last' },
-        h('span', { text: [`Dernière relance préparée ${fmtDate(op.updated_at || op.created_at)}`, RUN_STATE[op.status] || op.status, op.dry_run ? 'mode essai' : null].filter(Boolean).join(' · ') }),
-        h('button', { type: 'button', class: 'link-btn', text: 'Voir le détail', onclick: () => { state.open = true; ctx.renderDetail(); } }));
-    }
-    if (!state?.open) return null;
-    if (state.op) return replyOp(it, state);
-    const instructions = h('textarea', { class: 'input', rows: 3, 'aria-label': 'Consigne de relance',
-      oninput: (e) => { state.instructions = e.target.value; } });
-    instructions.value = state.instructions ?? followupText(it);
-    const models = ctx.config?.chat?.models || ['haiku', 'sonnet', 'opus'];
-    const model = h('select', { class: 'select', 'aria-label': 'Modèle de relance', onchange: e => { state.model = e.target.value; } },
-      models.map(m => h('option', { value: m, selected: m === (state.model || 'sonnet'), text: m })));
-    const start = btn('Préparer la relance', { primary: true, onclick: async () => {
-      if (state.busy) return;
-      state.busy = true; start.disabled = true;
-      try {
-        state.op = await ctx.api.post(`/api/pending/${encodeURIComponent(it.id)}/followup`, {
-          item_rev: it.item_rev, instructions: instructions.value, model: model.value,
-        });
-        ctx.renderDetail();
-        ctx.trackOp(state.op, async (final) => { state.op = final; ctx.renderDetail(); await ctx.refresh(['state', 'runs']); },
-          { onEvent: async (type) => {
-            if (type === 'step') {
-              try { state.op = await ctx.api.get(state.op.links.status_url); ctx.renderDetail(); }
-              catch (err) { toastError(err, 'Suivi de la relance'); }
-            }
-          } });
-      } catch (err) { toastError(err, 'Relance'); start.disabled = false; }
-      finally { state.busy = false; }
-    } });
-    return h('section', { class: 'box followup-box' }, h('h3', { class: 'h3', text: 'Préparer une relance' }), instructions,
-      h('div', { class: 'box-foot' }, model, start),
-      h('p', { class: 'muted small', text: 'Contrôle Brouillons et Envoyés → squelette → mise en forme worka → vérification. Aucun envoi.' }));
   }
 
   function freeBlockEntry(b) {
@@ -214,8 +154,8 @@ export function makeViews(ctx) {
         h('span', { class: 'row-title', text: b.title }), chip('note', 'quiet')), h('div', { class: 'row-sub', text: segText(b.segments) })),
       detail: () => h('article', { class: 'detail' }, h('header', { class: 'detail-head' }, h('div', { class: 'eyebrow', text: 'Note libre (lecture seule)' }),
         h('h2', { text: b.title })), h('p', { class: 'prose' }, segments(b.segments)),
-      h('div', { class: 'actions' }, b.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null),
-      h('p', { class: 'muted small', text: 'Paragraphe libre : pas de Réglé, discussion possible dans le chat.' })),
+      h('div', { class: 'actions' }, b.topic_id ? btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }) : null),
+      h('p', { class: 'muted small', text: 'Paragraphe libre : pas de Réglé, contexte disponible pour le hub.' })),
     };
   }
 
@@ -354,7 +294,7 @@ export function makeViews(ctx) {
         const active = runs.runs.filter((r) => r.status === 'running');
         const recent = runs.runs.filter((r) => r.status !== 'running');
         moreRuns = Math.max(0, recent.length - 5);
-        for (const r of [...active, ...recent.slice(0, 5)]) runRows.push(cardRow(() => r.topic_id && r.label.startsWith('Chat · ') ? ctx.openChat({ topic: { topic_id: r.topic_id, title: r.topic_title || r.label, kind: 'run' } }) : ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
+        for (const r of [...active, ...recent.slice(0, 5)]) runRows.push(cardRow(() => ctx.go('jobs', 'run:' + r.run_id), runDot(r.status),
           h('span', { class: 'grow', text: r.label }), h('span', { class: 'muted small', text: `${r.account || 'script'} · ${RUN_STATE[r.status] || r.status}` })));
         for (const q of runs.queue || []) runRows.push(cardRow(() => ctx.go('jobs', 'queue:' + q.operation_id), runDot('queued'),
           h('span', { class: 'grow', text: q.label }), h('span', { class: 'muted small', text: `en file · position ${q.position}` })));
@@ -539,7 +479,7 @@ export function makeViews(ctx) {
       items.length ? null : emptyState('Rien à afficher', activeCount(dueFilters) ? 'Aucun élément pour ces filtres.' : 'Aucune échéance sur 15 jours.'),
       h('div', { class: 'tl-body' }, dayCards(items, opts),
         h('aside', { class: 'tl-side', 'aria-label': 'Élément choisi' }, side
-          ? [side.detail(), h('div', { class: 'actions' }, btn('Ouvrir avec le chat', { icon: 'chat',
+          ? [side.detail(), h('div', { class: 'actions' }, btn('Ouvrir le détail', { icon: 'chat',
             onclick: () => { store.pendingTab = 'dues'; ctx.go('pending', side.key); } }))]
           : h('p', { class: 'muted', text: 'Choisis un élément dans la frise ou les jours.' }))));
   }
@@ -586,7 +526,7 @@ export function makeViews(ctx) {
           primary: option === d.recommendation, disabled: !d.item_rev ? 'Révision de décision indisponible' : store.afkBusy ? 'Enregistrement en cours' : null,
           onclick: () => answerDecision(d, afk, option),
         })) : null,
-        d.topic_id ? btn('Répondre dans le chat', { icon: 'chat', primary: true, onclick: () => ctx.openChat({ prefill: `Décision ${d.n} : je choisis « ${d.recommendation} ».` }) }) : null,
+        d.topic_id ? btn('Envoyer au hub', { icon: 'chat', primary: true, onclick: () => ctx.sendToHub({ prefill: `Décision ${d.n} : je choisis « ${d.recommendation} ».` }) }) : null,
         job && job.report_file_id ? btn('Rapport du job', { icon: 'file', onclick: () => ctx.openFile(job.report_file_id, `rapport ${job.name}`) }) : null),
       h('p', { class: 'muted small', text: d.answered ? `Choix enregistré${d.answer ? ' : ' + d.answer : ''}`
         : ctx.config?.mode === 'dry_run' ? 'Mode essai : la réponse est enregistrée sur une copie. Aucune action externe.' : 'Le choix est enregistré dans le journal. Aucune action externe.' }),
@@ -606,7 +546,7 @@ export function makeViews(ctx) {
   // ------------------------------------------------------------ Mails
 
   function proposalChip(p) {
-    if (!p) return null;
+    if (!p) return chip('pas de proposition', 'quiet');
     const label = p.action === 'move' ? `→ ${p.folder_path}` : ACTION_LABEL[p.action] || p.action;
     const c = chip(label, p.allowed === false ? 'disabled' : p.action === 'reply' ? 'accent' : 'quiet');
     if (p.disabled_reason) c.title = p.disabled_reason;
@@ -843,21 +783,16 @@ export function makeViews(ctx) {
 
   function replyBox(d) {
     const rs = replyState(d.id);
-    const cfg = ctx.config || {};
-    const models = (cfg.chat && cfg.chat.models) || ['haiku', 'sonnet', 'opus'];
-    const def = rs.model || (cfg.chat && cfg.chat.default_model) || 'sonnet';
     if (rs.op) return replyOp(d, rs);
     const ta = h('textarea', { class: 'textarea', rows: '4', id: 'reply-instructions', placeholder: 'Consigne : points à couvrir, ton, PJ à joindre…',
       oninput: () => { rs.instructions = ta.value; } });
     ta.value = rs.instructions;
-    const sel = h('select', { class: 'select', 'aria-label': 'Modèle', onchange: () => { rs.model = sel.value; } },
-      models.map((m) => { const o = h('option', { value: m, text: m }); if (m === def) o.selected = true; return o; }));
     const cap = capability('draft_skeleton');
     const go = btn('Préparer le brouillon', { icon: 'reply', primary: true, onclick: async () => {
       if (!rs.instructions.trim()) { ta.focus(); toast('Écris une consigne pour le brouillon', { kind: 'warn' }); return; }
       go.disabled = true;
       try {
-        const op = await ctx.api.post(`/api/mail/${encodeURIComponent(d.id)}/reply-all`, { instructions: rs.instructions, model: sel.value });
+        const op = await ctx.api.post(`/api/mail/${encodeURIComponent(d.id)}/reply-all`, { instructions: rs.instructions });
         rs.op = op; rs.log = [];
         ctx.renderDetail();
         ctx.trackOp(op, (final) => { rs.op = final; if (store.sel.mail === d.id) ctx.renderDetail(); toast(final.summary || 'Brouillon prêt', { kind: final.status === 'succeeded' ? 'ok' : 'warn' }); },
@@ -869,7 +804,7 @@ export function makeViews(ctx) {
       h('header', { class: 'box-head' }, h('h3', { class: 'h3', text: 'Préparer une réponse à tous' }),
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Fermer', onclick: () => { rs.open = false; ctx.renderDetail(); } }, icon('close'))),
       ta,
-      h('div', { class: 'box-foot' }, h('label', { class: 'inline-label' }, h('span', { class: 'muted small', text: 'Modèle' }), sel), go),
+      h('div', { class: 'box-foot' }, h('span', { class: 'muted small', text: 'Rédaction : worka' }), go),
       h('p', { class: 'muted small', text: 'Le texte suit tes consignes. Le brouillon reste dans Outlook pour ta relecture.' }),
       cap && cap.state !== 'available' ? h('p', { class: 'small warn-text', text: `Capacité limitée : ${cap.reason || CAP_STATE[cap.state]}` }) : null);
   }
@@ -953,7 +888,7 @@ export function makeViews(ctx) {
     if (acts.includes('reply_all')) bar.append(btn('Répondre à tous', { icon: 'reply', primary: true, key: 'r', onclick: () => { rs.open = true; ctx.renderDetail(); focusReply(); } }));
     if (acts.includes('triage')) { const b = btn('Classer', { icon: 'folder' }); b.addEventListener('click', () => classerMenu(b, d)); bar.append(b); }
     if (owa) bar.append(h('a', { class: 'btn', href: owa, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Ouvrir dans Outlook' })));
-    if (d.topic_id) bar.append(btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }));
+    if (d.topic_id) bar.append(btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }));
 
     const people = (list) => (list || []).map((p) => typeof p === 'string' ? p : p.name && p.address ? `${p.name} <${p.address}>` : p.name || p.address || '').filter(Boolean).join(', ');
     let body;
@@ -1008,12 +943,12 @@ export function makeViews(ctx) {
     items() {
       const items = mailItems();
       if (store.mailMode !== 'triage') return items.map((m) => ({ key: m.id, text: `${m.from.name} ${m.subject} ${m.preview}`, cls: m.unread ? 'is-unread' : null,
-        topic: { topic_id: m.topic_id, title: m.subject, kind: 'mail', mailOnly: true }, row: () => mailRow(m), detail: () => mailDetail(m) }));
+        topic: { topic_id: m.topic_id, title: m.subject, kind: 'mail', message_id: m.id, mailOnly: true }, row: () => mailRow(m), detail: () => mailDetail(m) }));
       const withProp = items.filter((m) => m.proposal);
       const toFile = withProp.filter((m) => actionable(m.proposal));
       const others = withProp.filter((m) => !actionable(m.proposal));
       const out = [];
-      const entry = (m) => ({ key: m.id, text: `${m.from.name} ${m.subject}`, topic: { topic_id: m.topic_id, title: m.subject, kind: 'mail', mailOnly: true },
+      const entry = (m) => ({ key: m.id, text: `${m.from.name} ${m.subject}`, topic: { topic_id: m.topic_id, title: m.subject, kind: 'mail', message_id: m.id, mailOnly: true },
         row: () => triageRow(m), detail: () => mailDetail(m) });
       for (const confidence of ['high', 'medium', 'low']) {
         const group = toFile.filter((m) => (m.proposal.confidence || 'low') === confidence);
@@ -1126,7 +1061,7 @@ export function makeViews(ctx) {
       h('div', { class: 'actions' },
         owa ? h('a', { class: 'btn btn-primary', href: owa, target: '_blank', rel: 'noopener noreferrer' }, icon('external'), h('span', { text: 'Relire dans Outlook' })) : null,
         linked ? btn('Ligne liée', { icon: 'pending', onclick: () => ctx.go(linked.section === 'decisions' ? 'decisions' : 'pending', linked.id) }) : null,
-        d.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null),
+        d.topic_id ? btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }) : null),
       h('dl', { class: 'fields' },
         h('dt', { text: 'À' }), h('dd', { text: d.to.join(', ') || '–' }),
         h('dt', { text: 'Cc' }), h('dd', { text: d.cc.length ? d.cc.join(', ') : '–' }),
@@ -1189,7 +1124,7 @@ export function makeViews(ctx) {
       h('div', { class: 'row-sub mono', text: d.folder_label || '' }),
       h('div', { class: 'row-sub', text: [d.files_active_at ? `fichiers modifiés ${ago(d.files_active_at)}` : null,
         d.recent_count ? plural(d.recent_count, 'fichier récent', 'fichiers récents') : null,
-        d.last_activity ? `chat ${ago(d.last_activity)}` : null].filter(Boolean).join(' · ') })),
+        d.last_activity ? `historique ${ago(d.last_activity)}` : null].filter(Boolean).join(' · ') })),
       detail: () => dossierDetail(d),
     };
   }
@@ -1256,7 +1191,7 @@ export function makeViews(ctx) {
         full.files_active_at ? h('p', { class: 'muted small', text: `Fichiers modifiés ${ago(full.files_active_at)}${full.recent_count ? ' · ' + plural(full.recent_count, 'fichier récent', 'fichiers récents') : ''}` }) : null),
       h('div', { class: 'actions' },
         full.folder_file_id ? btn('Ouvrir le dossier', { icon: 'folder', primary: true, onclick: () => ctx.openFile(full.folder_file_id, full.title) }) : null,
-        full.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null,
+        full.topic_id ? btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }) : null,
         btn(full.pinned ? 'Désépingler' : 'Épingler', { icon: 'pin', ghost: true, onclick: () => dossierPref(d, 'pin', !full.pinned) }),
         btn(full.hidden ? 'Afficher' : 'Masquer', { icon: full.hidden ? 'eye' : 'eye-off', ghost: true, onclick: () => dossierPref(d, 'hide', !full.hidden) })),
       h('h3', { class: 'h3', text: `Lignes liées (${items.length})` }),
@@ -1331,7 +1266,7 @@ export function makeViews(ctx) {
   function runEntry(r) {
     return {
       key: 'run:' + r.run_id, text: `${r.label} ${r.account} ${r.project} ${r.status}`,
-      topic: r.topic_id ? { topic_id: r.topic_id, title: r.topic_title || r.label, kind: 'run' } : { topic_id: null, title: r.label },
+      topic: (r.hub_topic_id || r.topic_id) ? { topic_id: r.hub_topic_id || r.topic_id, title: r.topic_title || r.label, kind: 'run' } : { topic_id: null, title: r.label },
       row: () => h('div', { class: 'row-body' }, h('div', { class: 'row-line' }, runDot(r.status), h('span', { class: 'row-title', text: r.label }),
         r.owned_by_panel ? null : chip('hors panneau', 'quiet'), h('span', { class: 'row-time', text: fmtDate(r.started_at) })),
       h('div', { class: 'row-sub', text: [r.project && String(r.project).split('/').filter(Boolean).pop(), [r.account, r.model].filter(Boolean).join(' · ') || 'script local',
@@ -1360,7 +1295,7 @@ export function makeViews(ctx) {
         btn(d.status === 'running' ? 'Journal en direct' : 'Rejouer le journal', { icon: 'log', primary: d.status === 'running', onclick: () => followLog(r.run_id, d.label, evUrl) }),
         r.report_file_id ? btn('Rapport', { icon: 'file', onclick: () => ctx.openFile(r.report_file_id, `rapport ${d.label}`) }) : null,
         d.log_file_id ? btn('Log', { icon: 'file', ghost: true, onclick: () => ctx.openFile(d.log_file_id, `log ${d.label}`) }) : null,
-        r.topic_id ? btn('Chat', { icon: 'chat', ghost: true, key: 'c', onclick: () => ctx.openChat() }) : null),
+        (r.hub_topic_id || r.topic_id) ? btn('Envoyer au hub', { icon: 'jobs', ghost: true, onclick: () => ctx.sendToHub() }) : null),
       d.status === 'running' && stop && !stop.allowed ? h('p', { class: 'muted small', text: `Pas de bouton Arrêter : ${stop.reason}` }) : null,
       h('dl', { class: 'fields fields-grid' },
         h('dt', { text: 'Compte' }), h('dd', { text: `${d.account ?? 'inconnu'} · ${d.model ?? '?'}` }),

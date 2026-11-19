@@ -240,40 +240,6 @@ def test_dossier_detail_uses_private_folder_and_version_reference(panel, tmp_pat
     assert result["recent_files"] == [] and "inconnu" in result["recent_files_note"]
 
 
-def test_chat_queue_cancel_admission_and_continuation(panel):
-    app, fake = panel
-    topic = pending_item(app)["topic_id"]
-    path = "/api/topics/" + topic + "/messages"
-    fake.active = 5
-    _, op = post(app, path, {"request_id": "a", "text": "Un résumé"})
-    app.launcher.tick()
-    assert app.operation(op["operation_id"])["status"] == "queued"
-    assert len(app.readers.runs()["queue"]) == 1
-    _, cancelled = post(app, op["links"]["status_url"] + "/cancel", {"request_id": "cancel"})
-    assert cancelled["status"] == "cancelled"
-    fake.active = 0
-    _, op = post(app, path, {"request_id": "b", "text": "Un résumé"})
-    app.launcher.tick()
-    live = app.operation(op["operation_id"])
-    rid = live["steps"][0]["run_id"]
-    assert rid
-    fake.rows[rid].update(status="succeeded", ended_at="2026-11-18T00:01:00+00:00", exit_code=0)
-    app.launcher.tick()
-    assert app.operation(op["operation_id"])["status"] == "succeeded"
-    _, second = post(app, path, {"request_id": "c", "text": "Encore"})
-    app.launcher.tick()
-    cmd = next(c for c in reversed(fake.calls) if c[1] == "run")
-    assert cmd[cmd.index("--continue-run") + 1] == rid
-    assert "--model" not in cmd  # cdx pins the measured parent model.
-    import shlex
-    extra = shlex.split(cmd[cmd.index("--extra-args") + 1])
-    settings = json.loads(Path(extra[extra.index("--settings") + 1]).read_text())
-    assert {"Read", "Grep", "Glob", "Bash", "Write"}.issubset(settings["permissions"]["deny"])
-    assert "--strict-mcp-config" in extra
-    registry = [json.loads(line) for line in Path(app.cfg["runs_registry"]).read_text().splitlines()]
-    assert all(r["source"] == "panel" and r["operation_id"] and r["topic_id"] == topic for r in registry)
-
-
 def test_upstream_suspends_new_runs_and_preserves_cache(panel):
     app, fake = panel
     app.launcher.running()
@@ -281,20 +247,9 @@ def test_upstream_suspends_new_runs_and_preserves_cache(panel):
     topic = pending_item(app)["topic_id"]
     with pytest.raises(Problem) as err:
         post(app, "/api/topics/" + topic + "/messages", {"request_id": "no", "text": "Hi"})
-    assert err.value.status == 503
+    assert err.value.status == 404
     assert app.launcher.running() == []
     assert app.get("/api/pending", {})["sections"]
-
-
-def test_mail_policy_and_model_validation(panel):
-    app, _ = panel
-    topic = app.launcher.topic("mail", "conversation", "Example")
-    with pytest.raises(Problem) as err:
-        post(app, "/api/topics/" + topic + "/messages", {"request_id": "a", "text": "Hi", "account": "workb", "model": "gpt-5"})
-    assert err.value.body["error"]["code"] == "policy_denied"
-    with pytest.raises(Problem) as err:
-        post(app, "/api/topics/" + topic + "/messages", {"request_id": "a", "text": "Hi", "model": "invalid"})
-    assert err.value.body["error"]["code"] == "invalid_model"
 
 
 def test_snapshot_pagination_partial_and_reintroduced_old_mail(panel):
@@ -470,20 +425,6 @@ def test_sse_persistent_replay_without_duplicates(http_panel):
     assert status == 200 and raw == b""
 
 
-def test_missing_result_unknown_never_relaunches(panel):
-    app, fake = panel
-    _, op = post(app, "/api/mail/sync", {"request_id": "sync"})
-    app.launcher.tick()
-    op = app.operation(op["operation_id"])
-    rid = op["steps"][0]["run_id"]
-    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
-    app.launcher.tick()
-    assert app.operation(op["operation_id"])["status"] == "unknown"
-    count = len([c for c in fake.calls if c[1] == "run"])
-    app.launcher.tick()
-    assert len([c for c in fake.calls if c[1] == "run"]) == count
-
-
 def test_journal_recovers_lost_http_response_without_rewrite(panel):
     app, _ = panel
     item = pending_item(app)
@@ -507,50 +448,8 @@ def test_live_mail_is_blocked_without_proof(panel):
     key = app.mail.raw()["items"][0]["id"]
     with pytest.raises(Problem) as err:
         post(app, "/api/mail/" + key + "/reply-all", {"request_id": "live", "instructions": "reply"})
-    assert err.value.body["error"]["code"] == "capability_unavailable"
+    assert err.value.body["error"]["code"] == "outlook_unavailable"
     assert not any(c[1] == "run" for c in fake.calls)
-
-
-def test_live_reply_pipeline_persists_draft_before_styling_and_restart(panel, tmp_path):
-    app, fake = panel
-    app.mail.publish(snapshot())
-    app.cfg["mode"] = "live"
-    app.cfg["mail"]["draft_app_id"] = "draft_only_example"
-    app.cfg["mail"]["style_rules"] = str(tmp_path / "style.md")
-    app.cfg["work_handoff_dir"] = str(tmp_path / "handoff")
-    Path(app.cfg["mail"]["style_rules"]).write_text("Concise, no send.")
-    (tmp_path / "local").mkdir(exist_ok=True)
-    (tmp_path / "local/owner-prefs.md").write_text("Drafts only.")
-    proof = {name: {k: {"ok": True, "at": "2026-11-18T00:00:00+00:00", "detail": "fixture proof"} for k in ("schema", "headless_probe", "permissions", "live_trial")} for name in ("draft_skeleton", "draft_style")}
-    (app.cfg.state / "capabilities.json").write_text(json.dumps(proof))
-    key = app.mail.raw()["items"][0]["id"]
-    _, op = post(app, "/api/mail/" + key + "/reply-all", {"request_id": "live", "instructions": "Reply concisely"})
-    app.launcher.tick()
-    current = app.operation(op["operation_id"])
-    rid = current["steps"][-1]["run_id"]
-    job = app.store.get("jobs", op["operation_id"])
-    Path(job["output"]).write_text(json.dumps({"draft_id": "draft-one", "replied_message_id": key, "to": [], "cc": [], "thread_text": "untrusted", "evidence": ["tool fixture"]}))
-    Path(fake.rows[rid]["artifacts"]["stdout_path"]).write_text(json.dumps({"message": {"content": [{"type": "tool_use", "name": "mcp__M365__outlook_create_reply_all_draft", "input": {"messageId": key}}]}}) + "\n")
-    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
-    app.launcher.tick()
-    saved = app.operation(op["operation_id"])
-    assert saved["result"]["draft_id"] == "draft-one" and saved["steps"][-1]["name"] == "style"
-    restarted = App(app.cfg, fake)
-    restarted.launcher.tick()
-    cmd = next(c for c in reversed(fake.calls) if c[1] == "run")
-    assert cmd[2] == "worka" and "--power" in cmd
-    assert 'apps._default.enabled=false' in cmd[cmd.index("--extra-args") + 1]
-    saved = restarted.operation(op["operation_id"])
-    rid = saved["steps"][-1]["run_id"]
-    output = Path(fake.rows[rid]["artifacts"]["stdout_path"])
-    output.write_text(json.dumps({"type": "result", "result": json.dumps({"draft_id": "draft-one", "updated": True, "evidence": ["fixture"]})}) + "\n")
-    # Codex's final envelope differs from Claude's.
-    output.write_text(json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps({"draft_id": "draft-one", "updated": True, "evidence": ["fixture"]})}}) + "\n")
-    fake.rows[rid].update(ended_at="2026-11-18T00:02:00+00:00", exit_code=0, status="succeeded")
-    restarted.launcher.tick()
-    assert restarted.operation(op["operation_id"])["steps"][-1]["name"] == "verify"
-    assert len([c for c in fake.calls if c[1] == "run" and c[2] == "claude"]) == 1
-    restarted.store.db.close()
 
 
 def test_utf8_tail_waits_for_complete_line_and_redacts(panel, tmp_path):
@@ -612,34 +511,6 @@ def test_example_config_alone_and_non_loopback_rejected(tmp_path):
         Config(overrides={"host": "0.0.0.0"})
 
 
-def test_real_transcript_shapes_and_intentional_probe_denial(panel):
-    app, fake = panel
-    _, op = post(app, "/api/mail/sync", {"request_id": "probe-shapes", "probe": True})
-    app.launcher.tick()
-    live = app.operation(op["operation_id"])
-    job = app.store.get("jobs", op["operation_id"])
-    rid = live["steps"][-1]["run_id"]
-    log = Path(fake.rows[rid]["artifacts"]["stdout_path"])
-    entries = [
-        {"type": "user", "message": {"content": "The actual provider stores prompts as strings."}},
-        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "mcp__M365__outlook_email_search", "input": {}}]}},
-        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "mcp__M365__get_me", "input": {}}]}},
-        {"type": "user", "message": {"content": [{"type": "tool_result", "content": "Panel action policy denied this tool."}]}},
-        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "ListMcpResourcesTool", "input": {"server": "M365"}}]}},
-    ]
-    log.write_text("".join(json.dumps(v) + "\n" for v in entries))
-    value = snapshot()
-    value["probe"] = {"tools": ["mcp__M365__outlook_email_search"], "denied_tool": {"name": "get_me", "blocked": True}}
-    Path(job["output"]).write_text(json.dumps(value))
-    fake.rows[rid].update(ended_at="2026-11-18T00:01:00+00:00", exit_code=0, status="succeeded")
-    app.launcher.tick()
-    assert app.operation(op["operation_id"])["status"] == "succeeded"
-    caps = app.mail.capabilities()
-    read = next(c for c in caps["capabilities"] if c["name"] == "mail_read")
-    assert read["allowed"] and read["evidence"]["permissions"]["ok"]
-    assert all("actual provider stores" not in e["data"].get("text", "") for e in app.store.events(rid))
-
-
 def test_restart_marks_unfinished_acceptance_unknown(panel):
     app, fake = panel
     op = app.store.operation("mail.reply_all", {"request_id": "interrupted"}, "Example")
@@ -660,64 +531,6 @@ def test_repeated_pending_reads_do_not_rewrite_durable_state(panel):
     topic["default_model"] = "haiku"
     app.store.put("topics", topic["topic_id"], topic)
     assert app.topic(topic["topic_id"])["default_model"] == "haiku"
-
-
-def test_public_chat_models_match_account_policy(panel):
-    app, _ = panel
-    config = app.public_config()
-    topic = app.topic(app.launcher.topic("project", "models-contract", "Model selection"))
-    for account in config["chat"]["accounts"]:
-        for model in account["models"]:
-            selected = app.launcher.select(topic, {"account": account["name"], "model": model})
-            assert selected[:2] == (account["name"], model)
-    assert "pending_md" not in config and "real_home" not in config
-
-
-@pytest.mark.parametrize('violation', ['extra_id', 'wrong_folder', 'categories', 'conversation', 'unknown_tool', 'missing_hook'])
-def test_triage_transcript_violation_is_partial_and_alerted(panel, tmp_path, violation):
-    from crow_panel.security import write_policy
-    app, fake = panel
-    op = app.store.operation('mail.triage.execute', {'request_id': violation}, 'Confirmed batch')
-    item = {'message_id': 'one', 'folder_id': 'target', 'source_folder_id': 'inbox', 'action': 'move'}
-    job = app.mail.triage_job(op, {'items': [item]})
-    op.update(status='succeeded', steps=[{'name': 'execute'}])
-    write_policy(app.cfg, op['operation_id'], 'triage', Path(job['output']), job['manifest'])
-    name, arguments = 'mcp__M365__outlook_modify_labels', {'messageId': 'one', 'moveToFolderId': 'target'}
-    if violation == 'extra_id':
-        arguments['messageId'] = 'outside'
-    elif violation == 'wrong_folder':
-        arguments['moveToFolderId'] = 'other'
-    elif violation == 'categories':
-        arguments['categories'] = ['unconfirmed']
-    elif violation == 'conversation':
-        name = 'mcp__M365__outlook_modify_thread_labels'
-    elif violation == 'unknown_tool':
-        name = 'mcp__M365__unexpected_writer'
-    else:
-        (app.cfg.state / 'ops' / op['operation_id'] / 'policy.json').unlink()
-    transcript = tmp_path / 'triage-transcript.jsonl'
-    transcript.write_text(json.dumps({'message': {'content': [{'type': 'tool_use', 'name': name, 'input': arguments}]}}) + '\n')
-    Path(job['output']).write_text(json.dumps({'items': [{'message_id': 'one', 'status': 'succeeded', 'folder_id': 'target'}], 'evidence': ['claimed result']}))
-    app.mail.complete(op, job, {'stdout_path': str(transcript)}, '')
-    assert op['status'] == 'partial'
-    assert op['error']['code'] == 'manifest_violation'
-    assert not op['undo']['available']
-    assert not any(c[1] == 'run' for c in fake.calls)
-
-
-def test_lost_triage_result_stays_unknown_without_retry(panel):
-    app, fake = panel
-    op = app.store.operation('mail.triage.execute', {'request_id': 'lost-triage'}, 'Confirmed batch')
-    item = {'message_id': 'one', 'folder_id': 'target', 'source_folder_id': 'inbox', 'action': 'move'}
-    job = app.mail.triage_job(op, {'items': [item]})
-    op.update(status='succeeded', steps=[{'name': 'execute'}])
-    app.mail.complete(op, job, {}, '')
-    app.store.save_op(op)
-    app.launcher.tick()
-    assert app.operation(op['operation_id'])['status'] == 'unknown'
-    assert op['error']['code'] == 'result_missing'
-    assert not op['undo']['available']
-    assert not any(c[1] == 'run' for c in fake.calls)
 
 
 @pytest.mark.parametrize("profile", ["skeleton", "triage", "style"])
@@ -823,7 +636,6 @@ def test_run_reports_do_not_expose_credentials(panel, tmp_path):
     assert "credential-secret" not in rendered and "cookie-secret" not in rendered
 
 
-
 def test_worker_failure_closes_the_operation_event_stream(panel):
     app, _ = panel
     app.cfg["mode"] = "live"
@@ -833,35 +645,6 @@ def test_worker_failure_closes_the_operation_event_stream(panel):
     assert op["status"] == "failed" and op["result"]["exit_code"] == 127
     events = app.store.events(op["operation_id"])
     assert events[-1]["event"] == "done" and events[-1]["data"]["status"] == "failed"
-
-
-@pytest.mark.parametrize("evidence", ["none", "error", "wrapped_error", "success"])
-def test_triage_success_requires_a_completed_tool_call(panel, tmp_path, evidence):
-    from crow_panel.security import write_policy
-    app, _ = panel
-    op = app.store.operation("mail.triage.execute", {"request_id": "triage-proof"}, "Confirmed batch")
-    item = {"message_id": "one", "folder_id": "target", "source_folder_id": "inbox", "action": "move"}
-    job = app.mail.triage_job(op, {"items": [item]})
-    write_policy(app.cfg, op["operation_id"], "triage", Path(job["output"]), job["manifest"])
-    op.update(status="succeeded", steps=[{"name": "execute"}])
-    entries = []
-    if evidence != "none":
-        entries = [
-            {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "tool-one", "name": "mcp__M365__outlook_modify_labels",
-                                                             "input": {"messageId": "one", "moveToFolderId": "target"}}]}},
-            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "tool-one", "is_error": evidence == "error",
-                                                        "content": '{"isError":true,"error":"access denied"}' if evidence == "wrapped_error" else "access denied" if evidence == "error" else '{"success":true}'}]}},
-        ]
-    transcript = tmp_path / "proof.jsonl"
-    transcript.write_text("".join(json.dumps(e) + "\n" for e in entries))
-    Path(job["output"]).write_text(json.dumps({"items": [{"message_id": "one", "status": "succeeded", "folder_id": "target", "new_message_id": "new-one"}],
-                                               "evidence": ["claimed by final output"]}))
-    app.mail.complete(op, job, {"stdout_path": str(transcript)}, "")
-    if evidence == "success":
-        assert op["status"] == "succeeded" and op["items"][0]["status"] == "succeeded"
-    else:
-        assert op["status"] == "unknown" and op["items"][0]["status"] == "unknown"
-        assert not op["undo"]["available"]
 
 
 @pytest.mark.parametrize("state", ["queued", "unknown"])

@@ -130,7 +130,9 @@ export async function newPage(cdp, { width, height, dark, mobile }) {
     async goto(url, wait = 900) {
       const p = new Promise((r) => { loaded = r; });
       await s('Page.navigate', { url });
-      await Promise.race([p, sleep(8000)]);
+      // Chromium does not consistently emit load for top-level SVG documents.
+      // The favicon is only an origin anchor for localStorage in open().
+      if (!url.endsWith('/favicon.svg')) await Promise.race([p, sleep(8000)]);
       await sleep(wait);
     },
     async eval(expr) {
@@ -190,7 +192,7 @@ async function expect(page, sel, text, what) {
   if (!(await has(page, sel, text))) throw new Error(`attendu : ${what || sel + (text ? ' « ' + text + ' »' : '')}`);
 }
 
-const VIEWS = ['today', 'mail', 'drafts', 'pending', 'decisions', 'dossiers', 'jobs', 'accounts'];
+const VIEWS = ['today', 'mail', 'drafts', 'pending', 'decisions', 'dossiers', 'jobs', 'accounts', 'terminal'];
 
 const SCENARIOS = [];
 const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });
@@ -200,7 +202,7 @@ for (const width of [1280, 1024, 390]) {
     await open(page, base, { view: 'pending' });
     await expect(page, '.admission', 'claude 1/3 · worka 0/1 · workb 0/1');
     const controls = await page.eval(`({width:innerWidth,buttons:[...document.querySelectorAll('#topbar-actions button')].map(b=>({label:b.getAttribute('aria-label'),right:b.getBoundingClientRect().right}))})`);
-    for (const label of ['Nouveau chat', 'Mise à jour machine', 'Save OneDrive']) {
+    for (const label of ['Historique', 'Mise à jour outils', 'Save OneDrive']) {
       if (!controls.buttons.some(b => b.label === label && b.right <= controls.width)) throw new Error('Commande inaccessible : ' + label);
     }
   });
@@ -353,7 +355,11 @@ for (const dark of [false, true]) {
     add(`${dark ? 'dark' : 'light'}-${v}`, { ...DESK, dark }, async (page, base) => {
       await open(page, base, { view: v });
       await expect(page, '.view-title', null, 'titre de vue');
-      if (v !== 'today') await expect(page, '#pane-list .row', null, `lignes dans ${v}`);
+      if (v === 'terminal' || v === 'today') {
+        if (await page.eval(`getComputedStyle(document.getElementById('pane-list')).display !== 'none'`)) throw new Error('Liste visible dans une vue pleine largeur');
+      }
+      if (v === 'terminal') await expect(page, '.terminal-screen', 'Hub prêt');
+      else if (v !== 'today') await expect(page, '#pane-list .row', null, `lignes dans ${v}`);
       else await expect(page, '.kpi', null, 'tuiles KPI');
       await page.shot(`${dark ? 'dark' : 'light'}-${v}`);
     });
@@ -385,77 +391,46 @@ add('flow-snooze', DESK, async (page, base) => {
   await expect(page, '.toast', 'Reporté');
 });
 
-add('flow-followup', DESK, async (page, base) => {
-  await open(page, base, { view: 'pending', sel: { pending: 'p_k3m9x2qa' } });
-  await page.click('.detail .btn', 'Relancer');
-  const v = await page.eval(`document.querySelector('.followup-box textarea').value`);
-  if (!v.startsWith('Prépare la relance de')) throw new Error('consigne de relance absente : ' + v);
-  await expect(page, '.followup-box', 'Contrôle Brouillons et Envoyés');
-  await page.shot('flow-followup-form');
-  await page.click('.followup-box .btn-primary', 'Préparer la relance');
-  await sleep(4000);
-  const steps = await page.eval(`document.querySelectorAll('.steps .step').length`);
-  if (steps !== 4) throw new Error('Quatre étapes attendues pour la relance : ' + steps);
-  await expect(page, '.steps', 'Contrôle Brouillons et Envoyés');
-  await page.shot('flow-followup-pipeline');
-  await page.click('.detail .btn', 'Relancer');
-  await expect(page, '.followup-box', 'Préparer la relance');
-});
-
-add('flow-chat-stream', DESK, async (page, base) => {
-  await open(page, base, { view: 'pending', sel: { pending: 'p_7hd2lw0e' } });
-  await expect(page, '.msg-crow', 'Il manque la section');
-  await sleep(1300);
-  await page.shot('flow-chat-streaming');
-  await sleep(2600);
-  await expect(page, '.msg-crow', 'Relance prête', 'réponse finale du run');
-  await page.click('.chat-input');
-  await page.type('Ajoute le responsable en copie seulement si besoin.');
-  await page.key('Enter', 600);
-  await expect(page, '.msg-user', 'Ajoute le responsable');
-  await page.shot('flow-chat-sent');
-  await sleep(3200);
-});
-
 for (const [name, viewport] of [['desktop', DESK], ['mobile', MOBILE]]) {
-  add('flow-chat-continuity-' + name, viewport, async (page, base) => {
+  add('flow-terminal-' + name, viewport, async (page, base) => {
     await open(page, base, { view: 'pending', sel: { pending: 'p_7hd2lw0e' } });
-    await sleep(3400);
-    await page.eval(`document.body.classList.add('chat-open'); true`);
-    const title = await page.eval(`document.querySelector('.chat-title').textContent`);
-    await page.click('.chat-input'); await page.type('Texte conservé avant réglé');
-    await page.click('#pane-detail .btn', 'Réglé'); await sleep(700);
-    if (await page.eval(`document.querySelector('.chat-title').textContent`) !== title) throw new Error('Sujet changé après Réglé');
-    await expect(page, '#pane-chat', 'historique conservé');
-    if (await page.eval(`document.querySelector('.chat-input').value`) !== 'Texte conservé avant réglé') throw new Error('Brouillon perdu');
-    await page.click('#pane-list .row');
-    if (await page.eval(`document.querySelector('.chat-title').textContent`) !== title) throw new Error('Sujet suit la sélection');
-    await page.click('.chat-input'); await page.key('Enter', 500); await sleep(3300);
-    if (await page.eval('document.activeElement.id') !== 'chat-input') throw new Error('Focus perdu après réponse');
-    await page.type('e');
-    if (await page.eval(`document.querySelector('.chat-input').value`) !== 'e') throw new Error('e a déclenché une action de ligne');
-    await page.click('.chat-tools button', 'Nouveau chat');
-    await expect(page, '#dialog[open]', 'Conversations récentes');
-    await page.click('#dialog input'); await page.type('Un sujet autonome');
-    await page.click('#dialog button', 'Créer le chat'); await sleep(500);
-    await expect(page, '.chat-title', 'Un sujet autonome');
-    await page.click('.chat-input'); await page.type('Historique libre'); await page.key('Enter', 500); await sleep(3300);
-    await page.click('.chat-tools button', 'Conversations récentes');
-    await expect(page, '#dialog', 'Un sujet autonome');
-    await page.click('#dialog .search-result', title); await sleep(450);
-    await expect(page, '.msg-user', 'Texte conservé avant réglé');
-    await page.click('#search-open'); await page.type('Historique libre'); await sleep(500);
-    await expect(page, '#search-results', 'Conversations');
-    await page.click('#search-results .search-result', 'Un sujet autonome'); await sleep(450);
-    await expect(page, '.msg-user', 'Historique libre');
-    await page.click('.chat-close');
-    await page.click('.rail-item', "Aujourd'hui"); await sleep(450);
-    await page.click('.card button', 'Chat · Un sujet autonome'); await sleep(450);
-    await expect(page, '.msg-user', 'Historique libre');
-    if (!(await page.eval(`document.body.classList.contains('chat-open') && getComputedStyle(document.getElementById('pane-chat')).display !== 'none'`))) throw new Error('Chat du run invisible sur l’accueil');
-    await page.shot('chat-continuity-' + name);
+    if (await has(page, '#pane-chat')) throw new Error('Ancien chat encore présent');
+    await page.eval(`import('./js/api.js').then(({api})=>{
+      window.terminalCalls=[]; const post=api.post.bind(api), get=api.get.bind(api);
+      api.post=async(p,b)=>{ if(p.startsWith('/api/terminal'))window.terminalCalls.push({path:p,body:b}); if(p.endsWith('/start'))window.hubStopped=false; return post(p,b); };
+      api.get=async p=>p==='/api/terminal'&&window.hubStopped ? {running:false,sessions:[]} : get(p);
+    })`);
+
+    await page.click('#pane-detail .btn', 'Envoyer au hub');
+    await page.click('#dialog textarea'); await page.type('Relance avec mon contexte');
+    await page.click('#dialog button', 'Insérer dans le terminal'); await sleep(1500);
+    await expect(page, '.view-title', 'Terminal');
+    await expect(page, '.terminal-view code', 'tmux attach -t crow-hub-fixture');
+    await expect(page, '.terminal-screen', 'Hub prêt');
+    if (await has(page, '.terminal-screen script')) throw new Error('Texte terminal interprété comme HTML');
+    const calls = () => page.eval('window.terminalCalls');
+    const handoff = (await calls()).find(c => c.path.endsWith('/handoff'));
+    if (!handoff || handoff.body.note !== 'Relance avec mon contexte') throw new Error('Contexte non transféré');
+    if ((await calls()).some(c => c.path.endsWith('/keys'))) throw new Error('Entrée envoyée pendant le transfert');
+    await page.click('.terminal-screen'); await page.key('e'); await page.key('Enter'); await sleep(500);
+    const keys = (await calls()).filter(c => c.path.endsWith('/keys')).flatMap(c => c.body.keys);
+    if (!keys.some(k=>k.text==='e') || !keys.some(k=>k.key==='Enter')) throw new Error('Saisie non transmise');
+    await page.eval('window.hubStopped=true'); await sleep(1400);
+    await expect(page, '.terminal-view', 'Démarrer le hub');
+    await page.click('.terminal-view button', 'Démarrer le hub'); await sleep(1400);
+    await expect(page, '.terminal-screen', 'Hub prêt');
+    await page.shot('terminal-' + name);
   });
 }
+
+add('flow-history-readonly', DESK, async (page, base) => {
+  await open(page, base, { view: 'pending' });
+  await page.click('#topbar-actions button', 'Historique');
+  await expect(page, '#dialog', 'lecture seule');
+  await page.click('#dialog .search-result'); await sleep(500);
+  await expect(page, '#dialog', 'historique en lecture seule');
+  if (await has(page, '#dialog textarea, #chat-input')) throw new Error('Historique modifiable');
+});
 
 add('flow-reply-all', DESK, async (page, base) => {
   await open(page, base, { view: 'mail', sel: { mail: 'AAMkAGFAKE0002==' } });
@@ -539,8 +514,9 @@ add('flow-keys-help', DESK, async (page, base) => {
   await page.key('e', 300);
   if (await has(page, '.toast', 'Réglé')) throw new Error('e a agi hors de la liste En attente');
   await page.key('c', 300);
-  const c = await page.eval(`document.activeElement && document.activeElement.id`);
-  if (c !== 'chat-input') throw new Error('c ne donne pas le focus au chat');
+  if (await has(page, '#chat-input')) throw new Error('Ancien raccourci chat actif');
+  await page.key('g'); await page.key('h'); await sleep(1200);
+  await expect(page, '.view-title', 'Terminal');
 });
 
 add('flow-file-open', DESK, async (page, base) => {
@@ -578,11 +554,11 @@ add('flow-hostile', DESK, async (page, base) => {
 });
 
 // Narrow and mobile layouts.
-add('mid-pending-chat', MID, async (page, base) => {
+add('mid-pending-detail', MID, async (page, base) => {
   await open(page, base, { view: 'pending', sel: { pending: 'p_7hd2lw0e' } });
   await page.shot('mid-pending');
-  await page.key('c', 500);
-  await page.shot('mid-pending-chat-drawer');
+  await page.click('.detail .btn', 'Envoyer au hub');
+  await page.shot('mid-pending-handoff');
 });
 for (const dark of [false, true]) {
   const tag = dark ? 'dark' : 'light';
@@ -599,9 +575,9 @@ for (const dark of [false, true]) {
     await sleep(400);
     await expect(page, '.detail h2', 'Fournisseur Alpha');
     await page.shot(`mobile-${tag}-pending-detail`);
-    await page.click('#chat-toggle');
-    await sleep(600);
-    await page.shot(`mobile-${tag}-chat`);
+    await page.click('.detail .btn', 'Envoyer au hub');
+    await sleep(300);
+    await page.shot(`mobile-${tag}-handoff`);
     await page.key('Escape');
     await page.click('#nav-open');
     await page.click('.rail-item', 'Mails');
@@ -611,26 +587,6 @@ for (const dark of [false, true]) {
     await page.shot(`mobile-${tag}-mail-detail`);
   });
 }
-
-add('flow-chat-account-model', DESK, async (page, base) => {
-  await open(page, base, { view: 'dossiers' });
-  await page.click('#pane-list .row');
-  await sleep(500);
-  const models = await page.eval(`(() => {
-    const s = document.querySelector('.chat-foot select[aria-label=Compte]');
-    s.value = 'workb'; s.dispatchEvent(new Event('change'));
-    return [...document.querySelector('.chat-foot select[aria-label=Modèle]').options].map(o => o.value);
-  })()`);
-  if (models.length !== 1 || models[0] !== 'gpt-5') throw new Error('incompatible provider models: ' + models);
-  await page.click('.chat-foot .link-btn', 'Par défaut ici');
-  await expect(page, '.toast', 'gpt-5');
-  const selected = await page.eval(`(() => {
-    const s = document.querySelector('.chat-foot select[aria-label=Compte]');
-    s.value = 'claude'; s.dispatchEvent(new Event('change'));
-    return document.querySelector('.chat-foot select[aria-label=Modèle]').value;
-  })()`);
-  if (selected !== 'sonnet') throw new Error('default model not restored');
-});
 
 // Every fixture scenario from index.json.
 const SCEN = {
@@ -692,19 +648,12 @@ const SCEN = {
     await page.shot('scenario-nobody');
   },
   queued: async (page, base) => {
-    await open(page, base, { view: 'decisions', scenario: 'queued', sel: { decisions: 'p_q81zc5vn' } });
-    await page.click('.chat-input');
-    await page.type('Résume les options.');
-    await page.key('Enter', 600);
-    await expect(page, '.msg-crow', 'En file');
-    await page.shot('scenario-queued');
+    await open(page, base, { view: 'jobs', scenario: 'queued' });
+    await expect(page, '.view-title', 'Jobs');
   },
   policy: async (page, base) => {
-    await open(page, base, { view: 'pending', scenario: 'policy', sel: { pending: 'p_k3m9x2qa' } });
-    await page.click('.chat-input');
-    await page.type('test');
-    await page.key('Enter', 500);
-    await expect(page, '.msg-error', 'workb');
+    await open(page, base, { view: 'pending', scenario: 'policy' });
+    if (await has(page, '#chat-input')) throw new Error('Chat présent');
   },
   upstream: async (page, base) => {
     await open(page, base, { view: 'jobs', scenario: 'upstream' });
@@ -733,6 +682,7 @@ for (const [name, run] of Object.entries(SCEN)) add(`scenario-${name}`, DESK, ru
 add('scenarios-all-views', DESK, async (page, base) => {
   const index = JSON.parse(await readFile(path.join(ROOT, 'fixtures', 'index.json'), 'utf8'));
   for (const scenario of ['', ...Object.keys(index.scenarios)]) {
+    console.log('    views · ' + (scenario || 'default'));
     for (const v of VIEWS) {
       await open(page, base, { view: v, scenario, wait: 700 });
       // open the first entry of each list too

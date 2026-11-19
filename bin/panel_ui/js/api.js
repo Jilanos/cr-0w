@@ -193,19 +193,19 @@ const fake = {
   async request(method, rawPath, body) {
     await new Promise((r) => setTimeout(r, 60));
     const [path, qs] = rawPath.split('?');
+    if (path.startsWith('/api/terminal')) {
+      this.terminalCalls ||= [];
+      if (method === 'POST') this.terminalCalls.push({ path, body: clone(body) });
+      this.hub ||= { session: 'crow-hub-fixture', pid: 42, attach: 'tmux attach -t crow-hub-fixture' };
+      if (method === 'GET' && path === '/api/terminal') return { status: 200, data: { running: !this.hubStopped, sessions: this.hubStopped ? [] : [this.hub] } };
+      if (path.endsWith('/start')) this.hubStopped = false;
+      if (path.endsWith('/screen')) return { status: 200, data: { ok: true, lines: ['\x1b[32mHub prêt\x1b[0m', '<script>literal text</script>'], rows: 24, cols: 80, history: 0, cursor: { x: 0, y: 1, shown: true } } };
+      return { status: 200, data: { ok: true, submitted: false } };
+    }
+    if (method !== 'GET' && /\/api\/topics/.test(path)) throw new ApiError(404, { error: { code: 'not_found', message: 'Historique en lecture seule.' } });
     if (method === 'GET' && path === '/api/search') return this.search(qs);
     if (method === 'GET' && path === '/api/operations') return { status: 200, data: { operations: [...this.ops.values()].map(e => clone(e.done ? e.final : e.op)) } };
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
-    if (method === 'POST' && path === '/api/topics') {
-      const d = body.dossier_slug && this.doc('GET', '/api/dossiers').dossiers.find(d => d.slug === body.dossier_slug);
-      let topic = d && this.doc('GET', '/api/topics').topics.find(t => t.topic_id === d.topic_id);
-      if (!topic) {
-        topic = { topic_id: d?.topic_id || 't_free_' + ++this.seq, title: d?.title || body.title, kind: d ? 'dossier' : 'free',
-          default_account: null, default_model: null, last_message_at: null, orphan: false, messages: 0 };
-        this.doc('GET', '/api/topics').topics.unshift(topic);
-      }
-      return { status: 201, data: clone(topic) };
-    }
     if (method === 'GET' && /^\/api\/topics\/[^/]+$/.test(path)) {
       const id = path.split('/')[3];
       const doc = this.topicDoc(id);
@@ -213,15 +213,6 @@ const fake = {
         topic_id: id, title: doc.title, settled: doc.settled } };
     }
     const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
-    const followup = /^\/api\/pending\/([^/]+)\/followup$/.exec(path);
-    if (method === 'POST' && followup) {
-      const op = this.newOp(this.raw('operation-reply-all-done.json').data, { kind: 'mail.followup', status: 'queued',
-        dry_run: true, request_id: body.request_id, summary: 'Relance simulée' });
-      op.steps.unshift({ ...clone(op.steps[0]), name: 'check_followup' });
-      for (const step of op.steps) Object.assign(step, { status: 'queued', run_id: 'simulated', output: { simulated: true } });
-      op.result = { simulated: true, draft_link: null, checks: op.result.checks.map(c => ({ name: c.name, ok: null, detail: 'simulation, aucune écriture distante' })) };
-      this.track(op); return { status: 202, data: clone(op) };
-    }
     if (method === 'POST' && decision) {
       const afk = this.doc('GET', '/api/afk');
       const row = afk.decisions.find(d => d.n === Number(decision[1]));
@@ -537,29 +528,6 @@ const fake = {
           inverse: () => { if (list) { list.items.push(...removed); list.items.sort((a, b) => b.received.localeCompare(a.received)); }
             this.counts({ inbox: removed.length, triage_proposals: removed.length }); return `${removed.length} mails remis dans la boîte`; } });
         return { status: 200, data: op };
-      }
-      case '/api/topics/{id}/messages': {
-        const doc = this.topicDoc(p.id);
-        const op = this.newOp(base, { request_id: body.request_id, topic_id: p.id, summary: `Chat : ${doc.title || p.id}` });
-        if (op.steps[0]) Object.assign(op.steps[0], { model: body.model || 'sonnet', account: body.account || 'claude' });
-        const at = this.now().toISOString();
-        const topic = this.doc('GET', '/api/topics').topics.find(t => t.topic_id === p.id);
-        if (topic) topic.last_message_at = at;
-        const run = { run_id: 'chat_fx_' + this.seq, kind: 'agent', label: 'Chat · ' + doc.title,
-          topic_id: p.id, topic_title: doc.title, operation_id: op.operation_id, owned_by_panel: true,
-          account: body.account || 'claude', model: body.model || 'sonnet', started_at: at,
-          status: op.status, project: 'crow' };
-        this.doc('GET', '/api/runs').runs.unshift(run);
-        doc.messages.push({ id: `m_fx${this.seq}a`, role: 'user', at, text: body.text, model: body.model || 'sonnet',
-          account: body.account || 'claude', intent: body.intent || 'chat', operation_id: op.operation_id });
-        const queued = op.status === 'queued';
-        const reply = { id: `m_fx${this.seq}b`, role: 'crow', at, status: queued ? 'queued' : 'running', operation_id: op.operation_id,
-          run_id: null, model_effective: null, account: body.account || 'claude', continued_from: null, segments: [],
-          cost_usd: null, cost_status: 'unknown' };
-        doc.messages.push(reply);
-        if (!queued) this.track(op);
-        else this.ops.set(op.operation_id, { op, final: op, done: false });
-        return { status: res.status, data: op };
       }
       case '/api/routines/{name}': {
         const routines = this.files.get('routines.json');

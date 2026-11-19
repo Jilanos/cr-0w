@@ -31,20 +31,12 @@ mail:
   style_rules: null
   allowed_folders: []
   body_prefetch: 50
-  proposals_per_sync: 100
   stale_after_minutes: 120
   internal_domains: []
-  draft_app_id: null
-  probe_deny_tool: get_me
 accounts:
-  claude: {provider: claude, kinds: [chat, mail_read, mail_skeleton, mail_triage]}
-  worka: {provider: codex, kinds: [chat, mail_style, files], power: high, model: gpt-5}
-  workb: {provider: codex, kinds: [chat, files], model: gpt-5}
-chat:
-  default_model: sonnet
-  default_account: claude
-  models: [haiku, sonnet, opus]
-  by_kind: {}
+  claude: {provider: claude, kinds: [mail_read]}
+  worka: {provider: codex, kinds: [mail_style, files], power: high, model: gpt-5}
+  workb: {provider: codex, kinds: [files], model: gpt-5}
 projects: {}
 dossiers: {}
 # dossiers:

@@ -65,8 +65,6 @@ def run_job(mail, op, job):
                             'proposals': mail.proposal_counts()}
             op['status'] = 'succeeded' if result['coverage']['status'] == 'complete' else 'partial'
             op['steps'][-1].update(status=op['status'], ended_at=now(), output=op['result'])
-            if result['published'] and op['status'] == 'succeeded' and not job.get('probe') and not job.get('fast'):
-                mail.queue_proposals(op)
             return
         elif op['kind'] == 'mail.fetch':
             row = mail.find(job['message_id'])

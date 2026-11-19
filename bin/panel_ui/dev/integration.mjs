@@ -1,4 +1,4 @@
-// Browser checks against a real dry-run server. Chat and sync require explicit flags.
+// Browser checks against a disposable dry-run server. Sync requires an explicit flag.
 import { CDP, findChrome, launch, newPage } from './shots.mjs';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -46,7 +46,7 @@ try {
   const session = await api("api.get('/api/session')");
   if(session.mode !== 'dry_run') throw new Error('This check requires mode: dry_run');
   await check('all-views', async()=>{
-    for (const label of ["Aujourd'hui",'Mails','Relances & échéances','Décisions','Brouillons','Dossiers','Jobs','Comptes']) {
+    for (const label of ["Aujourd'hui",'Mails','Relances & échéances','Décisions','Brouillons','Dossiers','Jobs','Comptes','Terminal']) {
       await go(label); await selectFirst();
       await page.shot('real-light-'+label.replace(/[^a-zA-Z]/g,'_'));
       if(await page.eval(`!!document.querySelector('.state-error')`)) throw new Error('view error: '+label);
@@ -86,7 +86,7 @@ try {
     await poll(`!!document.querySelector('#pane-list .row:not(.dim)[data-key="${id}"]')`);
     return {id};
   });
-  await check('snooze-undo-followup',async()=>{
+  await check('snooze-undo',async()=>{
     await selectFirst();
     for(const label of ['+2 jours ouvrés','+1 semaine']) {
       await page.click('.detail .btn','Reporter'); await page.click('.menu-item',label);
@@ -98,16 +98,15 @@ try {
     await page.click('.menu button[type=submit]');
     await poll(`!!document.querySelector('.toast-action')`);
     await page.click('.toast-action'); await poll(`!document.querySelector('.toast-action')`); await sleep(700);
-    await page.click('.detail .btn','Relancer');
-    await poll(`document.querySelector('.followup-box textarea')?.value.startsWith('Prépare la relance de')`);
-    await page.click('.followup-box .btn','Préparer la relance');
-    await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
-    await page.shot('real-followup');
-    await page.goto(base+'/', 1600);
-    await poll(`!!document.querySelector('.followup-last')`);
-    await page.click('.followup-last button','Voir le détail');
-    await poll(`document.querySelectorAll('.steps .step-succeeded').length===4`);
-    await page.shot('real-followup-after-reload');
+  });
+  await check('terminal-and-history',async()=>{
+    await go('Terminal');
+    await poll(`!!document.querySelector('.terminal-view')`);
+    if(await page.eval(`!!document.querySelector('#pane-chat, #chat-input')`)) throw new Error('Retired chat present');
+    await page.shot('real-terminal');
+    await page.click('#topbar-actions button','Historique');
+    await poll(`document.querySelector('#dialog[open]')?.textContent.includes('lecture seule')`);
+    await page.key('Escape');
   });
   await check('reply-all-dry',async()=>{
     await go('Mails'); await selectFirst();
@@ -142,38 +141,6 @@ try {
     await page.click('.detail .btn','Annuler le lot');
     await sleep(1000);
   });
-  if(args.includes('--chat')) await check('chat-sonnet-live',async()=>{
-    await go('Relances & échéances'); await selectFirst();
-    await page.click('.detail .btn','Chat');
-    await page.click('#chat-input');
-    await page.eval(`document.getElementById('chat-input').value='';document.getElementById('chat-input').dispatchEvent(new Event('input'))`);
-    await page.type('Réponds seulement OK. Aucun outil.');
-    await page.click('button[aria-label=Envoyer]');
-    await poll(`!!document.querySelector('.msg-crow')`);
-    await page.shot('real-chat-running');
-    await poll(`document.querySelector('.msg-crow:not(.live) .bubble')?.textContent.includes('OK')`,180000);
-    await page.shot('real-chat-complete');
-    return await api("api.get('/api/operations?active=0').then(d=>d.operations.filter(o=>o.kind==='chat.message').at(-1))");
-  });
-  await check('chat-settings',async()=>{
-    await go('Dossiers'); await selectFirst();
-    await poll(`!!document.querySelector('.chat-foot select[aria-label=Compte]')`);
-    const values=await page.eval(`(()=>{
-      const a=document.querySelector('.chat-foot select[aria-label=Compte]');
-      a.value='workb';a.dispatchEvent(new Event('change'));
-      return [...document.querySelector('.chat-foot select[aria-label=Modèle]').options].map(o=>o.value);
-    })()`);
-    if(!values.length||values.includes('sonnet'))throw new Error('incompatible account models');
-    await page.click('.chat-foot .link-btn','Par défaut ici');
-    await poll(`[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Défaut du sujet')&&t.textContent.includes('workb'))`);
-    await page.eval(`(()=>{
-      const a=document.querySelector('.chat-foot select[aria-label=Compte]');
-      a.value='claude';a.dispatchEvent(new Event('change'));
-    })()`);
-    await page.click('.chat-foot .link-btn','Par défaut ici');
-    await page.shot('real-chat-settings');
-    return {models:values,restored_account:'claude',messages_sent:0};
-  });
   await check('classer-dry',async()=>{
     await go('Mails'); await selectFirst();
     await page.click('.detail .btn','Classer');
@@ -185,8 +152,8 @@ try {
     await page.click('.detail .btn','Modifier la sélection');
   });
   await check('sse-reconnect',async()=>{
-    const op=await api("api.get('/api/operations?active=0').then(d=>d.operations.filter(o=>o.kind==='chat.message'&&o.status==='succeeded').at(-1))");
-    if(!op) throw new Error('A completed chat is needed for replay');
+    const op=await api("api.get('/api/operations?active=0').then(d=>d.operations.filter(o=>o.kind==='mail.reply_all'&&o.status==='succeeded').at(-1))");
+    if(!op) throw new Error('A completed simulated reply operation is needed for replay');
     const replay=await page.eval(`(async()=>{
       const url=${JSON.stringify(op.links.events_url)};
       const first=await fetch(url), reader=first.body.getReader();
@@ -213,7 +180,7 @@ try {
     await page.shot('real-file-open-dry');
   });
   // Routines execute for real unless simulate_in_trial is set: clicking them is opt-in.
-  for(const label of ['Maj','Mise à jour machine']) await check('routine-'+label.replaceAll(' ','-'),async()=>{
+  for(const label of ['Maj','Mise à jour outils']) await check('routine-'+label.replaceAll(' ','-'),async()=>{
     if(!args.includes('--routines'))return {limited:true,reason:'Routines execute for real. Pass --routines with simulate_in_trial: true.'};
     await page.click('#topbar-actions .btn',label);
     await poll(`document.querySelector('.drawer')?.textContent.includes('Mode essai') || document.querySelector('#drawer')?.textContent.includes('Mode essai')`);

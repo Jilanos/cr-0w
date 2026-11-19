@@ -1,44 +1,6 @@
 {
   "generated_at": "2026-11-18T08:31:00+01:00",
   "mode": "dry_run",
-  "chat": {
-    "default_model": "sonnet",
-    "models": [
-      "haiku",
-      "sonnet",
-      "opus"
-    ],
-    "default_account": "claude",
-    "accounts": [
-      {
-        "name": "claude",
-        "provider": "claude",
-        "kinds": [
-          "chat",
-          "mail_read",
-          "mail_skeleton",
-          "mail_triage"
-        ]
-      },
-      {
-        "name": "worka",
-        "provider": "codex",
-        "kinds": [
-          "chat",
-          "mail_style",
-          "files"
-        ]
-      },
-      {
-        "name": "workb",
-        "provider": "codex",
-        "kinds": [
-          "chat",
-          "files"
-        ]
-      }
-    ]
-  },
   "undo_seconds": 10,
   "max_parallel": 5,
   "routines": [
@@ -48,7 +10,7 @@
     },
     {
       "name": "daily_update",
-      "label": "Mise à jour machine"
+      "label": "Mise à jour outils"
     },
     {
       "name": "backup",
@@ -63,7 +25,8 @@
     "decisions",
     "dossiers",
     "jobs",
-    "accounts"
+    "accounts",
+    "terminal"
   ],
   "shortcuts": {
     "j": "next",
@@ -71,7 +34,6 @@
     "Enter": "open",
     "e": "pending_done",
     "r": "reply_all_box",
-    "c": "focus_chat",
     "/": "filter",
     "x": "toggle_select",
     "?": "help",

@@ -22,11 +22,11 @@ from .readers import Readers
 from .security import CSP, Files
 from .visits import Visits
 from .afk import Decisions
-from .followups import Followups
 from .search import Search
 from .notifications import Notifications
 from .calendar import CalendarSync
 from .dossiers import Dossiers
+from .terminal import Terminal
 
 
 class App:
@@ -39,8 +39,7 @@ class App:
         self.pending.active_maj = self.launcher.maj
         self.launcher.pending = self.pending.resume
         self.mail = Mail(cfg, self.store, self.launcher)
-        self.followups = Followups(self)
-        self.mail.followups = self.followups
+        self.terminal = Terminal(self)
         self.calendar = CalendarSync(self)
         self.launcher.complete = self.complete
         self.launcher.native = self.native
@@ -72,15 +71,9 @@ class App:
 
     def public_config(self):
         # Values are an explicit allowlist. Private paths and action profiles never leave the server.
-        return {"generated_at": now(), "mode": self.cfg["mode"], "chat": {
-            "default_model": self.cfg["chat"].get("default_model", "sonnet"), "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]),
-            "default_account": self.cfg["chat"].get("default_account", "claude"), "accounts": [
-                {"name": name, "provider": c.get("provider", "claude" if name == "claude" else "codex"), "kinds": c.get("kinds", []),
-                 "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]) if c.get("provider", "claude" if name == "claude" else "codex") == "claude"
-                 else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
-            "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "limits": self.cfg["limits"], "routines": [{"name": "maj", "label": "Maj"}, {"name": "daily_update", "label": "Mise à jour machine"}, {"name": "backup", "label": "Save OneDrive"}],
-            "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts"],
-            "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
+        return {"generated_at": now(), "mode": self.cfg["mode"], "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "limits": self.cfg["limits"], "routines": [{"name": "maj", "label": "Maj"}, {"name": "daily_update", "label": "Mise à jour outils"}, {"name": "backup", "label": "Save OneDrive"}],
+            "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts", "terminal"],
+            "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
 
     def complete(self, op, job, row, text):
         if op["kind"] == CalendarSync.KIND:
@@ -118,6 +111,9 @@ class App:
         routes = {"/api/config": self.public_config, "/api/state": self.readers.state, "/api/pending": self.pending.view,
                   "/api/capabilities": self.mail.capabilities, "/api/mail/folders": self.mail.folders, "/api/drafts": self.mail.drafts,
                   "/api/accounts": self.readers.accounts, "/api/routines": self.readers.routines, "/api/dossiers": self.readers.dossiers, "/api/afk": self.readers.afk}
+        if path == "/api/terminal/screen":
+            return self.terminal.screen(query)
+        routes["/api/terminal"] = self.terminal.status
         routes["/api/notifications"] = self.notifications.status
         if path in routes:
             return routes[path]()
@@ -167,26 +163,16 @@ class App:
             return status, result
 
     def _mutate(self, method, path, body, route):
-        match = re.fullmatch(r'/api/topics/([^/]+)', path)
-        if method == "PUT" and match:
-            topic = self.topic(match[1])
-            for field in ("default_model", "default_account"):
-                if field in body:
-                    topic[field] = body[field]
-            self.launcher.select(topic, {})
-            self.store.put("topics", topic["topic_id"], topic)
-            return 200, topic
         if method != "POST":
             raise Problem(404, "not_found", "Route introuvable.")
-        if path == "/api/topics":
-            slug = body.get("dossier_slug")
-            if slug:
-                return 200, self.topic(self.readers.dossier(slug)["topic_id"])
-            title = body.get("title")
-            if not isinstance(title, str) or not title.strip() or len(title.strip()) > 200:
-                raise Problem(400, "bad_request", "Titre requis, limité à 200 caractères.")
-            key = self.launcher.topic("free", uid("chat_"), title.strip(), {"title": title.strip()})
-            return 201, self.topic(key)
+        if path == "/api/terminal/start":
+            return 200, self.terminal.start()
+        if path == "/api/terminal/keys":
+            return 200, self.terminal.keys(body)
+        if path == "/api/terminal/resize":
+            return 200, self.terminal.resize(body)
+        if path == "/api/terminal/handoff":
+            return 200, self.terminal.handoff(body)
         if path == "/api/state/visit":
             return 200, self.visits.visit(body, route)
         match = re.fullmatch(r'/api/afk/decisions/(\d+)/answer', path)
@@ -195,9 +181,6 @@ class App:
         match = re.fullmatch(r'/api/pending/([^/]+)/(done|snooze)', path)
         if match:
             return self.pending.submit(match[1], match[2], body, route)
-        match = re.fullmatch(r'/api/pending/([^/]+)/followup', path)
-        if match:
-            return 202, self.followups.submit(match[1], body, route)
         match = re.fullmatch(r'/api/operations/([^/]+)/(undo|cancel|reconcile)', path)
         if match:
             op = self.operation(match[1])
@@ -232,9 +215,6 @@ class App:
         match = re.fullmatch(r'/api/mail/([^/]+)/(fetch|reply-all)', path)
         if match:
             return (202, self.mail.collect("mail.fetch", body, route, match[1])) if match[2] == "fetch" else (202, self.mail.reply(match[1], body, route))
-        match = re.fullmatch(r'/api/topics/([^/]+)/messages', path)
-        if match:
-            return 202, self.launcher.chat(self.topic(match[1]), body, route)
         match = re.fullmatch(r'/api/routines/([^/]+)', path)
         if match:
             return 202, self.launcher.routine(match[1], body, route)

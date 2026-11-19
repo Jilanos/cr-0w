@@ -181,7 +181,7 @@ $result
 
 def test_panel_connection_label_and_native_sync_are_distinct_from_routines(panel):
     app, _ = panel
-    assert app.mail.connection()['label'] == 'Outlook classique : non ouvert (repli connecteur)'
+    assert app.mail.connection()['label'] == 'Outlook classique : non ouvert, instantané conservé'
     class Backend:
         def probe(self):
             return {'connected': True, 'folders_resolvable': True}

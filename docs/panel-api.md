@@ -44,7 +44,7 @@ accounts count conservatively against admission until metadata is available.
 
 The JSON examples in `tests/fixtures/panel/` mirror the private specification's
 fixtures. An error is `{error: {code, message, retryable, details}}`. Mutations
-return a durable operation, except triage planning, topic defaults and file-open
+return a durable operation, except triage planning, terminal and file-open
 responses, whose fixture defines a separate shape. HTTP 202 means accepted.
 Inspect the operation for the business result and its evidence.
 
@@ -55,8 +55,7 @@ First fetch `/` to receive the HttpOnly, SameSite=Strict session cookie. Then fe
 
 Every POST requires a client `request_id`. Reusing the id with the same route and
 body returns the original operation or result; a different body returns 409.
-PUT topic defaults accepts an optional request id for compatibility with its
-fixture. Supply one when retrying it.
+Topic history is read-only; topic POST and PUT routes return 404.
 
 | Routes | Methods |
 | --- | --- |
@@ -64,7 +63,7 @@ fixture. Supply one when retrying it.
 | `/api/state/visit` | POST |
 | `/api/pending` | GET |
 | `/api/pending/{id}/done`, `/api/pending/{id}/snooze` | POST |
-| `/api/pending/{id}/followup`, `/api/afk/decisions/{n}/answer` | POST |
+| `/api/afk/decisions/{n}/answer` | POST |
 | `/api/operations`, `/api/operations/{id}` | GET |
 | `/api/operations/{id}/undo`, `/cancel`, `/reconcile` | POST |
 | `/api/operations/{id}/events`, `/api/runs/{id}/events` | GET, SSE |
@@ -74,9 +73,8 @@ fixture. Supply one when retrying it.
 | `/api/mail/sync`, `/api/mail/{id}/fetch`, `/api/mail/{id}/reply-all` | POST |
 | `/api/mail/triage/plan`, `/api/mail/triage/execute` | POST |
 | `/api/topics`, `/api/topics/{id}`, `/api/topics/{id}/messages` | GET |
-| `/api/topics` | POST |
-| `/api/topics/{id}/messages` | POST |
-| `/api/topics/{id}` | PUT |
+| `/api/terminal`, `/api/terminal/screen` | GET |
+| `/api/terminal/start`, `/api/terminal/keys`, `/api/terminal/resize`, `/api/terminal/handoff` | POST |
 | `/api/runs`, `/api/runs/{id}`, `/api/accounts`, `/api/routines` | GET |
 | `/api/routines/maj`, `/api/routines/daily_update`, `/api/routines/backup` | POST |
 | `/api/dues`, `/api/dossiers`, `/api/dossiers/{slug}`, `/api/afk` | GET |
@@ -143,86 +141,64 @@ An unavailable update status blocks edits. Queued edits and pending inverses sta
 bound to their accepted mode and resolved target file. A changed mode or target
 requires a fresh click. Legacy queued mutations without that binding are refused.
 
-Mail is read by recorded headless runs through the connector. The HTTP server
-never accesses the mailbox directly. Inbox coverage is a scan across a time
-interval. Failed or partial scans preserve a published snapshot. A missing
-conversation id stays null and gets a separate message topic. A missing draft
-stays uncertain without a matching Sent message proof. Folder ids are taken from
-connector evidence; no destination is fabricated.
+Mail and calendar reads use classic Outlook COM. Partial collections preserve the
+published snapshot. If classic Outlook is unavailable the server returns an
+explicit error without launching a model or discarding cached data. Filing
+proposals come from native conversations, sender/domain history and rules.
+Unresolved messages have no proposal. Legacy model suggestions are discarded.
 
-In dry-run mode, reply-all shows skeleton, drafting-account styling and read-only
-verification stages. Triage validates a frozen manifest and the message-level
-guard, then simulates it. Neither path invokes a remote writer. Scripts display
-their command without executing it. Pending actions still edit the configured
-copy. Chat and mailbox reads are real.
+Dry-run pending actions write the configured copy. Mail writes are simulated;
+mailbox reads still use COM. Routines execute for real unless their own
+`simulate_in_trial` flag is set. The terminal can be read in dry-run, but its
+startup and keys are refused. Native live replies use `compose` (worka, high
+effort), `create_draft` and `verify` (COM). No endpoint sends mail.
 
-Live reply-all persists the draft id before styling, releases admission between
-stages, and verifies the result. The drafting account uses high effort and a
-restricted draft-only app. Configure `mail.draft_app_id`, `mail.style_rules` and
-`work_handoff_dir` privately. Shell tools and other apps are disabled in that
-profile. Its capability and permissions must be proven before activation.
-The skeleton hook permits one blank reply-all creation attempt on the clicked
-message. A newer message requires refreshing the mailbox. Additional recipients,
-other message ids and draft updates are refused at this stage. Concurrent replies
-and replies with an unknown outcome block another pipeline for the same topic.
-The styling profile still lacks a server-enforced draft-id argument guard. Keep
-live drafting disabled until that guard and its connector proof are available.
+`GET /api/topics` and `/api/topics/{id}/messages` keep stored history readable,
+including settled/orphan topics. Topic creation, message submission and default
+changes are disabled. Settled pending rows preserve their topic and history.
+Search returns stored conversations with `view: conversation`. Queued legacy
+chat/model-read/model-triage jobs fail with `model_disabled` before launch.
+Only explicit native mail composition can enter `Launcher.start_run`.
 
-Live triage requires connector schema, headless and permission evidence. Its hook
-allows only confirmed message ids and destinations, at most five messages per
-call, without categories or conversation mutations. Lost results become unknown
-and are never retried automatically. Undo first verifies current locations and
-leaves independently reclassified messages alone. Trash and run stopping remain
-disabled. A real move and its return still require the owner's trial.
-Each claimed successful move must match a guarded tool call and its completed
-non-error result. A missing call, lost result or wrapped connector error stays
-unknown. The final run text alone cannot prove a move.
+## Shared hub Terminal
 
-`POST /api/topics` accepts `{request_id, title}` for a new free topic (1–200
-characters), or `{request_id, dossier_slug}` to reuse a dossier topic. Creation
-does not launch a run. `GET /api/topics` sorts by last message, newest first;
-the browser lists threads with messages and newly created free topics. Topic
-messages expose `settled`; completed pending rows preserve their topic identifier,
-context and transcript. Legacy settled rows recover their topic from an exact
-completion-operation line match. Search adds a `conversation` group with topic ids
-and `view: conversation`, matching titles and stored message text.
+`GET /api/terminal` returns `{running, sessions: [{session,pid,attach}], dry_run}`.
+Discovery uses Crow tmux sessions in the configured data-home directory. No
+arbitrary browser-supplied PID can be controlled. Screen requests carry query
+`session` and `pid`; the server resolves that exact current pane before invoking
+`crow-screen show`. The response includes ANSI `lines`, `history`, `cols`, `rows`
+and `cursor`. The browser reuses Nest's ANSI and key mappings.
 
-Sonnet is the default chat model. Per-message, topic, kind and project settings
-follow the configured cascade. Invalid account/model pairs are rejected. Mail
-subjects use the read account; the drafting account is reserved for the styling
-stage. Trial native continuations pin the parent's provider settings and disable
-MCP/read tools. Live chat uses the `chat` profile with shell and file writes,
-connector actions and no-send instructions. Its Claude hook rejects send and
-forward tools; shell actions follow owner instructions. Codex live chats disable
-apps and use the local API helper; workb must never write or draft mail. Each live
-turn starts with fresh hooks and the last 24 stored messages, since cdx continuation
-cannot carry hooks. Earlier history remains available through the messages route.
-Mode changes reject queued live action chats. Chat runs use `Chat · <title>`;
-the registry owns their topic, operation and source even when cdx omits them.
+POST bodies include the normal `request_id` and, except startup, `session` and
+`pid` from discovery. `/keys` accepts upstream `keys: [{text: string}|{key: name}]`;
+`/resize` accepts integer `cols` (20–400), `rows` (5–200). The upstream validation
+and `crow-screen` implementation own key sending and resizing. `/start` takes no
+session arguments and reuses `CROW_TERMINAL=headless crow term --account claude
+--on-busy fail crow` under a startup lock. Register `crow` as the data-home project.
+It returns the session list and does not start another hub when one exists.
 
-`bin/crow-panel-api --config <config> [--method POST|PUT] [--body-file <json>|-]
-/api/...` calls the running panel with its regular cookie, CSRF token and origin.
-It does not open another database writer or server. A reply request posts
-`{request_id, instructions, model: "sonnet"}` to `/api/mail/{id}/reply-all`, then
-polls the returned operation. The existing native pipeline composes with worka,
-creates a latest-message ReplyAll draft and verifies it. Connector fallback keeps
-its existing capability checks. No endpoint sends mail.
+`/handoff` takes `topic_id` and optional `note` (up to 1500 characters). The server
+resolves the stored topic context, constructs one bounded literal line with title
+and pending path/line, dossier directory, mail link/reference or run source.
+Control characters are removed. It calls upstream keys with one `{text: ...}`
+and no Enter; the result has `submitted: false`. Reusing its request id replays
+the response without typing twice. The UI switches to Terminal; the owner submits
+with an explicit Enter. The displayed `tmux attach -t <name>` attaches another
+terminal to the same session. The session survives panel restart.
 
 ## Operational limits
 
-Capability evidence is conservative. Missing tools, folder discovery, a missing
-native conversation, Windows document opening, and unproven connector policies
-remain visible limitations. A live mail pipeline needs verified draft-only and
-message-level connector profiles. The read-only probe does not perform a remote
-write to certify them.
+Classic Outlook must be open for live mailbox actions. A missing or incomplete
+native conversation stops drafting. COM writes with lost results remain unknown
+and require read-only verification before any retry. File opens require allowed
+roots and Windows integration. Terminal startup requires tmux, the project `crow`
+and an available Claude account. The terminal contains interactive hub output,
+which is kept in the hub session, not copied into panel conversations.
 
-The AFK view reads local reports and recorded decision lines. Decision editing,
-recent dossier files, attaching orphan topics and visit deltas remain deferred.
-Private dossier paths can be configured in `dossiers.<slug>.path` with an optional
-`label`; linked local files are exposed through opaque ids and checked roots.
-A maintenance script that outlives the server keeps admissions suspended after
-restart while its recorded process identity still exists. Its exit status is
-unknown if the original parent process was lost.
+`bin/crow-panel-api --config <config> [--method POST] [--body-file <json>|-]
+/api/...` uses the same cookie, CSRF token and origin as the browser. A reply
+request posts `{request_id, instructions}` to `/api/mail/{id}/reply-all` and polls
+the returned operation. Worka owns its configured model; no chat model is selected.
 
 ## Visit checkpoint
 
@@ -290,27 +266,11 @@ reads the configured source and writes an overlay under `state_dir/afk/`; the
 original decision log stays untouched. Subsequent reads show that overlay.
 Interrupted writes are reconciled by the recorded content hash, without replay.
 
-## Dedicated follow-up pipeline
+## Follow-up requests
 
-`POST /api/pending/{id}/followup` accepts `request_id`, `item_rev`, `instructions`
-and `model` (Sonnet by default). Only a current row in a follow-ups section is
-eligible. The returned `mail.followup` operation first runs `check_followup` with
-the read profile on the read account. The result must identify the conversation,
-latest incoming message and exhaustive Drafts/Sent checks, backed by a permitted
-remote-read transcript and evidence. Incomplete access or ambiguous matching stops
-the pipeline. An existing draft returns its link. A proven reply in Sent prevents
-a new follow-up. The pending line is never resolved automatically.
-
-Only a proven ready result on an unchanged pending row enters the existing
-`skeleton`, `style`, `verify` pipeline. Capability proofs still gate creation and
-styling. The draft-only styling account runs at high effort. The skeleton checks
-Drafts/Sent again before creation and adds no unsolicited cc. The entire flow is
-simulated in dry-run mode, including its four visible steps, with no mailbox run.
-
-A second follow-up on an active or uncertain subject returns 409. Unknown results
-are never retried automatically. `/reconcile` runs only the read check. Observing
-no draft does not authorize a retry after a lost write. The UI's Relancer button
-opens this dedicated form; Chat remains separately available.
+The old `/api/pending/{id}/followup` model pipeline is removed. **Envoyer au hub**
+passes a pending row to the shared terminal. Réglé, Reporter and settled history
+remain deterministic local actions.
 
 ## Calendar deadlines
 
@@ -328,8 +288,7 @@ Only HTTPS links are exposed. Calendar rows have no pending-file actions.
 
 The default source is `CROW_HOME/local/state/maj/calendar.json`. Override it with
 `calendar.snapshot`, the display zone with `calendar.time_zone` (IANA), and age
-with `calendar.stale_after_minutes`. The server never calls Outlook itself; the
-panel calendar run publishes through the same validation. The night
+with `calendar.stale_after_minutes`. The server reads classic Outlook through COM and publishes through the same validation. The night
 `/maj` prompt collects 16 days of occurrences using read tools and writes an
 incoming JSON file. The launcher validates and atomically publishes it after a
 successful run. `crow-maj calendar schema` prints the format; `calendar import
@@ -346,22 +305,14 @@ partial even when the source exhausted that shorter window.
 
 ## Mail capability activation
 
-Classic Outlook capabilities use a read-only COM probe: the running application
-and its folders must resolve. Every move resolves both frozen folder ids again
-before writing. Closing classic Outlook returns the panel to connector evidence.
-Connector evidence never inherits COM evidence.
-
-For the connector's first live proof, run the read-only probe, select one message,
-and confirm its plan with `owner_trial: true` in the execute body. This exception
-requires the discovered move schema and proven tool denial. Undo uses the same
-frozen manifest and guarded tool profile. Only successful tool results for both
-the move and its undo record `headless_probe`, `permissions` and `live_trial`.
-A missing result remains unknown and cannot unlock the capability. Later
-read-only probes preserve proven trials while the required schema remains present.
+The native read-only COM probe checks the running application and resolvable
+folders. Every move resolves both frozen folder ids before writing. Closing
+Outlook disables live actions and preserves readable snapshots. Persisted
+connector proofs do not reactivate the removed connector fallback.
 
 ## Native Outlook operations
 
-Set `mail.outlook_com.enabled: true` privately to prefer the running classic
+Set `mail.outlook_com.enabled: true` privately to use the running classic
 Outlook profile. Native mail and calendar jobs run locally without model admission.
 The durable job records its running intent before COM; interrupted writes become
 unknown and are never replayed. A connector snapshot and a native snapshot use
@@ -369,8 +320,8 @@ different identities. Switching backend requires sync before fetching or writing
 
 Native sync publishes EntryID/StoreID identities and a full folder tree. It reads
 the native conversation for each Inbox message, then the capped filing history.
-Conversation, sender/domain and configured rules precede model proposals. The
-model receives only the unresolved messages. A failed history scan is reported;
+Conversation, sender/domain and configured rules are the only proposal sources.
+Unresolved messages show no proposal. A failed history scan is reported;
 its previous index is retained. Non-mail folders cannot be filing targets.
 
 Native replies have `compose`, `create_draft`, `verify` steps. The drafting account
@@ -394,11 +345,11 @@ mail-specific links accept that native protocol. No sending action is exposed.
 
 ## Separate header actions and calendar cache
 
-The header has three actions: **Synchro Outlook** posts `/api/mail/sync` with
+The header separates sync and three routines: **Synchro Outlook** posts `/api/mail/sync` with
 `fast: true` and refreshes only mail/calendar snapshots, **Maj** runs the configured
-night routine, and **Mise à jour machine** runs only its configured update script.
-Fast sync publishes deterministic proposals without waiting for a proposal model.
-The mail view's normal sync retains the proposal-model phase for unresolved mail.
+night routine, and **Mise à jour outils** runs its configured update script and **Save OneDrive**
+runs its independent backup command.
+All sync modes publish deterministic proposals without a model phase.
 `state.mail.connection` reports the current backend and its French display label.
 
 A valid complete calendar snapshot younger than 30 minutes that covers the requested

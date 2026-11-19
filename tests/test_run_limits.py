@@ -59,11 +59,19 @@ def test_every_account_and_total_capacity():
     assert not available('claude', slots(rows(worka=1, workb=1), tight), tight)
 
 
+def draft_operation(app, request_id):
+    op = app.store.operation('mail.reply_all', {'request_id': request_id}, 'Draft')
+    job = {'account': 'worka', 'provider': 'codex', 'model': 'gpt-5', 'profile': 'compose',
+           'backend': 'outlook_com', 'cwd': str(app.cfg.home), 'prompt': 'Compose only.'}
+    app.launcher.enqueue(op, job, '/reply', {})
+    return op
+
+
 def test_queue_skips_saturated_account_and_releases_its_slot(panel):
     app, fake = panel
     app.cfg['limits'] = LIMITS.copy()
     app.cfg['max_parallel'] = 5
-    active = rows(workb=1)
+    active = rows(worka=1)
     original = fake.__call__
 
     def command(argv):
@@ -75,18 +83,20 @@ def test_queue_skips_saturated_account_and_releases_its_slot(panel):
         return result
 
     app.launcher.command = command
-    first = app.launcher.topic('free', 'b', 'Codex')
-    _, queued = post(app, '/api/topics/' + first + '/messages', {'request_id': 'b', 'text': 'Wait', 'account': 'workb', 'model': 'gpt-5'})
-    _, chat = post(app, '/api/topics/' + pending_item(app)['topic_id'] + '/messages', {'request_id': 'c', 'text': 'Go'})
+    app.cfg['mode'] = 'live'
+    queued = draft_operation(app, 'b')
+    # A saturated worka draft does not block an independent deterministic operation.
+    item = pending_item(app)
+    _, done = post(app, '/api/pending/' + item['id'] + '/done', {'request_id': 'done', 'item_rev': item['item_rev']})
     app.launcher.tick()
     assert app.operation(queued['operation_id'])['status'] == 'queued'
-    assert app.operation(chat['operation_id'])['status'] == 'running'
-    assert app.readers.state()['admissions']['slots']['accounts']['claude']['busy'] == 1
-    cmd = next(c for c in fake.calls if c[1] == 'run')
-    assert cmd[cmd.index('--max-parallel') + 1] == '5'
+    assert done['status'] == 'succeeded'
+    assert not any(c[1] == 'run' for c in fake.calls)
     active.pop(0)
     app.launcher.tick()
     assert app.operation(queued['operation_id'])['status'] == 'running'
+    cmd = next(c for c in fake.calls if c[1] == 'run')
+    assert cmd[cmd.index('--max-parallel') + 1] == '5'
 
 
 def test_parallel_panel_launches_cannot_take_the_same_account_slot(panel):
@@ -104,10 +114,10 @@ def test_parallel_panel_launches_cannot_take_the_same_account_slot(panel):
         return result
 
     app.launcher.command = command
+    app.cfg['mode'] = 'live'
     jobs = []
     for i in range(2):
-        topic = app.launcher.topic('free', str(i), str(i))
-        _, op = post(app, '/api/topics/' + topic + '/messages', {'request_id': str(i), 'text': 'Go', 'account': 'workb', 'model': 'gpt-5'})
+        op = draft_operation(app, str(i))
         jobs.append((op, app.store.get('jobs', op['operation_id'])))
     errors = []
     def start(op, job):

@@ -109,7 +109,7 @@ class Calendar:
 
 
 class CalendarSync:
-    """Read-only Outlook calendar collection through a guarded headless run."""
+    """Read-only Outlook calendar collection through native COM."""
 
     KIND = "calendar.sync"
 
@@ -148,21 +148,8 @@ class CalendarSync:
             op = self.store.operation(self.KIND, body, "Lecture de l'agenda Outlook classique")
             self.launcher.enqueue(op, {"kind": "outlook_com", "window_start": start.isoformat(), "window_end": end.isoformat(), "time_zone": str(zone)}, route, body, "collect")
             return op
-        self.launcher.running(fresh=True)  # Fail before accepting when admission cannot be measured.
-        op = self.store.operation(self.KIND, body, "Lecture de l'agenda")
-        output = self.cfg.state / "calendar/incoming" / (op["operation_id"] + ".json")
-        output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        from .core import ENGINE
-        prompt = (ENGINE / "bin/panel_prompts/calendar-sync.md").read_text() + "\nConfiguration: " + canonical({
-            "output": str(output), "time_zone": str(zone), "window_start": start.isoformat(), "window_end": end.isoformat(),
-            "contract": {"synced_at": "ISO timestamp with offset", "time_zone": str(zone),
-                         "coverage": {"status": "complete|partial", "window_start": start.isoformat(), "window_end": end.isoformat()},
-                         "events": [{"id": "stable Outlook event id", "subject": "text", "start": "ISO with offset, or YYYY-MM-DD when all_day",
-                                     "end": "ISO with offset, or YYYY-MM-DD when all_day", "all_day": False, "cancelled": False,
-                                     "location": "text or null", "web_link": "https link or null"}]}})
-        self.launcher.enqueue(op, {"account": "claude", "model": "sonnet", "provider": "claude", "cwd": str(self.cfg.home), "profile": "calendar",
-                                   "prompt": prompt, "output": str(output)}, route, body, "collect")
-        return op
+        from .core import Problem
+        raise Problem(422, "outlook_unavailable", "Ouvre Outlook classique pour synchroniser l’agenda. Instantané conservé.")
 
     def native(self, op, job):
         try:
@@ -174,25 +161,5 @@ class CalendarSync:
             op.update(status="failed", error={"code": "calendar_com_failed", "message": "Agenda Outlook indisponible : " + str(exc)[:200], "retryable": True, "details": {}})
 
     def complete(self, op, job, row, text):
-        if job.get("kind") == "outlook_com":
-            return
-        if op["kind"] != self.KIND or op["status"] != "succeeded":
-            return
-        output = read_json(job.get("output", ""))
-        if output is None:
-            op.update(status="unknown", error={"code": "result_missing", "message": "Le run est terminé sans agenda validable.", "retryable": False, "details": {}})
-            return
-        if not self.app.mail.transcript_ok(op, job, row, require_remote=True):
-            op.update(status="failed", error={"code": "unproven", "message": "Lecture de l'agenda non prouvée par le transcript.", "retryable": True, "details": {}})
-            return
-        if isinstance(output, dict):
-            # The model's clock is unreliable. The read started after the operation was accepted.
-            output["synced_at"] = op["created_at"]
-        try:
-            result = publish(Calendar(self.cfg).path, output)
-        except (ValueError, KeyError, TypeError, AttributeError, ZoneInfoNotFoundError) as exc:
-            op.update(status="failed", error={"code": "invalid_snapshot", "message": "Agenda reçu invalide : " + str(exc)[:200], "retryable": True, "details": {}})
-            return
-        op["result"] = {**result, "events": len(output.get("events", []))}
-        if not result["published"] or result["status"] != "complete":
-            op["status"] = "partial"
+        # Old model-backed reads are never resumed or published.
+        return

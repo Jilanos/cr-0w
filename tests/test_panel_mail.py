@@ -37,13 +37,6 @@ def test_full_nested_tree_survives_failed_refresh_and_expiry(panel):
     assert not app.mail.folders()['stale']
 
 
-def test_sync_forces_folder_refresh_even_with_fresh_cache(panel):
-    app, _ = panel
-    app.mail.collect('mail.sync', {'request_id': 'tree'}, '/sync')
-    prompt = app.store.all('jobs')[0]['prompt']
-    assert 'regardless of its cache TTL' in prompt and 'parent_id' in prompt
-
-
 def destinations(app):
     app.mail.publish(snapshot())
     return [f for f in app.mail.folders()['folders'] if f['allowed_target']]
@@ -130,57 +123,7 @@ def test_rules_reference_markdown_and_precede_fallback(panel, tmp_path):
     assert p['source'] == 'rules' and p['action'] == 'archive' and rule in p['reason']
     path.write_text('The rule was withdrawn.')
     app.mail.publish(value)
-    assert app.mail.find(row['id'])['proposal']['source'] == 'llm'
-
-
-def test_fallback_cannot_override_history_or_invent_folders_and_caps_confidence(panel):
-    app, _ = panel
-    value = snapshot()
-    value['history'] = {'folders': [scan(value['folders'][2]['id'], [filed('filed', conversation=value['items'][0]['conversation_id'])])]}
-    for row in value['items']:
-        row['proposal'] = None
-    app.mail.publish(value)
-    protected = value['items'][0]['id']
-    op = app.store.operation('mail.sync', {'request_id': 'fallback'}, 'sync')
-    assert app.mail.queue_proposals(op)
-    job = app.store.get('jobs', op['operation_id'])
-    assert protected not in job['candidate_ids']
-    assert all(f['path'] in job['prompt'] for f in app.mail.folders()['folders'])
-    output = {'items': [{'id': i, 'proposal': {'action': 'move', 'folder_id': value['folders'][2]['id'], 'source': 'rules', 'reason': 'fallback', 'confidence': 'high'}} for i in job['candidate_ids']]}
-    app.mail.apply_proposals(job, output)
-    assert app.mail.find(protected)['proposal']['source'] == 'conversation'
-    for i in job['candidate_ids']:
-        assert app.mail.find(i)['proposal']['source'] == 'llm'
-        assert app.mail.find(i)['proposal']['confidence'] == 'medium'
-    assert app.mail.normalized_proposal({'action': 'move', 'folder_id': 'invented', 'confidence': 'high'}, {f['id']: f for f in app.mail.folders()['folders']}) is None
-    with pytest.raises(ValueError):
-        app.mail.apply_proposals(job, output)
-
-
-def test_sync_stages_fallback_batches_after_history(panel, monkeypatch):
-    app, _ = panel
-    app.cfg['mail']['proposals_per_sync'] = 2
-    monkeypatch.setattr(app.mail, 'transcript_ok', lambda *a, **k: True)
-    op = app.mail.collect('mail.sync', {'request_id': 'pipeline'}, '/sync')
-    job = app.store.get('jobs', op['operation_id'])
-    value = snapshot()
-    value['history'] = {'folders': []}
-    for row in value['items']:
-        row['proposal'] = None
-    Path(job['output']).parent.mkdir(parents=True, exist_ok=True)
-    Path(job['output']).write_text(json.dumps(value))
-    op['status'] = 'succeeded'
-    app.mail.complete(op, job, {}, '')
-    assert op['status'] == 'queued' and op['steps'][-1]['name'] == 'propose'
-    seen = set()
-    while op['status'] == 'queued':
-        job = app.store.get('jobs', op['operation_id'])
-        seen.update(job['candidate_ids'])
-        Path(job['output']).write_text(json.dumps({'items': [{'id': i, 'proposal': {'action': 'keep', 'confidence': 'low', 'reason': 'Needs review'}} for i in job['candidate_ids']]}))
-        op['status'] = 'succeeded'
-        app.mail.complete(op, job, {}, '')
-    assert op['status'] == 'succeeded' and len(seen) == len(value['items'])
-    assert op['result']['proposals']['llm'] == len(value['items'])
+    assert app.mail.find(row['id'])['proposal'] is None
 
 
 def test_learning_starts_on_confirmation_is_weighted_durable_and_isolated(panel):
@@ -210,6 +153,9 @@ def test_learning_starts_on_confirmation_is_weighted_durable_and_isolated(panel)
 def test_unchanged_choice_is_not_a_correction_and_undo_retracts_learning(panel):
     app, _ = panel
     folders = destinations(app)
+    value = snapshot()
+    value['history'] = {'folders': [scan(folders[0]['id'], [filed('prior', conversation=value['items'][0]['conversation_id'])])]}
+    app.mail.publish(value)
     row = next(r for r in app.mail.raw()['items'] if (r.get('proposal') or {}).get('folder_id'))
     suggested = row['proposal']['folder_id']
     same = {'items': [{'message_id': row['id'], 'folder_id': suggested, 'learning': {'sender': row['from']['address'], 'suggested_folder_id': suggested}}]}
