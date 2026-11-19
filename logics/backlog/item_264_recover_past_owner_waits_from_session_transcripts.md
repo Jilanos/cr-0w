@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:27:47
 
 # AI Context
 - Summary: Past days of the Ops answer show owner waits for interactive sessions, read from the session transcripts through crow-usage.
@@ -18,6 +19,9 @@
 # Problem
 - The ops answer of item_257 marks a lane waiting only while it is live, and the serve tick state log keeps those waits from then on.
 - Past days without log lines show gaps as idle. In an interactive session the time between the agent's last message and the owner's next prompt is a wait on the owner, and the transcripts hold both timestamps.
+
+# Owner decisions (2026-11-19)
+- A session counts as waiting on the owner once it stays quiet 2 minutes after the agent's last message, until the next owner prompt.
 
 # Scope
 - In:

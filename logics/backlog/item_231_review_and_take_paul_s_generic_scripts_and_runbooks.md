@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:27:46
 
 # AI Context
 - Summary: Decide each of Paul's new generic files (crow-board, crow-mailtxt, crow-maj, crow-docx-redline, simpledoc, runbooks office-documents, can-log-audit, android-adb-from-wsl, maj-routine): take as is, take into a module, or leave with Paul.
@@ -17,6 +18,11 @@
 
 # Problem
 - Paul proposes 10 generic files (feedback §3). Some fit the core, some a module (office docs, mail), some are his domain only (CAN logs).
+
+# Owner decisions (2026-11-19)
+- Patch received: `local/state/paul-patches/2-office-scripts.patch` (applies on main).
+- Take crow-mailtxt, crow-docx-redline, simpledoc.py and runbooks/office-documents.md as a separate optional `office` brick (bricks.tsv rows, adr_002 brick list).
+- Leave crow-board with its author: Nest Inbox and item_238 cover it; it becomes part of his own manager module.
 
 # Scope
 - In:

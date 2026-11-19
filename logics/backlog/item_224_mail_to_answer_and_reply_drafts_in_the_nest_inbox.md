@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:27:47
 
 # AI Context
 - Summary: Mail that needs an answer shows in Inbox; the owner asks for a draft, reads and edits it in Nest, and crow saves it as a draft in the mailbox. Never sends. Backend is configurable so Paul's M365 setup and the owner's Graph setup both work.
@@ -19,6 +20,9 @@
 - The owner answers mail in Outlook or a terminal session; item_179 and item_092 planned the pieces but nothing is built.
 - Owner rule: mail is drafts only, never sent, even when asked to reply. item_179 planned a `send` step; it is dropped here.
 - Paul built the same flow by hand (hub skeleton, worka formatting, post-write checks) and asks for a generic draft pipeline with a configurable backend (req_064).
+
+# Owner decisions (2026-11-19)
+- The second user builds the Outlook COM backend (from WSL), next to Graph on a branch from main and sends a patch; review it here like item_229.
 
 # Scope
 - In:

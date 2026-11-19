@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 15:27:47
 
 # AI Context
 - Summary: Define the 'pending items' schema Paul uses (decisions, follow-ups with due/priority/who/expected, recently settled purged after 14 days) as a crow concept stored as Markdown with a minimal schema, read by brief, routines and the Inbox `followup` kind.
@@ -17,6 +18,9 @@
 
 # Problem
 - Paul tracks everything in one EN_ATTENTE file rendered by crow-board (§4.3). The owner's equivalent is the Waiting section of Open Threads. Two formats, no shared reader.
+
+# Owner decisions (2026-11-19)
+- The second user builds the pending items schema on a branch from main and sends a patch; review it here like item_229.
 
 # Scope
 - In:
