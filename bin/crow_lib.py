@@ -293,10 +293,24 @@ def oneshot_prompt(provider, hub, skill, args=""):
             f"{args}").strip()
 
 
-def permission(provider):
-    """cdx permission for headless runs, fresh or continued: default mode. Claude then runs only the kind's
-    sandbox allowlist; Codex keeps writes in the workspace, no network."""
-    return "default"
+HEADLESS_PERMISSIONS = ("default", "full")
+
+
+def permission(provider, env=None):
+    """cdx permission for headless runs, fresh or continued: `permission` in local/headless.json, else default.
+    In default mode Claude runs only the kind's sandbox allowlist; Codex keeps writes in the workspace, no network.
+    Same value for both providers. Exits on an unreadable file or an unknown value."""
+    path = os.path.join(data_home(env), "local", "headless.json")
+    try:
+        with open(path) as fh:
+            value = json.load(fh).get("permission", "default")
+    except FileNotFoundError:
+        return "default"
+    except (OSError, ValueError, AttributeError) as e:
+        sys.exit(f"crow: {path}: {e}")
+    if value not in HEADLESS_PERMISSIONS:
+        sys.exit(f"crow: {path}: permission must be one of {', '.join(HEADLESS_PERMISSIONS)}, not {value!r}")
+    return value
 
 
 def hub_session_refusal(provider):
