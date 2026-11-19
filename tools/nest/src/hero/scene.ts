@@ -591,6 +591,29 @@ const rgba = (col: RGB, a: number) => {
   return v
 }
 const BLOOM_DIV = 4
+// One reusable cols x rows canvas for the cell backgrounds of a grid pass (cleared per pass).
+let bgCv: HTMLCanvasElement | undefined, bgData: ImageData | undefined
+function bgImage(gr: Grid) {
+  const C = (bgCv ??= document.createElement('canvas'))
+  if (C.width !== gr.cols || C.height !== gr.rows) { C.width = gr.cols; C.height = gr.rows; bgData = undefined }
+  const x = C.getContext('2d')!
+  const d = (bgData ??= x.createImageData(gr.cols, gr.rows)), p = d.data
+  p.fill(0)
+  let any = false
+  return {
+    put: (i: number, col: RGB, a: number) => {
+      const o = i * 4
+      p[o] = col[0] & 0xf8; p[o + 1] = col[1] & 0xf8; p[o + 2] = col[2] & 0xf8
+      p[o + 3] = Math.round((Math.max(0, Math.min(63, Math.round(a * 63))) / 63) * 255); any = true
+    },
+    draw: (l: CanvasRenderingContext2D, w: number, h: number) => {
+      if (!any) return
+      x.putImageData(d, 0, 0)
+      const sm = l.imageSmoothingEnabled
+      l.imageSmoothingEnabled = false; l.drawImage(C, 0, 0, w, h); l.imageSmoothingEnabled = sm
+    },
+  }
+}
 function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, runs = false) {
   const ctx = cv.getContext('2d')
   if (!ctx) return
@@ -614,9 +637,14 @@ function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, ru
     if (runs) l.letterSpacing = `${ls}px`
     const dx = runs ? ls / 2 : 0
     let txt = '', tc = -1, ts = ''
+    // Lit table: the cell backgrounds of a pass go out as one cols x rows image scaled up without smoothing
+    // (one fillRect per planet cell was half the calls), after the blank clears and before the glyphs.
+    const bgs = runs && gr.bg ? bgImage(gr) : undefined
+    const texts: [string, number, number, string][] = []
     const emit = (r: number) => {
       if (!txt) return
-      l.fillStyle = ts; l.textAlign = 'left'; l.fillText(txt, tc * CW + ls / 2, r * CH + CH / 2 + 0.5)
+      if (bgs) texts.push([txt, tc, r, ts])
+      else { l.fillStyle = ts; l.textAlign = 'left'; l.fillText(txt, tc * CW + ls / 2, r * CH + CH / 2 + 0.5) }
       txt = ''
     }
     for (let r = 0; r < gr.rows; r++) {
@@ -626,7 +654,8 @@ function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, ru
         if (ch === ' ') { emit(r); if (run < 0) run = c; continue }
         flush(r, c)
         const bg = gr.bg?.[i] ?? 0
-        if (!runs || bg > 0 || ch.length !== 1 || ch.charCodeAt(0) > 126) { emit(r); draw(gr, i, ch, c, r, CW, CH, dx); continue }
+        if (bgs && bg > 0) bgs.put(i, gr.col[i], bg)
+        if (!runs || (!bgs && bg > 0) || ch.length !== 1 || ch.charCodeAt(0) > 126) { emit(r); if (bgs) late.push(i); else draw(gr, i, ch, c, r, CW, CH, dx); continue }
         const st = rgba(gr.col[i], gr.a[i])
         if (txt && st === ts && tc + txt.length === c) txt += ch
         else { emit(r); txt = ch; tc = c; ts = st }
@@ -634,11 +663,20 @@ function paint(cv: HTMLCanvasElement, g: Grid, dpr: number, head?: HeadLayer, ru
       emit(r)
       flush(r, gr.cols)
     }
+    if (bgs) {
+      bgs.draw(l, gr.cols * CW, gr.rows * CH)
+      l.textAlign = 'left'
+      for (const [t, c, r, st] of texts) { l.fillStyle = st; l.fillText(t, c * CW + ls / 2, r * CH + CH / 2 + 0.5) }
+      for (const d of late) draw(gr, d, gr.ch[d]!, d % gr.cols, Math.floor(d / gr.cols), CW, CH, dx, false)
+      late.length = 0
+    }
     if (runs) l.letterSpacing = '0px'
   }
-  const draw = (gr: Grid, i: number, ch: string, c: number, r: number, CW: number, CH: number, dx = 0) => {
+  // With a background image, odd glyphs wait until the image is down.
+  const late: number[] = []
+  const draw = (gr: Grid, i: number, ch: string, c: number, r: number, CW: number, CH: number, dx = 0, now = true) => {
     const col = gr.col[i], bg = gr.bg?.[i] ?? 0
-    if (bg > 0) { l.fillStyle = rgba(col, bg); l.fillRect(c * CW, r * CH, CW, CH) }
+    if (now && bg > 0) { l.fillStyle = rgba(col, bg); l.fillRect(c * CW, r * CH, CW, CH) }
     l.fillStyle = rgba(col, gr.a[i]); l.textAlign = 'center'
     l.fillText(ch, c * CW + CW / 2 + dx, r * CH + CH / 2 + 0.5)
   }
