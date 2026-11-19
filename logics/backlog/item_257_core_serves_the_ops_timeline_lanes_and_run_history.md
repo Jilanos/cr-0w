@@ -50,7 +50,7 @@
 # Links
 - Request: `req_063_nest_pages_and_inbox_as_the_home_for_everything_that_waits`
 - Used by: `item_190_laptop_missions_from_the_approved_missions_board` (Ops page)
-- Follow-up: `item_260_recover_past_owner_waits_from_session_transcripts` (owner waits on past days)
+- Follow-up: `item_264_recover_past_owner_waits_from_session_transcripts` (owner waits on past days)
 
 # Priority
 - Priority: High
@@ -65,7 +65,7 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-19T14:01:17.790393+00:00 | cdx | 2866cbe5305b46ba9d09b6387757907d | item-257-ops-3 | running |  | steps 3-6: f7f8183 state log, d8e2434 run report, aba0c93 item_260 |
+| 2026-11-19T14:15:50.832182+00:00 | cdx | 2866cbe5305b46ba9d09b6387757907d | item-257-ops-3 | succeeded |  | steps 3-6: f7f8183 state log, d8e2434 run report, aba0c93 item_260 |
 | 2026-11-19T11:29:56.791066+00:00 | cdx | 0252b0dd039b4254b0415f3a09c8bc13 | item-257-ops-2 | failed |  | limit |
 | 2026-11-19T11:26:32.177194+00:00 | cdx | 1127c9d50f1c41318bf0a85090970bef | item-257-ops-2 | failed |  | limit |
 | 2026-11-19T10:15:21.543277+00:00 | cdx | 2c99eeef8098407e9f6de81c299f9b38 | item-257-ops | succeeded |  |  |

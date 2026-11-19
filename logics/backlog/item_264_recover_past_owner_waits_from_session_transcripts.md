@@ -1,4 +1,4 @@
-## item_260_recover_past_owner_waits_from_session_transcripts - Recover past owner waits from session transcripts
+## item_264_recover_past_owner_waits_from_session_transcripts - Recover past owner waits from session transcripts
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: Ready
