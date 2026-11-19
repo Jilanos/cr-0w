@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 10:59:19
 
 # AI Context
 - Summary: MRs tab on live `/api/state/mrs`: mine, to review, CI state, threads; each row opens review, threads or the MR on the forge. Optional brick (req_064 modules).
@@ -23,6 +24,7 @@
   - Sections: To review (unblock devs first, per priorities), Mine (CI, approvals, threads open), Merged today.
   - Row actions: review (dispatch review run), answer threads (review-threads session), open on forge, open repo session.
   - Mockups first (phone, laptop), reuse the deck MR board layout ideas (item_049/050).
+  - Review patterns panel: top patterns from the review ledgers (local/reviews/common.md and the project ledger), with counts and the last MR that hit each one.
   - Hidden when the forge module is off (req_064).
 - Out:
   - Posting comments from Nest (stays a gated action in the review flow).
@@ -31,6 +33,7 @@
 - AC1: Owner approved the MRs board first.
 - AC2: Rows match `crow-mrs` output on live data for both forges.
 - AC3: Each row action works from phone and laptop.
+- AC4: The patterns panel lists the ledger patterns for the MR's project, newest hits first.
 
 # AC Traceability
 - req_063_nest_pages_and_inbox_as_the_home_for_everything_that_waits-AC -> This backlog slice. Proof: Owner approved the MRs board first.

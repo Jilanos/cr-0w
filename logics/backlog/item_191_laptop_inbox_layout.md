@@ -8,12 +8,13 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 10:59:19
 
 # AI Context
-- Summary: (unfilled: replace before this doc is used)
+- Summary: Laptop layout of the Inbox: list, reading pane and inline answer. Folded into item_223 (Inbox kinds and viewers); build both together.
 - Keywords: laptop, inbox, layout
-- Use when: (unfilled: replace before this doc is used)
-- Skip when: (unfilled: replace before this doc is used)
+- Use when: building the Inbox page on the laptop, with item_223.
+- Skip when: the inbox kinds model in core (item_238).
 
 # Problem
 - Inbox on the laptop renders the Fold inner layout and has no laptop board.
@@ -50,4 +51,3 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-
