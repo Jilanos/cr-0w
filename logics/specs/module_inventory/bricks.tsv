@@ -148,6 +148,7 @@ core-route	POST /api/missions/{id}/cancel	core-api
 core-route	POST /api/inbox/{id...}	core-api
 core-route	GET /api/state	core-api
 core-route	GET /api/state/{section}	core-api
+core-route	GET /api/runs/{id}	core-api
 core-route	GET /api/missions/{id}	core-api
 core-route	GET /api/missions/{id}/artifacts/{path...}	core-api
 core-route	GET /api/events	core-api
