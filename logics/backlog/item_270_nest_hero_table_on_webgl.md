@@ -4,11 +4,11 @@
 > Status: In progress
 > Understanding: 90%
 > Confidence: 85%
-> Progress: 70%
+> Progress: 75%
 > Complexity: high
 > Theme: nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
-> Indicators reviewed: 2026-11-19 17:58:46
+> Indicators reviewed: 2026-11-19 18:01:31
 
 # AI Context
 - Summary: Draw the hero's cell grid (table, planets, board, bloom) with WebGL2 instead of Canvas 2D, reusing the live head's glyph pipeline, with the same look.
@@ -70,7 +70,8 @@
 - Bench (load avg 6-8, 2 runs each), p10 ratio GL vs 2D: laptop 2.65-2.87 vs 4.48-4.49, inner 2.07-2.28 vs 3.40-3.79, cover 1.41 vs 2.40-2.86. Frame p10 roughly halves (laptop 23-28 vs 46-47 ms). Canvas calls per frame: 1 drawImage (was 3000-4400 fillText). AC2 2x reached on cover only; the rest of the frame is the CPU grid build (out of scope).
 - Default hash unchanged on both paths. tsc clean, vitest 241 green.
 - Debug hooks: `TABLEGL`, `BLOOMK`, `BLOOMG` (bloom gain, 0 = off) env in `hero-table.mjs`.
-- Left: AC1 owner crop, AC3 forced fallback check, AC5 rebuild and hero-fit shots, gl/common.ts extraction.
+- AC1: owner OK 2026-11-19 (same look on both sides; crop in the vault, Research/nest-design/item_270/).
+- Left: AC3 forced fallback check, AC5 rebuild and hero-fit shots, gl/common.ts extraction.
 
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
