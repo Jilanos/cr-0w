@@ -244,7 +244,7 @@ def test_chat_queue_cancel_admission_and_continuation(panel):
     app, fake = panel
     topic = pending_item(app)["topic_id"]
     path = "/api/topics/" + topic + "/messages"
-    fake.active = 2
+    fake.active = 5
     _, op = post(app, path, {"request_id": "a", "text": "Un résumé"})
     app.launcher.tick()
     assert app.operation(op["operation_id"])["status"] == "queued"

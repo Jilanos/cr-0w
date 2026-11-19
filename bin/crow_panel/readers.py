@@ -314,10 +314,11 @@ class Readers:
         overdue = [i for i in items if i["overdue_workdays"]]
         mail = self.app.mail.list({})
         try:
-            active = len(self.launcher.running())
+            slots = self.launcher.slots()
+            active = slots["busy"]
             admission = not self.launcher.cache.get("running_error") and not self.launcher.maintenance()
         except Problem:
-            active, admission = None, False
+            active, admission, slots = None, False, None
         queued = sum(o["status"] == "queued" for o in self.store.all("operations"))
         # Same window as the Échéances 7 jours card: today to today + 7 days, both included.
         limit = (dt.date.today() + dt.timedelta(days=8)).isoformat()
@@ -334,6 +335,6 @@ class Readers:
             alerts.append({"level": "warn", "text": "Instantané mail absent ou ancien.", "ref": {"kind": "view", "id": "mail"}})
         return {"generated_at": now(), "mode": self.cfg["mode"], "counts": counts, "alerts": alerts,
                 "locks": {"pending": pending["lock"], "maj": self.launcher.maj(), "maintenance": {"holder": "daily_update", "since": None, "run_id": None} if self.launcher.maintenance() else None},
-                "admissions": {"open": bool(admission), "reason": None if admission else "Maintenance ou état cdx indisponible."},
+                "admissions": {"slots": slots, "open": bool(admission), "reason": None if admission else "Maintenance ou état cdx indisponible."},
                 "mail": {"synced_at": mail["synced_at"], "stale": mail["stale"], "coverage": mail["coverage"]["status"],
                          "connection": self.app.mail.connection()}, "since_last_visit": self.app.visits.changes()}

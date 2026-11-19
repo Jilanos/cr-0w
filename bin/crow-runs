@@ -29,6 +29,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import crow_lib  # noqa: E402
+import crow_limits  # noqa: E402
 
 HOME = Path(crow_lib.data_home())
 ACCOUNT = os.environ.get("CROW_ACCOUNT") or os.environ.get("CROW_SESSION_ACCOUNT") or subprocess.check_output([os.path.join(os.path.dirname(os.path.realpath(__file__)), "crow-accounts"), "default"], text=True).strip()
@@ -36,7 +37,6 @@ _REG_FILE = HOME / "local/projects.yaml"
 REG = (yaml.safe_load(open(_REG_FILE)) if _REG_FILE.is_file() else None) or {"projects": []}
 STATE = crow_lib.machine_dir(HOME)
 LEDGER = STATE / "runs.jsonl"
-MAX_PARALLEL = int(os.environ.get("CROW_MAX_RUNS", "2"))
 WORKING_S = 20      # transcript touched this recently = working
 TAIL_BYTES = 2_000_000  # tool results are big; enough tail for ~30 recent actions
 FINISHED_SHOWN = 5
@@ -831,14 +831,14 @@ def collect(since="today", include_unledgered=False):
                              "duration_s": int(r.get("duration_seconds") or 0), "ended_at": r.get("ended_at"), "commits": [],
                              "cost_usd": run_cost(r), "budget_usd": None, "denials": crow_lib.run_denials(r)})
 
-    busy = len(running_runs())
+    slots = crow_limits.slots(running_runs(), crow_limits.load(HOME), recs)
     pu = project_usage()
     for a in agents:
         split = pu["sessions"].get(a["session_id"])
         a["multi_project"] = bool(split)
         a["projects"] = split["projects"] if split else []
     return {"usage_by_project": pu["today"], "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "slots": {"busy": busy, "max": MAX_PARALLEL}, "agents": agents, "finished": past}
+            "slots": slots, "agents": agents, "finished": past}
 
 
 # ---------- commands ----------
@@ -933,6 +933,8 @@ def dispatch(a):
             dispatch_fail(a, "write_dir_missing", f"--write-dir {a.write_dir} is not a folder")
         if a.permission == "review":
             a.permission = None  # plan mode refuses every edit; the review allowlist keeps the project read only
+    limits = crow_limits.load(HOME)
+    limits.setdefault(acct, 3 if provider == "claude" else 1)
     runs = running_runs()
     # A review run cannot write in its cwd (plan mode, or the review allowlist on Claude), so it may share it.
     read_only = a.permission == "review" or (a.kind == "review" and provider == "claude")
@@ -958,8 +960,9 @@ def dispatch(a):
     over = {f"CROW_{a.kind.upper()}_TIMEOUT_MIN": str(a.timeout_min)} if a.timeout_min else {}
     flags, env = crow_lib.run_flags(a.kind, provider, a.model, a.power, a.continue_run, env={**os.environ, **over},
                                     budget=a.budget, state=state, write_dir=a.write_dir)
-    if a.isolate:  # cdx failover could land on a full-login account, which refuses isolation; requeue moves it
-        flags = [f for f in flags if f != "--failover"]
+    # Account admission is pinned to the selected account; recovery may requeue elsewhere.
+    flags = [f for f in flags if f != "--failover"]
+    if a.isolate:  # isolated runs also require their original sandbox identity
         # cdx allowlists toolchains under Path.home(); a crow session's HOME is the cdx profile home, which
         # holds no claude binary ("Executable is outside the permitted toolchains"). CDX_HOME keeps the profiles.
         env = {**env, "HOME": crow_lib.real_home(),
@@ -969,7 +972,7 @@ def dispatch(a):
     permission = a.permission or ("default" if scoped else crow_lib.permission(provider))
     cmd = ["cdx", "run", acct, "--cwd", cwd, *src, *(["--continue-run", a.continue_run] if a.continue_run else []), *flags,
            "--permission", permission, "--detach", "--json",
-           "--label", f"{p['name']}/{a.label}", *([] if a.force else ["--max-parallel", str(MAX_PARALLEL)]),
+           "--label", f"{p['name']}/{a.label}", *([] if a.force else ["--max-parallel", str(limits["total"])]),
            *(["--isolate-workspace"] if a.isolate else [])]
     if a.dry_run:
         print(" ".join(f"{k}={v}" for k, v in env.items()), " ".join(cmd))
@@ -979,8 +982,9 @@ def dispatch(a):
     with lock(locks, "admission"):
         if locked(locks, "maintenance"):
             dispatch_fail(a, "maintenance", "machine maintenance is running; retry after it finishes")
-        if not a.force and len(running_runs()) >= MAX_PARALLEL:
-            dispatch_fail(a, "too_many_runs", f"{MAX_PARALLEL} runs already running")
+        usage = crow_limits.slots(running_runs(), limits, ledger())
+        if not a.force and not crow_limits.available(acct, usage, limits, provider):
+            dispatch_fail(a, "too_many_runs", f"run capacity reached for {acct} (account {limits[acct]}, total {limits['total']})")
         out = subprocess.run(cmd, capture_output=True, text=True, env=crow_lib.run_env(env, a.kind)).stdout.strip()
     try:
         res = json.loads(out)
@@ -988,7 +992,7 @@ def dispatch(a):
         res = {"ok": False}
     if not res.get("ok"):
         if "too_many_runs" in out:
-            dispatch_fail(a, "too_many_runs", f"{MAX_PARALLEL} runs already running; --force to override")
+            dispatch_fail(a, "too_many_runs", f"run capacity reached (total {limits['total']}); --force to override")
         err = res.get("error")
         code = err.get("code", "") if isinstance(err, dict) else ""
         dispatch_fail(a, code or "dispatch_failed", f"dispatch failed: {code + ': ' if code else ''}"
@@ -1063,8 +1067,9 @@ def render(data, color=True, width=None):
     runs = [a for a in data["agents"] if a["kind"] == "run"]
     sess = [a for a in data["agents"] if a["kind"] == "session"]
     sl = data["slots"]
+    account_slots = " · ".join(f"{name} {row['busy']}/{row['max']}" for name, row in sl.get("accounts", {}).items())
     out.append(f"{c['b']}CR-0W agents{c['0']}  {c['dim']}{datetime.now():%H:%M:%S}{c['0']}   "
-               f"background slots {sl['busy']}/{sl['max']}   sessions {len(sess)}")
+               f"background slots {account_slots + ' · ' if account_slots else ''}total {sl['busy']}/{sl['max']}   sessions {len(sess)}")
 
     def agent_lines(a, title):
         sym, col = STATE_STYLE[a["state"]]

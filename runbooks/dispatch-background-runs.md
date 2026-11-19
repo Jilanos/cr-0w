@@ -3,7 +3,9 @@
 Use when the user wants work done in project repos without opening a session there.
 
 ## Before dispatching
-1. Check slots: `crow runs`. The default limit is 2 parallel runs (`CROW_MAX_RUNS`).
+1. Check slots: `crow runs`. `local/panel.yaml` defines `limits` per account and `limits.total`.
+   Defaults are 3 per Claude account, 1 per Codex account and 5 total.
+   Legacy `max_parallel` (then `CROW_MAX_RUNS`) supplies the total when `limits.total` is absent.
 2. For each repo: `git config user.email` must match the scope identity in the registry,
    and `git status --short` must be checked. Uncommitted owner files get named in the prompt
    as "do not stage, commit, revert or stash".
@@ -60,7 +62,7 @@ When relaunching an interrupted run, add `--resumes <run_id>` so the old run is 
   past 95% of its 5h window. It refuses a plain `ask-first` account: get the owner's OK, then pass `--account <name>`.
   When `local/accounts.yaml` has `scopes`, dispatch picks by the project's registry scope instead: usable now, then
   the account's rank for that scope, then cdx priority, then room (same pick as `crow-accounts pick --scope <scope>`,
-  which prints the deciding factor). An ask-first pick is never taken unasked. `--failover` is on every run.
+  which prints the deciding factor). An ask-first pick is never taken unasked. Launches stay on the admitted account. Crow recovery can requeue on another account after checking its capacity.
   Two medium runs launched together can exhaust a session window in about 90 seconds. Stagger them if the window was recently used.
 - **Permission**: `local/headless.json` selects `default` or `full` for headless launches. The public default is `default`. Explicit review and isolated modes retain their own constraints.
   If the prompt already expects deletions, name the exact files in it, or plan for the owner to approve them afterwards.

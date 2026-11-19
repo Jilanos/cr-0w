@@ -168,9 +168,11 @@ function renderHeader() {
   if (st) {
     if (st.mail?.connection) status.append(h('span', { class: 'outlook-status muted small', title: st.mail.connection.label, text: st.mail.connection.label }));
     const adm = st.admissions || {};
-    const max = (cfg && cfg.max_parallel) || 2;
+    const max = (cfg && cfg.max_parallel) || 5;
+    const slots = adm.slots;
+    const accountSlots = slots && Object.entries(slots.accounts).map(([name, row]) => `${name} ${row.busy}/${row.max}`).join(" · ");
     const c = st.counts || {};
-    const txt = adm.open === false ? 'Lancements suspendus' : `${c.runs_active ?? 0}/${max} runs${c.runs_queued ? ` · ${c.runs_queued} en file` : ''}`;
+    const txt = adm.open === false ? 'Lancements suspendus' : `${accountSlots || `${c.runs_active ?? 0}/${max} runs`}${c.runs_queued ? ` · ${c.runs_queued} en file` : ''}`;
     status.append(h('button', { type: 'button', class: ['admission', adm.open === false && 'admission-closed'],
       title: adm.reason || 'Runs de fond actifs sur le maximum autorisé', onclick: () => setView('jobs') },
     h('span', { class: 'dot' }), h('span', { text: txt })));

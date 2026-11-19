@@ -30,6 +30,16 @@ launches share the admission lock. A maintenance script suspends admissions and
 waits for existing runs. Manual cdx launches can bypass the shared lock; the cdx
 parallel-run cap remains in effect.
 
+`limits` maps account names to capacities and includes `total` (default 5).
+Account defaults are 3 for Claude and 1 for Codex. `max_parallel` remains the
+legacy fallback for the total, followed by `CROW_MAX_RUNS`. `/api/config` exposes
+normalized `limits` and the effective `max_parallel`. `/api/state` exposes
+`admissions.slots` with `busy`, `max`, `unknown`, and an `accounts` mapping of
+`{busy, max}` rows. `crow runs json` exposes the same slot shape. Queued model
+steps wait for their own account capacity and total capacity. Finished registry
+entries supply missing account metadata without occupying slots. Unknown live
+accounts count conservatively against admission until metadata is available.
+
 ## HTTP contract
 
 The JSON examples in `tests/fixtures/panel/` mirror the private specification's

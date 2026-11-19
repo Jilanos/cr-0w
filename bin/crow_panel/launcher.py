@@ -10,6 +10,7 @@ import threading
 import time
 
 import crow_lib
+import crow_limits
 from .core import ACTIVE, ENGINE, Problem, atomic, canonical, digest, lock, locked, now, read_json, uid
 from .security import redact, write_policy
 
@@ -67,6 +68,13 @@ class Launcher:
         if not isinstance(value.get("runs"), list):
             raise Problem(503, "upstream_unavailable", "État des runs illisible.", retryable=True)
         return [r for r in value["runs"] if r.get("status") in (None, "running", "queued", "starting") and not r.get("ended_at")]
+
+    def slots(self, fresh=False):
+        registry = crow_limits.read_registry(self.cfg["runs_registry"])
+        return crow_limits.slots(self.running(fresh=fresh), self.cfg["limits"], registry)
+
+    def available(self, job):
+        return crow_limits.available(job["account"], self.slots(fresh=True), self.cfg["limits"], job.get("provider"))
 
     def rows(self, since="24h"):
         try:
@@ -247,7 +255,7 @@ class Launcher:
         if self.maintenance():
             return
         with lock(self.cfg.locks, "admission"):
-            if locked(self.cfg.locks, "maintenance") or len(self.running(fresh=True)) >= self.cfg["max_parallel"]:
+            if locked(self.cfg.locks, "maintenance") or not self.available(job):
                 return
             op_id = op["operation_id"]
             folder = self.cfg.state / "ops" / op_id
@@ -414,7 +422,11 @@ class Launcher:
             raise Problem(422, "capability_unavailable", "Commande non configurée.")
         op = self.store.operation("routine." + name, body, {"maj": "Mise à jour", "daily_update": "Mise à jour machine", "backup": "Save OneDrive"}[name], dry=self.routine_simulated(name))
         wait = name == "daily_update" and self.cfg["routines"].get(name, {}).get("wait_runs", True)
-        self.enqueue(op, {"kind": "script", "argv": argv, "cwd": str(self.cfg.home)}, route, body, "wait_runs" if wait else "script")
+        job = {"kind": "script", "argv": argv, "cwd": str(self.cfg.home)}
+        if name == "maj":
+            config = read_json(self.cfg.home / "local/maj.json", {})
+            job.update(account=config.get("account", "claude"), provider="claude")
+        self.enqueue(op, job, route, body, "wait_runs" if wait else "script")
         if wait:
             op["steps"].append(step("script"))
             self.store.save_op(op)
@@ -474,7 +486,7 @@ class Launcher:
             if op["kind"] == "routine.daily_update":
                 stack.enter_context(lock(self.cfg.locks, "maintenance", False))
             self.held[key] = stack
-        if op["kind"] == "routine.maj" and len(self.running(fresh=True)) >= self.cfg["max_parallel"]:
+        if op["kind"] == "routine.maj" and not self.available({"account": job.get("account", "claude"), "provider": "claude"}):
             return
         waits = op["kind"] == "routine.daily_update" and op["steps"][0]["name"] == "wait_runs"
         if waits and self.running(fresh=True):

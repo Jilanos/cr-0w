@@ -198,6 +198,7 @@ const add = (name, vp, run) => SCENARIOS.push({ name, vp, run });
 for (const width of [1280, 1024, 390]) {
   add('header-routines-' + width, { ...DESK, width, mobile: width < 500 }, async (page, base) => {
     await open(page, base, { view: 'pending' });
+    await expect(page, '.admission', 'claude 1/3 · worka 0/1 · workb 0/1');
     const controls = await page.eval(`({width:innerWidth,buttons:[...document.querySelectorAll('#topbar-actions button')].map(b=>({label:b.getAttribute('aria-label'),right:b.getBoundingClientRect().right}))})`);
     for (const label of ['Nouveau chat', 'Mise à jour machine', 'Save OneDrive']) {
       if (!controls.buttons.some(b => b.label === label && b.right <= controls.width)) throw new Error('Commande inaccessible : ' + label);

@@ -40,7 +40,26 @@
   },
   "admissions": {
     "open": true,
-    "reason": null
+    "reason": null,
+    "slots": {
+      "busy": 2,
+      "max": 5,
+      "unknown": 0,
+      "accounts": {
+        "claude": {
+          "busy": 2,
+          "max": 3
+        },
+        "worka": {
+          "busy": 0,
+          "max": 1
+        },
+        "workb": {
+          "busy": 0,
+          "max": 1
+        }
+      }
+    }
   },
   "mail": {
     "synced_at": "2026-11-18T08:16:10+01:00",

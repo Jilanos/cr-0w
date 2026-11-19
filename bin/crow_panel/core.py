@@ -13,6 +13,7 @@ import threading
 
 import yaml
 import crow_lib
+import crow_limits
 
 ENGINE = Path(__file__).resolve().parents[2]
 ACTIVE = ("queued", "running", "cancel_requested")
@@ -103,7 +104,6 @@ class Config(dict):
         self.setdefault("state_dir", str(self.home / "local/state/panel"))
         self.setdefault("locks_dir", str(self.home / "local/state/locks"))
         self.setdefault("runs_registry", str(self.home / "local/state/runs.jsonl"))
-        self.setdefault("max_parallel", int(os.environ.get("CROW_MAX_RUNS", "2")))
         self.setdefault("pending", {})
         self.setdefault("files", {"roots": []})
         self.setdefault("mail", {})
@@ -131,8 +131,8 @@ class Config(dict):
             raise ValueError("host must be 127.0.0.1; mode must be dry_run or live")
         if not isinstance(self["port"], int) or not 0 <= self["port"] <= 65535:
             raise ValueError("invalid port")
-        if not isinstance(self["max_parallel"], int) or self["max_parallel"] < 1:
-            raise ValueError("invalid max_parallel")
+        self["limits"] = crow_limits.normalize(self)
+        self["max_parallel"] = self["limits"]["total"]
         for name in ("maj", "daily_update", "backup"):
             argv = self["routines"].get(name, {}).get("argv", [])
             if not isinstance(argv, list) or any(not isinstance(x, str) or not x for x in argv):

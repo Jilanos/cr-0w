@@ -193,8 +193,8 @@ def _dispatch(tmp_path, monkeypatch, extra=(), state=None):
     return next(a for a in seen if a[:2] == ["cdx", "run"])
 
 
-def test_dispatch_passes_failover(tmp_path, monkeypatch):
-    assert "--failover" in _dispatch(tmp_path, monkeypatch)
+def test_dispatch_pins_the_admitted_account(tmp_path, monkeypatch):
+    assert "--failover" not in _dispatch(tmp_path, monkeypatch)
 
 
 def test_dispatch_routes_by_the_project_scope(tmp_path, monkeypatch):

@@ -40,7 +40,7 @@
     ]
   },
   "undo_seconds": 10,
-  "max_parallel": 2,
+  "max_parallel": 5,
   "routines": [
     {
       "name": "maj",
@@ -76,5 +76,11 @@
     "x": "toggle_select",
     "?": "help",
     "Escape": "close"
+  },
+  "limits": {
+    "claude": 3,
+    "worka": 1,
+    "workb": 1,
+    "total": 5
   }
 }

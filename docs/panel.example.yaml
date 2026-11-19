@@ -67,7 +67,8 @@ notifications:
   min_interval_seconds: 120
   powershell_exe: powershell.exe
   app_id: null  # Use/register crow for the current Windows user. No admin rights.
-max_parallel: 2
+# max_parallel remains a fallback for limits.total.
+limits: {claude: 3, worka: 1, workb: 1, total: 5}
 # Routines execute for real, even in dry_run mode. simulate_in_trial: true only prints
 # the command in dry_run. daily_update waits for active runs unless wait_runs: false.
 routines:

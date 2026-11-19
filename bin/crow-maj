@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 import crow_lib
+import crow_limits
 
 ENGINE = Path(__file__).resolve().parent.parent
 HOME = Path(crow_lib.data_home())
@@ -96,6 +97,28 @@ def calendar_import(source):
         return 2
 
 
+def launch_night(cmd, env, limits):
+    from crow_panel.core import lock, shared_locks
+    account = CFG.get("account", "claude")
+    # A panel precheck cannot reserve a slot for a child process. Recheck under
+    # the shared lock and wait here if another launch took the account's slot.
+    while True:
+        with lock(shared_locks(HOME), "admission"):
+            active = subprocess.run(["cdx", "runs", "--running", "--json"], capture_output=True, text=True, env=env)
+            try:
+                value = json.loads(active.stdout)
+                runs = value["runs"]
+                if active.returncode or value.get("ok") is False or not isinstance(runs, list):
+                    raise ValueError("running runs unavailable")
+                registry = crow_limits.read_registry(os.environ.get("CROW_PANEL_RUNS_REGISTRY", STATE.parent / "runs.jsonl"))
+                usage = crow_limits.slots(runs, limits, registry)
+                if crow_limits.available(account, usage, limits, "claude"):
+                    return subprocess.run(cmd, capture_output=True, text=True, env=env)
+            except (ValueError, KeyError):
+                log("run admission unavailable; retrying")
+        time.sleep(5)
+
+
 def _night():
     from crow_panel.core import lock, shared_locks
     log("start")
@@ -107,11 +130,12 @@ def _night():
               "including recurring instances and all-day events. Use only calendar read tools. Never create, update, respond to or delete an event. "
               "Follow every page. Report partial coverage when access or pagination is incomplete. Do not invent events or infer an empty calendar from a failed read. "
               "Write this JSON contract to " + str(calendar_incoming) + " using actual ISO dates with offsets, IANA time zone and HTTPS links: " + json.dumps(calendar_contract()))
-    cmd = ["cdx", "run", CFG.get("account", "claude"), "--cwd", str(HOME), "--model", CFG.get("model", "sonnet"),
-           "--permission", "full", "--prompt", prompt, "--detach", "--max-parallel", os.environ.get("CROW_MAX_RUNS", "2"), "--json"]
+    account = CFG.get("account", "claude")
+    limits = crow_limits.load(HOME)
+    cmd = ["cdx", "run", account, "--cwd", str(HOME), "--model", CFG.get("model", "sonnet"),
+           "--permission", "full", "--prompt", prompt, "--detach", "--max-parallel", str(limits["total"]), "--json"]
     env = dict(os.environ, HOME=crow_lib.real_home(), CROW_RETRO="1", CROW_MAJ_NIGHT="1")
-    with lock(shared_locks(HOME), "admission"):
-        out = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    out = launch_night(cmd, env, limits)
     exit_code = out.returncode or 1
     try:
         res = json.loads(out.stdout)

@@ -26,7 +26,11 @@ Use explicit paths when an older checkout is still on the shell's PATH.
 
 Copy `docs/panel.example.yaml` into the ignored `local/panel.yaml`. Set the real
 home, data directory, routine commands, accounts and allowed file roots there.
-Keep private values out of tracked files. `check-config` validates the structure;
+Set `limits: {claude: 3, worka: 1, workb: 1, total: 5}` for account admission.
+Chat, mail model steps and dispatched runs share these slots and the admission lock.
+A queued model step waits for its own account; other accounts can still start.
+The header and `crow runs` show account usage. `max_parallel` remains a fallback
+for the total when `limits.total` is absent. Keep private values out of tracked files. `check-config` validates the structure;
 it does not prove connector availability.
 
 Start with these keys:
