@@ -69,6 +69,7 @@
 - `item_265_user_modules_from_a_local_folder_or_a_git_url`
 - `item_266_move_the_shell_integration_brick_to_its_own_git_repo`
 - `item_267_nest_themes_hero_and_module_pages_built_from_the_user_s_modules`
+- `item_268_butler_auto_account_skips_codex_accounts`
 
 # Execution order
 1. Interleaved with req_063; see its Execution order.
