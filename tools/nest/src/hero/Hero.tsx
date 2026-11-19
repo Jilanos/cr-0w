@@ -13,10 +13,12 @@ import type { Heads, Palette, PlanetLabel, SceneOut } from './scene'
 import { drawScene, TABLE_FX } from './scene'
 import { createHead, liveHeadOk, type HeadGL } from './gl/head'
 import { bakeLook, CHARACTER, faceOf, HeadCtl, lookAt, PITCH_MAX, type Look } from './headCtl'
+import { watchActive, type Active } from './active'
 
 // Holotable hero (item_162, item_158): ASCII galaxy map of projects with the option B head above
 // the lens. Drag spins the planets, hover lifts one and shows its moons, click focuses then opens.
-// The frame loop only runs while something moves; otherwise it sleeps (0 fps).
+// The frame loop only runs while something moves; otherwise it sleeps (0 fps). Both loops stop
+// while the hero is off screen, the tab is hidden or the window has lost focus.
 
 type RGB = [number, number, number]
 const VARS: Record<UiState, string> = { needs: '--c-n', working: '--c-w', failed: '--c-f', sleeping: '--c-s', queued: '--c-q', done: '--c-d' }
@@ -144,6 +146,8 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     raf: 0, timer: 0, last: 0, lay: '', asks: -1, input: -1e9,
   })
   const [glOn, setGlOn] = useState(false)
+  const act = useRef<Active | undefined>(undefined)
+  const running = () => act.current?.on() ?? document.visibilityState === 'visible'
 
   useEffect(() => {
     let live = true
@@ -160,7 +164,13 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     ro.observe(el)
     const mo = new MutationObserver(() => setTheme(document.documentElement.dataset.theme))
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(st.current.raf); clearTimeout(st.current.timer) }
+    act.current = watchActive(el, (on) => {
+      const s = st.current, h = hd.current
+      if (on) { kick(); headKick(); return }
+      cancelAnimationFrame(s.raf); clearTimeout(s.timer); s.raf = 0; s.timer = 0; s.last = 0
+      cancelAnimationFrame(h.raf); clearTimeout(h.timer); h.raf = 0; h.timer = 0; h.last = 0
+    })
+    return () => { ro.disconnect(); mo.disconnect(); act.current?.stop(); act.current = undefined; cancelAnimationFrame(st.current.raf); clearTimeout(st.current.timer) }
   }, [])
 
   // Live head: created once when the device can run it; a lost context falls back to the bake.
@@ -288,7 +298,7 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
   const cur = useRef({ frame, headFrame, reduced, glOn })
   cur.current = { frame, headFrame, reduced, glOn }
   // Head loop: every display frame while it answers an input, 30 fps for ambient moves (drift, blinks),
-  // 20 fps settled, stopped while the page is hidden.
+  // 20 fps settled, stopped while the hero is not seen (watchActive).
   const headKick = () => {
     const h = hd.current
     if (!h.gl || h.raf) return
@@ -296,17 +306,13 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     if (h.timer) { clearTimeout(h.timer); h.timer = 0 }
     h.raf = requestAnimationFrame((t) => {
       h.raf = 0
-      if (document.visibilityState !== 'visible') { h.last = 0; return }
+      // Not seen: one still frame for the latest state, then stop until watchActive wakes it.
+      if (!running()) { cur.current.headFrame(t); h.last = 0; return }
       const busy = cur.current.headFrame(t)
       if (busy && t - h.input < HEAD_LIVE_MS) headKick()
       else h.timer = window.setTimeout(() => { h.timer = 0; headKick() }, busy ? HEAD_AMBIENT_MS : HEAD_IDLE_MS)
     })
   }
-  useEffect(() => {
-    const v = () => { if (document.visibilityState === 'visible') { kick(); headKick() } }
-    document.addEventListener('visibilitychange', v)
-    return () => document.removeEventListener('visibilitychange', v)
-  })
 
   // Wake the loop. Fast frames while busy; a slow tick for the sweep and the working pulse.
   const kick = () => {
@@ -316,9 +322,10 @@ export function Hero({ missions, inbox, now, say, sections }: { missions: Missio
     const loop = (t: number) => {
       s.raf = 0
       const c = cur.current
+      if (!running()) { c.frame(t); s.last = 0; return }
       if (c.frame(t)) { s.raf = requestAnimationFrame(loop); return }
       s.last = 0
-      if (!c.reduced && document.visibilityState === 'visible') s.timer = window.setTimeout(() => kick(), c.glOn ? TABLE_FRAME_MS : PULSE_FRAME_MS)
+      if (!c.reduced) s.timer = window.setTimeout(() => kick(), c.glOn ? TABLE_FRAME_MS : PULSE_FRAME_MS)
     }
     s.raf = requestAnimationFrame(loop)
   }

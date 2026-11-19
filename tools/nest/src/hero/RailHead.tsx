@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createHead, liveHeadOk, type HeadGL } from './gl/head'
 import { CHARACTER, faceOf, HeadCtl } from './headCtl'
+import { watchActive } from './active'
 import type { Mood } from './model'
 
 type RGB = [number, number, number]
@@ -23,7 +24,8 @@ function cssRgb(name: string, fb: RGB): RGB {
 
 // The droid head alone, for the butler rail (item_176). Same renderer and controller as the
 // Home hero, no table: it idles, blinks, and nods when a new ask lands. Without WebGL or with
-// reduced motion it shows nothing and the rail keeps its mood diamond.
+// reduced motion it shows nothing and the rail keeps its mood diamond. It stops while off screen,
+// in a hidden tab or an unfocused window.
 export function RailHead({ mood, working, asks }: { mood: Mood; working: boolean; asks: number }) {
   const box = useRef<HTMLDivElement>(null)
   const cv = useRef<HTMLCanvasElement>(null)
@@ -72,7 +74,7 @@ export function RailHead({ mood, working, asks }: { mood: Mood; working: boolean
       if (timer) { clearTimeout(timer); timer = 0 }
       raf = requestAnimationFrame((t) => {
         raf = 0
-        if (document.visibilityState !== 'visible') { last = 0; return }
+        if (!act.on()) { frame(t); last = 0; return }
         const busy = frame(t)
         timer = window.setTimeout(() => { timer = 0; kick() }, busy ? AMBIENT_MS : IDLE_MS)
       })
@@ -83,14 +85,16 @@ export function RailHead({ mood, working, asks }: { mood: Mood; working: boolean
       pal = { fail: cssRgb('--c-f', pal.fail), run: cssRgb('--c-w', pal.run) }
     })
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    const vis = () => { if (document.visibilityState === 'visible') kick() }
-    document.addEventListener('visibilitychange', vis)
+    const act = watchActive(el, (on) => {
+      if (on) { kick(); return }
+      cancelAnimationFrame(raf); clearTimeout(timer); raf = 0; timer = 0; last = 0
+    })
     place()
     kick()
     return () => {
       cancelAnimationFrame(raf); clearTimeout(timer)
       ro.disconnect(); mo.disconnect()
-      document.removeEventListener('visibilitychange', vis)
+      act.stop()
       gl?.dispose(); gl = null
       setOn(false)
     }

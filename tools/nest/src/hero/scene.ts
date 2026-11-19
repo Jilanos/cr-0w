@@ -221,6 +221,8 @@ const MAXP = 9
 const TSIZE: Record<HeroProject['planet'], number> = { bands: 0.44, terrain: 0.34, ice: 0.3, rock: 0.26 }
 const HSZ = 0.62, S3 = Math.sqrt(3), DARK: RGB = [20, 20, 50]
 export const PHONE_W = 500
+// Laptop hero (wider than the Fold inner panel): planets a quarter smaller, they read too big there (owner 2026-11-19).
+export const WIDE_W = 720
 const hexOf = (p: V3) => { const q = Math.round(p.x / (HSZ * 1.5)), r = Math.round(p.z / (HSZ * S3) - q / 2); return V(HSZ * 1.5 * q, PY, HSZ * S3 * (r + q / 2)) }
 const rotY = (p: V3, deg: number) => { const c = Math.cos(deg * D2R), s = Math.sin(deg * D2R); return V(p.x * c + p.z * s, p.y, -p.x * s + p.z * c) }
 // Hex etch: edge points in the table frame built once; projected cells cached per size and spin
@@ -332,7 +334,7 @@ export function drawScene(cv: HTMLCanvasElement, w: number, h: number, dpr: numb
     if (gl > 0) base = add(base, V((Math.random() - 0.5) * 0.5 * gl, 0, 0))
     // Lit table: size by planet type, bigger on a phone where one label leaves room; back planets grow
     // to offset perspective so they stay readable (owner 2026-11-17).
-    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.75 : 1.8) : SIZE[p.state] * (1 - 0.25 * depth)
+    const r = T ? TSIZE[p.planet] * (w < PHONE_W ? 1.75 : w >= WIDE_W ? 1.35 : 1.8) : SIZE[p.state] * (1 - 0.25 * depth)
     const z0 = cam.proj(base).z, px = z0 / cam.focal
     const hk = hov?.name === p.name ? hov.k : 0
     const stalk = ALT[p.state] + (p.state === 'needs' ? 0.18 * Math.min((p.wait ?? 0) / 300, 1) : 0)

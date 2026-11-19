@@ -1,5 +1,6 @@
 // Headless idle check: hero paints per second at rest. 2D = table canvas paints, GL = live head frames
 // (draws to the default framebuffer). Reduced motion expects 0 and 0 (static bake, no loops).
+// A window blur expects 0 and 0 too; focus restores the idle rates.
 import { spawn } from 'node:child_process'
 import { chromium } from 'playwright-core'
 const PORT = 4392
@@ -25,5 +26,15 @@ try {
     await page.waitForTimeout(3000)
     const b = await page.evaluate(() => [window.__draws, window.__gl])
     console.log(rm, '2D paints/s:', ((b[0] - a[0]) / 3).toFixed(1), 'GL head frames/s:', ((b[1] - a[1]) / 3).toFixed(1))
+    if (rm === 'reduce') continue
+    // Window blur stops both loops (expect 0 and 0); focus brings them back.
+    for (const ev of ['blur', 'focus']) {
+      await page.evaluate((ev) => window.dispatchEvent(new Event(ev)), ev)
+      await page.waitForTimeout(500)
+      const c = await page.evaluate(() => [window.__draws, window.__gl])
+      await page.waitForTimeout(2000)
+      const d = await page.evaluate(() => [window.__draws, window.__gl])
+      console.log(rm, `after ${ev}`, '2D paints/s:', ((d[0] - c[0]) / 2).toFixed(1), 'GL head frames/s:', ((d[1] - c[1]) / 2).toFixed(1))
+    }
   }
 } finally { await browser.close(); server.kill() }
