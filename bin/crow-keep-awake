@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# crow-keep-awake: keep the machine awake for N seconds (default 11 h). Run it as a background command.
+# Usage: crow-keep-awake [--print] [seconds]   --print shows the command and exits.
+# Linux: systemd-inhibit (who=crow-afk, as crow-afk-preflight checks). WSL: Windows SetThreadExecutionState.
+# 2147483651 = ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED (0x80000003 overflows Int32 in PowerShell 5).
+# WSL uses -EncodedCommand: quotes inside -Command do not survive the bash -> powershell.exe hand-off.
+set -euo pipefail
+print=0
+[ "${1:-}" = --print ] && { print=1; shift; }
+secs=${1:-39600}
+case "$secs" in ''|*[!0-9]*) echo "crow-keep-awake: seconds must be a number" >&2; exit 2 ;; esac
+if grep -qi microsoft "${CROW_PROC_VERSION:-/proc/version}" 2>/dev/null; then
+  ps='$s = Add-Type -MemberDefinition '"'"'[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'"'"' -Name P -Namespace W -PassThru
+if ($s::SetThreadExecutionState([uint32]2147483651) -eq 0) { [Console]::Error.WriteLine("SetThreadExecutionState failed"); exit 1 }
+Write-Output "awake for '"$secs"' s"
+Start-Sleep -Seconds '"$secs"
+  enc=$(printf '%s' "$ps" | iconv -t UTF-16LE | base64 -w0)
+  cmd=(powershell.exe -NoProfile -NonInteractive -EncodedCommand "$enc")
+elif command -v systemd-inhibit >/dev/null; then
+  cmd=(systemd-inhibit --what=sleep:idle:handle-lid-switch --who=crow-afk --why=afk-runs sleep "$secs")
+else
+  echo "crow-keep-awake: no sleep inhibitor on this system (not WSL, no systemd-inhibit); nothing to do"
+  exit 0
+fi
+if [ "$print" = 1 ]; then printf '%s\n' "${cmd[*]}"; exit 0; fi
+[ "${cmd[0]}" = systemd-inhibit ] && echo "awake for $secs s"
+exec "${cmd[@]}"

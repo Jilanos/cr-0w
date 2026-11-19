@@ -19,12 +19,14 @@ script	crow-ctx	core
 script	crow-design-notes	design
 script	crow-digest	retro
 script	crow-doctor	core
+script	crow-download-relay	core
 script	crow-focus	core
 script	crow-forge-read	forge
 script	crow-gather	core
 script	crow-hub-guard	core
 script	crow-isolation-probe	core
 script	crow_lib.py	core
+script	crow-keep-awake	afk
 script	crow-log	vault
 script	crow-memory	core
 script	crow-mrs	forge
@@ -78,6 +80,7 @@ runbook	archeotech-crow-agents	integration-shell
 runbook	archeotech-crow-usage	integration-shell
 runbook	ci-secrets	forge
 runbook	claude-and-codex	core
+runbook	codex-download-relay	core
 runbook	core-service	core-api
 runbook	cost-audit	retro
 runbook	design-canvas	design

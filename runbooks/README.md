@@ -38,6 +38,7 @@ want to trigger it by name.
 - [live-claude-session-test](live-claude-session-test.md): drive a hidden tmux Claude session to live-test hooks and permission prompt answers
 - [readme-showcase](readme-showcase.md): method for a marketing README per repo (visuals, header options, structure, audit, preview)
 - [claude-and-codex](claude-and-codex.md): what changes on a Codex account (instructions, skills, permission, models) and what the hub guard covers
+- [codex-download-relay](codex-download-relay.md): hub-side downloader (`crow-download-relay`) for signed URLs a run without network cannot open
 - [long-sessions](long-sessions.md): context cap at 150k, warning at 120k, when to wrap and how to split one session into scoped handoffs
 - [vault-capture](vault-capture.md): `crow note`, `crow notes` JSON, the `eod` skill and the capture tags that feed every recap
 - [tui-review-ux](tui-review-ux.md): review-tool UX research for the deck MR page: stage rail, whose-move rule, badge options, TUI constraints

@@ -6,7 +6,7 @@ Unattended work while the owner is away. The hub session is the orchestrator; ru
 
 ## Before the owner leaves
 - Run `bin/crow-afk-preflight <repo paths of this run's jobs>` and fix every FAIL. Read the WARNs to the owner: on battery, packages upgraded since boot (they go live at the next login: reboot or relogin *before* the night, not after), docker broken, gh/glab logged out.
-- Start the sleep inhibitor it prints, as a background command.
+- Start `bin/crow-keep-awake [seconds]` as a background command and check it prints `awake for N s`. On Linux it runs `systemd-inhibit`. On WSL `systemd-inhibit` is refused and only blocks Linux, so it blocks Windows sleep through `powershell.exe -EncodedCommand` (an inline `-Command` with escaped quotes fails silently).
 - Ask every open question *now* (AskUserQuestion), so jobs don't pause on things the owner could have answered in 10 seconds.
 - Repos with their own push rule in `.claude/` (the preflight flags them): read it, then either promise pushes in the job or list the repo as "owner pushes". A preamble must never authorise what the repo's hook forbids.
 
