@@ -90,19 +90,25 @@ func butlerManager(cfg config.Config) (*butler.Manager, error) {
 		cmd.Dir = cwd
 		return cmd, nil
 	}
-	pick := func() (string, error) {
-		out, err := exec.Command(filepath.Join(cfg.Engine, "bin", "crow-accounts"), butlerPickArgs...).Output()
+	return butler.New(butler.Options{Dir: state, Launch: launch, Pick: butlerPick(cfg.Engine)}), nil
+}
+
+// butlerPick returns the auto account picker: the last word crow-accounts prints, or an
+// error that says no account can run the butler, with the reasons crow-accounts gave.
+func butlerPick(engine string) func() (string, error) {
+	return func() (string, error) {
+		out, err := exec.Command(filepath.Join(engine, "bin", "crow-accounts"), butlerPickArgs...).Output()
 		lines := strings.Fields(strings.TrimSpace(string(out)))
-		if err != nil || len(lines) == 0 {
-			var ee *exec.ExitError
-			if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-				return "", errors.New(strings.TrimSpace(string(ee.Stderr)))
-			}
-			return "", fmt.Errorf("crow-accounts pick: %v", err)
+		if err == nil && len(lines) > 0 {
+			return lines[len(lines)-1], nil
 		}
-		return lines[len(lines)-1], nil
+		why := fmt.Sprintf("crow-accounts pick: %v", err)
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
+			why = strings.TrimSpace(string(ee.Stderr))
+		}
+		return "", errors.New("no account can run the butler: " + why)
 	}
-	return butler.New(butler.Options{Dir: state, Launch: launch, Pick: pick}), nil
 }
 
 // butlerArgs is the `env` command line: the account's profile as HOME (so the account

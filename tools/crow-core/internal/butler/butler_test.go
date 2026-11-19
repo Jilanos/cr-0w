@@ -1,6 +1,7 @@
 package butler
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,6 +71,26 @@ func crow(v View) []Msg {
 		}
 	}
 	return out
+}
+
+func TestAutoPickFailureEndsTheTurnWithANote(t *testing.T) {
+	var calls []launch
+	m := manager(t, fake(t, `[]`), &calls)
+	m.o.Pick = func() (string, error) {
+		return "", errors.New("no account can run the butler: crow: no allowed account runs claude (cx: runs codex).")
+	}
+	msg, err := m.Say("main", "hello", "nest")
+	if err == nil || msg.Seq == 0 {
+		t.Fatalf("want the message kept and an error, got %+v %v", msg, err)
+	}
+	v, _ := m.Get("main", 0)
+	last := v.Messages[len(v.Messages)-1]
+	if v.Busy || v.Running || len(calls) != 0 {
+		t.Fatalf("turn must end with no process: busy %v running %v launches %v", v.Busy, v.Running, calls)
+	}
+	if last.Role != "note" || !strings.Contains(last.Text, "no account can run the butler") || !strings.Contains(last.Text, "cx: runs codex") {
+		t.Fatalf("note %+v", last)
+	}
 }
 
 func TestTurnQueueAndChips(t *testing.T) {
