@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -68,5 +70,39 @@ func TestObserveOpsNoStateDir(t *testing.T) {
 	}
 	if s.opsLog != nil {
 		t.Fatal("log without a state dir")
+	}
+}
+
+func TestAFKPending(t *testing.T) {
+	md := "| # | job file | item | state |\n|---|---|---|---|\n" +
+		"| 1 | job-a.md | item_1 | done 58d5c24d |\n| 2 | job-b.md | item_2 | skipped (cap) |\n" +
+		"| 3 | job-c.md | item_3 | running |\n| 4 | job-d.md | item_4 | |\n"
+	if got := afkPending(md); !slices.Equal(got, []string{"job-c.md", "job-d.md"}) {
+		t.Errorf("pending %v", got)
+	}
+}
+
+func TestAFKJobsQueueFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "afk", "queue.md"), []byte("| 1 | job-crow-x.md | done |\n| 2 | job-crow-y.md | |\n"))
+	writeFile(t, filepath.Join(dir, "afk", "job-crow-x.md"), []byte("x"))
+	writeFile(t, filepath.Join(dir, "afk", "job-crow-y.md"), []byte("y"))
+	writeFile(t, filepath.Join(dir, "afk", "queued", "job-blur.md"), []byte("z"))
+	got := afkJobs(dir)
+	if len(got) != 2 || got[0].ID != "job-crow-y.md" || got[0].Title != "crow y" || got[1].ID != "queued/job-blur.md" {
+		t.Errorf("afk %+v", got)
+	}
+}
+
+func TestAddPaused(t *testing.T) {
+	next := "2026-11-10T17:00:00Z"
+	jobs := []Job{{Unit: "crow-retro.timer", Activates: "crow-retro.service", Next: &next}}
+	jobs = AddPaused(jobs, []byte(`[{"unit_file":"crow-retro.timer","state":"enabled"},{"unit_file":"crow-toolwatch.timer","state":"disabled"},{"unit_file":"other.timer","state":"disabled"}]`))
+	if len(jobs) != 2 || jobs[0].Paused || !jobs[1].Paused || jobs[1].Activates != "crow-toolwatch.service" {
+		t.Errorf("jobs %+v", jobs)
+	}
+	jobs = AddDescriptions(jobs, []byte("Id=crow-retro.service\nDescription=crow daily session retro batch\n\nId=crow-toolwatch.service\nDescription=crow-toolwatch.service\n"))
+	if jobs[0].Description != "crow daily session retro batch" || jobs[1].Description != "" {
+		t.Errorf("descriptions %+v", jobs)
 	}
 }

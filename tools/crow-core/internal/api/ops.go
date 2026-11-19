@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -145,16 +146,65 @@ func isoWeek(s string, loc *time.Location) (time.Time, error) {
 	return mon, nil
 }
 
-// afkJobs lists the AFK job prompts waiting in <state>/afk (job-*.md, top level only).
+// afkJobs lists the AFK jobs still to run, in order:
+//   - the rows of <state>/afk/queue.md (the only source of order) not yet done, skipped or
+//     failed, whose job file exists; without a queue.md, every top-level job-*.md;
+//   - then the jobs prepared for a next run in <state>/afk/queued/ (id "queued/<file>").
+//
 // The title is the file name without "job-" and ".md", order prefix and dashes dropped (job-01-crow-checks.md is "crow checks").
 func afkJobs(state string) []contract.OpsQueued {
 	if state == "" {
 		return nil
 	}
-	paths, _ := filepath.Glob(filepath.Join(state, "afk", "job-*.md"))
+	dir := filepath.Join(state, "afk")
 	var out []contract.OpsQueued
+	add := func(id string) {
+		if _, err := os.Stat(filepath.Join(dir, id)); err == nil {
+			out = append(out, contract.OpsQueued{Kind: "afk", ID: id, Title: jobTitle(id)})
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "queue.md")); err == nil {
+		for _, row := range afkPending(string(b)) {
+			add(row)
+		}
+	} else {
+		paths, _ := filepath.Glob(filepath.Join(dir, "job-*.md"))
+		for _, p := range paths {
+			add(filepath.Base(p))
+		}
+	}
+	paths, _ := filepath.Glob(filepath.Join(dir, "queued", "job-*.md"))
 	for _, p := range paths {
-		out = append(out, contract.OpsQueued{Kind: "afk", ID: filepath.Base(p), Title: jobTitle(p)})
+		add("queued/" + filepath.Base(p))
+	}
+	return out
+}
+
+// afkPending is the job files of the queue.md table rows whose state is not final.
+// The job file is the first cell ending in .md, the state the last cell.
+func afkPending(md string) []string {
+	var out []string
+	for _, l := range strings.Split(md, "\n") {
+		l = strings.TrimSpace(l)
+		if !strings.HasPrefix(l, "|") {
+			continue
+		}
+		cells := strings.Split(strings.Trim(l, "|"), "|")
+		file := ""
+		for _, c := range cells {
+			if c = strings.TrimSpace(c); strings.HasSuffix(c, ".md") && !strings.ContainsAny(c, "/ ") {
+				file = c
+				break
+			}
+		}
+		state := strings.ToLower(strings.TrimSpace(cells[len(cells)-1]))
+		final := false
+		for _, w := range []string{"done", "skipped", "skip", "failed", "superseded", "cancelled", "dropped"} {
+			final = final || strings.HasPrefix(state, w)
+		}
+		if file != "" && !final {
+			out = append(out, file)
+		}
 	}
 	return out
 }

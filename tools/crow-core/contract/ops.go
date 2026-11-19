@@ -44,7 +44,8 @@ type OpsQueued struct {
 	ID      string `json:"id"`
 	Project string `json:"project,omitempty"`
 	Title   string `json:"title"`
-	Next    string `json:"next,omitempty"` // routines: next start, RFC 3339
+	Next    string `json:"next,omitempty"`   // routines: next start, RFC 3339
+	Paused  bool   `json:"paused,omitempty"` // routines: timer stopped (crow-routine pause)
 }
 
 // OpsTotal sums the lanes of one project or one kind.

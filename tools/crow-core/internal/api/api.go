@@ -124,6 +124,7 @@ func (s *Server) Handler(trusted bool) http.Handler {
 	mux.HandleFunc("GET /api/events", s.events)
 	s.routeActions(mux)
 	s.routeLive(mux)
+	s.routeQueue(mux)
 	s.routeConversation(mux)
 	s.routeTerminal(mux)
 	s.routeButler(mux)

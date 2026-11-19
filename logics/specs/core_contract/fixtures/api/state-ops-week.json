@@ -1,6 +1,6 @@
 {
   "section": "ops",
-  "version": "5efa3fac79ab1a5f",
+  "version": "cada1403ec962084",
   "updated_at": "2026-11-10T09:00:00Z",
   "data": {
     "week": "2026-W46",
@@ -38,7 +38,7 @@
       {
         "kind": "routine",
         "id": "crow-retro.timer",
-        "title": "crow-retro.service",
+        "title": "retro",
         "next": "2026-11-10T17:03:47Z"
       },
       {

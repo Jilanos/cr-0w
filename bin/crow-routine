@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""crow-routine: run, pause or resume a crow routine (a crow-*.timer of the user systemd).
+
+  crow-routine run <name>      start the routine's service now (crow-retro.timer, crow-retro or retro)
+  crow-routine pause <name>    stop and disable the timer: no next start until resumed
+  crow-routine resume <name>   enable and start the timer again
+
+Prints one JSON line: {"ok": true, "message": "..."} or {"ok": false, "error": {"code", "message"}}.
+"""
+import json, re, subprocess, sys
+
+
+def out(ok, msg, code="failed"):
+    print(json.dumps({"ok": True, "message": msg} if ok else {"ok": False, "error": {"code": code, "message": msg}}))
+    sys.exit(0 if ok else 1)
+
+
+def main(argv):
+    if len(argv) != 2 or argv[0] not in ("run", "pause", "resume"):
+        print(__doc__.strip(), file=sys.stderr)
+        sys.exit(2)
+    verb, name = argv
+    base = re.sub(r"\.(timer|service)$", "", name)
+    if not base.startswith("crow-"):
+        base = "crow-" + base
+    if not re.fullmatch(r"crow-[a-z0-9-]+", base):
+        out(False, f"bad routine name {name!r}", "bad_name")
+    if base == "crow-core":
+        out(False, "crow-core is the service, not a routine", "bad_name")
+    known = subprocess.run(["systemctl", "--user", "list-unit-files", f"{base}.timer", "--no-legend"],
+                           capture_output=True, text=True).stdout.strip()
+    if not known:
+        out(False, f"no routine {base}.timer", "not_found")
+    cmds = {
+        "run": [["start", "--no-block", f"{base}.service"]],
+        "pause": [["disable", "--now", f"{base}.timer"]],
+        "resume": [["enable", "--now", f"{base}.timer"]],
+    }[verb]
+    for c in cmds:
+        r = subprocess.run(["systemctl", "--user", *c], capture_output=True, text=True)
+        if r.returncode:
+            out(False, (r.stderr or r.stdout).strip().splitlines()[-1] if (r.stderr or r.stdout).strip() else f"systemctl {c[0]} failed")
+    done = {"run": "started", "pause": "paused", "resume": "resumed"}[verb]
+    out(True, f"{done} {base.removeprefix('crow-')}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

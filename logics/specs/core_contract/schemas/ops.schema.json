@@ -57,7 +57,7 @@
         "id": {"type": "string", "description": "Mission id, timer unit or AFK job file name."},
         "project": {"type": "string"},
         "title": {"type": "string"},
-        "next": {"type": "string", "format": "date-time", "description": "Routines: next start."}
+        "next": {"type": "string", "format": "date-time", "description": "Routines: next start."}, "paused": {"type": "boolean", "description": "Routines: timer stopped, no next start."}
       }
     },
     "total": {

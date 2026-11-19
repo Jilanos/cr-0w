@@ -287,7 +287,23 @@ func jobsFetch() (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("systemctl list-timers: %w", err)
 	}
-	return api.ParseTimers(out)
+	jobs, err := api.ParseTimers(out)
+	if err != nil {
+		return nil, err
+	}
+	if files, err := exec.CommandContext(ctx, "systemctl", "--user", "list-unit-files", "crow-*.timer", "-o", "json").Output(); err == nil {
+		jobs = api.AddPaused(jobs, files)
+	}
+	args := []string{"--user", "show", "-p", "Id,Description"}
+	for _, j := range jobs {
+		args = append(args, j.Activates)
+	}
+	if len(jobs) > 0 {
+		if show, err := exec.CommandContext(ctx, "systemctl", args...).Output(); err == nil {
+			jobs = api.AddDescriptions(jobs, show)
+		}
+	}
+	return jobs, nil
 }
 
 // unitFile is the systemd user unit that runs this binary as the service.

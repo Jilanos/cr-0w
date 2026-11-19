@@ -1,6 +1,6 @@
 {
   "section": "ops",
-  "version": "296b7d7a03eac70c",
+  "version": "8a75fc951a41af30",
   "updated_at": "2026-11-10T09:00:00Z",
   "data": {
     "day": "2026-11-10",
@@ -32,7 +32,7 @@
       {
         "kind": "routine",
         "id": "crow-retro.timer",
-        "title": "crow-retro.service",
+        "title": "retro",
         "next": "2026-11-10T17:03:47Z"
       },
       {

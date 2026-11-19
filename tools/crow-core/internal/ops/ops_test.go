@@ -194,7 +194,7 @@ func TestQueue(t *testing.T) {
 	o := Build(input(t, "2026-11-10"))
 	want := []contract.OpsQueued{
 		{Kind: "mission", ID: "m-2", Project: "crow", Title: "Refresh the docs index"},
-		{Kind: "routine", ID: "crow-retro.timer", Title: "crow-retro.service", Next: "2026-11-10T17:00:00Z"},
+		{Kind: "routine", ID: "crow-retro.timer", Title: "retro", Next: "2026-11-10T17:00:00Z"},
 		{Kind: "afk", ID: "job-01.md", Title: "Audit"},
 	}
 	if !slices.Equal(o.Queue, want) {

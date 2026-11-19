@@ -438,13 +438,38 @@ func queue(in Input, reg Names) []contract.OpsQueued {
 	}
 	var rs []contract.OpsQueued
 	for _, j := range anyRows(in.Jobs) {
-		if next := str(j, "next"); next != "" {
-			rs = append(rs, contract.OpsQueued{Kind: "routine", ID: str(j, "unit"), Title: str(j, "activates"), Next: next})
+		paused, _ := j["paused"].(bool)
+		if next := str(j, "next"); next != "" || paused {
+			rs = append(rs, contract.OpsQueued{Kind: "routine", ID: str(j, "unit"), Title: routineTitle(j), Next: next, Paused: paused})
 		}
 	}
-	sort.SliceStable(rs, func(a, b int) bool { return rs[a].Next < rs[b].Next })
+	// Paused routines last, the rest by next start.
+	sort.SliceStable(rs, func(a, b int) bool {
+		if rs[a].Paused != rs[b].Paused {
+			return rs[b].Paused
+		}
+		return rs[a].Next < rs[b].Next
+	})
 	out = append(out, rs...)
-	return append(out, in.AFK...)
+	for _, a := range in.AFK {
+		// "crow nest design" is the job "nest design" of the registered project crow.
+		if head, rest, ok := strings.Cut(a.Title, " "); ok && a.Project == "" {
+			if _, known := reg.find(head); known {
+				a.Project, a.Title = reg.ShortName(head), rest
+			}
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// routineTitle is what the timer does: its service description without a leading "crow ",
+// else the unit name without "crow-" and ".timer" (crow-retro.timer is "retro").
+func routineTitle(j map[string]any) string {
+	if d := strings.TrimPrefix(str(j, "description"), "crow "); d != "" {
+		return d
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(str(j, "unit"), "crow-"), ".timer")
 }
 
 // Totals sums the lanes per project, then per kind, each sorted by name.
