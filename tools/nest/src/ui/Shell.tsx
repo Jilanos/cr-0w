@@ -25,7 +25,7 @@ function useTheme(): [Theme, () => void] {
 function badges(snap: Snapshot | null): Partial<Record<TabKey, { n: number; failed?: boolean }>> {
   if (!snap) return {}
   const c = countByState(snap.missions, snap.inbox)
-  return { missions: { n: c.failed, failed: true }, inbox: inboxBadge(snap) }
+  return { ops: { n: c.failed, failed: true }, inbox: inboxBadge(snap) }
 }
 
 // Header A (item_206): one chip after the logo cycles the scope filter.

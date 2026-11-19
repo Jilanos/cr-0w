@@ -4,10 +4,12 @@ import stateInbox from '../../fixtures/states/inbox.json'
 import stateAgenda from '../../fixtures/states/agenda.json'
 import stateLive from '../../fixtures/states/live.json'
 import stateWork from '../../fixtures/states/work.json'
+import stateOps from '../../fixtures/states/ops.json'
 import { ApiError } from './api'
 import { fixtureButler, type ButlerMsg } from './butler'
 import type { ChatTarget, ConversationPage, Entry, PageAsk } from './conversation'
 import type { Actions, Dispatch, LiveReply } from './live'
+import type { Ops } from './ops'
 import type { DataSource } from './source'
 import { CANCELLABLE } from './state'
 import type { AgendaEvent, InboxItem, InboxVerb, Mission, SectionBody, SectionName } from './types'
@@ -246,6 +248,8 @@ export function fixtureSource(missions: Mission[] = MISSIONS, inbox: InboxItem[]
     agenda: async () => agenda,
     section,
     conversation: chats.page,
+    ops: async (query) => fixtureOps(query),
+    run: async (id) => fixtureRun(id),
     actions,
     now: () => now,
     butler: fixtureButler(now, BUTLER_SEED),
@@ -298,5 +302,28 @@ function missionActions(rec: { missions: Mission[]; inbox: InboxItem[] }, now: D
       row({ ...r, state: 'dropped' })
       return rec.inbox.find((x) => x.id === item)
     },
+  }
+}
+
+// Ops fixture (item_190): one day. A week answer repeats its lanes on each past day of the week.
+function fixtureOps(query: string): Ops {
+  const day = stateOps as unknown as Ops
+  const week = /^week=(.+)$/.exec(query)?.[1]
+  if (week) {
+    const days = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']
+    return { week, days, lanes: day.lanes, queue: day.queue, totals: day.totals }
+  }
+  const d = /^day=(.+)$/.exec(query)?.[1] ?? day.day ?? ''
+  return d === day.day ? day : { day: d ?? '', days: [d ?? ''], lanes: [], queue: day.queue, totals: [] }
+}
+
+function fixtureRun(id: string) {
+  const l = (stateOps as unknown as Ops).lanes.find((x) => x.keys.includes(id))
+  if (!l) return undefined
+  return {
+    run: id, source: 'dispatch', project: l.project, label: l.title, account: l.account, status: l.state,
+    started: l.spans[0]?.start ?? null, ended: l.spans.at(-1)?.end ?? null, cost_usd: l.cost_usd, commits: [],
+    branch: l.title, worktree: `/work/${l.project}.wt/${l.title}`, item: null, mission: null,
+    report: `## ${l.title}\n\nFixture report: what the run did and what is left.`,
   }
 }

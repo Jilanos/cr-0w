@@ -1,6 +1,7 @@
 import { apiButler } from './butler'
 import { conversationPath, pageQuery, type ConversationPage } from './conversation'
 import type { Actions, LiveReply, Screen } from './live'
+import type { Ops, RunReport } from './ops'
 import type { DataSource } from './source'
 import type { AgendaEvent, InboxItem, Mission, SectionBody, SectionName, TodayEvent } from './types'
 
@@ -141,6 +142,17 @@ export function apiSource(base = '/api', get: Fetch = (i, init) => fetch(i, init
       const res = await get(`${base}${conversationPath(target)}${pageQuery(page)}`, { cache: 'no-store' })
       if (!res.ok) throw await failure(res)
       return (await res.json()) as ConversationPage
+    },
+    async ops(query) {
+      const res = await get(`${base}/state/ops?${query}`, { cache: 'no-store' })
+      if (!res.ok) throw await failure(res)
+      return ((await res.json()) as Section<Ops>).data
+    },
+    async run(id) {
+      const res = await get(`${base}/runs/${encodeURIComponent(id)}`, { cache: 'no-store' })
+      if (res.status === 404) return undefined
+      if (!res.ok) throw await failure(res)
+      return (await res.json()) as RunReport
     },
     async agenda() {
       const body = await section('today')

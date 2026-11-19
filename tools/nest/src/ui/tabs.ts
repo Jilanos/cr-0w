@@ -2,7 +2,7 @@ import type { Route } from '../router'
 import type { TabKey } from './icons'
 
 // Phone tab bar B (item_206): four tabs plus More. More holds the rarer screens.
-export const BAR_KEYS = ['home', 'desk', 'missions', 'inbox'] as const
+export const BAR_KEYS = ['home', 'desk', 'ops', 'inbox'] as const
 export const MORE_KEYS = ['mrs', 'agenda', 'reports'] as const
 export type BarKey = (typeof BAR_KEYS)[number] | 'more'
 

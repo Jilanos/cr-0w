@@ -252,12 +252,12 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       const a = agents.find((x) => (w.kind === 'run' ? x.run_id === ref : String(x.pid) === ref))
       if (a && cover) navigate(`/desk/${a.pid}`)
       else if (a) pick(a, waits(a) && !a.prompt)
-      else if (w.kind === 'run' && w.mission) navigate(`/missions/${encodeURIComponent(w.mission)}`)
+      else if (w.kind === 'run' && w.mission) navigate(`/ops?mission=${encodeURIComponent(w.mission)}`)
     } else if (w.kind === 'parked') {
       const r = resumable.find((x) => x.conversation_id === ref)
       if (r) resume(r)
     } else if (w.kind === 'mission') {
-      navigate(`/missions/${encodeURIComponent(ref)}`)
+      navigate(`/ops?mission=${encodeURIComponent(ref)}`)
     } else {
       navigate('/mrs')
     }
@@ -321,7 +321,7 @@ function useDesk(snap: Snapshot, refresh: () => Promise<void>) {
       if (a.prompt && promptView(a.prompt) === 'options' && a.prompt.options.some((o) => o.key === 'allow')) return { label: 'Allow', run: () => allow(a) }
       return { label: 'Answer', run: () => pick(a, !a.prompt) }
     }
-    if (w.kind === 'mission' && w.state === 'needs') return { label: 'Answer', run: () => navigate(`/missions/${encodeURIComponent(w.source.ref)}`) }
+    if (w.kind === 'mission' && w.state === 'needs') return { label: 'Answer', run: () => navigate(`/ops?mission=${encodeURIComponent(w.source.ref)}`) }
     return undefined
   }
   const promptOf = (i: ReadyItem) => `Implement ${shortRef(i.ref)} end to end. Read ${i.path} first.`

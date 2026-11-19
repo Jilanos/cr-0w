@@ -1,10 +1,10 @@
 ## item_190_laptop_missions_from_the_approved_missions_board - Nest Ops page (ex-Missions): timeline of everything worked on, queue and run detail
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: In progress
 > Understanding: 85%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 70%
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -33,6 +33,13 @@
 - Out:
   - Desk resume, Inbox answers, Usage quota: they have their own pages.
   - Core data (item_257).
+
+# Build notes (2026-11-19)
+- Core gaps fixed first (commits 9b5e7c2, 4861a24): worktree lanes fold into their repo, runs join their session lane, AFK titles from the job file, usage buckets kept a week.
+- Nest: tab and route are Ops (/ops); /missions and /missions/<id> redirect. Screen src/screens/Ops.tsx: day timeline grouped by project, live lanes hatched with a now line and OPEN to the chat, planned routines dashed, week strip, queue, totals by project or kind, lane sheet with the run report and cost.
+- Not built, no core route yet: routine pause and run now, AFK edit and delete, mission run now and reorder, worktree and diff stat, AFK stop times. Mission cancel works (crow mission cancel).
+- Past waiting spans: item_264. The state log records them from now on.
+- Left: owner review on live data (AC1, AC3), then the missing actions as core routes.
 
 # Acceptance criteria
 - AC1: Owner approved the Ops board before the build.

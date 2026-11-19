@@ -1,0 +1,357 @@
+{
+ "day": "2026-11-09",
+ "days": [
+  "2026-11-09"
+ ],
+ "lanes": [
+  {
+   "id": "s-hub",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "interactive",
+   "title": "morning brief and triage",
+   "model": "opus",
+   "state": "needs",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T08:10:00+01:00",
+     "end": "2026-11-09T09:00:00+01:00"
+    },
+    {
+     "state": "idle",
+     "start": "2026-11-09T09:00:00+01:00",
+     "end": "2026-11-09T10:30:00+01:00"
+    },
+    {
+     "state": "working",
+     "start": "2026-11-09T10:30:00+01:00",
+     "end": "2026-11-09T11:40:00+01:00"
+    },
+    {
+     "state": "waiting",
+     "start": "2026-11-09T15:40:00+01:00",
+     "end": "2026-11-09T16:10:00+01:00"
+    }
+   ],
+   "keys": [
+    "s-hub"
+   ],
+   "active_s": 7200,
+   "wait_s": 1800,
+   "cost_usd": 6.2,
+   "tokens": 420000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "s-ops",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "interactive",
+   "title": "ops timeline design",
+   "model": "opus",
+   "state": "working",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T13:00:00+01:00",
+     "end": "2026-11-09T14:20:00+01:00"
+    },
+    {
+     "state": "idle",
+     "start": "2026-11-09T14:20:00+01:00",
+     "end": "2026-11-09T14:50:00+01:00"
+    },
+    {
+     "state": "working",
+     "start": "2026-11-09T14:50:00+01:00",
+     "end": "2026-11-09T16:10:00+01:00"
+    }
+   ],
+   "keys": [
+    "s-ops"
+   ],
+   "active_s": 9600,
+   "wait_s": 0,
+   "cost_usd": 4.1,
+   "tokens": 310000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "w-ops",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "run",
+   "title": "item-90-ops",
+   "model": "opus",
+   "state": "run",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T14:30:00+01:00",
+     "end": "2026-11-09T16:10:00+01:00"
+    }
+   ],
+   "keys": [
+    "w-ops",
+    "3f2a9c1b7d4e4f60a1b2c3d4e5f60718"
+   ],
+   "active_s": 6000,
+   "wait_s": 0,
+   "cost_usd": 2.4,
+   "tokens": 180000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "w-docs",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "run",
+   "title": "item-88-docs",
+   "model": "opus",
+   "state": "done",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T09:20:00+01:00",
+     "end": "2026-11-09T10:10:00+01:00"
+    },
+    {
+     "state": "done",
+     "start": "2026-11-09T10:10:00+01:00",
+     "end": "2026-11-09T10:20:00+01:00"
+    }
+   ],
+   "keys": [
+    "w-docs",
+    "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+   ],
+   "active_s": 3600,
+   "wait_s": 0,
+   "cost_usd": 1.1,
+   "tokens": 90000,
+   "commits": 3,
+   "runs": 1
+  },
+  {
+   "id": "w-tick",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "mission",
+   "title": "item-87-tick",
+   "model": "opus",
+   "state": "failed",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T11:00:00+01:00",
+     "end": "2026-11-09T11:30:00+01:00"
+    },
+    {
+     "state": "failed",
+     "start": "2026-11-09T11:30:00+01:00",
+     "end": "2026-11-09T11:40:00+01:00"
+    }
+   ],
+   "keys": [
+    "w-tick",
+    "b2c3d4e5f60718293a4b5c6d7e8f90a1"
+   ],
+   "active_s": 2400,
+   "wait_s": 0,
+   "cost_usd": 0.7,
+   "tokens": 50000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "s-shop",
+   "day": "2026-11-09",
+   "project": "shop",
+   "account": "work",
+   "kind": "interactive",
+   "title": "checkout review threads",
+   "model": "opus",
+   "state": "done",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T09:30:00+01:00",
+     "end": "2026-11-09T10:40:00+01:00"
+    },
+    {
+     "state": "idle",
+     "start": "2026-11-09T10:40:00+01:00",
+     "end": "2026-11-09T11:10:00+01:00"
+    },
+    {
+     "state": "working",
+     "start": "2026-11-09T11:10:00+01:00",
+     "end": "2026-11-09T12:00:00+01:00"
+    }
+   ],
+   "keys": [
+    "s-shop"
+   ],
+   "active_s": 7200,
+   "wait_s": 0,
+   "cost_usd": 3.3,
+   "tokens": 260000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "w-shop",
+   "day": "2026-11-09",
+   "project": "shop",
+   "account": "work",
+   "kind": "run",
+   "title": "mr12-threads-ci",
+   "model": "opus",
+   "state": "stuck",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T12:30:00+01:00",
+     "end": "2026-11-09T13:10:00+01:00"
+    },
+    {
+     "state": "stuck",
+     "start": "2026-11-09T13:10:00+01:00",
+     "end": "2026-11-09T13:20:00+01:00"
+    }
+   ],
+   "keys": [
+    "w-shop",
+    "c3d4e5f60718293a4b5c6d7e8f90a1b2"
+   ],
+   "active_s": 3000,
+   "wait_s": 0,
+   "cost_usd": 0.9,
+   "tokens": 70000,
+   "commits": 0,
+   "runs": 1
+  },
+  {
+   "id": "r-brief",
+   "day": "2026-11-09",
+   "project": "crow",
+   "account": "personal",
+   "kind": "routine",
+   "title": "brief",
+   "model": "opus",
+   "state": "done",
+   "spans": [
+    {
+     "state": "working",
+     "start": "2026-11-09T07:30:00+01:00",
+     "end": "2026-11-09T07:40:00+01:00"
+    }
+   ],
+   "keys": [
+    "r-brief"
+   ],
+   "active_s": 600,
+   "wait_s": 0,
+   "cost_usd": 0.2,
+   "tokens": 12000,
+   "commits": 0,
+   "runs": 1
+  }
+ ],
+ "queue": [
+  {
+   "kind": "mission",
+   "id": "20261109-refresh-docs",
+   "project": "crow",
+   "title": "Refresh the docs index"
+  },
+  {
+   "kind": "routine",
+   "id": "crow-retro.timer",
+   "title": "crow-retro.service",
+   "next": "2026-11-09T17:00:00Z"
+  },
+  {
+   "kind": "afk",
+   "id": "job-01-crow-checks.md",
+   "title": "crow checks"
+  }
+ ],
+ "totals": [
+  {
+   "by": "project",
+   "name": "crow",
+   "lanes": 6,
+   "active_s": 29400,
+   "wait_s": 1800,
+   "stuck": 0,
+   "failed": 1,
+   "cost_usd": 14.7,
+   "tokens": 1062000
+  },
+  {
+   "by": "project",
+   "name": "shop",
+   "lanes": 2,
+   "active_s": 10200,
+   "wait_s": 0,
+   "stuck": 1,
+   "failed": 0,
+   "cost_usd": 4.2,
+   "tokens": 330000
+  },
+  {
+   "by": "kind",
+   "name": "interactive",
+   "lanes": 3,
+   "active_s": 24000,
+   "wait_s": 1800,
+   "stuck": 0,
+   "failed": 0,
+   "cost_usd": 13.6,
+   "tokens": 990000
+  },
+  {
+   "by": "kind",
+   "name": "mission",
+   "lanes": 1,
+   "active_s": 2400,
+   "wait_s": 0,
+   "stuck": 0,
+   "failed": 1,
+   "cost_usd": 0.7,
+   "tokens": 50000
+  },
+  {
+   "by": "kind",
+   "name": "routine",
+   "lanes": 1,
+   "active_s": 600,
+   "wait_s": 0,
+   "stuck": 0,
+   "failed": 0,
+   "cost_usd": 0.2,
+   "tokens": 12000
+  },
+  {
+   "by": "kind",
+   "name": "run",
+   "lanes": 3,
+   "active_s": 12600,
+   "wait_s": 0,
+   "stuck": 1,
+   "failed": 0,
+   "cost_usd": 4.4,
+   "tokens": 340000
+  }
+ ]
+}

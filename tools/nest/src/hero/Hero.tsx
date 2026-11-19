@@ -69,7 +69,7 @@ const hit = (out: SceneOut | undefined, x: number, y: number): PlanetLabel | und
 const onHead = (out: SceneOut | undefined, x: number, y: number) =>
   !!out && x > out.head.left + 30 && x < out.head.right - 30 && y > out.head.top && y < out.lens.y + 10
 
-export const missionsHref = (project: string) => `/missions?project=${encodeURIComponent(project)}`
+export const missionsHref = (project: string) => `/ops?project=${encodeURIComponent(project)}`
 // A system planet (item_200) covers its members and opens on the most urgent one.
 const namesOf = (p?: HeroProject) => (p?.members ? p.members.map((q) => q.name) : p ? [p.name] : [])
 

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type AnchorHTMLAttribut
 const PathContext = createContext('/')
 const SearchContext = createContext('')
 export const usePath = () => useContext(PathContext)
-// Query string of the current route (e.g. ?project= on Missions).
+// Query string of the current route (e.g. ?project= on Ops).
 export const useQuery = () => new URLSearchParams(useContext(SearchContext))
 
 export function navigate(to: string) {
@@ -13,11 +13,23 @@ export function navigate(to: string) {
   dispatchEvent(new PopStateEvent('popstate'))
 }
 
+// Old Missions links (/missions, /missions/<id>) land on Ops (item_190), the query kept.
+export function redirect(path: string): string | null {
+  return /^\/missions(\/[^/]+)?\/?$/.test(path) ? '/ops' : null
+}
+
+const fixUrl = () => {
+  const to = redirect(location.pathname)
+  if (to) history.replaceState(null, '', to + location.search)
+}
+
 export function Router({ children }: { children: React.ReactNode }) {
+  fixUrl()
   const [path, setPath] = useState(location.pathname)
   const [search, setSearch] = useState(location.search)
   useEffect(() => {
     const on = () => {
+      fixUrl()
       setPath(location.pathname)
       setSearch(location.search)
       document.querySelector('.main')?.scrollTo(0, 0)
@@ -40,19 +52,19 @@ export function Link({ href, onClick, ...rest }: AnchorHTMLAttributes<HTMLAnchor
 }
 
 export type Route =
-  | { tab: 'home' | 'desk' | 'missions' | 'inbox' | 'mrs' | 'agenda' | 'reports' }
+  | { tab: 'home' | 'desk' | 'ops' | 'inbox' | 'mrs' | 'agenda' | 'reports' }
   | { tab: 'chat'; target: ChatTarget }
   | { tab: 'missing' }
 
 export function match(path: string): Route {
   const p = path.replace(/\/+$/, '') || '/'
   if (p === '/') return { tab: 'home' }
-  // Old mission links (no detail screen since item_168) land on Missions.
-  if (/^\/missions\/[^/]+$/.test(p)) return { tab: 'missions' }
+  const old = redirect(p)
+  if (old) return match(old)
   // The chat of a live session or run (/desk/<pid>) or of a mission's last run (/desk/m/<id>).
   const c = /^\/desk\/(?:(\d+)|m\/([^/]+))$/.exec(p)
   if (c) return { tab: 'chat', target: c[1] ? { pid: Number(c[1]) } : { mission: decodeURIComponent(c[2]) } }
   const key = p.slice(1)
-  if (['desk', 'missions', 'inbox', 'mrs', 'agenda', 'reports'].includes(key)) return { tab: key as 'desk' }
+  if (['desk', 'ops', 'inbox', 'mrs', 'agenda', 'reports'].includes(key)) return { tab: key as 'desk' }
   return { tab: 'missing' }
 }

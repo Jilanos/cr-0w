@@ -9,7 +9,8 @@ describe('phone tab bar B', () => {
   it('highlights the matching tab for the four bar screens', () => {
     expect(bar('/')).toBe('home')
     expect(bar('/desk')).toBe('desk')
-    expect(bar('/missions')).toBe('missions')
+    expect(bar('/ops')).toBe('ops')
+    expect(bar('/missions')).toBe('ops')
     expect(bar('/inbox')).toBe('inbox')
   })
 
@@ -19,10 +20,10 @@ describe('phone tab bar B', () => {
     expect(bar('/reports')).toBe('more')
   })
 
-  it('keeps chats under Desk, old mission links under Missions, unknown pages under Home', () => {
+  it('keeps chats under Desk, old mission links under Ops, unknown pages under Home', () => {
     expect(bar('/desk/4242')).toBe('desk')
     expect(bar('/desk/m/20261109-build-inbox-filters')).toBe('desk')
-    expect(bar('/missions/20261109-build-inbox-filters')).toBe('missions')
+    expect(bar('/missions/20261109-build-inbox-filters')).toBe('ops')
     expect(bar('/nope')).toBe('home')
   })
 
