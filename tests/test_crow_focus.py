@@ -324,7 +324,7 @@ def test_kitty_keys_args_map_names_and_keep_text_literal():
 def test_crow_screen_refuses_a_pid_without_a_window(tmp_path):
     import json
     import subprocess
-    r = subprocess.run([sys.executable, str(BIN / "crow-screen"), "show", "--pid", "1"], capture_output=True, text=True,
+    r = subprocess.run([sys.executable, str(BIN / "crow-screen"), "show", "--pid", "1"], capture_output=True, text=True, check=False,
                        env={**os.environ, "TMUX_TMPDIR": str(tmp_path), "XDG_RUNTIME_DIR": str(tmp_path)})
     assert r.returncode == 1 and json.loads(r.stdout)["ok"] is False
 
@@ -339,7 +339,7 @@ def test_resume_headless_prints_json_with_the_tmux_session(tmp_path):
     (fakebin / "tmux").chmod(0o755)
     env = {**os.environ, "PATH": f"{fakebin}:{os.environ['PATH']}", "CROW_TERMINAL": "headless", "INVOCATION_ID": ""}
     r = subprocess.run([sys.executable, str(BIN / "crow-focus"), "--pid", "0", "--account", "main", "--cwd", str(tmp_path),
-                        "--session", "abc"], capture_output=True, text=True, env=env)
+                        "--session", "abc"], capture_output=True, text=True, env=env, check=False)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout.strip().splitlines()[-1])
     assert out["ok"] and out["account"] == "main" and out["tmux"].startswith("crow-") and "no window" in out["message"]

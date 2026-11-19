@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 import json
+import pathlib
 
 import pytest
 from conftest import BIN
@@ -243,7 +244,7 @@ def test_keep_prompt_copies_a_temp_prompt(cr, tmp_path):
     a = type("A", (), {"prompt_file": str(f), "prompt": None})()
     kept = cr.keep_prompt("abcd1234", a)
     f.unlink()
-    assert open(kept).read() == "do the thing"
+    assert pathlib.Path(kept).read_text() == "do the thing"
 
 
 def test_retry_args_rebuild_the_run(cr, tmp_path):
