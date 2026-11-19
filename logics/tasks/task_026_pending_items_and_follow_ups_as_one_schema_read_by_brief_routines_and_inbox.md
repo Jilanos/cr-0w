@@ -1,4 +1,4 @@
-## task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox - Pending items and follow-ups as one schema read by brief, routines and Inbox
+## task_026_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox - Pending items and follow-ups as one schema read by brief, routines and Inbox
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
@@ -32,8 +32,8 @@
 - AC3: Settled rows older than N days are purged by the tidy step.
 
 # Plan
-- [ ] Use `python3 -m logics_manager flow progress task task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox.md --progress <n>%` during multi-wave work.
-- [ ] Run `python3 -m logics_manager flow finish task task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox.md` after implementation.
+- [ ] Use `python3 -m logics_manager flow progress task task_026_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox.md --progress <n>%` during multi-wave work.
+- [ ] Run `python3 -m logics_manager flow finish task task_026_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox.md` after implementation.
 
 # Validation
 - `uv run --no-project --with pytest --with pyyaml --with markdown pytest -q tests/`: 764 passed, 4 failed (the same 4 fail on origin/main 1569e72, see the backlog item).

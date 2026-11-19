@@ -71,4 +71,4 @@
 - Open Threads: is the optional `📅` due date acceptable?
 
 # Tasks
-- `task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox`
+- `task_026_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox`
