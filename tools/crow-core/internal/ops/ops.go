@@ -72,7 +72,7 @@ func Build(in Input) contract.Ops {
 
 // DayLanes runs the shared lanes builder on one day of crow-usage sessions. extra holds
 // the sessions with cost on the day but no activity buckets (crow-usage keeps buckets for
-// two days only): they get a lane without spans.
+// a week only): they get a lane without spans.
 func DayLanes(day string, sessions []map[string]any, agents []lanes.Agent, slots [2]int, reg lanes.Names) (ls, extra []lanes.Lane) {
 	var in []lanes.Session
 	for _, s := range sessions {
