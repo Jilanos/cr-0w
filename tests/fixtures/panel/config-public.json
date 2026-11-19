@@ -49,6 +49,10 @@
     {
       "name": "daily_update",
       "label": "Mise à jour machine"
+    },
+    {
+      "name": "backup",
+      "label": "Save OneDrive"
     }
   ],
   "views": [

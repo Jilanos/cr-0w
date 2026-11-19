@@ -1,0 +1,231 @@
+{
+  "budgets": {
+    "max_docs": 12,
+    "max_docs_per_ref": 4
+  },
+  "changed_paths": [],
+  "command": "logics-manager sync context-pack req_063_panel_persistent_actionable_conversations_and_separate_backup_routine item_221_deliver_persistent_actionable_panel_chats_and_independent_backup task_024_deliver_panel_conversation_continuity_and_actions --mode summary-only --profile normal --handoff",
+  "companion_docs": [
+    {
+      "kind": "product",
+      "linked_refs": {
+        "item": [
+          "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup"
+        ],
+        "prod": [
+          "prod_010_panel_conversation_continuity_and_actions"
+        ],
+        "req": [
+          "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine"
+        ],
+        "task": [
+          "task_024_deliver_panel_conversation_continuity_and_actions"
+        ]
+      },
+      "path": "logics/product/prod_010_panel_conversation_continuity_and_actions.md",
+      "ref": "prod_010_panel_conversation_continuity_and_actions",
+      "status": "Proposed",
+      "title": "Panel conversation continuity and actions"
+    }
+  ],
+  "docs": [
+    {
+      "ai_context": {
+        "keywords": "panel, persistent, actionable, conversations, separate, backup, routine",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "execution_table": "# Executions\n| When | Runner | Run id | Title | State | PR | Notes |\n| --- | --- | --- | --- | --- | --- | --- |\n\n",
+      "executions": {
+        "older_count": 0,
+        "rows": []
+      },
+      "kind": "request",
+      "linked_refs": {
+        "item": [
+          "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup"
+        ],
+        "prod": [
+          "prod_010_panel_conversation_continuity_and_actions"
+        ],
+        "req": [
+          "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine"
+        ]
+      },
+      "path": "logics/request/req_063_panel_persistent_actionable_conversations_and_separate_backup_routine.md",
+      "ref": "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine",
+      "schema_version": "1.0",
+      "status": "Draft",
+      "title": "Panel persistent actionable conversations and separate backup routine"
+    },
+    {
+      "ai_context": {
+        "keywords": "deliver, persistent, actionable, panel, chats, independent, backup",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "execution_table": "# Executions\n| When | Runner | Run id | Title | State | PR | Notes |\n| --- | --- | --- | --- | --- | --- | --- |\n\n",
+      "executions": {
+        "older_count": 0,
+        "rows": []
+      },
+      "kind": "backlog",
+      "linked_refs": {
+        "item": [
+          "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup"
+        ],
+        "prod": [
+          "prod_010_panel_conversation_continuity_and_actions"
+        ],
+        "req": [
+          "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine"
+        ],
+        "task": [
+          "task_024_deliver_panel_conversation_continuity_and_actions"
+        ]
+      },
+      "path": "logics/backlog/item_221_deliver_persistent_actionable_panel_chats_and_independent_backup.md",
+      "ref": "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup",
+      "schema_version": "1.0",
+      "status": "Ready",
+      "title": "Deliver persistent actionable panel chats and independent backup"
+    },
+    {
+      "ai_context": {},
+      "execution_table": "",
+      "executions": {
+        "older_count": 0,
+        "rows": []
+      },
+      "kind": "product",
+      "linked_refs": {
+        "item": [
+          "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup"
+        ],
+        "prod": [
+          "prod_010_panel_conversation_continuity_and_actions"
+        ],
+        "req": [
+          "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine"
+        ],
+        "task": [
+          "task_024_deliver_panel_conversation_continuity_and_actions"
+        ]
+      },
+      "path": "logics/product/prod_010_panel_conversation_continuity_and_actions.md",
+      "ref": "prod_010_panel_conversation_continuity_and_actions",
+      "schema_version": "1.0",
+      "status": "Proposed",
+      "title": "Panel conversation continuity and actions"
+    },
+    {
+      "ai_context": {
+        "keywords": "deliver, panel, conversation, continuity, actions",
+        "skip when": "(unfilled: replace before this doc is used)",
+        "summary": "(unfilled: replace before this doc is used)",
+        "use when": "(unfilled: replace before this doc is used)"
+      },
+      "execution_table": "# Executions\n| When | Runner | Run id | Title | State | PR | Notes |\n| --- | --- | --- | --- | --- | --- | --- |\n\n",
+      "executions": {
+        "older_count": 0,
+        "rows": []
+      },
+      "kind": "task",
+      "linked_refs": {
+        "item": [
+          "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup"
+        ],
+        "prod": [
+          "prod_010_panel_conversation_continuity_and_actions"
+        ],
+        "req": [
+          "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine"
+        ],
+        "task": [
+          "task_024_deliver_panel_conversation_continuity_and_actions"
+        ]
+      },
+      "path": "logics/tasks/task_024_deliver_panel_conversation_continuity_and_actions.md",
+      "ref": "task_024_deliver_panel_conversation_continuity_and_actions",
+      "schema_version": "1.0",
+      "status": "Ready",
+      "title": "Deliver panel conversation continuity and actions"
+    }
+  ],
+  "estimates": {
+    "char_count": 4480,
+    "companion_doc_count": 1,
+    "doc_count": 4
+  },
+  "generated_at": "2026-11-19T10:41:11Z",
+  "handoff": {
+    "companion_doc_count": 1,
+    "enabled": true,
+    "source_refs": [
+      "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine",
+      "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup",
+      "task_024_deliver_panel_conversation_continuity_and_actions"
+    ],
+    "validation_summary_count": 1
+  },
+  "i18n": {
+    "actions": [
+      "Choose the source locale for app-owned user-facing copy.",
+      "Run logics-manager i18n init --source-locale <locale>.",
+      "Route new UI copy through stable semantic keys."
+    ],
+    "applicable": null,
+    "configured": false,
+    "contract_path": "logics/i18n/contract.json",
+    "findings": [],
+    "next_action": "Run logics-manager i18n init --source-locale <locale> for a project that owns user-facing copy.",
+    "ok": true,
+    "state": "absent"
+  },
+  "mode": "summary-only",
+  "profile": "normal",
+  "ref": "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine,item_221_deliver_persistent_actionable_panel_chats_and_independent_backup,task_024_deliver_panel_conversation_continuity_and_actions",
+  "refs": [
+    "req_063_panel_persistent_actionable_conversations_and_separate_backup_routine",
+    "item_221_deliver_persistent_actionable_panel_chats_and_independent_backup",
+    "task_024_deliver_panel_conversation_continuity_and_actions"
+  ],
+  "release": {
+    "blocking_reasons": [
+      "Missing logics/release/contract.json."
+    ],
+    "configured": false,
+    "contract_path": "logics/release/contract.json",
+    "guidance": [
+      "Release readiness must come from project-owned evidence, not conversational memory.",
+      "Use release status or validate before preparing or claiming release readiness.",
+      "Publication-oriented actions are explicit operator actions and are separate from safe read/validate actions."
+    ],
+    "next_action": "Run logics-manager release discover --write, then review and promote logics/release/contract.draft.json to logics/release/contract.json.",
+    "publication_actions": [
+      "GitHub release publication",
+      "external publication"
+    ],
+    "required_gates": [],
+    "safe_actions": [
+      "logics-manager release status",
+      "logics-manager release plan <version>",
+      "logics-manager release validate <version>"
+    ],
+    "state": "not_configured",
+    "target_id": null,
+    "target_version": null,
+    "targets": []
+  },
+  "validation_summary": [
+    {
+      "items": [
+        "- (no validation recorded yet)"
+      ],
+      "path": "logics/tasks/task_024_deliver_panel_conversation_continuity_and_actions.md",
+      "ref": "task_024_deliver_panel_conversation_continuity_and_actions"
+    }
+  ]
+}

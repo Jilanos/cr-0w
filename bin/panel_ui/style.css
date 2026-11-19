@@ -158,6 +158,9 @@ body.rail-collapsed .rail .count-alert { display: block; position: absolute; top
 .pane-chat { border-left: 1px solid var(--line); background: var(--pane); display: flex; flex-direction: column; overflow: hidden; }
 body.view-wide .panes { grid-template-columns: minmax(0, 1fr); }
 body.view-wide .pane-list, body.view-wide .pane-chat { display: none; }
+body.view-wide.chat-open .pane-chat { display: flex; position: fixed; top: 0; right: 0; bottom: var(--drawer-h); width: min(440px, 100vw); z-index: 30; transform: none; }
+body.view-wide.chat-open .chat-close { display: inline-grid !important; }
+.chat-tools { padding: 8px 12px; border-bottom: 1px solid var(--line); flex: none; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------- buttons, inputs, chips */
 

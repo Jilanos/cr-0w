@@ -3,10 +3,10 @@ mode: dry_run
 host: 127.0.0.1
 port: 8790
 # Defaults for state_dir, locks_dir and runs_registry live under CROW_HOME/local/.
-# state_dir: /home/example/hub/local/state/panel
-# locks_dir: /home/example/hub/local/state/locks
-# runs_registry: /home/example/hub/local/state/runs.jsonl
-# real_home: /home/example
+# state_dir: /home/user/hub/local/state/panel
+# locks_dir: /home/user/hub/local/state/locks
+# runs_registry: /home/user/hub/local/state/runs.jsonl
+# real_home: /home/user
 pending_md: null
 pending:
   label: En attente
@@ -73,6 +73,9 @@ max_parallel: 2
 routines:
   maj: {argv: [], simulate_in_trial: false}
   daily_update: {argv: [], simulate_in_trial: false, wait_runs: true}
+  # Example commands: ["/path/to/daily-update.sh", "--no-backup"] above,
+  # ["/path/to/daily-update.sh", "--backup-only"] below. The script owns these flags.
+  backup: {argv: [], simulate_in_trial: false}
   maj_schedule: []
 floors: {}
 # Action profiles use a deny-by-default PreToolUse hook. Unknown tools are refused.
@@ -82,7 +85,7 @@ floors: {}
 # depth 2 is one dossier unless it holds only subfolders. exclude: glob patterns on
 # the path relative to the root. Empty roots disable discovery.
 dossiers_discover:
-  roots: []            # e.g. [/home/example/work]
+  roots: []            # e.g. [/home/user/work]
   depth: [2, 3]
   days: 14
   limit: 40

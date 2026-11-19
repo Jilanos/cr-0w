@@ -406,6 +406,46 @@ add('flow-chat-stream', DESK, async (page, base) => {
   await sleep(3200);
 });
 
+for (const [name, viewport] of [['desktop', DESK], ['mobile', MOBILE]]) {
+  add('flow-chat-continuity-' + name, viewport, async (page, base) => {
+    await open(page, base, { view: 'pending', sel: { pending: 'p_7hd2lw0e' } });
+    await sleep(3400);
+    await page.eval(`document.body.classList.add('chat-open'); true`);
+    const title = await page.eval(`document.querySelector('.chat-title').textContent`);
+    await page.click('.chat-input'); await page.type('Texte conservé avant réglé');
+    await page.click('#pane-detail .btn', 'Réglé'); await sleep(700);
+    if (await page.eval(`document.querySelector('.chat-title').textContent`) !== title) throw new Error('Sujet changé après Réglé');
+    await expect(page, '#pane-chat', 'historique conservé');
+    if (await page.eval(`document.querySelector('.chat-input').value`) !== 'Texte conservé avant réglé') throw new Error('Brouillon perdu');
+    await page.click('#pane-list .row');
+    if (await page.eval(`document.querySelector('.chat-title').textContent`) !== title) throw new Error('Sujet suit la sélection');
+    await page.click('.chat-input'); await page.key('Enter', 500); await sleep(3300);
+    if (await page.eval('document.activeElement.id') !== 'chat-input') throw new Error('Focus perdu après réponse');
+    await page.type('e');
+    if (await page.eval(`document.querySelector('.chat-input').value`) !== 'e') throw new Error('e a déclenché une action de ligne');
+    await page.click('.chat-tools button', 'Nouveau chat');
+    await expect(page, '#dialog[open]', 'Conversations récentes');
+    await page.click('#dialog input'); await page.type('Un sujet autonome');
+    await page.click('#dialog button', 'Créer le chat'); await sleep(500);
+    await expect(page, '.chat-title', 'Un sujet autonome');
+    await page.click('.chat-input'); await page.type('Historique libre'); await page.key('Enter', 500); await sleep(3300);
+    await page.click('.chat-tools button', 'Conversations récentes');
+    await expect(page, '#dialog', 'Un sujet autonome');
+    await page.click('#dialog .search-result', title); await sleep(450);
+    await expect(page, '.msg-user', 'Texte conservé avant réglé');
+    await page.click('#search-open'); await page.type('Historique libre'); await sleep(500);
+    await expect(page, '#search-results', 'Conversations');
+    await page.click('#search-results .search-result', 'Un sujet autonome'); await sleep(450);
+    await expect(page, '.msg-user', 'Historique libre');
+    await page.click('.chat-close');
+    await page.click('.rail-item', "Aujourd'hui"); await sleep(450);
+    await page.click('.card button', 'Chat · Un sujet autonome'); await sleep(450);
+    await expect(page, '.msg-user', 'Historique libre');
+    if (!(await page.eval(`document.body.classList.contains('chat-open') && getComputedStyle(document.getElementById('pane-chat')).display !== 'none'`))) throw new Error('Chat du run invisible sur l’accueil');
+    await page.shot('chat-continuity-' + name);
+  });
+}
+
 add('flow-reply-all', DESK, async (page, base) => {
   await open(page, base, { view: 'mail', sel: { mail: 'AAMkAGFAKE0002==' } });
   await expect(page, '.body-text', 'fils 12 et 48');

@@ -22,7 +22,7 @@ crow handoff <project> --task "<what>" --end-state "<what the owner's OK unlocks
   ask-first account, ask the owner, then rerun with `CROW_ACCOUNT=<name>`. `--on-busy fail` never prompts.
 - `CROW_ACCOUNT=<name>` always wins inside a session crow started, its own account included: the session sees
   its account as CROW_SESSION_ACCOUNT. A registry project with `planning: <other>` opens in that repo (open, term, handoff).
-- Hub work (cr-0w itself) is not a handoff target (`crow handoff` skips the hub path). Open a fresh hub session with `crow term cr-0w "<prompt>"` and put the item path, owner-prefs and end state in the prompt.
+- The hub itself can be a handoff target under its registry name. `crow-project project(..., hub=True)` includes it for handoffs; `projects()` still excludes it from repo ownership and guard checks. The regression is covered by `test_handoff_to_the_hub_itself_opens_a_fresh_hub_session`. Use the current checkout's explicit `bin/crow` when another checkout on PATH still reports "unknown project". Start a fresh hub session only at the session boundaries described in `CLAUDE.md`.
 
 ## Stay
 ```

@@ -11,7 +11,7 @@
        "state": "working", "label": "build x", "started_at": "2026-11-13T11:00:00Z"},
       {"kind": "session", "pid": 102, "session_id": "s102", "cwd": "/tmp/elsewhere", "project": "nest-app", "state": "working",
        "last_prompt": "tidy", "recent": [{"action": "Edit", "ts": "2026-11-13T11:40:00Z"}, {"action": "Read", "ts": "2026-11-13T11:20:00Z"}]},
-      {"kind": "session", "pid": 103, "session_id": "s103", "cwd": "/home/x", "project": "mystery", "state": "working",
+      {"kind": "session", "pid": 103, "session_id": "s103", "cwd": "/home/user/x", "project": "mystery", "state": "working",
        "projects": [{"name": "cr-0w", "share_pct": 20}, {"name": "platform-api", "share_pct": 50}]},
       {"kind": "session", "pid": 104, "session_id": "conv-live", "cwd": "/p/platform-api", "project": "platform-api", "state": "working"}
     ],

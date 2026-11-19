@@ -1,0 +1,95 @@
+{
+  "title": "Panel persistent actionable conversations and separate backup routine",
+  "references": [
+    "bin/crow_panel/launcher.py",
+    "bin/crow_panel/pending.py",
+    "bin/panel_ui/js/app.js",
+    "runbooks/panel.md"
+  ],
+  "request": {
+    "complexity": "High",
+    "theme": "Panel",
+    "needs": [
+      "Keep settled conversations reachable and prevent accidental topic switches.",
+      "Allow the owner to operate Crow from chat and observe its runs.",
+      "Separate expensive backups from tool updates."
+    ],
+    "context": [
+      "Cause spans topic persistence, selection, run registry and action policy; requires a workflow chain under ADR 030."
+    ],
+    "acceptance_criteria": [
+      "AC1: Settling a row preserves its topic and history; completed rows and global search reopen conversations, including existing stored topics.",
+      "AC2: Chat stays pinned across list navigation and settling; the topic banner is visible and the composer regains focus after answers without firing row shortcuts.",
+      "AC3: Live Claude chats can use Crow actions, files, jobs and classic Outlook reply-all drafts; sending mail remains forbidden and trial chats remain read-only.",
+      "AC4: Chat runs have readable topic labels and reopen links in Runs and Jobs, with fresh data after chat launches and completions.",
+      "AC5: New free-title or dossier chats and recent persisted conversations are accessible.",
+      "AC6: Machine updates and OneDrive backup have separate routines; the private script has backed-up no-backup and backup-only modes.",
+      "AC7: Hub handoff regression is fixed or documented with validation; tests pass, local commits exist and the live server is restarted."
+    ]
+  },
+  "product": {
+    "title": "Panel conversation continuity and actions",
+    "overview": "Operate Crow through persistent topic chats with visible runs and independent maintenance routines.",
+    "goals": [
+      "Preserve conversation identity and owner intent.",
+      "Make requested actions available without sending mail."
+    ],
+    "non_goals": [
+      "Sending mail",
+      "Pushing or merging the panel branch"
+    ]
+  },
+  "backlog_items": [
+    {
+      "title": "Deliver persistent actionable panel chats and independent backup",
+      "priority": "High",
+      "complexity": "High",
+      "theme": "Panel",
+      "request_acs": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7"
+      ],
+      "problem": [
+        "Selection changes redirect chat and completed rows lose their thread link; read-only policy prevents requested actions."
+      ],
+      "scope_in": [
+        "Topic persistence, pinned chat and recent/new conversations",
+        "Live action profile and classic Outlook draft pipeline access",
+        "Run labels, navigation and refresh",
+        "Separate backup routine and private script modes",
+        "Hub handoff regression validation"
+      ],
+      "scope_out": [
+        "Mail sending",
+        "Branch push or merge"
+      ],
+      "acceptance_criteria": [
+        "AC1: Settling a row preserves its topic and history; completed rows and global search reopen conversations, including existing stored topics.",
+        "AC2: Chat stays pinned across list navigation and settling; the topic banner is visible and the composer regains focus after answers without firing row shortcuts.",
+        "AC3: Live Claude chats can use Crow actions, files, jobs and classic Outlook reply-all drafts; sending mail remains forbidden and trial chats remain read-only.",
+        "AC4: Chat runs have readable topic labels and reopen links in Runs and Jobs, with fresh data after chat launches and completions.",
+        "AC5: New free-title or dossier chats and recent persisted conversations are accessible.",
+        "AC6: Machine updates and OneDrive backup have separate routines; the private script has backed-up no-backup and backup-only modes.",
+        "AC7: Hub handoff regression is fixed or documented with validation; tests pass, local commits exist and the live server is restarted."
+      ]
+    }
+  ],
+  "orchestration_task": {
+    "title": "Deliver panel conversation continuity and actions",
+    "plan": [
+      "1. Preserve settled topics, pin chat and restore focus; add creation, recents and search.",
+      "2. Enable live Crow actions, expose existing draft pipeline and improve run visibility.",
+      "3. Separate backup routine, validate regressions, document and restart live server."
+    ]
+  },
+  "context_pack": {
+    "out": "logics/context-packs/panel-conversations.json",
+    "mode": "summary-only",
+    "profile": "normal"
+  }
+}

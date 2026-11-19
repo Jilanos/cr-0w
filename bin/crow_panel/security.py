@@ -141,6 +141,10 @@ CALENDAR_READ = ("outlook_calendar_search",)
 
 def tool_allowed(profile, name, args, manifest=None):
     short = name.rsplit("__", 1)[-1]
+    if profile == "chat":
+        # Full Crow operations with a direct-tool no-send boundary. Shell tools
+        # retain the same owner no-send instructions as an interactive Crow hub.
+        return not any(word in short.lower() for word in ("send", "forward"))
     if profile == "calendar":
         # The calendar profile reads events only: no mail, no event writes.
         if name in ("Read", "Grep", "Glob", "ToolSearch", "ListMcpResourcesTool", "Write") or short == "search_tools":
@@ -184,6 +188,8 @@ def hook_input(policy, payload):
     name, args = payload.get("tool_name", ""), payload.get("tool_input", {})
     if name in policy.get("deny_tools", []) or name.rsplit("__", 1)[-1] in policy.get("deny_tools", []):
         return False
+    if policy.get("profile") == "chat":
+        return tool_allowed("chat", name, args)
     if name in ("Write", "Edit"):
         path = Path(args.get("file_path", "")).resolve()
         return str(path) in policy.get("write_paths", [])
@@ -218,6 +224,6 @@ def write_policy(cfg, op_id, profile="read", output=None, manifest=None, deny_to
     import shlex
     command = shlex.join([str(Path(__file__).resolve().parents[1] / "crow-panel"), "tool-guard", str(directory / "policy.json")])
     settings = {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": command}]}]},
-                "permissions": {"deny": ["Bash", "WebFetch", "WebSearch", "Task", "Agent"]}}
+                "permissions": {"deny": [] if profile == "chat" else ["Bash", "WebFetch", "WebSearch", "Task", "Agent"]}}
     atomic(directory / "settings.json", canonical(settings))
     return "--settings " + shlex.quote(str(directory / "settings.json"))

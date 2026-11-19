@@ -65,13 +65,24 @@ class Readers:
             live.update({r["run_id"]: r for r in self.launcher.running()})
         except Problem:
             pass
-        local = {r["run_id"]: r for r in self.registry()}
+        registry = {r["run_id"]: r for r in self.registry()}
+        local = dict(registry)
         local.update({r["run_id"]: {**local.get(r["run_id"], {}), **r} for r in self.store.all("runs")})
         ids = set(live) | set(local)
         cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
         result = []
         for key in ids:
             row = {**local.get(key, {}), **live.get(key, {})}
+            # cdx metadata can omit or null out panel-owned context. The local
+            # registry remains authoritative for navigation and presentation.
+            for field in ("topic_id", "operation_id", "source"):
+                value = registry.get(key, {}).get(field) or local.get(key, {}).get(field)
+                if value:
+                    row[field] = value
+            topic = self.store.get("topics", row.get("topic_id"), {})
+            operation = self.store.get("operations", row.get("operation_id"), {})
+            if topic and (operation.get("kind") == "chat.message" or row.get("label") == "panel:chat.message"):
+                row["label"] = "Chat · " + topic["title"]
             try:
                 if row.get("started_at") and dt.datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")) < cutoff:
                     continue
@@ -82,6 +93,7 @@ class Readers:
                 status = "succeeded" if row.get("exit_code") == 0 else "failed"
             result.append({"run_id": key, "kind": "script" if row.get("kind") == "script" else "agent", "label": row.get("label", ""),
                            "project": row.get("project"), "topic_id": row.get("topic_id"), "operation_id": row.get("operation_id"),
+                           "topic_title": topic.get("title"),
                            "account": row.get("account") or row.get("session"), "provider": row.get("provider"), "model": row.get("model"),
                            "status": status, "started_at": row.get("started_at"), "ended_at": row.get("ended_at"),
                            "duration_s": row.get("duration_seconds"), "cost_usd": row.get("cost_usd"), "cost_status": row.get("cost_status", "unknown"),
@@ -129,7 +141,8 @@ class Readers:
         result = []
         waits = self.cfg["routines"].get("daily_update", {}).get("wait_runs", True)
         for name, label, description in (("maj", "Maj", "Mails, brouillons, relances, fichier en attente"),
-                                         ("daily_update", "Mise à jour machine", "Outils et dépôts." + (" Attend la fin des runs." if waits else ""))):
+                                         ("daily_update", "Mise à jour machine", "Outils et dépôts, sans sauvegarde." + (" Attend la fin des runs." if waits else "")),
+                                         ("backup", "Save OneDrive", "Sauvegarder le dossier dev vers OneDrive uniquement.")):
             ops = [o for o in self.store.all("operations") if o["kind"] == "routine." + name]
             active = next((o for o in reversed(ops) if o["status"] in ACTIVE), None)
             last = next((o for o in reversed(ops) if o["status"] not in ACTIVE), None)

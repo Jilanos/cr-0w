@@ -34,6 +34,7 @@ const store = {
   reply: {},              // mail id -> {open, instructions, model, op, log[]}
   followups: {},
   chatTopic: null,
+  pinnedChat: null,
   sinceVisit: undefined,
   showDetail: false,
 };
@@ -73,7 +74,7 @@ const ctx = {
   get state() { return cached('state'); },
   get config() { return cached('config'); },
   render, renderDetail, renderList, select, go, openChat, openFile, pendingDone, pendingSnooze, undo, trackOp,
-  runRoutine, writable, setView,
+  runRoutine, writable, setView, openConversations, chatActivity,
 };
 
 const views = makeViews(ctx);
@@ -176,6 +177,7 @@ function renderHeader() {
   }
 
   const actions = clear(document.getElementById('topbar-actions'));
+  actions.append(btn('Nouveau chat', { icon: 'chat', small: true, onclick: openConversations }));
   const routines = (cached('routines') || {}).routines || [];
   const defs = (cfg && cfg.routines) || [{ name: 'maj', label: 'Mise à jour' }, { name: 'daily_update', label: 'Mise à jour machine' }];
   const majLock = st && st.locks && (st.locks.maj || st.locks.pending);
@@ -302,12 +304,15 @@ function renderChatPane(force) {
   const v = views[store.view];
   const pane = document.getElementById('pane-chat');
   const e = v.wide ? null : selectedEntry();
-  const topic = e && e.topic ? e.topic : null;
-  const id = topic ? topic.topic_id || 'none:' + e.key : null;
+  const topic = store.pinnedChat || (e && e.topic?.topic_id ? e.topic : null);
+  if (topic?.topic_id) store.pinnedChat = topic;
+  const id = topic?.topic_id || null;
   if (!force && store.chatTopic === id && pane.firstChild) return;
+  const restoreFocus = document.activeElement?.id === 'chat-input';
   store.chatTopic = id;
   clear(pane);
   renderChat(pane, topic, ctx);
+  if (restoreFocus) focusComposer();
 }
 
 function render() {
@@ -365,6 +370,10 @@ async function setView(name, key) {
 function go(view, key) { return setView(view, key); }
 
 async function openSearchResult(entry) {
+  if (entry.view === 'conversation') {
+    await openTopic(entry.key);
+    return;
+  }
   store.filter = ''; document.getElementById('filter').value = '';
   if (entry.view === 'pending') store.pendingTab = 'list';
   if (entry.view === 'mail') {
@@ -404,10 +413,45 @@ function move(delta) {
 
 function openChat(opts = {}) {
   const e = selectedEntry();
+  if (opts.topic) store.pinnedChat = opts.topic;
+  else if (e?.topic?.topic_id) store.pinnedChat = e.topic;
   if (opts.prefill && e && e.topic && e.topic.topic_id) setChatDraft(e.topic.topic_id, opts.prefill, opts.intent || 'chat');
   renderChatPane(true);
   document.body.classList.add('chat-open');
   focusComposer();
+}
+
+async function openTopic(id) {
+  const topic = await api.get('/api/topics/' + encodeURIComponent(id));
+  openChat({ topic });
+}
+
+async function openConversations() {
+  try {
+    const [topics, dossiers] = await Promise.all([api.get('/api/topics'), api.get('/api/dossiers')]);
+    const title = h('input', { class: 'input', maxlength: 200, placeholder: 'Titre du nouveau sujet', 'aria-label': 'Titre du chat' });
+    const dossier = h('select', { class: 'select', 'aria-label': 'Dossier du chat' },
+      h('option', { value: '', text: 'Sujet libre' }), dossiers.dossiers.map(d => h('option', { value: d.slug, text: d.title })));
+    const error = h('p', { class: 'late', role: 'alert' });
+    const create = btn('Créer le chat', { primary: true, onclick: async () => {
+      try {
+        const topic = await api.post('/api/topics', dossier.value ? { dossier_slug: dossier.value } : { title: title.value });
+        closeDialog(); openChat({ topic });
+      } catch (err) { error.textContent = err.message; }
+    } });
+    const recent = topics.topics.filter(t => t.last_message_at || t.kind === 'free');
+    openDialog('Nouveau chat et conversations récentes', h('div', { class: 'stack' }, title, dossier, create, error,
+      h('h3', { text: 'Conversations récentes' }), recent.length ? recent.map(t => h('button', { type: 'button', class: 'search-result',
+        onclick: () => { closeDialog(); openChat({ topic: t }); } }, h('span', { text: t.title }),
+        h('span', { class: 'muted small', text: [t.settled ? 'Réglé' : null, fmtDate(t.last_message_at)].filter(Boolean).join(' · ') }))) : emptyState('Aucune conversation', null)));
+    title.focus();
+  } catch (err) { toastError(err, 'Conversations'); }
+}
+
+async function chatActivity() {
+  await refresh(['runs', 'state', 'topics']);
+  if (store.view === 'today' || store.view === 'jobs') { renderList(); renderDetail(); }
+  renderHeader(); renderRail();
 }
 
 // ---------------------------------------------------------------- shared actions
@@ -439,6 +483,8 @@ async function pendingDone(item) {
   const w = writable();
   if (!w.ok && !w.queueable) { toast(w.reason, { kind: 'warn' }); return; }
   if (!item || !(item.actions || []).includes('done')) return;
+  // Pin before the optimistic selection advance, including a quick action on an unselected row.
+  if (!store.pinnedChat && item.topic_id) store.pinnedChat = { topic_id: item.topic_id, title: item.title, kind: 'pending' };
   // Optimistic removal: the row disappears at once, next row gets the selection.
   const rows = listEntries.filter((e) => !e.header);
   const idx = rows.findIndex((e) => e.key === item.id);
@@ -451,6 +497,10 @@ async function pendingDone(item) {
   try {
     const op = await api.post(`/api/pending/${encodeURIComponent(item.id)}/done`, { item_rev: item.item_rev, queue: true });
     await refresh(['pending', 'state', 'dues']);
+    if (store.pinnedChat?.topic_id === item.topic_id) {
+      store.pinnedChat = await api.get('/api/topics/' + encodeURIComponent(item.topic_id));
+      renderChatPane(true);
+    }
     store.hidden.delete(item.id);
     render();
     pendingResult(op);
@@ -587,6 +637,8 @@ function onKey(e) {
     return;
   }
   if (typing) return;
+  // Controls inside the chat must never trigger actions on a selected pending row.
+  if (t?.closest('#pane-chat')) return;
   if (document.getElementById('dialog').open) return;
   if (gPending) {
     gPending = false;
@@ -670,8 +722,9 @@ async function boot() {
   if (!api.fixtures) {
     setInterval(async () => {
       if (document.hidden) return;
-      await refresh(['state', 'routines']);
+      await refresh(['state', 'routines', 'runs']);
       renderRail(); renderHeader(); renderBanners();
+      if (store.view === 'today' || store.view === 'jobs') { renderList(); renderDetail(); }
     }, 30000);
   }
 }

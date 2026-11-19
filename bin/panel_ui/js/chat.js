@@ -21,6 +21,10 @@ export function focusComposer() {
 
 export function renderChat(pane, topic, ctx) {
   current = { pane, topic, ctx };
+  pane.append(h('div', { class: 'actions chat-tools' },
+    h('button', { type: 'button', class: 'link-btn', text: 'Nouveau chat', onclick: ctx.openConversations }),
+    h('button', { type: 'button', class: 'link-btn', text: 'Conversations récentes', onclick: ctx.openConversations }),
+    h('button', { type: 'button', class: 'link-btn', text: 'Sujet sélectionné', onclick: () => ctx.openChat() })));
   if (!topic || !topic.topic_id) wantFocus = false;
   const closeBtn = h('button', { type: 'button', class: 'icon-btn chat-close', 'aria-label': 'Fermer le chat', onclick: () => document.body.classList.remove('chat-open') }, icon('close'));
   if (!topic) {
@@ -37,7 +41,7 @@ export function renderChat(pane, topic, ctx) {
   const log = h('div', { class: 'chat-log', role: 'log', 'aria-live': 'polite' }, loadingState());
   const foot = h('div', { class: 'chat-foot' });
   pane.append(head, log, foot);
-  head.append(h('div', { class: 'chat-title-wrap' }, h('div', { class: 'chat-eyebrow muted', text: kindLabel(topic.kind) }),
+  head.append(h('div', { class: 'chat-title-wrap' }, h('div', { class: 'chat-eyebrow muted', text: 'Sujet épinglé · ' + kindLabel(topic.kind) }),
     h('div', { class: 'chat-title', text: topic.title || topic.topic_id })), closeBtn);
   load(topic, ctx, log, foot, head);
 }
@@ -55,7 +59,8 @@ async function load(topic, ctx, log, foot, head) {
     doc = { messages: [], default_model: null, default_account: null };
   }
   if (!current || current.topic !== topic) return;
-  if (doc.orphan) head.querySelector('.chat-title-wrap').append(chip('ligne disparue du fichier', 'warn'));
+  if (doc.settled) head.querySelector('.chat-title-wrap').append(chip('Réglé · historique conservé', 'quiet'));
+  else if (doc.orphan) head.querySelector('.chat-title-wrap').append(chip('ligne disparue du fichier', 'warn'));
   renderMessages(doc, log, topic, ctx);
   renderComposer(doc, foot, topic, ctx, log);
 }
@@ -109,7 +114,11 @@ function attachStream(m, body, topic, ctx) {
         if (type === 'tool') s.text.push(`· ${data.name}${data.summary ? ' : ' + data.summary : ''}`);
         s.listeners.forEach((fn) => fn());
       },
-      end() { streams.delete(m.operation_id); if (current && current.topic && current.topic.topic_id === topic.topic_id) reload(topic, ctx); },
+      async end() {
+        streams.delete(m.operation_id);
+        if (current?.topic?.topic_id === topic.topic_id) { await reload(topic, ctx); focusComposer(); }
+        ctx.chatActivity();
+      },
     });
   }
   const paint = () => {
@@ -195,7 +204,7 @@ function renderComposer(doc, foot, topic, ctx, log) {
   const paintIntent = () => {
     clear(intentChip);
     if (d.intent === 'followup') {
-      intentChip.append(chip('relance', 'accent'), h('span', { class: 'muted small', text: 'crow retrouve le fil et propose le texte, rien n\'est créé sans ton « go ».' }),
+      intentChip.append(chip('relance', 'accent'), h('span', { class: 'muted small', text: 'crow retrouve le fil et prépare le brouillon demandé dans Outlook. Aucun mail envoyé.' }),
         h('button', { type: 'button', class: 'icon-btn icon-btn-sm', 'aria-label': 'Retirer le mode relance', onclick: () => { d.intent = 'chat'; paintIntent(); } }, icon('close')));
     }
   };
@@ -203,7 +212,7 @@ function renderComposer(doc, foot, topic, ctx, log) {
   const send = h('button', { type: 'button', class: 'btn btn-primary btn-icon', 'aria-label': 'Envoyer', title: 'Envoyer (Entrée)' }, icon('send'));
   const doSend = async () => {
     const text = ta.value.trim();
-    if (!text) return;
+    if (!text || send.disabled) return;
     send.disabled = true;
     try {
       const body = { text, model: modelSel.value, account: accSel.value, intent: d.intent === 'followup' ? 'followup' : 'chat' };
@@ -211,11 +220,12 @@ function renderComposer(doc, foot, topic, ctx, log) {
       d.text = ''; d.intent = 'chat'; ta.value = ''; paintIntent();
       if (op.status === 'queued') toast(op.summary || 'Message en file', { kind: 'info', detail: op.result && op.result.queue_position ? `position ${op.result.queue_position}` : null });
       await reload(topic, ctx);
+      ctx.chatActivity();
     } catch (err) {
       const line = h('div', { class: 'msg msg-system msg-error', text: `${err.message}${err.code ? ` (${err.code})` : ''}` });
       log.append(line);
       log.scrollTop = log.scrollHeight;
-    } finally { send.disabled = false; }
+    } finally { send.disabled = false; if (current?.topic?.topic_id === topic.topic_id) focusComposer(); }
   };
   send.addEventListener('click', doSend);
   ta.addEventListener('keydown', (e) => {

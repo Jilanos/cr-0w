@@ -166,7 +166,7 @@ const fake = {
     const query = (new URLSearchParams(qs).get('q') || '').trim();
     const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
     const terms = fold(query).split(/\s+/).filter(Boolean);
-    const groups = ['mail', 'pending', 'decision', 'dossier', 'run'].map((kind, i) => ({ kind, label: ['Mails', 'En attente', 'Décisions', 'Dossiers', 'Runs'][i], total: 0, items: [] }));
+    const groups = ['mail', 'pending', 'decision', 'dossier', 'run', 'conversation'].map((kind, i) => ({ kind, label: ['Mails', 'En attente', 'Décisions', 'Dossiers', 'Runs', 'Conversations'][i], total: 0, items: [] }));
     const add = (kind, key, title, subtitle, view, text = '') => {
       if (!terms.length || !terms.every(t => fold(`${title} ${subtitle || ''} ${text}`).includes(t))) return;
       const group = groups.find(g => g.kind === kind); group.total++;
@@ -183,6 +183,10 @@ const fake = {
     for (const d of this.doc('GET', '/api/dossiers').dossiers) add('dossier', d.slug, d.title, `${d.open_count} lignes`, 'dossiers');
     const runs = this.doc('GET', '/api/runs');
     for (const r of runs?.runs || []) add('run', 'run:' + r.run_id, r.label, r.status, 'jobs', `${r.run_id} ${r.account} ${r.project} ${r.model}`);
+    for (const t of this.doc('GET', '/api/topics').topics) {
+      const doc = this.topicDoc(t.topic_id);
+      add('conversation', t.topic_id, t.title, doc.settled ? 'Réglé' : 'Conversation', 'conversation', doc.messages.map(m => m.text || (m.segments || []).map(s => s.v).join(' ')).join(' '));
+    }
     return { status: 200, data: { query, groups, sources: { mail: { coverage: mail.coverage.status, synced_at: mail.synced_at, stale: mail.stale }, runs: runs?.source_status } } };
   },
 
@@ -192,6 +196,22 @@ const fake = {
     if (method === 'GET' && path === '/api/search') return this.search(qs);
     if (method === 'GET' && path === '/api/operations') return { status: 200, data: { operations: [...this.ops.values()].map(e => clone(e.done ? e.final : e.op)) } };
     if (method === 'POST' && path === '/api/state/visit') return { status: 200, data: { result: { visited_at: this.now().toISOString() } } };
+    if (method === 'POST' && path === '/api/topics') {
+      const d = body.dossier_slug && this.doc('GET', '/api/dossiers').dossiers.find(d => d.slug === body.dossier_slug);
+      let topic = d && this.doc('GET', '/api/topics').topics.find(t => t.topic_id === d.topic_id);
+      if (!topic) {
+        topic = { topic_id: d?.topic_id || 't_free_' + ++this.seq, title: d?.title || body.title, kind: d ? 'dossier' : 'free',
+          default_account: null, default_model: null, last_message_at: null, orphan: false, messages: 0 };
+        this.doc('GET', '/api/topics').topics.unshift(topic);
+      }
+      return { status: 201, data: clone(topic) };
+    }
+    if (method === 'GET' && /^\/api\/topics\/[^/]+$/.test(path)) {
+      const id = path.split('/')[3];
+      const doc = this.topicDoc(id);
+      return { status: 200, data: { ...clone(this.doc('GET', '/api/topics').topics.find(t => t.topic_id === id)),
+        topic_id: id, title: doc.title, settled: doc.settled } };
+    }
     const decision = /^\/api\/afk\/decisions\/(\d+)\/answer$/.exec(path);
     const followup = /^\/api\/pending\/([^/]+)\/followup$/.exec(path);
     if (method === 'POST' && followup) {
@@ -379,12 +399,13 @@ const fake = {
           actions: ['chat'], topic_id: item.topic_id, source_line: null,
         };
         if (done) done.items.unshift(entry);
+        this.topicDoc(item.topic_id).settled = true;
         this.counts({ pending: -1, overdue: item.overdue_workdays > 0 ? -1 : 0 });
         const op = this.newOp(base, { request_id: body.request_id, summary: `Réglé : ${item.title}`, topic_id: item.topic_id,
           items: [{ ref: { kind: 'pending', id: item.id }, status: 'succeeded', detail: 'ligne déplacée dans Réglé récemment' }],
           undo: { available: true, until, reason: null } });
         this.ops.set(op.operation_id, { op, final: op, done: true,
-          inverse: () => { if (done) done.items = done.items.filter((x) => x !== entry); section.items.splice(index, 0, item);
+          inverse: () => { this.topicDoc(item.topic_id).settled = false; if (done) done.items = done.items.filter((x) => x !== entry); section.items.splice(index, 0, item);
             this.counts({ pending: 1, overdue: item.overdue_workdays > 0 ? 1 : 0 }); return item.title; } });
         return { status: res.status, data: op };
       }
@@ -522,6 +543,13 @@ const fake = {
         const op = this.newOp(base, { request_id: body.request_id, topic_id: p.id, summary: `Chat : ${doc.title || p.id}` });
         if (op.steps[0]) Object.assign(op.steps[0], { model: body.model || 'sonnet', account: body.account || 'claude' });
         const at = this.now().toISOString();
+        const topic = this.doc('GET', '/api/topics').topics.find(t => t.topic_id === p.id);
+        if (topic) topic.last_message_at = at;
+        const run = { run_id: 'chat_fx_' + this.seq, kind: 'agent', label: 'Chat · ' + doc.title,
+          topic_id: p.id, topic_title: doc.title, operation_id: op.operation_id, owned_by_panel: true,
+          account: body.account || 'claude', model: body.model || 'sonnet', started_at: at,
+          status: op.status, project: 'crow' };
+        this.doc('GET', '/api/runs').runs.unshift(run);
         doc.messages.push({ id: `m_fx${this.seq}a`, role: 'user', at, text: body.text, model: body.model || 'sonnet',
           account: body.account || 'claude', intent: body.intent || 'chat', operation_id: op.operation_id });
         const queued = op.status === 'queued';
@@ -562,6 +590,8 @@ const fake = {
       e.done = true;
       if (e.after) e.after();
     }
+    const run = this.doc('GET', '/api/runs')?.runs.find(r => r.operation_id === opId);
+    if (run) run.status = 'succeeded';
     const segs = (doneData && doneData.final_segments) || [];
     for (const doc of this.topics.values()) {
       for (const m of doc.messages) {

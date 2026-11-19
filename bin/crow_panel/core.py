@@ -133,7 +133,7 @@ class Config(dict):
             raise ValueError("invalid port")
         if not isinstance(self["max_parallel"], int) or self["max_parallel"] < 1:
             raise ValueError("invalid max_parallel")
-        for name in ("maj", "daily_update"):
+        for name in ("maj", "daily_update", "backup"):
             argv = self["routines"].get(name, {}).get("argv", [])
             if not isinstance(argv, list) or any(not isinstance(x, str) or not x for x in argv):
                 raise ValueError("routine argv must be a list of strings")

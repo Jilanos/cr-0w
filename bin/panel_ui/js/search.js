@@ -3,7 +3,7 @@ import { h, clear, openDialog, closeDialog, loadingState, emptyState, errorState
 
 export function openSearch(api, openResult) {
   const input = h('input', { id: 'global-search', class: 'input', type: 'search', maxlength: 200,
-    placeholder: 'Mails, en attente, décisions, dossiers, runs', 'aria-label': 'Recherche globale',
+    placeholder: 'Mails, sujets réglés, conversations, dossiers, runs', 'aria-label': 'Recherche globale',
     role: 'combobox', 'aria-autocomplete': 'list', 'aria-controls': 'search-results', 'aria-expanded': 'false',
     autocomplete: 'off', spellcheck: 'false' });
   const status = h('p', { class: 'muted small', role: 'status', 'aria-live': 'polite' });

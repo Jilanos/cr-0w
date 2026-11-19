@@ -78,7 +78,7 @@ class App:
                 {"name": name, "provider": c.get("provider", "claude" if name == "claude" else "codex"), "kinds": c.get("kinds", []),
                  "models": self.cfg["chat"].get("models", ["haiku", "sonnet", "opus"]) if c.get("provider", "claude" if name == "claude" else "codex") == "claude"
                  else c.get("models", [c.get("model", "gpt-5")])} for name, c in self.cfg["accounts"].items()]},
-            "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Maj"}, {"name": "daily_update", "label": "Mise à jour machine"}],
+            "undo_seconds": 10, "max_parallel": self.cfg["max_parallel"], "routines": [{"name": "maj", "label": "Maj"}, {"name": "daily_update", "label": "Mise à jour machine"}, {"name": "backup", "label": "Save OneDrive"}],
             "views": ["today", "mail", "drafts", "pending", "decisions", "dossiers", "jobs", "accounts"],
             "shortcuts": {"j": "next", "k": "prev", "Enter": "open", "e": "pending_done", "r": "reply_all_box", "c": "focus_chat", "/": "filter_or_search", "Ctrl+K": "global_search", "x": "toggle_select", "?": "help", "Escape": "close"}}
 
@@ -135,7 +135,7 @@ class App:
             return self.readers.dues(int(query.get("days", [14])[0]))
         if path == "/api/topics":
             self.pending.view()
-            return {"generated_at": now(), "topics": self.store.all("topics")}
+            return {"generated_at": now(), "topics": sorted(self.store.all("topics"), key=lambda t: t.get("last_message_at") or "", reverse=True)}
         if path == "/api/operations":
             return {"operations": [o for o in self.store.all("operations") if query.get("active", ["0"])[0] != "1" or o["status"] in ACTIVE]}
         match = re.fullmatch(r'/api/(mail|runs|dossiers|operations)/([^/]+)', path)
@@ -146,7 +146,10 @@ class App:
         if match:
             topic = self.topic(match[1])
             return {"generated_at": now(), "topic_id": topic["topic_id"], "title": topic["title"], "ref": topic["ref"], "default_model": topic["default_model"],
-                    "default_account": topic["default_account"], "orphan": topic["orphan"], "messages": self.store.get("messages", topic["topic_id"], [])}
+                    "default_account": topic["default_account"], "orphan": topic["orphan"], "settled": topic.get("settled", False), "messages": self.store.get("messages", topic["topic_id"], [])}
+        match = re.fullmatch(r'/api/topics/([^/]+)', path)
+        if match:
+            return self.topic(match[1])
         raise Problem(404, "not_found", "Route introuvable.")
 
     def mutate(self, method, path, body):
@@ -175,6 +178,15 @@ class App:
             return 200, topic
         if method != "POST":
             raise Problem(404, "not_found", "Route introuvable.")
+        if path == "/api/topics":
+            slug = body.get("dossier_slug")
+            if slug:
+                return 200, self.topic(self.readers.dossier(slug)["topic_id"])
+            title = body.get("title")
+            if not isinstance(title, str) or not title.strip() or len(title.strip()) > 200:
+                raise Problem(400, "bad_request", "Titre requis, limité à 200 caractères.")
+            key = self.launcher.topic("free", uid("chat_"), title.strip(), {"title": title.strip()})
+            return 201, self.topic(key)
         if path == "/api/state/visit":
             return 200, self.visits.visit(body, route)
         match = re.fullmatch(r'/api/afk/decisions/(\d+)/answer', path)

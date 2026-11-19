@@ -63,11 +63,12 @@ fixture. Supply one when retrying it.
 | `/api/mail`, `/api/mail/{id}`, `/api/mail/folders`, `/api/drafts` | GET |
 | `/api/mail/sync`, `/api/mail/{id}/fetch`, `/api/mail/{id}/reply-all` | POST |
 | `/api/mail/triage/plan`, `/api/mail/triage/execute` | POST |
-| `/api/topics`, `/api/topics/{id}/messages` | GET |
+| `/api/topics`, `/api/topics/{id}`, `/api/topics/{id}/messages` | GET |
+| `/api/topics` | POST |
 | `/api/topics/{id}/messages` | POST |
 | `/api/topics/{id}` | PUT |
 | `/api/runs`, `/api/runs/{id}`, `/api/accounts`, `/api/routines` | GET |
-| `/api/routines/maj`, `/api/routines/daily_update` | POST |
+| `/api/routines/maj`, `/api/routines/daily_update`, `/api/routines/backup` | POST |
 | `/api/dues`, `/api/dossiers`, `/api/dossiers/{slug}`, `/api/afk` | GET |
 | `/api/files/{id}` | GET |
 | `/api/files/{id}/open` | POST |
@@ -167,13 +168,35 @@ Each claimed successful move must match a guarded tool call and its completed
 non-error result. A missing call, lost result or wrapped connector error stays
 unknown. The final run text alone cannot prove a move.
 
+`POST /api/topics` accepts `{request_id, title}` for a new free topic (1–200
+characters), or `{request_id, dossier_slug}` to reuse a dossier topic. Creation
+does not launch a run. `GET /api/topics` sorts by last message, newest first;
+the browser lists threads with messages and newly created free topics. Topic
+messages expose `settled`; completed pending rows preserve their topic identifier,
+context and transcript. Legacy settled rows recover their topic from an exact
+completion-operation line match. Search adds a `conversation` group with topic ids
+and `view: conversation`, matching titles and stored message text.
+
 Sonnet is the default chat model. Per-message, topic, kind and project settings
 follow the configured cascade. Invalid account/model pairs are rejected. Mail
 subjects use the read account; the drafting account is reserved for the styling
-stage. Native continuations pin the parent's provider settings. cdx currently
-accepts permission-only continuation settings, so resumed chat disables MCP
-servers and uses its supplied context. Changing account or model creates a new
-conversation with a summary.
+stage. Trial native continuations pin the parent's provider settings and disable
+MCP/read tools. Live chat uses the `chat` profile with shell and file writes,
+connector actions and no-send instructions. Its Claude hook rejects send and
+forward tools; shell actions follow owner instructions. Codex live chats disable
+apps and use the local API helper; workb must never write or draft mail. Each live
+turn starts with fresh hooks and the last 24 stored messages, since cdx continuation
+cannot carry hooks. Earlier history remains available through the messages route.
+Mode changes reject queued live action chats. Chat runs use `Chat · <title>`;
+the registry owns their topic, operation and source even when cdx omits them.
+
+`bin/crow-panel-api --config <config> [--method POST|PUT] [--body-file <json>|-]
+/api/...` calls the running panel with its regular cookie, CSRF token and origin.
+It does not open another database writer or server. A reply request posts
+`{request_id, instructions, model: "sonnet"}` to `/api/mail/{id}/reply-all`, then
+polls the returned operation. The existing native pipeline composes with worka,
+creates a latest-message ReplyAll draft and verifies it. Connector fallback keeps
+its existing capability checks. No endpoint sends mail.
 
 ## Operational limits
 

@@ -158,6 +158,9 @@ class Pending:
                 continue
             i += 1
         old = self.store.all("pending_index")
+        completions = sorted((o for o in self.store.all("operations") if o["kind"] == "pending.done"
+                              and o["status"] == "succeeded" and not o.get("undone_by") and o.get("topic_id")),
+                             key=lambda o: o["created_at"], reverse=True)
         previous = self.store.get("meta", "pending", {})
         groups = {}
         for record, item, section in entries:
@@ -176,7 +179,13 @@ class Pending:
                 peer["ambiguous"] = True
                 self.store.put("pending_index", peer["id"], peer)
             match = next((r for r in peers if r["rank"] == rank and not r.get("ambiguous")), None)
-            key = (hints or {}).get(record["start"]) or (match["id"] if match and not uncertain else "p_" + base64.b32encode(secrets.token_bytes(5)).decode().lower())
+            # Older panels lost the topic link on completion. Recover it from the
+            # exact durable splice evidence, never by fuzzy subject matching.
+            completed = next((o for o in completions
+                              if section["kind"] == "done" and (not match or not self.store.get("topics", digest("pending:" + match["id"], "t_")[:26]))
+                              and (o.get("result") or {}).get("moved_to", {}).get("line_preview") == record["raw"].rstrip()
+                              and o.get("items") and o["items"][0]["ref"]["id"] not in live_ids), None)
+            key = (hints or {}).get(record["start"]) or (completed["items"][0]["ref"]["id"] if completed else None) or (match["id"] if match and not uncertain else "p_" + base64.b32encode(secrets.token_bytes(5)).decode().lower())
             record.update(id=key, active=True, ambiguous=False)
             former = next((r for r in old if r["id"] == key), {})
             record["original_group_size"] = former.get("original_group_size", len(group))
@@ -184,7 +193,15 @@ class Pending:
             record["anchor_next"] = former.get("anchor_next", former.get("next", record["next"]))
             self.store.put("pending_index", key, record)
             item["id"] = key
-            item["topic_id"] = None if section["kind"] == "done" else self.topics("pending", key, item["title"], record)
+            topic_id = digest("pending:" + key, "t_")[:26]
+            previous_topic = self.store.get("topics", topic_id)
+            settled = section["kind"] == "done"
+            item["topic_id"] = self.topics("pending", key, previous_topic["title"] if settled and previous_topic else item["title"],
+                                           None if settled and previous_topic else record)
+            topic = self.store.get("topics", item["topic_id"])
+            if topic:
+                topic["settled"] = settled
+                self.store.put("topics", item["topic_id"], topic)
             live_ids.add(key)
             section["items"].append(item)
         for record in old:

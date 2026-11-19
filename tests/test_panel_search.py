@@ -26,7 +26,7 @@ def test_search_groups_accents_all_words_and_exact_targets(panel, tmp_path):
     assert groups['mail']['items'][0]['view'] == 'mail'
     assert groups['pending']['items'][0]['view'] == 'pending'
     assert groups['decision']['items'][0]['key'] == 'afk:1'
-    assert len(groups) == 5
+    assert set(groups) == {'mail', 'pending', 'decision', 'dossier', 'run', 'conversation'}
     assert search(app, 'EXAMPLE echeance')['groups'][0]['total'] == 1
     assert not any(g['total'] for g in search(app, 'echeance missing')['groups'])
     assert all(call[1] in ('runs',) for call in fake.calls)

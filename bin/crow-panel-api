@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Call an existing loopback panel from a Crow chat using its normal session/CSRF API."""
+import argparse
+import http.client
+import json
+from pathlib import Path
+import sys
+
+from crow_panel.core import Config, canonical, uid
+
+
+def call(cfg, path, method="GET", body=None):
+    if not path.startswith("/api/") or any(c in path for c in ("\r", "\n", "#")):
+        raise ValueError("Use a local /api/ path")
+    conn = http.client.HTTPConnection("127.0.0.1", cfg["port"], timeout=120)
+    try:
+        conn.request("GET", "/")
+        response = conn.getresponse()
+        cookie = response.getheader("Set-Cookie", "").split(";", 1)[0]
+        response.read()
+        conn.request("GET", "/api/session", headers={"Cookie": cookie})
+        response = conn.getresponse()
+        session = json.loads(response.read())
+        headers = {"Cookie": cookie, "X-Crow-Token": session["csrf_token"],
+                   "Origin": "http://127.0.0.1:" + str(cfg["port"]), "Content-Type": "application/json"}
+        payload = None
+        if method != "GET":
+            if not isinstance(body, dict):
+                raise ValueError("JSON object body required")
+            payload = canonical({"request_id": uid("req_"), **body}).encode("utf-8")
+        conn.request(method, path, payload, headers)
+        response = conn.getresponse()
+        return response.status, json.loads(response.read())
+    finally:
+        conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config")
+    parser.add_argument("--method", choices=("GET", "POST", "PUT"), default="GET")
+    parser.add_argument("--body-file", help="JSON file, or - for stdin")
+    parser.add_argument("path")
+    args = parser.parse_args()
+    try:
+        body = json.loads(sys.stdin.read() if args.body_file == "-" else Path(args.body_file).read_text()) if args.body_file else {}
+        status, result = call(Config(args.config), args.path, args.method, body)
+        print(canonical(result))
+        return 0 if status < 400 else 1
+    except (OSError, ValueError, KeyError, http.client.HTTPException) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

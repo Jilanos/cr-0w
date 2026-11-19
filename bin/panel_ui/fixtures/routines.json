@@ -21,7 +21,7 @@
     {
       "name": "daily_update",
       "label": "Mise à jour machine",
-      "description": "Outils, cdx, dépôts, sauvegarde. Attend la fin des runs en cours.",
+      "description": "Outils et dépôts, sans sauvegarde. Attend la fin des runs en cours.",
       "running": false,
       "operation_id": null,
       "blocked_reason": "Mise à jour prévue à 08:15 : lancer après",
@@ -33,6 +33,16 @@
         "simulated": false,
         "duration_s": 291.8
       },
+      "dry_run": false
+    },
+    {
+      "name": "backup",
+      "label": "Save OneDrive",
+      "description": "Sauvegarder le dossier dev vers OneDrive uniquement.",
+      "running": false,
+      "operation_id": null,
+      "blocked_reason": null,
+      "last": null,
       "dry_run": false
     }
   ]

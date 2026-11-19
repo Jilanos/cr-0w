@@ -24,7 +24,7 @@ class Search:
         if not 1 <= limit <= 50:
             raise Problem(400, "bad_request", "Limite de résultats invalide.")
         groups = {kind: {"kind": kind, "label": label, "total": 0, "items": []} for kind, label in (
-            ("mail", "Mails"), ("pending", "En attente"), ("decision", "Décisions"), ("dossier", "Dossiers"), ("run", "Runs"))}
+            ("mail", "Mails"), ("pending", "En attente"), ("decision", "Décisions"), ("dossier", "Dossiers"), ("run", "Runs"), ("conversation", "Conversations"))}
         result = {"generated_at": now(), "query": text, "groups": list(groups.values()), "sources": {}}
         terms = folded(text).split()
         if not terms:
@@ -56,6 +56,10 @@ class Search:
                 " ".join(row["options"] + [row.get("recommendation") or "", row.get("answer") or ""]))
         for row in self.app.readers.dossiers()["dossiers"]:
             add("dossier", row["slug"], row["title"], str(row["open_count"]) + " lignes", "dossiers")
+        for topic in sorted(self.app.store.all("topics"), key=lambda t: t.get("last_message_at") or "", reverse=True):
+            messages = self.app.store.get("messages", topic["topic_id"], [])
+            transcript = " ".join(m.get("text", "") + " " + " ".join(s.get("v", "") for s in m.get("segments", [])) for m in messages)
+            add("conversation", topic["topic_id"], topic["title"], "Réglé" if topic.get("settled") else "Conversation" if messages else "Sujet", "conversation", transcript)
         runs = self.app.readers.runs(24 * 365)
         result["sources"]["runs"] = runs["source_status"]
         for row in runs["runs"]:

@@ -62,9 +62,16 @@ the read account. A partial collection preserves the previous published snapshot
 mail. Triage first freezes the selected messages and destinations, then requires
 **Exécuter** on the displayed manifest. Unknown outcomes require **Vérifier**.
 
-The chat follows the selected subject. Sonnet is the default. Queued messages
+The chat pins its subject independently of list selection. **Chat**, **c** or
+**Sujet sélectionné** explicitly replaces the pinned subject. The banner keeps
+the title visible after completion. Completed rows retain their original chat
+and history. **Nouveau chat** accepts a free title or an existing dossier;
+**Conversations récentes** reopens stored threads. Global search also searches
+topic titles and stored user/assistant messages, including settled and orphan topics.
+Sonnet is the default. Queued messages
 remain visible and can be removed from the queue. Each launch appears in the run
-registry with its operation and subject identifiers. **Jobs** shows the journal
+registry as **Chat · subject**, with its operation and subject identifiers. The
+Runs card reopens its thread; **Jobs** shows the journal
 and report. **Comptes** shows quotas, resets and capability evidence. Unknown
 values stay unknown. No reset credit is consumed automatically.
 
@@ -216,9 +223,21 @@ duplicate rows with independent clicks, unavailable update status, malformed bat
 arguments, missing tool results and repeated draft attempts. Use fake commands and
 disposable files. Reproduce each finding before changing its guard. Verify that
 worker failures emit a terminal event and that the browser leaves its waiting state.
-Read tools resolve paths against the configured data home, file roots and projects.
-Test symlink escapes and out-of-root credential reads. Native resumed chat disables
-local read tools as well as MCP because continuation settings cannot carry hooks.
+Trial read tools resolve paths against the configured data home, file roots and
+projects. Test symlink escapes and out-of-root credential reads. Trial native
+continuations disable read tools and MCP because continuation settings cannot
+carry hooks. Live chats start a fresh guarded turn with persisted history instead.
+
+Live chat uses Crow's shell, file and connector actions. It can update owner
+preferences, EN_ATTENTE, file mail and launch jobs. It must never send mail.
+Direct send/forward tools are denied by its tool hook; the shell follows the same
+owner no-send instructions as the interactive hub. Draft requests use the existing
+reply-all pipeline with work-account composition and native Outlook verification.
+`bin/crow-panel-api --config /path/to/panel.yaml /api/mail` reads the running panel.
+Add `--method POST --body-file request.json` for actions. This helper uses the normal
+loopback cookie and CSRF contract and exposes no sending route. Include a stable
+`request_id` in a JSON body when retrying a mutation; inspect uncertain operations
+before retrying any mailbox write.
 
 ## Classic Outlook bridge
 
@@ -249,7 +268,13 @@ Outlook's supported methods are documented in
 and [recurring instances](https://learn.microsoft.com/en-us/office/vba/api/outlook.items.includerecurrences).
 
 The header separates **Synchro Outlook** (mail/calendar reads), **Maj** (the night
-routine), and **Mise à jour machine** (the configured machine-update script).
+routine), **Mise à jour machine** (tools and repositories only), and **Save OneDrive**
+(backup only). Configure `routines.daily_update.argv` with the update script's
+`--no-backup` flag and `routines.backup.argv` with `--backup-only`. The external
+script must implement those flags; keep a `.bak` before changing it. Backup starts
+without waiting for model runs and does not reserve maintenance admission. Routines
+remain mutually exclusive. Do not click either routine as a smoke test against
+real paths; use fake commands or disposable backup roots.
 Calendar reads reuse complete snapshots for 30 minutes. Native sync has a fast
 mode without the proposal-model phase; use the mail view's normal sync to request
 proposals for the remaining messages.
