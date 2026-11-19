@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 17:32:08
 
 # AI Context
 - Summary: Nest Home in two parts: the hero takes about 2/3 of the screen, the right third is the butler chat with the old left column folded into a header above it. Home keeps its own chat width and fold state, and the hero fits its frame without clipping or a janky resize.
@@ -25,20 +26,22 @@
 # Scope
 - In:
   - Home layout: hero about 2/3 wide; right third = left-column facts as a compact header, chat below it.
-  - Mockups first (laptop, both themes): owner picks the header content and density before the build.
+  - Mockups first (laptop and Fold inner, both themes): owner picks the header content and density before the build.
+  - Fold inner (about 707x691): redesign Home so it uses the panel space (owner 2026-11-19: the inner display wastes space). The mockups decide whether it takes the laptop split or its own layout.
   - Home keeps its own fold and width keys, separate from the other pages.
   - Home opens the chat wider by default (about 40% of the window, clamped like item_256).
   - The hero fits its frame at every width: the holo table never clips. No width tween on the hero; it refits once when the fold or drag ends.
   - Shots at rail open, folded and dragged, both themes, laptop sizes.
 - Out:
   - Other pages' layout (they keep the item_256 rail).
-  - Phone Home (keeps its own layout; item_228).
+  - Phone cover Home (keeps its own layout; item_228). Owner likes the cover hero size as is.
 
 # Acceptance criteria
 - AC0: Owner approved the Home mockup (hero 2/3, header plus chat) before the build.
 - AC1: Folding or resizing on Home leaves the other pages' rail as it was, and the reverse.
 - AC2: First visit to Home shows the wider chat.
 - AC3: No clipping of the holo table in shots at 1280 and 1920, rail open and folded, both themes.
+- AC5: Fold inner Home uses its space per the approved mockup; shots in both themes, hero not clipped.
 - AC4: Fold and drag on Home show no stretched or jumping frames (recorded check or frame shots).
 
 # AC Traceability
