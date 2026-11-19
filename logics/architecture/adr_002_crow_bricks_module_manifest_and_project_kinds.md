@@ -1,7 +1,7 @@
 ## adr_002_crow_bricks_module_manifest_and_project_kinds - Crow bricks, module manifest and project kinds
 > Date: 2026-11-19
-> Status: Proposed
-> Owner review: pending
+> Status: Accepted
+> Owner review: accepted 2026-11-19
 > Related request: `req_064_paul_s_feedback_and_a_modular_public_crow`, `req_047_make_the_hub_rules_configurable_in_local_policy_yaml`, `req_051_adopt_ideas_from_life_distributable`
 > Related backlog: `item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds`, `item_122_crow_home_is_the_private_config_repo_itself`, `item_260_module_manifests_crow_yaml_loader_and_doctor_check`, `item_261_skills_hooks_and_gather_follow_the_module_switch`, `item_236_first_module_split_forge_mrs_optional_and_folder_projects`, `item_237_nest_and_crow_core_as_separate_front_and_back_bricks`, `item_262_mail_team_and_vault_bricks_optional`, `item_263_optional_tool_bricks_and_install_profiles`
 > Related task: (none yet)
@@ -188,12 +188,12 @@ Each split is one backlog item, run in this order, interleaved with req_063 as i
 - Hook scripts gain one manifest read per call; the loader caches by file mtime.
 - The deck and Nest gain one data dependency (`modules`); a failed read shows every page, as today.
 
-# Open choices for the owner
-1. Core set: which bricks are always on. Proposed: `core` only; `git`, `core-api`, `nest`, `deck` on by default for a new install.
-2. Manifest location: `crow.yaml` at the CROW_HOME root (proposed), a `modules:` block in `projects.yaml`, or in `policy.yaml`.
-3. Deck pages: hide a page whose brick is off (proposed), or keep every page with an "off" line.
-4. Project kind key: new `layout: repo | folder` (proposed) or rename the planet `kind`.
-5. Vault off: notes go to `CROW_HOME/notes/` as plain Markdown (proposed) or the vault brick becomes always on.
+# Owner decisions (2026-11-19)
+1. Core set: `core` is the only always-on brick; `git`, `core-api`, `nest`, `deck` are on by default for a new install.
+2. Manifest location: `crow.yaml` at the CROW_HOME root.
+3. Deck pages: a page whose brick is off is hidden, same rule as Nest.
+4. Project kind key: new `layout: repo | folder`, default from the presence of `.git`.
+5. Vault off: notes go to `CROW_HOME/notes/` as plain Markdown.
 
 # Follow-up work
 - Items in Migration order, linked from req_064.

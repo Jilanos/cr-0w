@@ -1,10 +1,10 @@
 ## item_235_module_design_for_a_public_crow_bricks_manifest_and_project_kinds - Module design for a public crow: bricks, manifest and project kinds
 > From version: 1.0.0
 > Schema version: 1.0
-> Status: Ready
+> Status: Done
 > Understanding: 95
 > Confidence: 85
-> Progress: 90%
+> Progress: 100%
 > Complexity: High
 > Theme: General
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
@@ -38,13 +38,13 @@
 - AC3: Follow-up items created for each split, in order.
 
 # AC Traceability
-- AC1 -> `adr_002_crow_bricks_module_manifest_and_project_kinds`: inventory table, `crow.yaml` `modules:` schema, project `layout`, front/back split, Nest as the panel, migration order. Status Proposed; owner OK pending.
+- AC1 -> `adr_002_crow_bricks_module_manifest_and_project_kinds`: inventory table, `crow.yaml` `modules:` schema, project `layout`, front/back split, Nest as the panel, migration order. Accepted by the owner 2026-11-19, all five proposed choices kept.
 - AC2 -> `logics/specs/module_inventory/bricks.tsv` tags 170 pieces (bin/ scripts, skills, runbooks, Claude and git hooks, core routes and sections, tools, integrations). `tests/test_module_inventory.py` fails crow-check on any untagged, stale or unknown row.
 - AC3 -> split items in adr_002 Migration order: item_260, item_261, item_236, item_237, item_262, item_263; listed in req_064 Backlog and Execution order.
 - req_064_paul_s_feedback_and_a_modular_public_crow-AC2 -> AC2 above.
 
 # Progress
-- 2026-11-19: inventory script and tags, adr_002 drafted, four split items created, items 236 and 237 aligned (`layout` key, dependencies, ADR links). Open: owner review of adr_002 and its five open choices.
+- 2026-11-19: inventory script and tags, adr_002 drafted, four split items created, items 236 and 237 aligned (`layout` key, dependencies, ADR links). Owner accepted adr_002 2026-11-19 with all five proposed choices.
 
 # Dependencies
 - Paul's code and bug items done first (owner order).
@@ -61,4 +61,5 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-19T10:07:31.959884+00:00 | cdx | 5bfe282ec6074fccbbf29b53a884892d | item-235-modules | running |  | commits ad2cb52, b270f96, e321e3d; ADR awaits owner review |
+| 2026-11-19T10:30:12.612132+00:00 | cdx | 5bfe282ec6074fccbbf29b53a884892d | item-235-modules | succeeded |  | commits ad2cb52, b270f96, e321e3d; ADR awaits owner review |
+
