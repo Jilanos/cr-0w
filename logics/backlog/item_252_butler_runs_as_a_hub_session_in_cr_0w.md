@@ -8,6 +8,7 @@
 > Complexity: Medium
 > Theme: Nest
 > Reminder: Update status/understanding/confidence/progress and linked request/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 10:29:55
 
 # AI Context
 - Summary: The butler process runs as a CR-0W hub session that orchestrates: it knows everything the hub knows (CLAUDE.md, owner-prefs, registry, open threads, runbooks, skills) and reads freely, but it does repo work only by delegating (dispatch, handoff, missions). It writes only hub files: Logics plans, vault notes, open threads.
@@ -63,4 +64,3 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-

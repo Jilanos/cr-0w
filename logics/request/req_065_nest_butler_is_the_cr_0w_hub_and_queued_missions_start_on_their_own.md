@@ -7,6 +7,7 @@
 > Complexity: High
 > Theme: Nest
 > Reminder: Update status/understanding/confidence and linked backlog/task references when you edit this doc.
+> Indicators reviewed: 2026-11-19 10:29:55
 
 # AI Context
 - Summary: The Nest butler becomes a real CR-0W hub session (cr-0w folder, CLAUDE.md, skills, Bash, crow CLI, hooks) driven from Nest, and queued core missions start without a hand-run tick.
@@ -69,4 +70,3 @@
 # Executions
 | When | Runner | Run id | Title | State | PR | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-
