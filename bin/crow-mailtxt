@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Plain text of a mail read with the M365 connector, without the quoted history.
+
+usage: crow-mailtxt <file> [--full] [--max N]
+<file> is a saved read_resource result (JSON, possibly prefixed by a header line) or raw HTML.
+Prints subject, from, to, cc, date and attachments, then the body cut at the first
+reply/forward separator (Outlook divRplyFwdMsg, <hr>, "De :"/"From:" header block).
+"""
+import html
+import json
+import re
+import sys
+
+
+def to_text(h):
+    h = re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", "", h)
+    h = re.sub(r"(?i)<br\s*/?>", "\n", h)
+    h = re.sub(r"(?i)</(div|p|tr|li|h\d)>", "\n", h)
+    h = re.sub(r"(?s)<[^>]+>", "", h)
+    t = html.unescape(h).replace("\xa0", " ")
+    t = re.sub(r"[ \t]+", " ", t)
+    return re.sub(r"\n\s*\n+", "\n\n", t).strip()
+
+
+def cut(h):
+    for pat in (r'(?i)<div id="appendonsend"', r'(?i)<div[^>]+id="divRplyFwdMsg"', r"(?i)<hr[^>]*>",
+                r"(?im)^\s*(De|From)\s*:.*\n.*(Envoy|Sent)"):
+        m = re.search(pat, h)
+        if m:
+            return h[:m.start()]
+    return h
+
+
+def load(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        raw = f.read()
+    start = raw.find("{")
+    if start != -1:
+        try:
+            return json.loads(raw[start:raw.rfind("}") + 1])
+        except json.JSONDecodeError:
+            pass
+    return {"body": {"content": raw}}
+
+
+def addr(lst):
+    return ", ".join(f"{r.get('name', '')} <{r.get('address', '')}>" for r in lst or [])
+
+
+USAGE = "usage: crow-mailtxt <file> [--full] [--max N]"
+
+
+def parse_args(argv):
+    """Return (path, full, max_chars) or None when the arguments are invalid."""
+    path, full, mx, rest = None, False, 6000, list(argv)
+    while rest:
+        a = rest.pop(0)
+        if a == "--full":
+            full = True
+        elif a == "--max":
+            if not rest or not rest[0].isdigit():
+                return None
+            mx = int(rest.pop(0))
+        elif a.startswith("-") or path is not None:
+            return None
+        else:
+            path = a
+    return (path, full, mx) if path else None
+
+
+def main(argv):
+    if argv and argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    args = parse_args(argv)
+    if args is None:
+        print(USAGE, file=sys.stderr)
+        return 2
+    path, full, mx = args
+    try:
+        d = load(path)
+    except OSError as e:
+        print(f"crow-mailtxt: {e}", file=sys.stderr)
+        return 2
+    s = d.get("sender") or {}
+    print(f"Subject: {d.get('subject', '')}")
+    if s:
+        print(f"From: {s.get('name', '')} <{s.get('address', '')}>  ·  {d.get('receivedDateTime', '')}")
+    if d.get("toRecipients"):
+        print(f"To: {addr(d['toRecipients'])}")
+    if d.get("ccRecipients"):
+        print(f"Cc: {addr(d['ccRecipients'])}")
+    atts = [a for a in d.get("attachments") or [] if not a.get("isInline")]
+    for a in atts:
+        print(f"Attachment: {a.get('name')} ({a.get('size', 0) // 1024} KB) {a.get('uri', '')}")
+    if d.get("webLink"):
+        print(f"Link: {d['webLink']}")
+    body = (d.get("body") or {}).get("content", "") or d.get("html", "")
+    text = to_text(body if full else cut(body))
+    print("\n" + text[:mx] + ("\n[…truncated]" if len(text) > mx else ""))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

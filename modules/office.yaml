@@ -1,0 +1,20 @@
+# Module manifest of the office brick (adr_002).
+name: office
+summary: Office documents - mail text without quoted history, tracked-changes DOCX, simple A4 DOCX.
+default: false
+requires: []
+scripts: [crow-docx-redline, crow-mailtxt, simpledoc.py]
+skills: []
+skill_lists: []
+runbooks: [office-documents]
+claude_hooks: []
+git_hooks: []
+core_sections: []
+core_routes: []
+apps: []
+integrations: []
+gather: {}
+doctor: {needs_any: [uv]}
+nest: {}
+deck: {}
+config: {}

@@ -22,10 +22,10 @@ def test_manifests_carry_the_adr_002_bricks_and_defaults():
     import yaml
     mods = Path(__file__).resolve().parents[1] / "modules"
     got = {f.stem: yaml.safe_load(f.read_text())["default"] for f in mods.glob("*.yaml")}
-    off = {"design", "integration-shell"}
+    off = {"design", "integration-shell", "office"}
     want = {b: b not in off for b in (
         "core", "git", "forge", "vault", "mail", "team", "afk", "retro", "design",
-        "releases", "core-api", "nest", "deck", "integration-shell")}
+        "releases", "core-api", "nest", "deck", "integration-shell", "office")}
     assert got == want
 
 

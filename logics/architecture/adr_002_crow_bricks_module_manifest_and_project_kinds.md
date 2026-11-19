@@ -54,11 +54,12 @@ flowchart LR
 | `nest` | `tools/nest` web front | on, needs `core-api` |
 | `deck` | `tools/crow-deck`, `tools/crow-watch` terminal front | on |
 | `integration-shell` | `integrations/archeotech` and its runbooks | off |
+| `office` | `crow-mailtxt` (mail text without quoted history), `crow-docx-redline` (tracked-changes DOCX), `simpledoc.py` (simple A4 DOCX), office-documents runbook; `doctor: {needs_any: [uv]}` (python-docx runs through `uv run --with`) | off |
 
 Defaults are the values for an existing setup with no `crow.yaml`. The install writes a starter file (see Install).
 
 ## Inventory
-Source of truth: the engine module manifests `modules/<brick>.yaml` (bricks.tsv until item_260). `logics/specs/module_inventory/inventory.py` lists every bin/ script, skill, runbook, Claude hook, git hook, core route, core section, app and integration, and joins them with the manifests. `tests/test_module_inventory.py` fails on a piece with no brick, a stale manifest entry or a piece in two manifests, so `bin/crow-check` keeps the table complete. `python3 logics/specs/module_inventory/inventory.py --markdown` prints the full table (170 rows on 2026-11-19).
+Source of truth: the engine module manifests `modules/<brick>.yaml` (bricks.tsv until item_260). `logics/specs/module_inventory/inventory.py` lists every bin/ script, skill, runbook, Claude hook, git hook, core route, core section, app and integration, and joins them with the manifests. `tests/test_module_inventory.py` fails on a piece with no brick, a stale manifest entry or a piece in two manifests, so `bin/crow-check` keeps the table complete. `python3 logics/specs/module_inventory/inventory.py --markdown` prints the full table (179 rows on 2026-11-19).
 
 | Brick | Pieces | Scripts | Skills | Runbooks | Hooks | Core routes and sections | Apps |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -76,10 +77,11 @@ Source of truth: the engine module manifests `modules/<brick>.yaml` (bricks.tsv 
 | deck | 9 | | | tui-agents-ux, tui-home-ux, tui-projects-ux, tui-render, tui-review-ux, tui-themes-ux, tui-usage-ux | | | tools/crow-deck, tools/crow-watch |
 | nest | 3 | | | nest-phone-install, nest-screenshots | | | tools/nest |
 | integration-shell | 3 | | | archeotech-crow-agents, archeotech-crow-usage | | | integrations/archeotech |
+| office | 4 | crow-docx-redline, crow-mailtxt, simpledoc.py | | office-documents | | | |
 
 ## Module manifests (engine side)
 - Each brick gets `modules/<brick>.yaml` in the engine. It replaces `bricks.tsv` once written; the inventory test then reads the manifests.
-- Fields: `name`, `summary`, `requires` (other bricks), `scripts`, `skills`, `claude_hooks`, `git_hooks`, `core_sections`, `core_routes`, `gather` (routine keys it adds to brief, daily, weekly), `doctor` (checks it owns, tools it needs on PATH), `nest` (sections), `deck` (pages and boxes), `config` (allowed keys with defaults).
+- Fields: `name`, `summary`, `default` (on or off with no crow.yaml), `requires` (other bricks), `scripts`, `skills`, `skill_lists`, `runbooks`, `apps`, `integrations`, `claude_hooks`, `git_hooks`, `core_sections`, `core_routes`, `gather` (routine keys it adds to brief, daily, weekly), `doctor` (checks it owns, tools it needs on PATH), `nest` (sections), `deck` (pages and boxes), `config` (allowed keys with defaults).
 - Files stay where they are. A manifest lists paths; moving folders is not part of any split.
 
 ```yaml
