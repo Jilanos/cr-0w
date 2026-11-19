@@ -1,12 +1,12 @@
 # Module manifest of the mail brick (adr_002).
 name: mail
-summary: Calendar and mail counts (crow-today), today done and snooze, Today box.
+summary: Calendar and mail counts (crow-today), today done and snooze, Today box, reply drafts (crow-mail-draft).
 default: true
 requires: []
-scripts: [crow-today]
+scripts: [crow-today, crow-mail-draft, crow-mail-draft-com.ps1]
 skills: []
 skill_lists: []
-runbooks: [graph-today]
+runbooks: [graph-today, mail-drafts]
 claude_hooks: []
 git_hooks: []
 core_sections: [today]

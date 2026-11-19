@@ -1,0 +1,12 @@
+# Copy to local/mail.yaml. bin/crow-mail-draft reads it.
+draft_backend: com            # graph | com | connector
+internal_domains: [example.com]   # signature auto: external when any recipient is outside these domains
+signatures:                   # one list of lines per kind; the draft file picks auto | internal | external | none
+  internal: ["Best,", "Your Name"]
+  external: ["Best regards,", "Your Name", "Your title, Company"]
+body_style: ""                # optional CSS for a wrapper div around reply and signature
+attachment_roots: []          # when set, attachments must sit under one of these folders
+com:                          # classic Outlook from WSL
+  powershell_exe: powershell.exe
+  timeout_seconds: 90
+# graph uses local/graph.yaml and the crow-today sign-in; drafts need the Mail.ReadWrite scope.

@@ -1,0 +1,511 @@
+#!/usr/bin/env python3
+"""crow-mail-draft: save one reply draft in the mailbox through a configurable backend, then check it. Never sends.
+
+  crow-mail-draft save FILE [--json]            write the draft described by FILE, read it back, run the checks
+  crow-mail-draft check FILE --readback R.json  run the checks on a readback another session wrote (connector backend)
+  crow-mail-draft probe                         com: is classic Outlook reachable (read only)
+  crow-mail-draft inbox [--limit N]             com: newest inbox summaries (read only)
+  crow-mail-draft delete-draft ID               remove one draft by id; refused outside the Drafts folder
+
+Config: local/mail.yaml (docs/mail.example.yaml). draft_backend: graph | com | connector.
+  graph      Microsoft Graph with the crow-today sign-in (local/graph.yaml); needs Mail.ReadWrite
+  com        classic Outlook from WSL through bin/crow-mail-draft-com.ps1 (fixed action list, no Send)
+  connector  writes a request in local/state/mail/connector/ for a hub session with the M365 connector;
+             that session writes the readback and runs `check`
+Draft file (YAML or JSON): message_id, store_id (com, optional), mode (all | sender, default all),
+  html or text, signature (auto | internal | external | none, default auto), cc [addresses], attachments [paths].
+Checks: body_visible, signature_once, no_native_signature, attachments, still_draft, not_sent.
+Output {schema, ok, backend, draft_id, checks:[{name, ok, detail}], uncertain}. Exit 0 all checks pass,
+1 a check failed or the request was refused, 2 config or backend error.
+"""
+import base64
+from collections import Counter
+import datetime as dt
+import html as html_module
+from html.parser import HTMLParser
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+import yaml
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import crow_lib  # noqa: E402
+
+ENGINE = Path(crow_lib.ENGINE)
+BACKENDS = ("graph", "com", "connector")
+SIGNATURES = ("auto", "internal", "external", "none")
+CHECKS = ("body_visible", "signature_once", "no_native_signature", "attachments", "still_draft", "not_sent")
+NATIVE_SIGNATURE = re.compile(r"""\bname\s*=\s*["']?_MailAutoSig\b""", re.I)
+
+
+class Refused(Exception):
+    """The request is invalid; nothing was written."""
+
+
+class BackendError(Exception):
+    def __init__(self, message, uncertain=False):
+        super().__init__(message)
+        self.uncertain = uncertain
+
+
+def home():
+    return Path(crow_lib.data_home())
+
+
+def load_config(path=None):
+    path = Path(path) if path else home() / "local" / "mail.yaml"
+    if not path.exists():
+        raise BackendError(f"no mail config: copy docs/mail.example.yaml to {path}")
+    cfg = yaml.safe_load(path.read_text()) or {}
+    if cfg.get("draft_backend") not in BACKENDS:
+        raise BackendError("draft_backend must be one of: " + ", ".join(BACKENDS))
+    return cfg
+
+
+def state_dir(cfg):
+    return Path(cfg.get("state_dir") or home() / "local" / "state" / "mail")
+
+
+# --- text helpers ---------------------------------------------------------
+
+class _Text(HTMLParser):
+    BLOCK = {"div", "p", "br", "li", "tr", "table", "h1", "h2", "h3", "h4", "blockquote"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("style", "script", "head"):
+            self.skip += 1
+        if tag in self.BLOCK:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in ("style", "script", "head") and self.skip:
+            self.skip -= 1
+        if tag in self.BLOCK:
+            self.parts.append(" ")
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+
+def html_text(value):
+    parser = _Text()
+    parser.feed(value or "")
+    parser.close()
+    return squash("".join(parser.parts))
+
+
+def squash(text):
+    return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
+
+
+def lines_html(lines):
+    return "".join('<div style="margin:0">' + html_module.escape(line) + "</div>" for line in lines)
+
+
+# --- draft request --------------------------------------------------------
+
+def load_draft(path):
+    path = Path(path)
+    try:
+        data = yaml.safe_load(path.read_text())
+    except (OSError, yaml.YAMLError) as e:
+        raise Refused(f"cannot read draft file: {e}")
+    if not isinstance(data, dict):
+        raise Refused("draft file must be a mapping")
+    if not isinstance(data.get("message_id"), str) or not data["message_id"].strip():
+        raise Refused("message_id is required")
+    if bool(data.get("html")) == bool(data.get("text")):
+        raise Refused("give exactly one of html or text")
+    data.setdefault("mode", "all")
+    data.setdefault("signature", "auto")
+    data.setdefault("cc", [])
+    data.setdefault("attachments", [])
+    if data["mode"] not in ("all", "sender"):
+        raise Refused("mode must be all or sender")
+    if data["signature"] not in SIGNATURES:
+        raise Refused("signature must be one of: " + ", ".join(SIGNATURES))
+    if not all(isinstance(data[k], list) for k in ("cc", "attachments")):
+        raise Refused("cc and attachments must be lists")
+    for address in data["cc"]:
+        if not re.fullmatch(r"[^\s<>@;]+@[^\s<>@;]+\.[^\s<>@;]+", str(address)):
+            raise Refused(f"invalid cc address: {address}")
+    base = path.resolve().parent
+    data["attachments"] = [str((base / a).resolve()) for a in data["attachments"]]
+    return data
+
+
+def check_attachments(paths, cfg):
+    roots = [Path(r).expanduser().resolve() for r in cfg.get("attachment_roots") or []]
+    for p in paths:
+        path = Path(p)
+        if not path.is_file():
+            raise Refused(f"attachment not found: {path.name}")
+        if roots and not any(path.resolve().is_relative_to(r) for r in roots):
+            raise Refused(f"attachment outside attachment_roots: {path.name}")
+
+
+def is_external(recipients, cfg):
+    domains = {d.casefold() for d in cfg.get("internal_domains") or []}
+    return any("@" not in a or a.rsplit("@", 1)[-1].casefold() not in domains for a in recipients if a is not None)
+
+
+def signature_lines(kind, recipients, cfg):
+    """The signature rule: auto picks external when any recipient is outside internal_domains."""
+    if kind == "none":
+        return "none", []
+    if kind == "auto":
+        if recipients is None:
+            raise Refused("signature auto needs the recipients: set signature to internal or external")
+        kind = "external" if is_external(recipients, cfg) else "internal"
+    lines = (cfg.get("signatures") or {}).get(kind)
+    if not lines or not isinstance(lines, list):
+        raise Refused(f"signatures.{kind} is not configured in local/mail.yaml")
+    return kind, [str(x) for x in lines]
+
+
+def compose(draft, signature):
+    body = draft["html"] if draft.get("html") else lines_html(str(draft["text"]).splitlines())
+    if not html_text(body):
+        raise Refused("draft body is empty")
+    sig = ("<div><br></div>" + lines_html(signature)) if signature else ""
+    style = draft.get("_style")
+    inner = body + sig
+    return f'<div style="{html_module.escape(style)}">{inner}</div>' if style else inner
+
+
+# --- post-write check -----------------------------------------------------
+
+def run_checks(readback, expected):
+    """Compare the draft read back from the mailbox with what was asked. Backend independent."""
+    html_body = readback.get("html") or ""
+    text = squash(readback.get("body_text")) or html_text(html_body)
+    quoted = squash(readback.get("quoted_text"))
+    body = expected["body_text"]
+    sig = squash(" ".join(expected["signature"]))
+    names = Counter(a.get("name", "") for a in readback.get("attachments") or [])
+    want = Counter(expected["attachments"])
+    out = []
+
+    def add(name, ok, detail):
+        out.append({"name": name, "ok": bool(ok), "detail": detail})
+
+    add("body_visible", body and body in text, "reply text found in the draft" if body in text else "reply text missing from the draft")
+    if sig:
+        count = text.count(sig) - quoted.count(sig)
+        add("signature_once", count == 1, f"signature found {count} time(s) outside the quote, expected 1")
+    else:
+        add("signature_once", True, "no signature requested")
+    native = bool(NATIVE_SIGNATURE.search(html_body))
+    add("no_native_signature", not native, "Outlook automatic signature still in the draft" if native else "no automatic signature")
+    missing = sorted((want - names).elements())
+    add("attachments", not missing, "missing: " + ", ".join(missing) if missing else f"{sum(want.values())} attachment(s) present")
+    add("still_draft", readback.get("is_draft") is True, "in Drafts" if readback.get("is_draft") is True else "not in Drafts")
+    add("not_sent", readback.get("sent") is False, "not sent" if readback.get("sent") is False else "sent flag set or unknown")
+    return out
+
+
+# --- backends ---------------------------------------------------------------
+
+def windows_path(path):
+    if re.match(r"^[A-Za-z]:[\\/]", str(path)) or str(path).startswith("\\\\"):
+        return str(path)
+    return subprocess.run(["wslpath", "-w", str(Path(path).resolve())], capture_output=True,
+                          text=True, check=True, timeout=5).stdout.strip()
+
+
+class ComBackend:
+    """Classic Outlook through the PowerShell bridge. Only ACTIONS cross the process boundary."""
+    name = "com"
+    ACTIONS = frozenset({"probe", "inbox", "body", "conversation", "reply", "draft", "delete_draft"})
+    WRITES = frozenset({"reply", "delete_draft"})
+    SCRIPT = ENGINE / "bin" / "crow-mail-draft-com.ps1"
+
+    def __init__(self, cfg, runner=None, to_windows=None):
+        self.cfg = cfg
+        self.options = cfg.get("com") or {}
+        self.runner = runner or subprocess.run
+        self.to_windows = to_windows or windows_path
+
+    def call(self, action, **args):
+        if action not in self.ACTIONS:
+            raise ValueError("unsupported Outlook action")
+        directory = state_dir(self.cfg) / "com-requests"
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd, path = tempfile.mkstemp(suffix=".json", dir=directory)
+        uncertain = action in self.WRITES
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump({"action": action, **args}, stream, ensure_ascii=False)
+            command = [self.options.get("powershell_exe", "powershell.exe"), "-NoProfile", "-NonInteractive", "-STA",
+                       "-ExecutionPolicy", "Bypass", "-File", self.to_windows(self.SCRIPT), "-RequestFile", self.to_windows(path)]
+            # One attempt only: a lost answer to a write is reported uncertain, never replayed.
+            result = self.runner(command, capture_output=True, encoding="utf-8", errors="replace",
+                                 timeout=self.options.get("timeout_seconds", 90))
+            value = json.loads((result.stdout or "").lstrip("﻿"))
+            if not isinstance(value, dict) or value.get("ok") is not True:
+                error = value.get("error", {}) if isinstance(value, dict) else {}
+                raise BackendError(error.get("message", "classic Outlook did not answer"), uncertain and error.get("uncertain", True))
+            return value["result"]
+        except BackendError:
+            raise
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+            raise BackendError("no answer from classic Outlook; check Outlook before any new action", uncertain)
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def recipients(self, draft):
+        source = self.call("body", entry_id=draft["message_id"], store_id=draft.get("store_id"))
+        rows = [source.get("from") or {}, *source.get("to", []), *source.get("cc", [])]
+        if draft["mode"] == "sender":
+            rows = rows[:1]
+        return [r.get("address", "") for r in rows] + list(draft["cc"])
+
+    def write(self, draft, html_body):
+        files = [{"path": self.to_windows(p)} for p in draft["attachments"]]
+        value = self.call("reply", entry_id=draft["message_id"], store_id=draft.get("store_id"), mode=draft["mode"],
+                          html=html_body, cc=list(draft["cc"]), files=files)
+        return value
+
+    def delete(self, draft_id, store_id=None):
+        return self.call("delete_draft", entry_id=draft_id, store_id=store_id)
+
+
+class GraphBackend:
+    """Microsoft Graph with the crow-today sign-in. createReply(All) then one body update."""
+    name = "graph"
+    BASE = "https://graph.microsoft.com/v1.0"
+    MAX_ATTACHMENT = 3 * 1024 * 1024
+
+    def __init__(self, cfg, token=None, opener=None):
+        self.cfg = cfg
+        self._token = token
+        self.opener = opener or urllib.request.urlopen
+
+    def token(self):
+        if not self._token:
+            path = ENGINE / "bin" / "crow-today"
+            loader = SourceFileLoader("crow_today", str(path))
+            today = module_from_spec(spec_from_loader("crow_today", loader))
+            loader.exec_module(today)
+            self._token = today.access(today.conf())
+        return self._token
+
+    def request(self, method, path, body=None, headers=None, write=False):
+        h = {"Authorization": "Bearer " + self.token(), "Content-Type": "application/json", **(headers or {})}
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(self.BASE + path, data, headers=h, method=method)
+        try:
+            with self.opener(req, timeout=30) as r:
+                raw = r.read()
+                return json.loads(raw) if raw else {}
+        except (OSError, ValueError) as e:
+            raise BackendError(f"Graph {method} failed: {e}", write)
+
+    def recipients(self, draft):
+        m = self.request("GET", f"/me/messages/{draft['message_id']}?$select=from,toRecipients,ccRecipients")
+        rows = [m.get("from") or {}] + ([] if draft["mode"] == "sender" else (m.get("toRecipients") or []) + (m.get("ccRecipients") or []))
+        return [(r.get("emailAddress") or {}).get("address", "") for r in rows] + list(draft["cc"])
+
+    def write(self, draft, html_body):
+        for p in draft["attachments"]:
+            if Path(p).stat().st_size > self.MAX_ATTACHMENT:
+                raise Refused(f"attachment over 3 MB, not supported by the graph backend: {Path(p).name}")
+        mid = draft["message_id"]
+        source_text = self.request("GET", f"/me/messages/{mid}?$select=body", headers={"Prefer": 'outlook.body-content-type="text"'})
+        verb = "createReplyAll" if draft["mode"] == "all" else "createReply"
+        created = self.request("POST", f"/me/messages/{mid}/{verb}", {}, write=True)
+        did = created["id"]
+        try:
+            current = (created.get("body") or {}).get("content", "")
+            fragment = '<div id="crow-reply">' + html_body + "</div>"
+            match = re.search(r"<body\b[^>]*>", current, re.I)
+            content = current[:match.end()] + fragment + current[match.end():] if match else fragment + current
+            patch = {"body": {"contentType": "html", "content": content}}
+            if draft["cc"]:
+                patch["ccRecipients"] = (created.get("ccRecipients") or []) + [{"emailAddress": {"address": a}} for a in draft["cc"]]
+            self.request("PATCH", f"/me/messages/{did}", patch, write=True)
+            for p in draft["attachments"]:
+                self.request("POST", f"/me/messages/{did}/attachments", {
+                    "@odata.type": "#microsoft.graph.fileAttachment", "name": Path(p).name,
+                    "contentBytes": base64.b64encode(Path(p).read_bytes()).decode()}, write=True)
+        except BackendError as e:
+            raise BackendError(f"{e} (draft {did} created, check it before retrying)", True)
+        value = self.readback(did)
+        value["quoted_text"] = (source_text.get("body") or {}).get("content", "")
+        return value
+
+    def readback(self, did):
+        m = self.request("GET", f"/me/messages/{did}?$select=body,isDraft,webLink")
+        text = self.request("GET", f"/me/messages/{did}?$select=body", headers={"Prefer": 'outlook.body-content-type="text"'})
+        files = self.request("GET", f"/me/messages/{did}/attachments?$select=name")
+        return {"draft_id": did, "html": (m.get("body") or {}).get("content", ""),
+                "body_text": (text.get("body") or {}).get("content", ""),
+                "attachments": [{"name": a.get("name", "")} for a in files.get("value", [])],
+                "is_draft": m.get("isDraft") is True, "sent": m.get("isDraft") is False, "link": m.get("webLink")}
+
+    def delete(self, draft_id, store_id=None):
+        m = self.request("GET", f"/me/messages/{draft_id}?$select=isDraft")
+        if m.get("isDraft") is not True:
+            raise Refused("delete refused: this message is not a draft")
+        self.request("DELETE", f"/me/messages/{draft_id}", write=True)
+        return {"deleted": True, "draft_id": draft_id}
+
+
+class ConnectorBackend:
+    """No local mailbox access: queue a request for a hub session that has the M365 connector."""
+    name = "connector"
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def recipients(self, draft):
+        return draft.get("recipients")
+
+    def write(self, draft, html_body):
+        directory = state_dir(self.cfg) / "connector"
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        path = directory / f"{stamp}-{re.sub(r'[^A-Za-z0-9]', '', draft['message_id'])[-12:]}.json"
+        tool = "outlook_create_reply_all_draft" if draft["mode"] == "all" else "outlook_create_reply_draft"
+        path.write_text(json.dumps({
+            "message_id": draft["message_id"], "tool": tool, "html": html_body, "cc": draft["cc"],
+            "attachments": draft["attachments"], "draft_file": draft["_path"],
+            "readback": str(path.with_suffix(".readback.json")),
+            "steps": [f"Create the draft with {tool}; never send.",
+                      "Read the draft back and write {draft_id, html, body_text, attachments:[{name}], is_draft, sent} to readback.",
+                      "Run: crow-mail-draft check <draft_file> --readback <readback>."]}, indent=2, ensure_ascii=False))
+        return {"pending": True, "request": str(path)}
+
+    def delete(self, draft_id, store_id=None):
+        raise Refused("connector backend: delete the draft from the hub session")
+
+
+def backend(cfg):
+    return {"graph": GraphBackend, "com": ComBackend, "connector": ConnectorBackend}[cfg["draft_backend"]](cfg)
+
+
+# --- commands -----------------------------------------------------------------
+
+def prepare(draft, cfg, chosen):
+    check_attachments(draft["attachments"], cfg)
+    recipients = chosen.recipients(draft) if draft["signature"] == "auto" else None
+    kind, signature = signature_lines(draft["signature"], recipients, cfg)
+    draft["_style"] = cfg.get("body_style")
+    html_body = compose(draft, signature)
+    expected = {"body_text": html_text(draft["html"]) if draft.get("html") else squash(str(draft["text"])),
+                "signature": signature, "signature_kind": kind,
+                "attachments": [Path(p).name for p in draft["attachments"]]}
+    return html_body, expected
+
+
+def record(cfg, name, payload):
+    directory = state_dir(cfg) / "drafts"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    (directory / f"{stamp}-{name}.json").write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+
+
+def result(chosen, readback, expected):
+    checks = run_checks(readback, expected)
+    return {"schema": crow_lib.SCRIPT_SCHEMA, "ok": all(c["ok"] for c in checks), "backend": chosen,
+            "draft_id": readback.get("draft_id"), "link": readback.get("link"), "signature": expected["signature_kind"],
+            "checks": checks, "uncertain": False}
+
+
+def cmd_save(path, cfg, chosen=None):
+    draft = load_draft(path)
+    draft["_path"] = str(Path(path).resolve())
+    chosen = chosen or backend(cfg)
+    html_body, expected = prepare(draft, cfg, chosen)
+    value = chosen.write(draft, html_body)
+    if value.get("pending"):
+        out = {"schema": crow_lib.SCRIPT_SCHEMA, "ok": True, "backend": chosen.name, "pending": True,
+               "request": value["request"], "draft_id": None, "checks": [], "uncertain": False}
+        Path(value["request"]).with_suffix(".expected.json").write_text(json.dumps(expected, ensure_ascii=False))
+        return out
+    out = result(chosen.name, value, expected)
+    record(cfg, chosen.name, {"draft_file": draft["_path"], "expected": expected, "result": out, "readback": value})
+    return out
+
+
+def cmd_check(path, readback_path, cfg):
+    draft = load_draft(path)
+    draft["_path"] = str(Path(path).resolve())
+    _, expected = prepare(draft, cfg, ConnectorBackend(cfg))
+    readback = json.loads(Path(readback_path).read_text())
+    return result(cfg["draft_backend"], readback, expected)
+
+
+def emit(out, as_json):
+    if as_json:
+        print(json.dumps(out, ensure_ascii=False))
+        return
+    if out.get("pending"):
+        print("queued for a connector session: " + out["request"])
+        return
+    print(("draft saved: " if out.get("draft_id") else "") + (out.get("link") or out.get("draft_id") or ""))
+    for c in out.get("checks", []):
+        print(("ok    " if c["ok"] else "FAIL  ") + c["name"] + ": " + c["detail"])
+
+
+def main(argv=None):
+    a = list(sys.argv[1:] if argv is None else argv)
+    as_json = "--json" in a
+    a = [x for x in a if x != "--json"]
+    config = None
+    if "--config" in a:
+        i = a.index("--config")
+        if i + 1 >= len(a):
+            print(__doc__, file=sys.stderr)
+            return 2
+        config = a[i + 1]
+        del a[i:i + 2]
+    if not a or a[0] not in ("save", "check", "probe", "inbox", "delete-draft"):
+        print(__doc__, file=sys.stderr)
+        return 2
+    try:
+        cfg = load_config(config)
+        if a[0] == "save" and len(a) == 2:
+            out = cmd_save(a[1], cfg)
+        elif a[0] == "check" and len(a) == 4 and a[2] == "--readback":
+            out = cmd_check(a[1], a[3], cfg)
+        elif a[0] == "delete-draft" and len(a) == 2:
+            out = backend(cfg).delete(a[1])
+            print(json.dumps(out, ensure_ascii=False))
+            return 0
+        elif a[0] in ("probe", "inbox"):
+            if cfg["draft_backend"] != "com":
+                raise Refused(f"{a[0]} needs draft_backend: com")
+            limit = int(a[a.index("--limit") + 1]) if "--limit" in a else 20
+            out = ComBackend(cfg).call(a[0], **({"limit": limit} if a[0] == "inbox" else {}))
+            print(json.dumps(out, ensure_ascii=False))
+            return 0
+        else:
+            print(__doc__, file=sys.stderr)
+            return 2
+    except Refused as e:
+        emit({"schema": crow_lib.SCRIPT_SCHEMA, "ok": False, "error": str(e), "uncertain": False}, True)
+        return 1
+    except BackendError as e:
+        emit({"schema": crow_lib.SCRIPT_SCHEMA, "ok": False, "error": str(e), "uncertain": e.uncertain}, True)
+        return 2
+    emit(out, as_json)
+    return 0 if out["ok"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
