@@ -1,5 +1,6 @@
 """crow-doctor: identity, accounts and stale worktrees, read only."""
 import json
+import shutil
 import subprocess
 
 from conftest import run
@@ -139,3 +140,42 @@ def test_doctor_flags_the_data_repo_gaps(hub, tmp_path):
     git("-C", str(local), "commit", "-q", "-m", "more")
     data = checks(run(hub, "crow-doctor", "--json"))["data"]
     assert data["level"] == "warn" and data["details"] == ["1 commit(s) not pushed"]
+
+
+def test_doctor_modules_does_not_fail_without_crow_yaml(hub):
+    out = run(hub, "crow-doctor", "--json")
+    mods = checks(out)["modules"]
+    assert mods["level"] in ("ok", "warn")
+    assert not any("crow.yaml" in d for d in mods["details"])
+
+
+def test_doctor_modules_fails_naming_file_and_key(hub):
+    home, _ = hub
+    (home / "crow.yaml").write_text(
+        "version: 1\nmodules:\n  billing: true\n  forge:\n    token: x\n  core-api: false\n")
+    out = run(hub, "crow-doctor", "--json")
+    assert out.returncode == 1
+    mods = checks(out)["modules"]
+    path = str(home / "crow.yaml")
+    assert mods["level"] == "fail"
+    assert any(d.startswith(f"{path}: modules.billing: unknown brick") for d in mods["details"])
+    assert any(d.startswith(f"{path}: modules.forge.token: unknown key") for d in mods["details"])
+    assert any(d.startswith(f"{path}: modules.nest: requires core-api") for d in mods["details"])
+
+
+def test_doctor_modules_fails_on_a_parse_error(hub):
+    home, _ = hub
+    (home / "local" / "crow.yaml").write_text("modules: [design\n")
+    mods = checks(run(hub, "crow-doctor", "--json"))["modules"]
+    assert mods["level"] == "fail" and ": (file): does not parse" in mods["details"][0]
+
+
+def test_doctor_modules_warns_on_a_missing_tool(hub, tmp_path):
+    only_git = tmp_path / "bin-git"
+    only_git.mkdir()
+    (only_git / "git").symlink_to(shutil.which("git"))
+    mods = checks(run(hub, "crow-doctor", "--json", env={"PATH": str(only_git)}))["modules"]
+    assert mods["level"] == "warn"
+    assert "core: cdx is not on PATH" in mods["details"]
+    assert "forge: none of glab, gh is on PATH" in mods["details"]
+    assert not any(d.startswith("git:") for d in mods["details"])

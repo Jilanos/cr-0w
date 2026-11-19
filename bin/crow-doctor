@@ -12,6 +12,8 @@ profiles   each claude `use` account with permanent memory: memory links into lo
            empty commit/PR attribution, crow skills/ linked (fix: crow-memory link <account>, copy settings from the default)
 data       the data repo (<CROW_HOME>/local): warn when it is not a git repo, has no remote, uncommitted changes
            or commits not pushed to its upstream (restore on a new machine needs it pushed)
+modules    crow.yaml (CROW_HOME root, else local/crow.yaml): fail on a parse error, unknown brick or key,
+           or an unmet `requires`, naming file and key; warn when a brick that is on misses a tool it needs
 
 Exit 1 when a check fails, 0 otherwise (warnings do not fail).
 """
@@ -206,6 +208,32 @@ def data_repo():
     return check("data", "ok", "data repo clean and pushed")
 
 
+def modules():
+    """crow.yaml errors fail, naming file and key. A brick that is on and misses its tools warns."""
+    sys.path.insert(0, HERE)
+    import crow_lib
+    try:
+        st = crow_lib.load_modules()
+        manifests = crow_lib.engine_manifests()
+    except Exception as e:  # noqa: BLE001 - a broken engine manifest is a finding, not a crash
+        return check("modules", "fail", f"engine manifests do not load ({type(e).__name__}: {e})")
+    on = sorted(n for n, m in st["modules"].items() if m["on"])
+    if st["errors"]:
+        return check("modules", "fail", f"{len(st['errors'])} problem(s) in crow.yaml",
+                     [f"{e['file']}: {e['key'] or '(file)'}: {e['error']}" for e in st["errors"]])
+    missing = []
+    for name in on:
+        need = (manifests[name].get("doctor") or {})
+        missing += [f"{name}: {t} is not on PATH" for t in need.get("needs") or [] if not shutil.which(t)]
+        any_of = need.get("needs_any") or []
+        if any_of and not any(shutil.which(t) for t in any_of):
+            missing.append(f"{name}: none of {', '.join(any_of)} is on PATH")
+    where = st["file"] if st["exists"] else "no crow.yaml, defaults"
+    if missing:
+        return check("modules", "warn", f"{len(missing)} tool(s) missing for bricks that are on", missing)
+    return check("modules", "ok", f"{len(on)} of {len(st['modules'])} bricks on ({where})")
+
+
 def main(argv):
     if argv not in ([], ["--json"]):
         sys.exit(__doc__)
@@ -213,7 +241,7 @@ def main(argv):
     reg = mod.load()
     acc = accounts_json()
     checks = [identity(reg), accounts(acc), quota((acc or {}).get("default")), profiles(acc),
-              stale_worktrees(reg, mod), data_repo()]
+              stale_worktrees(reg, mod), data_repo(), modules()]
     ok = all(c["level"] != "fail" for c in checks)
     if argv:
         json.dump({"ok": ok, "checks": checks}, sys.stdout)

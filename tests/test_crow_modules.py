@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 from conftest import BIN, run
 
 sys.path.insert(0, str(BIN))
@@ -33,6 +34,15 @@ def test_modules_returns_the_config_of_on_bricks(tmp_path):
     on = crow_lib.modules(str(tmp_path), str(ROOT))
     assert "design" not in on and "integration-shell" not in on
     assert on["nest"] == {"core_url": "http://127.0.0.1:8787"}
+
+
+def test_the_example_crow_yaml_loads_clean_and_matches_the_defaults(tmp_path):
+    text = (ROOT / "docs" / "crow.example.yaml").read_text()
+    (tmp_path / "crow.yaml").write_text(text)
+    st = crow_lib.load_modules(str(tmp_path), str(ROOT))
+    assert st["errors"] == []
+    assert all(m["on"] == m["default"] for m in st["modules"].values())
+    assert set(st["modules"]) - {"core"} == set(yaml.safe_load(text)["modules"])
 
 
 def test_errors_name_the_file_and_key():

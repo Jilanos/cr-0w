@@ -1,0 +1,25 @@
+# crow.yaml: which bricks are on, and their config (adr_002).
+# Copy to <CROW_HOME>/crow.yaml (or local/crow.yaml in a checkout). A missing file or key
+# keeps the default shown here. `crow modules` lists the result; `crow doctor` checks it.
+#
+# Each brick takes true, false, or a mapping with `on` and that brick's config keys.
+version: 1
+modules:
+  # core is always on.
+  git: true
+  forge:
+    on: true
+    hosts: {}               # forge name -> host; empty means the public hosts
+  vault: true
+  mail: true
+  team: true
+  afk: true
+  retro: true
+  releases: true
+  core-api: true
+  nest:
+    on: true                # requires core-api
+    core_url: http://127.0.0.1:8787
+  deck: true
+  design: false
+  integration-shell: false
