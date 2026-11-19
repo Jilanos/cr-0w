@@ -2,9 +2,9 @@
 > From version: 1.0.0
 > Schema version: 1.0
 > Status: In progress
-> Understanding: 90%
+> Understanding: 95%
 > Confidence: 85%
-> Progress: 0%
+> Progress: 90%
 > Complexity: Medium
 > Theme: Implementation delivery
 > Reminder: Update status/understanding/confidence/progress and linked request/backlog references when you edit this doc.
@@ -12,10 +12,10 @@
 > Indicators reviewed: 2026-11-19 18:10:58
 
 # AI Context
-- Summary: (unfilled: replace before this doc is used)
+- Summary: Build the pending items schema: parser and CLI in bin/, both formats read without loss, brief and Inbox followup rows, configurable purge of settled rows.
 - Keywords: pending, items, follow, ups, schema, read, brief, routines, inbox
-- Use when: (unfilled: replace before this doc is used)
-- Skip when: (unfilled: replace before this doc is used)
+- Use when: touching crow-pending, the brief's pending key or the settled-row purge.
+- Skip when: Inbox UI or the core Inbox kind model (item_223).
 
 # Definition of Done (DoD)
 - [ ] The backlog scope is implemented.
@@ -36,10 +36,13 @@
 - [ ] Run `python3 -m logics_manager flow finish task task_025_pending_items_and_follow_ups_as_one_schema_read_by_brief_routines_and_inbox.md` after implementation.
 
 # Validation
-- (no validation recorded yet)
+- `uv run --no-project --with pytest --with pyyaml --with markdown pytest -q tests/`: 764 passed, 4 failed (the same 4 fail on origin/main 1569e72, see the backlog item).
+- `bin/crow-check --fast`: green. `ruff check .`: clean. `go test ./internal/config/` (shared module fixtures): ok.
+- `bin/crow-pending check` on both real files: lossless, counts in the backlog AC traceability.
 
 # Report
-- Not started.
+- Commits e800aeb (task), 06e7975 (schema, parser, CLI, tests, config), 1fe0040 (brief and tidy), fe04fa9 (runbook, Open Threads due marker, brief skill).
+- Left: core Inbox adapter for `followup` rows, owned by item_223. Owner questions in the backlog item.
 
 # Links
 - Request: `req_064_paul_s_feedback_and_a_modular_public_crow`
